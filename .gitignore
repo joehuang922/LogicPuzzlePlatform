@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+*.egg
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Build outputs
+player/frontend/dist/
+player/api/dist/
+
+# CDK
+player/infra/cdk.out/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Test coverage
+coverage/
+htmlcov/
+.pytest_cache/

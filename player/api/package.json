@@ -1,0 +1,19 @@
+{
+  "name": "api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@aws-sdk/client-rds-data": "^3.600.0",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.140",
+    "@types/node": "^25.6.2",
+    "@types/uuid": "^10.0.0",
+    "typescript": "~5.5.0"
+  }
+}
