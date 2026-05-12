@@ -1,5 +1,15 @@
 from puzzle_parsers.base import PuzzleParser
+from puzzle_parsers.combo_sudoku.parser import ComboSudokuParser
 from puzzle_parsers.models import PuzzleData, PuzzleMetadata
-from puzzle_parsers.registry import ParserRegistry
+from puzzle_parsers.registry import ParserRegistry, registry
 
-__all__ = ["PuzzleParser", "PuzzleData", "PuzzleMetadata", "ParserRegistry"]
+registry.register(ComboSudokuParser)
+
+__all__ = [
+    "ComboSudokuParser",
+    "ParserRegistry",
+    "PuzzleData",
+    "PuzzleMetadata",
+    "PuzzleParser",
+    "registry",
+]

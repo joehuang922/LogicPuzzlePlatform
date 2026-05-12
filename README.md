@@ -7,6 +7,9 @@ A platform for parsing logic puzzle images into structured data and playing them
 ### Parsers (`parsers/`)
 Python package that converts scanned puzzle images into JSON representations. Extensible plugin system — add new puzzle types by implementing the `PuzzleParser` interface.
 
+**Supported puzzle types:**
+- **Combo-Sudoku** — overlapping 9x9 sudoku sub-boards arranged in a cross pattern
+
 ### Player (`player/`)
 AWS serverless web application for playing puzzles:
 - **frontend/** — React + TypeScript (Vite)
@@ -17,7 +20,9 @@ AWS serverless web application for playing puzzles:
 
 | Layer | Technology |
 |-------|-----------|
-| Parsers | Python 3.11+, Pydantic, Pillow |
+| Parsers | Python 3.10+, Pydantic, OpenCV, Pillow |
+| OCR (paid) | Claude Vision API (anthropic SDK) |
+| OCR (free) | EasyOCR |
 | Frontend | React 18, TypeScript, Vite |
 | API | AWS Lambda (Node.js/TypeScript) |
 | Database | Aurora Serverless v2 (MySQL) |
@@ -27,9 +32,30 @@ AWS serverless web application for playing puzzles:
 
 ### Parsers
 ```bash
+# Full install (both OCR backends)
+make install-parsers
+
+# Or manually:
 cd parsers
-pip install -e ".[dev]"
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e ".[all,dev]"
 pytest
+```
+
+### Parsing a Puzzle Image
+
+From the project root:
+```bash
+# Using Claude Vision (requires ANTHROPIC_API_KEY)
+make parse-combo-sudoku ARGS="docs/combo-sudoku/PXL_20260512_033536040.jpg --backend claude -o output.json"
+
+# Using EasyOCR (free, no API key)
+make parse-combo-sudoku ARGS="docs/combo-sudoku/PXL_20260512_033536040.jpg --backend easyocr -o output.json"
+```
+
+Or directly with the venv:
+```bash
+parsers/.venv/bin/python -m puzzle_parsers.combo_sudoku <image> --backend <claude|easyocr> -o output.json
 ```
 
 ### Player (Frontend)

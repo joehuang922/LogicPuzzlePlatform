@@ -10,13 +10,28 @@ requires-python = ">=3.10"
 dependencies = [
     "Pillow>=10.0",
     "pydantic>=2.0",
+    "opencv-python>=4.8",
+    "numpy>=1.24",
+    "scipy>=1.10",
 ]
 
 [project.optional-dependencies]
+claude = [
+    "anthropic>=0.39",
+]
+easyocr = [
+    "easyocr>=1.7",
+]
+all = [
+    "puzzle-parsers[claude,easyocr]",
+]
 dev = [
     "pytest>=7.0",
     "ruff>=0.4",
 ]
+
+[project.scripts]
+parse-combo-sudoku = "puzzle_parsers.combo_sudoku.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/puzzle_parsers"]
