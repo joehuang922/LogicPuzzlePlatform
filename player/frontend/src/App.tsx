@@ -1,6 +1,7 @@
 import { Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
 import Play from "./pages/Play";
+import Sandbox from "./pages/Sandbox";
 
 export default function App() {
   return (
@@ -9,6 +10,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/play/:id" element={<Play />} />
+        <Route path="/sandbox" element={<Sandbox />} />
       </Routes>
     </div>
   );

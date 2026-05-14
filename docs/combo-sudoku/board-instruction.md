@@ -2,7 +2,7 @@
 
 ## Overview
 
-This puzzle is a variation of traditional sudoku puzzle. A normal sudoku puzzle has a 9x9 board, subdivided into 3x3 square areas, where every area is a 3x3 square (thus 9 cells). The player has to fill up all cells with numbers from 1-9 with the constraints defined in the [rule](rule.md). In combo-sudoku, the basic set up is similar but the board might contains multiple sudoku 9x9 sub-boards, each one collide with others. As a result, numbers filled has to satisfy every sudoku sub-board's constraints.
+This puzzle is a variation of traditional sudoku puzzle. A normal sudoku puzzle has a 9x9 board, subdivided into 3x3 square areas, where every area is a 3x3 square called a room(thus 9 cells). The player has to fill up all cells with numbers from 1-9 with the constraints defined in the [rule](rule.md). In combo-sudoku, the basic set up is similar but the board might contains multiple sudoku 9x9 sub-boards, each one collide with others. As a result, numbers filled has to satisfy every sudoku sub-board's constraints.
 
 ## Schema
 
@@ -12,8 +12,6 @@ A JSON-representation of the combo-sudoku board can be as follow:
 
 ```json
 {
-    "room_width": 3,
-    "room_height": 3,
     "subboards": [
         {
             "x": 2,
@@ -81,7 +79,6 @@ A JSON-representation of the combo-sudoku board can be as follow:
 
 ### Explanation
 
-- `room_width` & `room_height`: This means the width and height of each room. Ordinary sudoku has 3 by 3 size.
 - `subboards`: Denoting each room's metadata.
 - `subboards.x` & `subboards.y`: This means the leftmost, topmost room's location within the combo-sudoku's board. Coordinate (0, 0) means the leftmost, topmost position.
 - `subboards.hint`: This means the existing number hints in the first place. 0 means no hint, and shall be filled by the players.
