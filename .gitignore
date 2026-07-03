@@ -20,6 +20,9 @@ player/api/dist/
 # CDK
 **/cdk.out/
 
+# Scratch outputs
+output.json
+
 # IDE
 .idea/
 .vscode/
