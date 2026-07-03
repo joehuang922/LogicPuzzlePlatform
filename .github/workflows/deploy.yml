@@ -1,0 +1,43 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: player/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: player
+
+      - name: Build API
+        run: npm run build
+        working-directory: player/api
+
+      - name: Build Frontend
+        run: npm run build
+        working-directory: player/frontend
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: CDK Deploy
+        run: npx cdk deploy --all --require-approval never
+        working-directory: player/infra

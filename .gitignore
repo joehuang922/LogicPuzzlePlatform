@@ -18,7 +18,7 @@ player/frontend/dist/
 player/api/dist/
 
 # CDK
-player/infra/cdk.out/
+**/cdk.out/
 
 # IDE
 .idea/

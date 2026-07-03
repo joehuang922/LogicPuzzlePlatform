@@ -72,3 +72,24 @@ cd player/infra
 npx cdk synth
 npx cdk deploy --all
 ```
+
+## CI/CD
+
+Pushes to `main` automatically deploy all stacks via GitHub Actions (`.github/workflows/deploy.yml`).
+
+### One-time Bootstrap Setup (admin)
+
+The OIDC provider and deploy IAM role are managed as a separate CDK app in `player/infra/bootstrap/`:
+
+```bash
+cd player/infra/bootstrap
+npm install
+npx cdk bootstrap          # if CDK hasn't been bootstrapped in this AWS account/region
+npx cdk deploy
+```
+
+After deployment, the stack outputs the role ARN. Configure GitHub:
+
+1. Go to repo **Settings > Secrets and variables > Actions**
+2. Add secret: `AWS_ROLE_ARN` → the role ARN from the stack output
+3. Add variable: `AWS_REGION` → your target region (e.g. `us-west-2`)

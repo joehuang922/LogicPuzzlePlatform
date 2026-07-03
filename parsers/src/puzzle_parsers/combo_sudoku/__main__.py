@@ -6,6 +6,7 @@ import json
 import sys
 from pathlib import Path
 
+from puzzle_parsers.combo_sudoku.grid_detector import CROSS_LAYOUT, DIAGONAL_LAYOUT
 from puzzle_parsers.combo_sudoku.ocr import ClaudeOcrBackend, EasyOcrBackend, OcrBackend
 from puzzle_parsers.combo_sudoku.parser import ComboSudokuParser
 
@@ -37,6 +38,12 @@ def main() -> None:
         help="OCR backend to use (default: claude)",
     )
     parser.add_argument(
+        "--layout",
+        choices=["cross", "diagonal", "auto"],
+        default="auto",
+        help="Layout type: cross, diagonal, or auto-detect (default: auto)",
+    )
+    parser.add_argument(
         "--debug",
         help="Directory to save intermediate debug images",
         default=None,
@@ -48,8 +55,11 @@ def main() -> None:
         print(f"Error: Image file not found: {image_path}", file=sys.stderr)
         sys.exit(1)
 
+    layout_map = {"cross": CROSS_LAYOUT, "diagonal": DIAGONAL_LAYOUT, "auto": None}
+    layout = layout_map[args.layout]
+
     backend = _make_backend(args.backend)
-    sudoku_parser = ComboSudokuParser(ocr_backend=backend)
+    sudoku_parser = ComboSudokuParser(ocr_backend=backend, layout=layout)
     board = sudoku_parser.parse_file(image_path, debug_dir=args.debug)
 
     output_json = json.dumps(board.model_dump(), indent=4)
