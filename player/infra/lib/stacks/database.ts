@@ -24,6 +24,7 @@ export class DatabaseStack extends cdk.Stack {
       serverlessV2MaxCapacity: 2,
       writer: rds.ClusterInstance.serverlessV2("writer"),
       vpc,
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
       enableDataApi: true,
     });
 
