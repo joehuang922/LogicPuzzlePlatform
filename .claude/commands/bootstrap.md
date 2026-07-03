@@ -1,5 +1,11 @@
 Deploy the admin bootstrap CDK stack (OIDC provider + IAM deploy role) to AWS using the "personal" profile.
 
+IMPORTANT: All AWS/CDK commands MUST be prefixed with:
+```
+AWS_CA_BUNDLE=~/.aws/nskp_config/netskope-cert-bundle.pem NODE_EXTRA_CA_CERTS=~/.aws/nskp_config/netskope-cert-bundle.pem
+```
+This overrides the global Netskope-only cert with the combined bundle needed for SSL verification.
+
 Follow these steps in order:
 
 1. Check if the bootstrap stack has been initialized by looking for `player/infra/bootstrap/node_modules/`. If it does NOT exist, run:
