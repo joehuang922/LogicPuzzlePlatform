@@ -17,7 +17,7 @@ export class DatabaseStack extends cdk.Stack {
 
     this.cluster = new rds.DatabaseCluster(this, "PuzzleCluster", {
       engine: rds.DatabaseClusterEngine.auroraMysql({
-        version: rds.AuroraMysqlEngineVersion.VER_3_05_2,
+        version: rds.AuroraMysqlEngineVersion.VER_3_08_1,
       }),
       defaultDatabaseName: this.databaseName,
       serverlessV2MinCapacity: 0.5,
