@@ -31,6 +31,8 @@ jobs:
       - name: Build Frontend
         run: npm run build
         working-directory: player/frontend
+        env:
+          VITE_API_URL: ${{ vars.API_URL }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
