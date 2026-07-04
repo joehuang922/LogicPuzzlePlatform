@@ -22,12 +22,12 @@ export function getPuzzle(id: string) {
 }
 
 export function createPuzzle(data: {
-  puzzleType: string;
-  metadata: Record<string, unknown>;
-  grid: Record<string, unknown>;
+  puzzleType: number;
+  difficulty: number;
+  canonRepr: Record<string, unknown>;
   title?: string;
-  constraints?: Record<string, unknown>[];
-  solution?: Record<string, unknown>;
+  width?: number;
+  height?: number;
 }) {
   return request<{ id: string }>("/puzzles", {
     method: "POST",

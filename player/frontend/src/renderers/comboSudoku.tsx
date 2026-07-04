@@ -2,11 +2,11 @@ import { PuzzleDefinition, PuzzleRenderer, PuzzleState, PlayerAction } from "../
 import ComboSudokuBoard from "../components/ComboSudokuBoard";
 
 export const comboSudokuRenderer: PuzzleRenderer = {
-  puzzleType: "combo-sudoku",
+  puzzleType: 2,
 
   render(puzzle: PuzzleDefinition, _state: PuzzleState) {
-    const grid = typeof puzzle.grid === "string" ? JSON.parse(puzzle.grid) : puzzle.grid;
-    return <ComboSudokuBoard subboards={grid.subboards} />;
+    const canonRepr = typeof puzzle.canonRepr === "string" ? JSON.parse(puzzle.canonRepr) : puzzle.canonRepr;
+    return <ComboSudokuBoard subboards={canonRepr.subboards} />;
   },
 
   handleInput(state: PuzzleState, _action: PlayerAction) {

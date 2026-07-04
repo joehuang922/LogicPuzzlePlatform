@@ -1,12 +1,12 @@
 import { PuzzleDefinition, PuzzleRenderer } from "../types/puzzle";
 
-const rendererRegistry = new Map<string, PuzzleRenderer>();
+const rendererRegistry = new Map<number, PuzzleRenderer>();
 
 export function registerRenderer(renderer: PuzzleRenderer) {
   rendererRegistry.set(renderer.puzzleType, renderer);
 }
 
-export function getRenderer(puzzleType: string): PuzzleRenderer | undefined {
+export function getRenderer(puzzleType: number): PuzzleRenderer | undefined {
   return rendererRegistry.get(puzzleType);
 }
 

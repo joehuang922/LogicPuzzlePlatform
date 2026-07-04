@@ -25,7 +25,12 @@ export default function Play() {
   return (
     <div>
       <Link to="/">&larr; Back to puzzles</Link>
-      <h2>{puzzle.title ?? `${puzzle.puzzleType} puzzle`}</h2>
+      <h2>{puzzle.title ?? "Untitled"}</h2>
+      <p>
+        Type: {puzzle.puzzleTypeName} | Difficulty: {puzzle.difficulty}/5
+        {puzzle.author && ` | Author: ${puzzle.author}`}
+        {puzzle.srcCollectionName && ` | Collection: ${puzzle.srcCollectionName}`}
+      </p>
       <PuzzleBoard puzzle={puzzle} />
     </div>
   );

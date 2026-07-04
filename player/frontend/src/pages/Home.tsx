@@ -37,7 +37,8 @@ export default function Home() {
         {puzzles.map((p) => (
           <li key={p.id}>
             <Link to={`/play/${p.id}`}>
-              {p.title ?? `${p.puzzleType} puzzle`}
+              {p.title ?? "Untitled"} — {p.puzzleTypeName} (difficulty: {p.difficulty}/5)
+              {p.srcCollectionName && ` — from: ${p.srcCollectionName}`}
             </Link>
           </li>
         ))}

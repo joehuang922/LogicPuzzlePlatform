@@ -26,23 +26,31 @@ function response(statusCode: number, body: unknown): APIGatewayProxyResult {
   };
 }
 
+const PUZZLE_SELECT = `
+  SELECT pq.*,
+         pt.name AS puzzle_type_name,
+         pc.name AS src_collection_name
+  FROM puzzle_questions pq
+  JOIN puzzle_types pt ON pq.puzzle_type = pt.id
+  LEFT JOIN puzzle_collections pc ON pq.src_collection = pc.id`;
+
 async function listPuzzles(
   event: APIGatewayProxyEvent
 ): Promise<APIGatewayProxyResult> {
   const puzzleType = event.queryStringParameters?.puzzleType;
 
-  let sql = "SELECT * FROM puzzle_questions";
+  let sql = PUZZLE_SELECT;
   const params: { name: string; value: any }[] = [];
 
   if (puzzleType) {
-    sql += " WHERE puzzle_type = :puzzleType";
+    sql += " WHERE pq.puzzle_type = :puzzleType";
     params.push({
       name: "puzzleType",
-      value: { stringValue: puzzleType },
+      value: { longValue: Number(puzzleType) },
     });
   }
 
-  sql += " ORDER BY created_at DESC";
+  sql += " ORDER BY pq.created_at DESC";
 
   const result = await executeStatement(sql, params);
   return response(200, { puzzles: result.records.map(mapRecord) });
@@ -55,7 +63,7 @@ async function getPuzzle(
   if (!id) return response(400, { error: "Missing puzzle id" });
 
   const result = await executeStatement(
-    "SELECT * FROM puzzle_questions WHERE id = :id",
+    `${PUZZLE_SELECT} WHERE pq.id = :id`,
     [{ name: "id", value: { stringValue: id } }]
   );
 
@@ -72,25 +80,27 @@ async function createPuzzle(
   if (!event.body) return response(400, { error: "Missing request body" });
 
   const body: CreatePuzzleRequest = JSON.parse(event.body);
-  if (!body.puzzleType || !body.metadata || !body.grid) {
+  if (!body.puzzleType || !body.canonRepr || body.difficulty == null) {
     return response(400, {
-      error: "puzzleType, metadata, and grid are required",
+      error: "puzzleType, difficulty, and canonRepr are required",
     });
   }
 
   const id = uuidv4();
 
   await executeStatement(
-    `INSERT INTO puzzle_questions (id, puzzle_type, title, metadata, grid, constraints, solution)
-     VALUES (:id, :puzzleType, :title, :metadata, :grid, :constraints, :solution)`,
+    `INSERT INTO puzzle_questions (id, puzzle_type, title, author, difficulty, width, height, canon_repr, src_collection)
+     VALUES (:id, :puzzleType, :title, :author, :difficulty, :width, :height, :canonRepr, :srcCollection)`,
     [
       { name: "id", value: { stringValue: id } },
-      { name: "puzzleType", value: { stringValue: body.puzzleType } },
+      { name: "puzzleType", value: { longValue: body.puzzleType } },
       { name: "title", value: body.title ? { stringValue: body.title } : { isNull: true } },
-      { name: "metadata", value: { stringValue: JSON.stringify(body.metadata) } },
-      { name: "grid", value: { stringValue: JSON.stringify(body.grid) } },
-      { name: "constraints", value: body.constraints ? { stringValue: JSON.stringify(body.constraints) } : { isNull: true } },
-      { name: "solution", value: body.solution ? { stringValue: JSON.stringify(body.solution) } : { isNull: true } },
+      { name: "author", value: body.author ? { stringValue: body.author } : { isNull: true } },
+      { name: "difficulty", value: { longValue: body.difficulty } },
+      { name: "width", value: body.width != null ? { longValue: body.width } : { isNull: true } },
+      { name: "height", value: body.height != null ? { longValue: body.height } : { isNull: true } },
+      { name: "canonRepr", value: { stringValue: JSON.stringify(body.canonRepr) } },
+      { name: "srcCollection", value: body.srcCollection != null ? { longValue: body.srcCollection } : { isNull: true } },
     ]
   );
 

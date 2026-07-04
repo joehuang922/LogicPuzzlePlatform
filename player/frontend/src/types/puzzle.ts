@@ -1,21 +1,16 @@
 import { ReactNode } from "react";
 
-export interface PuzzleMetadata {
-  title?: string;
-  source?: string;
-  difficulty?: string;
-  width?: number;
-  height?: number;
-  [key: string]: unknown;
-}
-
 export interface PuzzleDefinition {
   id: string;
-  puzzleType: string;
+  puzzleType: number;
+  puzzleTypeName: string;
   title: string | null;
-  metadata: PuzzleMetadata;
-  grid: Record<string, unknown>;
-  constraints: Record<string, unknown>[] | null;
+  author: string | null;
+  difficulty: number;
+  width: number | null;
+  height: number | null;
+  canonRepr: Record<string, unknown>;
+  srcCollectionName: string | null;
 }
 
 export interface PuzzleState {
@@ -31,7 +26,7 @@ export interface PlayerAction {
 }
 
 export interface PuzzleRenderer {
-  puzzleType: string;
+  puzzleType: number;
   render(puzzle: PuzzleDefinition, state: PuzzleState): ReactNode;
   handleInput(state: PuzzleState, action: PlayerAction): PuzzleState;
   checkSolution(state: PuzzleState, puzzle: PuzzleDefinition): boolean;

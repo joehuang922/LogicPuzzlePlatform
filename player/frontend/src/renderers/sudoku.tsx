@@ -2,11 +2,11 @@ import { PuzzleDefinition, PuzzleRenderer, PuzzleState, PlayerAction } from "../
 import SudokuBoard from "../components/SudokuBoard";
 
 export const sudokuRenderer: PuzzleRenderer = {
-  puzzleType: "sudoku",
+  puzzleType: 1,
 
   render(puzzle: PuzzleDefinition, _state: PuzzleState) {
-    const grid = typeof puzzle.grid === "string" ? JSON.parse(puzzle.grid) : puzzle.grid;
-    return <SudokuBoard hints={grid.hints} />;
+    const canonRepr = typeof puzzle.canonRepr === "string" ? JSON.parse(puzzle.canonRepr) : puzzle.canonRepr;
+    return <SudokuBoard hints={canonRepr.hints} />;
   },
 
   handleInput(state: PuzzleState, _action: PlayerAction) {
