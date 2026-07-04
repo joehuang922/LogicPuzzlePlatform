@@ -3,6 +3,18 @@ import { v4 as uuidv4 } from "uuid";
 import { executeStatement } from "../lib/db";
 import { CreatePuzzleRequest } from "../models/types";
 
+function toCamelCase(str: string): string {
+  return str.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+}
+
+function mapRecord(record: Record<string, unknown>): Record<string, unknown> {
+  const mapped: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(record)) {
+    mapped[toCamelCase(key)] = value;
+  }
+  return mapped;
+}
+
 function response(statusCode: number, body: unknown): APIGatewayProxyResult {
   return {
     statusCode,
@@ -33,7 +45,7 @@ async function listPuzzles(
   sql += " ORDER BY created_at DESC";
 
   const result = await executeStatement(sql, params);
-  return response(200, { puzzles: result.records });
+  return response(200, { puzzles: result.records.map(mapRecord) });
 }
 
 async function getPuzzle(
@@ -51,7 +63,7 @@ async function getPuzzle(
     return response(404, { error: "Puzzle not found" });
   }
 
-  return response(200, { puzzle: result.records[0] });
+  return response(200, { puzzle: mapRecord(result.records[0]) });
 }
 
 async function createPuzzle(
