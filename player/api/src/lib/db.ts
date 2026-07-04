@@ -11,8 +11,18 @@ const SECRET_ARN = process.env.SECRET_ARN!;
 const DATABASE_NAME = process.env.DATABASE_NAME!;
 
 export interface QueryResult {
-  records: Record<string, Field>[];
+  records: Record<string, unknown>[];
   numberOfRecordsUpdated: number;
+}
+
+function unwrapField(field: Field): unknown {
+  if (field.stringValue !== undefined) return field.stringValue;
+  if (field.longValue !== undefined) return field.longValue;
+  if (field.doubleValue !== undefined) return field.doubleValue;
+  if (field.booleanValue !== undefined) return field.booleanValue;
+  if (field.isNull) return null;
+  if (field.blobValue !== undefined) return field.blobValue;
+  return null;
 }
 
 export async function executeStatement(
@@ -35,13 +45,13 @@ export async function executeStatement(
 
   const columns =
     result.columnMetadata?.map((col) => col.name ?? "") ?? [];
-  const records: Record<string, Field>[] = [];
+  const records: Record<string, unknown>[] = [];
 
   if (result.records) {
     for (const row of result.records) {
-      const record: Record<string, Field> = {};
+      const record: Record<string, unknown> = {};
       for (let i = 0; i < columns.length; i++) {
-        record[columns[i]] = row[i];
+        record[columns[i]] = unwrapField(row[i]);
       }
       records.push(record);
     }
