@@ -13,6 +13,7 @@ dependencies = [
     "opencv-python>=4.8",
     "numpy>=1.24",
     "scipy>=1.10",
+    "jsonschema>=4.20",
 ]
 
 [project.optional-dependencies]

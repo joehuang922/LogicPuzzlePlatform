@@ -1,11 +1,12 @@
 import { PuzzleDefinition, PuzzleRenderer, PuzzleState, PlayerAction } from "../types/puzzle";
+import { SudokuCanon } from "../types/canon";
 import SudokuBoard from "../components/SudokuBoard";
 
 export const sudokuRenderer: PuzzleRenderer = {
   puzzleType: 1,
 
   render(puzzle: PuzzleDefinition, _state: PuzzleState) {
-    const canonRepr = typeof puzzle.canonRepr === "string" ? JSON.parse(puzzle.canonRepr) : puzzle.canonRepr;
+    const canonRepr = (typeof puzzle.canonRepr === "string" ? JSON.parse(puzzle.canonRepr) : puzzle.canonRepr) as SudokuCanon;
     return <SudokuBoard hints={canonRepr.hints} />;
   },
 

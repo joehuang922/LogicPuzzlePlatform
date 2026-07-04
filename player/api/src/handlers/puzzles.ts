@@ -1,6 +1,7 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { v4 as uuidv4 } from "uuid";
 import { executeStatement } from "../lib/db";
+import { validateCanon } from "../lib/schema";
 import { CreatePuzzleRequest } from "../models/types";
 
 function toCamelCase(str: string): string {
@@ -84,6 +85,13 @@ async function createPuzzle(
     return response(400, {
       error: "puzzleType, difficulty, and canonRepr are required",
     });
+  }
+
+  try {
+    validateCanon(body.puzzleType, body.canonRepr);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Invalid canonRepr";
+    return response(400, { error: message });
   }
 
   const id = uuidv4();

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "canon/combo-sudoku.json",
+  "title": "Combo Sudoku Canonical Representation",
+  "description": "Multiple overlapping 9x9 sudoku subboards",
+  "type": "object",
+  "required": ["subboards"],
+  "additionalProperties": false,
+  "properties": {
+    "room_width": { "type": "integer", "minimum": 1, "default": 3 },
+    "room_height": { "type": "integer", "minimum": 1, "default": 3 },
+    "subboards": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/SubBoard" },
+      "minItems": 1
+    }
+  },
+  "$defs": {
+    "SubBoard": {
+      "type": "object",
+      "required": ["x", "y", "hints"],
+      "additionalProperties": false,
+      "properties": {
+        "x": { "type": "integer", "minimum": 0 },
+        "y": { "type": "integer", "minimum": 0 },
+        "hints": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "type": "integer", "minimum": 0, "maximum": 9 },
+            "minItems": 9,
+            "maxItems": 9
+          },
+          "minItems": 9,
+          "maxItems": 9
+        }
+      }
+    }
+  }
+}
