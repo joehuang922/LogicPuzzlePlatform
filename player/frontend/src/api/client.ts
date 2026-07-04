@@ -38,3 +38,16 @@ export function createPuzzle(data: {
 export function deletePuzzle(id: string) {
   return request<null>(`/puzzles/${id}`, { method: "DELETE" });
 }
+
+export interface Collection {
+  id: number;
+  name: string;
+  publisher: string | null;
+  publishAt: string | null;
+  coverSrc: string | null;
+  puzzleCount: number;
+}
+
+export function listCollections() {
+  return request<{ collections: Collection[] }>("/collections");
+}

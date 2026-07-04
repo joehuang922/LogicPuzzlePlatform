@@ -29,6 +29,21 @@ export class ApiStack extends cdk.Stack {
     props.cluster.secret!.grantRead(puzzlesHandler);
     props.cluster.grantDataApiAccess(puzzlesHandler);
 
+    const collectionsHandler = new lambda.Function(this, "CollectionsHandler", {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: "handlers/collections.handler",
+      code: lambda.Code.fromAsset(path.join(__dirname, "../../../api/dist")),
+      environment: {
+        CLUSTER_ARN: props.cluster.clusterArn,
+        SECRET_ARN: props.cluster.secret!.secretArn,
+        DATABASE_NAME: props.databaseName,
+      },
+      timeout: cdk.Duration.seconds(10),
+    });
+
+    props.cluster.secret!.grantRead(collectionsHandler);
+    props.cluster.grantDataApiAccess(collectionsHandler);
+
     const api = new apigw.RestApi(this, "PuzzleApi", {
       restApiName: "Puzzle Platform API",
       defaultCorsPreflightOptions: {
@@ -45,6 +60,10 @@ export class ApiStack extends cdk.Stack {
     const singlePuzzle = puzzles.addResource("{id}");
     singlePuzzle.addMethod("GET", puzzleIntegration);
     singlePuzzle.addMethod("DELETE", puzzleIntegration);
+
+    const collections = api.root.addResource("collections");
+    const collectionIntegration = new apigw.LambdaIntegration(collectionsHandler);
+    collections.addMethod("GET", collectionIntegration);
 
     new cdk.CfnOutput(this, "ApiUrl", {
       value: api.url,

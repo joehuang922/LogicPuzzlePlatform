@@ -3,11 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "esbuild src/handlers/puzzles.ts --bundle --platform=node --target=node20 --outfile=dist/handlers/puzzles.js --external:@aws-sdk",
+    "build": "esbuild src/handlers/puzzles.ts src/handlers/collections.ts --bundle --platform=node --target=node20 --outdir=dist/handlers --external:@aws-sdk",
     "test": "jest"
   },
   "dependencies": {
     "@aws-sdk/client-rds-data": "^3.600.0",
+    "ajv": "^8.17.0",
     "uuid": "^10.0.0"
   },
   "devDependencies": {
