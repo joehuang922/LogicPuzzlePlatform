@@ -1,6 +1,4 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "canon/sudoku.json",
   "title": "Sudoku Canonical Representation",
   "description": "9x9 grid of hints where 0 = empty cell",
   "type": "object",
