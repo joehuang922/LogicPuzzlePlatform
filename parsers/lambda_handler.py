@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import traceback
 
 import cv2
@@ -13,7 +14,8 @@ from puzzle_parsers.combo_sudoku.ocr import EasyOcrBackend
 from puzzle_parsers.combo_sudoku.parser import ComboSudokuParser
 from puzzle_parsers.sudoku.parser import SudokuParser
 
-ocr = EasyOcrBackend()
+MODEL_DIR = os.environ.get("EASYOCR_MODULE_PATH", None)
+ocr = EasyOcrBackend(model_storage_directory=MODEL_DIR)
 
 PARSERS = {
     1: SudokuParser(ocr_backend=ocr),

@@ -194,10 +194,14 @@ class ClaudeOcrBackend(OcrBackend):
 class EasyOcrBackend(OcrBackend):
     """OCR backend using EasyOCR (free, local, no API key needed)."""
 
-    def __init__(self, languages: list[str] | None = None) -> None:
+    def __init__(self, languages: list[str] | None = None, model_storage_directory: str | None = None) -> None:
         import easyocr
 
-        self._reader = easyocr.Reader(languages or ["en"], gpu=False)
+        kwargs: dict = {"gpu": False}
+        if model_storage_directory:
+            kwargs["model_storage_directory"] = model_storage_directory
+            kwargs["download_enabled"] = False
+        self._reader = easyocr.Reader(languages or ["en"], **kwargs)
 
     @property
     def supports_full_image(self) -> bool:
