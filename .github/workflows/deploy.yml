@@ -43,5 +43,3 @@ jobs:
       - name: CDK Deploy
         run: npx cdk deploy --all --require-approval never
         working-directory: player/infra
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

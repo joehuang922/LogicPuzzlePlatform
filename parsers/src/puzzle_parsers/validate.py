@@ -5,7 +5,11 @@ from pathlib import Path
 
 from jsonschema import validate, ValidationError
 
-SCHEMA_DIR = Path(__file__).parents[3] / "schemas" / "canon"
+import os
+
+_PROJECT_SCHEMA_DIR = Path(__file__).parents[3] / "schemas" / "canon"
+_LAMBDA_SCHEMA_DIR = Path(os.environ.get("LAMBDA_TASK_ROOT", "")) / "schemas" / "canon"
+SCHEMA_DIR = _LAMBDA_SCHEMA_DIR if _LAMBDA_SCHEMA_DIR.exists() else _PROJECT_SCHEMA_DIR
 
 _schema_cache: dict[str, dict] = {}
 

@@ -1,0 +1,13 @@
+node_modules
+.git
+.venv
+venv
+__pycache__
+*.pyc
+player/frontend/dist
+player/api/dist
+player/infra/cdk.out
+parsers/tests
+parsers/docs
+.env
+.env.*
