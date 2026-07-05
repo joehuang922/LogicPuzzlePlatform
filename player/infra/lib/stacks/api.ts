@@ -89,7 +89,7 @@ export class ApiStack extends cdk.Stack {
       handler: "handlers/parser.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../../api/dist")),
       environment: {
-        ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ?? "",
+        GEMINI_API_KEY: process.env.GEMINI_API_KEY ?? "",
       },
       timeout: cdk.Duration.seconds(60),
       memorySize: 256,

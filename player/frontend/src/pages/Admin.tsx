@@ -119,6 +119,31 @@ function CollectionForm({ onCreated }: { onCreated: () => void }) {
 }
 
 const PARSE_TIMEOUT_MS = 60_000;
+const MAX_IMAGE_DIMENSION = 2048;
+
+function resizeImage(dataUrl: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width <= MAX_IMAGE_DIMENSION && height <= MAX_IMAGE_DIMENSION) {
+        resolve(dataUrl.split(",")[1]);
+        return;
+      }
+      const scale = MAX_IMAGE_DIMENSION / Math.max(width, height);
+      width = Math.round(width * scale);
+      height = Math.round(height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0, width, height);
+      const resized = canvas.toDataURL("image/jpeg", 0.85);
+      resolve(resized.split(",")[1]);
+    };
+    img.src = dataUrl;
+  });
+}
 
 function CanonPreview({ puzzleType, canonRepr }: { puzzleType: number; canonRepr: string }) {
   let parsed: Record<string, unknown>;
@@ -226,13 +251,13 @@ function QuestionForm({
       setParseError(null);
       setParsing(true);
 
-      const base64 = dataUrl.split(",")[1];
-
-      const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Parsing timed out (60s)")), PARSE_TIMEOUT_MS)
-      );
-
       try {
+        const base64 = await resizeImage(dataUrl);
+
+        const timeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Parsing timed out (60s)")), PARSE_TIMEOUT_MS)
+        );
+
         const res = await Promise.race([
           parseImage(base64, Number(puzzleType)),
           timeout,

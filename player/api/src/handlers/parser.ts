@@ -1,7 +1,13 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenAI } from "@google/genai";
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
+function getClient() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY environment variable is not set");
+  }
+  return new GoogleGenAI({ apiKey });
+}
 
 function response(statusCode: number, body: unknown): APIGatewayProxyResult {
   return {
@@ -61,30 +67,24 @@ export async function handler(
     return response(400, { error: "image (base64) and puzzleType are required" });
   }
 
-  const mediaType = image.startsWith("/9j/") ? "image/jpeg" : "image/png";
+  const mimeType = image.startsWith("/9j/") ? "image/jpeg" : "image/png";
 
   try {
-    const msg = await client.messages.create({
-      model: "claude-sonnet-4-6-20250514",
-      max_tokens: 4096,
-      messages: [
+    const client = getClient();
+    const result = await client.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [
         {
           role: "user",
-          content: [
-            {
-              type: "image",
-              source: { type: "base64", media_type: mediaType, data: image },
-            },
-            { type: "text", text: getPrompt(puzzleType) },
+          parts: [
+            { inlineData: { mimeType, data: image } },
+            { text: getPrompt(puzzleType) },
           ],
         },
       ],
     });
 
-    const text = msg.content
-      .filter((b) => b.type === "text")
-      .map((b) => (b as { type: "text"; text: string }).text)
-      .join("");
+    const text = result.text ?? "";
 
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
