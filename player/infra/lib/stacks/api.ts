@@ -84,13 +84,15 @@ export class ApiStack extends cdk.Stack {
     const puzzleTypes = api.root.addResource("puzzle-types");
     puzzleTypes.addMethod("GET", new apigw.LambdaIntegration(puzzleTypesHandler));
 
-    const parserHandler = new lambda.DockerImageFunction(this, "ParserHandler", {
-      code: lambda.DockerImageCode.fromImageAsset(
-        path.join(__dirname, "../../../../"),
-        { file: "parsers/Dockerfile" }
-      ),
-      timeout: cdk.Duration.seconds(120),
-      memorySize: 2048,
+    const parserHandler = new lambda.Function(this, "ParserHandler", {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: "handlers/parse.handler",
+      code: lambda.Code.fromAsset(path.join(__dirname, "../../../api/dist")),
+      environment: {
+        GEMINI_API_KEY: process.env.GEMINI_API_KEY ?? "",
+      },
+      timeout: cdk.Duration.seconds(29),
+      memorySize: 256,
     });
 
     const parse = api.root.addResource("parse");

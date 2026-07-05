@@ -1,45 +1,36 @@
 """AWS Lambda handler for puzzle image parsing (container-based)."""
 from __future__ import annotations
 
-import base64
 import json
 import os
-import traceback
+import sys
 
 HEADERS = {
     "Content-Type": "application/json",
     "Access-Control-Allow-Origin": "*",
 }
 
-_parsers = None
-
-
-def _get_parsers():
-    global _parsers
-    if _parsers is not None:
-        return _parsers
-
-    import cv2  # noqa: F401
-    import numpy as np  # noqa: F401
-    from PIL import Image  # noqa: F401
-
-    from puzzle_parsers.combo_sudoku.ocr import EasyOcrBackend
-    from puzzle_parsers.combo_sudoku.parser import ComboSudokuParser
-    from puzzle_parsers.sudoku.parser import SudokuParser
-
-    model_dir = os.environ.get("EASYOCR_MODULE_PATH", None)
-    ocr = EasyOcrBackend(model_storage_directory=model_dir)
-
-    _parsers = {
-        1: SudokuParser(ocr_backend=ocr),
-        2: ComboSudokuParser(ocr_backend=ocr),
-    }
-    return _parsers
-
 
 def handler(event, context):
+    # Health check — verify the container starts at all
+    if not event.get("body"):
+        return {
+            "statusCode": 200,
+            "headers": HEADERS,
+            "body": json.dumps({
+                "status": "ok",
+                "python": sys.version,
+                "cwd": os.getcwd(),
+                "task_root": os.environ.get("LAMBDA_TASK_ROOT", "?"),
+                "files": os.listdir(os.environ.get("LAMBDA_TASK_ROOT", "/var/task")),
+            }),
+        }
+
+    import base64
+    import traceback
+
     try:
-        body = json.loads(event.get("body") or "{}")
+        body = json.loads(event["body"])
         image_b64 = body.get("image")
         puzzle_type = body.get("puzzleType")
 
@@ -50,9 +41,21 @@ def handler(event, context):
                 "body": json.dumps({"error": "image (base64) and puzzleType are required"}),
             }
 
+        # Lazy import heavy deps
         import cv2
         import numpy as np
         from PIL import Image
+
+        from puzzle_parsers.combo_sudoku.ocr import EasyOcrBackend
+        from puzzle_parsers.combo_sudoku.parser import ComboSudokuParser
+        from puzzle_parsers.sudoku.parser import SudokuParser
+
+        model_dir = os.environ.get("EASYOCR_MODULE_PATH", None)
+        ocr = EasyOcrBackend(model_storage_directory=model_dir)
+        parsers = {
+            1: SudokuParser(ocr_backend=ocr),
+            2: ComboSudokuParser(ocr_backend=ocr),
+        }
 
         image_bytes = base64.b64decode(image_b64)
         np_arr = np.frombuffer(image_bytes, np.uint8)
@@ -67,7 +70,6 @@ def handler(event, context):
 
         pil_image = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
 
-        parsers = _get_parsers()
         parser = parsers.get(puzzle_type)
         if not parser:
             return {

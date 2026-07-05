@@ -344,7 +344,7 @@ function QuestionForm({
           {parsing && (
             <div style={{ marginTop: "0.5rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
               <span style={{ display: "inline-block", width: 16, height: 16, border: "2px solid #333", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-              <span style={{ fontSize: "0.85rem" }}>Parsing image with Claude Vision...</span>
+              <span style={{ fontSize: "0.85rem" }}>Parsing image with Gemini Vision...</span>
             </div>
           )}
           {parseError && <p style={{ ...errorStyle, marginTop: "0.5rem" }}>{parseError}</p>}
