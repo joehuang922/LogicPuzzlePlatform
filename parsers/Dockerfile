@@ -3,20 +3,23 @@ FROM public.ecr.aws/lambda/python:3.11
 # Copy schemas (needed for validation)
 COPY schemas/canon/ ${LAMBDA_TASK_ROOT}/schemas/canon/
 
-# Upgrade pip and pre-install packages that need binary wheels
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir "numpy<2.1" "Pillow>=10.0,<11"
+# Upgrade pip
+RUN pip install --no-cache-dir --upgrade pip
 
-# Install PyTorch CPU-only (much smaller, no CUDA)
-RUN pip install --no-cache-dir --no-build-isolation \
+# Install all scientific deps with pinned versions that have binary wheels
+# for manylinux x86_64 Python 3.11 (no compiler needed)
+RUN pip install --no-cache-dir \
+    "numpy>=1.24,<2.1" \
+    "Pillow>=10.0,<11" \
+    "scipy>=1.10,<1.14" \
+    "opencv-python-headless>=4.8,<4.11"
+
+# Install PyTorch CPU-only
+RUN pip install --no-cache-dir \
     torch torchvision --extra-index-url https://download.pytorch.org/whl/cpu
 
-# Install remaining dependencies
+# Install remaining deps (easyocr and others) — scipy/numpy/Pillow already satisfied
 RUN pip install --no-cache-dir \
-    opencv-python-headless>=4.8 \
-    numpy>=1.24 \
-    scipy>=1.10 \
-    Pillow>=10.0 \
     pydantic>=2.0 \
     jsonschema>=4.20 \
     easyocr>=1.7
