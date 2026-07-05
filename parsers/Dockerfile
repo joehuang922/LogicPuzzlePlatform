@@ -3,7 +3,14 @@ FROM public.ecr.aws/lambda/python:3.11
 # Copy schemas (needed for validation)
 COPY schemas/canon/ ${LAMBDA_TASK_ROOT}/schemas/canon/
 
-# Install dependencies directly (avoids needing hatchling build backend)
+# Upgrade pip to avoid metadata-generation issues
+RUN pip install --no-cache-dir --upgrade pip
+
+# Install PyTorch CPU-only first (much smaller, no CUDA)
+RUN pip install --no-cache-dir \
+    torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
+# Install remaining dependencies
 RUN pip install --no-cache-dir \
     opencv-python-headless>=4.8 \
     numpy>=1.24 \
