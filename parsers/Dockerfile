@@ -8,7 +8,7 @@ RUN pip install --no-cache-dir --upgrade pip
 
 # Install PyTorch CPU-only first (much smaller, no CUDA)
 RUN pip install --no-cache-dir \
-    torch torchvision --index-url https://download.pytorch.org/whl/cpu
+    torch torchvision --extra-index-url https://download.pytorch.org/whl/cpu
 
 # Install remaining dependencies
 RUN pip install --no-cache-dir \
