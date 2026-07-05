@@ -31,6 +31,8 @@ RUN mkdir -p ${EASYOCR_MODULE_PATH} && \
 
 # Copy parser source as a package
 COPY parsers/src/puzzle_parsers/ ${LAMBDA_TASK_ROOT}/puzzle_parsers/
+# Replace __init__.py with minimal version (avoid importing anthropic via registry)
+RUN echo "" > ${LAMBDA_TASK_ROOT}/puzzle_parsers/__init__.py
 
 # Copy the handler
 COPY parsers/lambda_handler.py ${LAMBDA_TASK_ROOT}/
