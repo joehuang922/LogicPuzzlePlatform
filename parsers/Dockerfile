@@ -3,10 +3,11 @@ FROM public.ecr.aws/lambda/python:3.11
 # Copy schemas (needed for validation)
 COPY schemas/canon/ ${LAMBDA_TASK_ROOT}/schemas/canon/
 
-# Upgrade pip to avoid metadata-generation issues
-RUN pip install --no-cache-dir --upgrade pip
+# Upgrade pip and install numpy first (avoid source builds)
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir "numpy<2.1"
 
-# Install PyTorch CPU-only first (much smaller, no CUDA)
+# Install PyTorch CPU-only (much smaller, no CUDA)
 RUN pip install --no-cache-dir \
     torch torchvision --extra-index-url https://download.pytorch.org/whl/cpu
 
