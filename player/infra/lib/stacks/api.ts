@@ -52,6 +52,20 @@ export class ApiStack extends cdk.Stack {
       },
     });
 
+    // Ensure 5xx/4xx Gateway errors include CORS headers so the browser can read them
+    api.addGatewayResponse("GatewayDefault5xx", {
+      type: apigw.ResponseType.DEFAULT_5XX,
+      responseHeaders: {
+        "Access-Control-Allow-Origin": "'*'",
+      },
+    });
+    api.addGatewayResponse("GatewayDefault4xx", {
+      type: apigw.ResponseType.DEFAULT_4XX,
+      responseHeaders: {
+        "Access-Control-Allow-Origin": "'*'",
+      },
+    });
+
     const puzzles = api.root.addResource("puzzles");
     const puzzleIntegration = new apigw.LambdaIntegration(puzzlesHandler);
     puzzles.addMethod("GET", puzzleIntegration);
@@ -84,7 +98,7 @@ export class ApiStack extends cdk.Stack {
     const puzzleTypes = api.root.addResource("puzzle-types");
     puzzleTypes.addMethod("GET", new apigw.LambdaIntegration(puzzleTypesHandler));
 
-    const parserHandler = new lambda.Function(this, "ParserHandler", {
+    const parserHandler = new lambda.Function(this, "GeminiParserHandler", {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "handlers/parse.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../../../api/dist")),
