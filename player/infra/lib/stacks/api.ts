@@ -64,6 +64,39 @@ export class ApiStack extends cdk.Stack {
     const collections = api.root.addResource("collections");
     const collectionIntegration = new apigw.LambdaIntegration(collectionsHandler);
     collections.addMethod("GET", collectionIntegration);
+    collections.addMethod("POST", collectionIntegration);
+
+    const puzzleTypesHandler = new lambda.Function(this, "PuzzleTypesHandler", {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: "handlers/puzzle-types.handler",
+      code: lambda.Code.fromAsset(path.join(__dirname, "../../../api/dist")),
+      environment: {
+        CLUSTER_ARN: props.cluster.clusterArn,
+        SECRET_ARN: props.cluster.secret!.secretArn,
+        DATABASE_NAME: props.databaseName,
+      },
+      timeout: cdk.Duration.seconds(10),
+    });
+
+    props.cluster.secret!.grantRead(puzzleTypesHandler);
+    props.cluster.grantDataApiAccess(puzzleTypesHandler);
+
+    const puzzleTypes = api.root.addResource("puzzle-types");
+    puzzleTypes.addMethod("GET", new apigw.LambdaIntegration(puzzleTypesHandler));
+
+    const parserHandler = new lambda.Function(this, "ParserHandler", {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: "handlers/parser.handler",
+      code: lambda.Code.fromAsset(path.join(__dirname, "../../../api/dist")),
+      environment: {
+        ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY ?? "",
+      },
+      timeout: cdk.Duration.seconds(60),
+      memorySize: 256,
+    });
+
+    const parse = api.root.addResource("parse");
+    parse.addMethod("POST", new apigw.LambdaIntegration(parserHandler));
 
     new cdk.CfnOutput(this, "ApiUrl", {
       value: api.url,

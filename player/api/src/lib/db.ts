@@ -13,6 +13,7 @@ const DATABASE_NAME = process.env.DATABASE_NAME!;
 export interface QueryResult {
   records: Record<string, unknown>[];
   numberOfRecordsUpdated: number;
+  generatedId: number | null;
 }
 
 function unwrapField(field: Field): unknown {
@@ -57,8 +58,11 @@ export async function executeStatement(
     }
   }
 
+  const generatedId = result.generatedFields?.[0]?.longValue ?? null;
+
   return {
     records,
     numberOfRecordsUpdated: result.numberOfRecordsUpdated ?? 0,
+    generatedId,
   };
 }

@@ -26,8 +26,10 @@ export function createPuzzle(data: {
   difficulty: number;
   canonRepr: Record<string, unknown>;
   title?: string;
+  author?: string;
   width?: number;
   height?: number;
+  srcCollection?: number;
 }) {
   return request<{ id: string }>("/puzzles", {
     method: "POST",
@@ -50,4 +52,33 @@ export interface Collection {
 
 export function listCollections() {
   return request<{ collections: Collection[] }>("/collections");
+}
+
+export function createCollection(data: {
+  name: string;
+  publisher?: string;
+  publishAt?: string;
+  coverSrc?: string;
+}) {
+  return request<{ id: number }>("/collections", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export interface PuzzleType {
+  id: number;
+  name: string;
+  rule: string;
+}
+
+export function listPuzzleTypes() {
+  return request<{ puzzleTypes: PuzzleType[] }>("/puzzle-types");
+}
+
+export function parseImage(image: string, puzzleType: number) {
+  return request<{ canon: Record<string, unknown> }>("/parse", {
+    method: "POST",
+    body: JSON.stringify({ image, puzzleType }),
+  });
 }
