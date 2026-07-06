@@ -28,19 +28,28 @@ jobs:
         run: npm run build
         working-directory: player/api
 
-      - name: Build Frontend
-        run: npm run build
-        working-directory: player/frontend
-        env:
-          VITE_API_URL: ${{ vars.API_URL }}
-          VITE_PARSER_URL: ${{ vars.PARSER_URL }}
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      - name: CDK Deploy
-        run: npx cdk deploy --all --require-approval never
+      - name: Deploy API & Database stacks
+        id: deploy-api
+        run: |
+          npx cdk deploy PuzzleDatabaseStack PuzzleApiStack --require-approval never --outputs-file cdk-outputs.json
+          echo "api_url=$(jq -r '.PuzzleApiStack.ApiUrl' cdk-outputs.json)" >> "$GITHUB_OUTPUT"
+          echo "parser_url=$(jq -r '.PuzzleApiStack.ParserUrl' cdk-outputs.json)" >> "$GITHUB_OUTPUT"
+          cat cdk-outputs.json
+        working-directory: player/infra
+
+      - name: Build Frontend
+        run: npm run build
+        working-directory: player/frontend
+        env:
+          VITE_API_URL: ${{ steps.deploy-api.outputs.api_url }}
+          VITE_PARSER_URL: ${{ steps.deploy-api.outputs.parser_url }}
+
+      - name: Deploy Frontend stack
+        run: npx cdk deploy PuzzleFrontendStack --require-approval never
         working-directory: player/infra
