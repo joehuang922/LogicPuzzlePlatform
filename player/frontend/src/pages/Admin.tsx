@@ -2,11 +2,14 @@ import { useEffect, useState, useRef, FormEvent } from "react";
 import {
   listPuzzleTypes,
   listCollections,
+  listPuzzles,
   createCollection,
   createPuzzle,
+  deletePuzzle,
   parseImage,
   PuzzleType,
   Collection,
+  Puzzle,
 } from "../api/client";
 import SudokuBoard from "../components/SudokuBoard";
 import ComboSudokuBoard from "../components/ComboSudokuBoard";
@@ -380,6 +383,173 @@ function QuestionForm({
   );
 }
 
+const DIFFICULTY_LABELS: Record<number, string> = {
+  1: "Very easy",
+  2: "Easy",
+  3: "Normal",
+  4: "Hard",
+  5: "Super hard",
+};
+
+function CollectionBrowser({
+  collections,
+  puzzleTypes,
+  onDataChanged,
+}: {
+  collections: Collection[];
+  puzzleTypes: PuzzleType[];
+  onDataChanged: () => void;
+}) {
+  const sorted = [...collections].sort((a, b) => {
+    if (!a.publishAt && !b.publishAt) return 0;
+    if (!a.publishAt) return 1;
+    if (!b.publishAt) return -1;
+    return b.publishAt.localeCompare(a.publishAt);
+  });
+
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [puzzles, setPuzzles] = useState<Puzzle[]>([]);
+  const [loadingPuzzles, setLoadingPuzzles] = useState(false);
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
+
+  const puzzleTypeMap = Object.fromEntries(puzzleTypes.map((pt) => [pt.id, pt.name]));
+
+  async function handleExpand(collectionId: number) {
+    if (expandedId === collectionId) {
+      setExpandedId(null);
+      return;
+    }
+    setExpandedId(collectionId);
+    setChecked(new Set());
+    setLoadingPuzzles(true);
+    try {
+      const res = await listPuzzles({ srcCollection: collectionId });
+      setPuzzles(res.puzzles);
+    } finally {
+      setLoadingPuzzles(false);
+    }
+  }
+
+  function toggleCheck(id: string) {
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function handleDelete() {
+    if (checked.size === 0) return;
+    const confirmed = window.confirm(`Delete ${checked.size} selected question(s)? This cannot be undone.`);
+    if (!confirmed) return;
+
+    setDeleting(true);
+    try {
+      await Promise.all([...checked].map((id) => deletePuzzle(id)));
+      setPuzzles((prev) => prev.filter((p) => !checked.has(p.id)));
+      setChecked(new Set());
+      onDataChanged();
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  const groupedByType = puzzles.reduce<Record<number, Puzzle[]>>((acc, p) => {
+    (acc[p.puzzleType] ??= []).push(p);
+    return acc;
+  }, {});
+
+  return (
+    <div style={cardStyle}>
+      <h2>Collections</h2>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem" }}>
+        <thead>
+          <tr style={{ borderBottom: "2px solid #ddd", textAlign: "left" }}>
+            <th style={{ padding: "0.5rem" }}>Name</th>
+            <th style={{ padding: "0.5rem" }}>Publisher</th>
+            <th style={{ padding: "0.5rem" }}>Publish Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((c) => (
+            <>
+              <tr
+                key={c.id}
+                onClick={() => handleExpand(c.id)}
+                style={{ cursor: "pointer", borderBottom: "1px solid #eee", background: expandedId === c.id ? "#f0f7ff" : undefined }}
+              >
+                <td style={{ padding: "0.5rem" }}>{c.name}</td>
+                <td style={{ padding: "0.5rem" }}>{c.publisher || "—"}</td>
+                <td style={{ padding: "0.5rem" }}>{c.publishAt || "—"}</td>
+              </tr>
+              {expandedId === c.id && (
+                <tr key={`${c.id}-detail`}>
+                  <td colSpan={3} style={{ padding: "0.75rem 0.5rem", background: "#fafafa" }}>
+                    {loadingPuzzles ? (
+                      <p style={{ margin: 0, fontSize: "0.85rem" }}>Loading questions...</p>
+                    ) : puzzles.length === 0 ? (
+                      <p style={{ margin: 0, fontSize: "0.85rem", color: "#666" }}>No questions in this collection.</p>
+                    ) : (
+                      <div>
+                        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.5rem" }}>
+                          <button
+                            onClick={handleDelete}
+                            disabled={checked.size === 0 || deleting}
+                            style={{ padding: "0.3rem 0.75rem", fontSize: "0.8rem", color: checked.size > 0 ? "#fff" : undefined, background: checked.size > 0 ? "#d33" : undefined, border: "1px solid #ccc", borderRadius: 4, cursor: checked.size > 0 ? "pointer" : "default" }}
+                          >
+                            {deleting ? "Deleting..." : `Delete (${checked.size})`}
+                          </button>
+                        </div>
+                        {Object.entries(groupedByType).map(([typeId, items]) => (
+                          <div key={typeId} style={{ marginBottom: "0.75rem" }}>
+                            <div style={{ fontWeight: "bold", fontSize: "0.85rem", padding: "0.3rem 0.5rem", background: "#e8e8e8", borderRadius: 4, marginBottom: "0.25rem" }}>
+                              {puzzleTypeMap[Number(typeId)] || `Type ${typeId}`} ({items.length})
+                            </div>
+                            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.8rem" }}>
+                              <thead>
+                                <tr style={{ borderBottom: "1px solid #ddd", textAlign: "left" }}>
+                                  <th style={{ padding: "0.3rem", width: 30 }}></th>
+                                  <th style={{ padding: "0.3rem" }}>Title</th>
+                                  <th style={{ padding: "0.3rem" }}>Difficulty</th>
+                                  <th style={{ padding: "0.3rem" }}>Author</th>
+                                  <th style={{ padding: "0.3rem" }}>Size</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {items.map((p) => (
+                                  <tr key={p.id} style={{ borderBottom: "1px solid #f0f0f0" }}>
+                                    <td style={{ padding: "0.3rem", textAlign: "center" }}>
+                                      <input
+                                        type="checkbox"
+                                        checked={checked.has(p.id)}
+                                        onChange={() => toggleCheck(p.id)}
+                                      />
+                                    </td>
+                                    <td style={{ padding: "0.3rem" }}>{p.title || "(none)"}</td>
+                                    <td style={{ padding: "0.3rem" }}>{DIFFICULTY_LABELS[p.difficulty] || String(p.difficulty)}</td>
+                                    <td style={{ padding: "0.3rem" }}>{p.author || "N/A"}</td>
+                                    <td style={{ padding: "0.3rem" }}>{p.width && p.height ? `${p.width} x ${p.height}` : "—"}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              )}
+            </>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function Admin() {
   const [puzzleTypes, setPuzzleTypes] = useState<PuzzleType[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -401,6 +571,7 @@ export default function Admin() {
   return (
     <div>
       <h1>Admin</h1>
+      <CollectionBrowser collections={collections} puzzleTypes={puzzleTypes} onDataChanged={loadData} />
       <CollectionForm onCreated={loadData} />
       <QuestionForm puzzleTypes={puzzleTypes} collections={collections} />
     </div>

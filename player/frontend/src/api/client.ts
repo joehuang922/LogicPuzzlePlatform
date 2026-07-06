@@ -17,9 +17,26 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
-export function listPuzzles(puzzleType?: string) {
-  const params = puzzleType ? `?puzzleType=${puzzleType}` : "";
-  return request<{ puzzles: unknown[] }>(`/puzzles${params}`);
+export interface Puzzle {
+  id: string;
+  puzzleType: number;
+  puzzleTypeName: string;
+  title: string | null;
+  author: string | null;
+  difficulty: number;
+  width: number | null;
+  height: number | null;
+  canonRepr: Record<string, unknown>;
+  srcCollection: number | null;
+  srcCollectionName: string | null;
+}
+
+export function listPuzzles(filters?: { puzzleType?: string; srcCollection?: number }) {
+  const params = new URLSearchParams();
+  if (filters?.puzzleType) params.set("puzzleType", filters.puzzleType);
+  if (filters?.srcCollection != null) params.set("srcCollection", String(filters.srcCollection));
+  const qs = params.toString();
+  return request<{ puzzles: Puzzle[] }>(`/puzzles${qs ? `?${qs}` : ""}`);
 }
 
 export function getPuzzle(id: string) {

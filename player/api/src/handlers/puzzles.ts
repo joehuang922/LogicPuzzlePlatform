@@ -39,16 +39,30 @@ async function listPuzzles(
   event: APIGatewayProxyEvent
 ): Promise<APIGatewayProxyResult> {
   const puzzleType = event.queryStringParameters?.puzzleType;
+  const srcCollection = event.queryStringParameters?.srcCollection;
 
   let sql = PUZZLE_SELECT;
   const params: { name: string; value: any }[] = [];
+  const conditions: string[] = [];
 
   if (puzzleType) {
-    sql += " WHERE pq.puzzle_type = :puzzleType";
+    conditions.push("pq.puzzle_type = :puzzleType");
     params.push({
       name: "puzzleType",
       value: { longValue: Number(puzzleType) },
     });
+  }
+
+  if (srcCollection) {
+    conditions.push("pq.src_collection = :srcCollection");
+    params.push({
+      name: "srcCollection",
+      value: { longValue: Number(srcCollection) },
+    });
+  }
+
+  if (conditions.length > 0) {
+    sql += " WHERE " + conditions.join(" AND ");
   }
 
   sql += " ORDER BY pq.created_at DESC";
