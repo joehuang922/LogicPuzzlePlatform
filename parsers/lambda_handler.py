@@ -12,9 +12,6 @@ print(f"LAMBDA_TASK_ROOT: {os.environ.get('LAMBDA_TASK_ROOT', '?')}")
 
 HEADERS = {
     "Content-Type": "application/json",
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
 }
 
 _ocr = None
@@ -53,10 +50,6 @@ def _init_parsers():
 def handler(event, context):
     print(f"=== Handler invoked: method={event.get('requestContext', {}).get('http', {}).get('method', event.get('httpMethod', '?'))} ===")
 
-    # Handle OPTIONS preflight for Function URL
-    method = event.get("requestContext", {}).get("http", {}).get("method", event.get("httpMethod", ""))
-    if method == "OPTIONS":
-        return {"statusCode": 200, "headers": HEADERS, "body": ""}
 
     # Health check (GET or empty body)
     if not event.get("body"):
