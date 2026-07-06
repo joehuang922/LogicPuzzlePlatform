@@ -37,6 +37,7 @@ jobs:
       - name: Deploy API & Database stacks
         id: deploy-api
         run: |
+          mkdir -p ../frontend/dist && echo '<!DOCTYPE html><html></html>' > ../frontend/dist/index.html
           npx cdk deploy PuzzleDatabaseStack PuzzleApiStack --require-approval never --outputs-file cdk-outputs.json
           echo "api_url=$(jq -r '.PuzzleApiStack.ApiUrl' cdk-outputs.json)" >> "$GITHUB_OUTPUT"
           echo "parser_url=$(jq -r '.PuzzleApiStack.ParserUrl' cdk-outputs.json)" >> "$GITHUB_OUTPUT"
