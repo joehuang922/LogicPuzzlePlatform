@@ -13,9 +13,10 @@ export function getRenderer(puzzleType: number): PuzzleRenderer | undefined {
 interface PuzzleBoardProps {
   puzzle: PuzzleDefinition;
   initialAnswer?: Record<string, unknown> | null;
+  onValuesChange?: (values: Record<string, number>) => void;
 }
 
-export default function PuzzleBoard({ puzzle, initialAnswer }: PuzzleBoardProps) {
+export default function PuzzleBoard({ puzzle, initialAnswer, onValuesChange }: PuzzleBoardProps) {
   const renderer = getRenderer(puzzle.puzzleType);
 
   if (!renderer) {
@@ -30,5 +31,5 @@ export default function PuzzleBoard({ puzzle, initialAnswer }: PuzzleBoardProps)
     );
   }
 
-  return <>{renderer.render(puzzle, { puzzleId: puzzle.id, playerGrid: initialAnswer ?? {}, startedAt: "", lastUpdatedAt: "" })}</>;
+  return <>{renderer.render(puzzle, { puzzleId: puzzle.id, playerGrid: initialAnswer ?? {}, startedAt: "", lastUpdatedAt: "" }, onValuesChange)}</>;
 }

@@ -118,6 +118,41 @@ async function getAttemptSnapshot(
   return response(200, { snapshot: mapRecord(result.records[0]) });
 }
 
+async function listAttemptSnapshots(
+  event: APIGatewayProxyEvent
+): Promise<APIGatewayProxyResult> {
+  const attemptId = event.pathParameters?.id;
+  if (!attemptId) return response(400, { error: "Missing attempt id" });
+
+  const result = await executeStatement(
+    `SELECT id, progress, elapsed_seconds, created_at
+     FROM player_attempt_snapshot
+     WHERE attempt = :attempt
+     ORDER BY created_at DESC`,
+    [{ name: "attempt", value: { stringValue: attemptId } }]
+  );
+
+  return response(200, { snapshots: result.records.map(mapRecord) });
+}
+
+async function getSnapshotById(
+  event: APIGatewayProxyEvent
+): Promise<APIGatewayProxyResult> {
+  const snapshotId = event.queryStringParameters?.snapshotId;
+  if (!snapshotId) return response(400, { error: "snapshotId query param required" });
+
+  const result = await executeStatement(
+    `SELECT * FROM player_attempt_snapshot WHERE id = :id`,
+    [{ name: "id", value: { stringValue: snapshotId } }]
+  );
+
+  if (result.records.length === 0) {
+    return response(404, { error: "Snapshot not found" });
+  }
+
+  return response(200, { snapshot: mapRecord(result.records[0]) });
+}
+
 async function saveSnapshot(
   event: APIGatewayProxyEvent
 ): Promise<APIGatewayProxyResult> {
@@ -171,6 +206,11 @@ export async function handler(
       return listAttempts(event);
     case method === "GET" && hasId && subResource === "snapshot":
       return getAttemptSnapshot(event);
+    case method === "GET" && hasId && subResource === "snapshots":
+      if (event.queryStringParameters?.snapshotId) {
+        return getSnapshotById(event);
+      }
+      return listAttemptSnapshots(event);
     case method === "POST" && hasId && subResource === "snapshot":
       return saveSnapshot(event);
     default:

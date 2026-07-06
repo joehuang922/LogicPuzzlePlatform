@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS player_attempt_snapshot (
   id              VARCHAR(36)  NOT NULL PRIMARY KEY,
   attempt         VARCHAR(36)  NOT NULL,
   current_answer  JSON         NOT NULL,
-  progress        FLOAT        NOT NULL,
+  progress        FLOAT        NOT NULL DEFAULT 0.0,
   elapsed_seconds INT          NOT NULL DEFAULT 0,
   finished        BOOLEAN      NOT NULL DEFAULT FALSE,
   created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,

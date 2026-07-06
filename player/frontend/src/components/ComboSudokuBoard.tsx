@@ -8,6 +8,8 @@ interface Subboard {
 
 interface ComboSudokuBoardProps {
   subboards: Subboard[];
+  initialUserValues?: Record<string, number>;
+  onValuesChange?: (values: Record<string, number>) => void;
 }
 
 const CELL_SIZE = 40;
@@ -18,15 +20,19 @@ const THICK = 3;
 const RADIAL_RADIUS = 44;
 const CIRCLE_RADIUS = 13;
 
-export default function ComboSudokuBoard({ subboards }: ComboSudokuBoardProps) {
+export default function ComboSudokuBoard({ subboards, initialUserValues, onValuesChange }: ComboSudokuBoardProps) {
   const totalCols = Math.max(...subboards.map((sb) => 3 * sb.x + 9));
   const totalRows = Math.max(...subboards.map((sb) => 3 * sb.y + 9));
   const width = totalCols * CELL_SIZE + PAD * 2;
   const height = totalRows * CELL_SIZE + PAD * 2;
 
-  const [userValues, setUserValues] = useState<Record<string, number>>({});
+  const [userValues, setUserValues] = useState<Record<string, number>>(initialUserValues ?? {});
   const [activeCell, setActiveCell] = useState<string | null>(null);
   const [hoveredCell, setHoveredCell] = useState<string | null>(null);
+
+  useEffect(() => {
+    onValuesChange?.(userValues);
+  }, [userValues, onValuesChange]);
 
   const hintCells = useMemo(() => {
     const set = new Set<string>();

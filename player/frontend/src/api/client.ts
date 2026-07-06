@@ -151,6 +151,21 @@ export function saveSnapshot(
   });
 }
 
+export interface SnapshotSummary {
+  id: string;
+  progress: number;
+  elapsedSeconds: number;
+  createdAt: string;
+}
+
+export function listSnapshots(attemptId: string) {
+  return request<{ snapshots: SnapshotSummary[] }>(`/attempts/${attemptId}/snapshots`);
+}
+
+export function getSnapshotById(attemptId: string, snapshotId: string) {
+  return request<{ snapshot: Snapshot }>(`/attempts/${attemptId}/snapshots?snapshotId=${encodeURIComponent(snapshotId)}`);
+}
+
 const PARSER_URL = import.meta.env.VITE_PARSER_URL ?? `${API_BASE}/parse`;
 
 export async function parseImage(image: string, puzzleType: number) {

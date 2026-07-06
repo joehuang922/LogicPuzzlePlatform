@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { listPuzzles, listCollections, listAttempts, createAttempt, getAttemptSnapshot, Collection, Attempt } from "../api/client";
 import { PuzzleDefinition } from "../types/puzzle";
 import { DIFFICULTY_LABELS } from "../constants";
+import { extractAnswer } from "../extractors";
 
 const HARDCODED_PLAYER_ID = 1;
 
@@ -44,10 +45,11 @@ export default function Home() {
 
   async function handleNewAttempt() {
     if (!selectedPuzzle) return;
+    const initialAnswer = extractAnswer(selectedPuzzle, {});
     const result = await createAttempt({
       player: HARDCODED_PLAYER_ID,
       question: selectedPuzzle.id,
-      initialAnswer: selectedPuzzle.canonRepr,
+      initialAnswer,
     });
     setShowChoiceDialog(false);
     navigate(`/play/${selectedPuzzle.id}?attempt=${result.attemptId}`);
