@@ -81,9 +81,21 @@ export function listPuzzleTypes() {
   return request<{ puzzleTypes: PuzzleType[] }>("/puzzle-types");
 }
 
-export function parseImage(image: string, puzzleType: number) {
-  return request<{ canon: Record<string, unknown> }>("/parse", {
+const PARSER_URL = import.meta.env.VITE_PARSER_URL ?? `${API_BASE}/parse`;
+
+export async function parseImage(image: string, puzzleType: number) {
+  const res = await fetch(PARSER_URL, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ image, puzzleType }),
   });
+  if (!res.ok) {
+    let detail = res.statusText;
+    try {
+      const body = await res.json();
+      if (body.error) detail = body.error;
+    } catch {}
+    throw new Error(`Parse error ${res.status}: ${detail}`);
+  }
+  return res.json() as Promise<{ canon: Record<string, unknown> }>;
 }

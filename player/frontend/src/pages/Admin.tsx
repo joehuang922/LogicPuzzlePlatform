@@ -118,7 +118,7 @@ function CollectionForm({ onCreated }: { onCreated: () => void }) {
   );
 }
 
-const PARSE_TIMEOUT_MS = 60_000;
+const PARSE_TIMEOUT_MS = 120_000;
 const MAX_IMAGE_DIMENSION = 2048;
 
 function resizeImage(dataUrl: string): Promise<string> {
@@ -255,7 +255,7 @@ function QuestionForm({
         const base64 = await resizeImage(dataUrl);
 
         const timeout = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Parsing timed out (60s)")), PARSE_TIMEOUT_MS)
+          setTimeout(() => reject(new Error("Parsing timed out (2min). Cold start may take a while — try again.")), PARSE_TIMEOUT_MS)
         );
 
         const res = await Promise.race([
@@ -344,7 +344,7 @@ function QuestionForm({
           {parsing && (
             <div style={{ marginTop: "0.5rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
               <span style={{ display: "inline-block", width: 16, height: 16, border: "2px solid #333", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-              <span style={{ fontSize: "0.85rem" }}>Parsing image with Gemini Vision...</span>
+              <span style={{ fontSize: "0.85rem" }}>Parsing image (first call may take ~30s for cold start)...</span>
             </div>
           )}
           {parseError && <p style={{ ...errorStyle, marginTop: "0.5rem" }}>{parseError}</p>}

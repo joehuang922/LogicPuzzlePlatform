@@ -33,6 +33,7 @@ jobs:
         working-directory: player/frontend
         env:
           VITE_API_URL: ${{ vars.API_URL }}
+          VITE_PARSER_URL: ${{ vars.PARSER_URL }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -43,5 +44,3 @@ jobs:
       - name: CDK Deploy
         run: npx cdk deploy --all --require-approval never
         working-directory: player/infra
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

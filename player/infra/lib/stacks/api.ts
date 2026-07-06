@@ -98,22 +98,31 @@ export class ApiStack extends cdk.Stack {
     const puzzleTypes = api.root.addResource("puzzle-types");
     puzzleTypes.addMethod("GET", new apigw.LambdaIntegration(puzzleTypesHandler));
 
-    const parserHandler = new lambda.Function(this, "GeminiParserHandler", {
-      runtime: lambda.Runtime.NODEJS_20_X,
-      handler: "handlers/parse.handler",
-      code: lambda.Code.fromAsset(path.join(__dirname, "../../../api/dist")),
-      environment: {
-        GEMINI_API_KEY: process.env.GEMINI_API_KEY ?? "",
-      },
-      timeout: cdk.Duration.seconds(29),
-      memorySize: 256,
+    // Parser Lambda — container-based with Function URL (bypasses APIGW 29s timeout)
+    const parserHandler = new lambda.DockerImageFunction(this, "OcrParserHandler", {
+      code: lambda.DockerImageCode.fromImageAsset(
+        path.join(__dirname, "../../../../"),
+        { file: "parsers/Dockerfile" }
+      ),
+      timeout: cdk.Duration.minutes(2),
+      memorySize: 2048,
     });
 
-    const parse = api.root.addResource("parse");
-    parse.addMethod("POST", new apigw.LambdaIntegration(parserHandler));
+    const parserUrl = parserHandler.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.NONE,
+      cors: {
+        allowedOrigins: ["*"],
+        allowedMethods: [lambda.HttpMethod.POST],
+        allowedHeaders: ["Content-Type"],
+      },
+    });
 
     new cdk.CfnOutput(this, "ApiUrl", {
       value: api.url,
+    });
+
+    new cdk.CfnOutput(this, "ParserUrl", {
+      value: parserUrl.url,
     });
   }
 }

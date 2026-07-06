@@ -7,7 +7,6 @@ COPY schemas/canon/ ${LAMBDA_TASK_ROOT}/schemas/canon/
 RUN pip install --no-cache-dir --upgrade pip
 
 # Install all scientific deps with pinned versions that have binary wheels
-# for manylinux x86_64 Python 3.11 (no compiler needed)
 RUN pip install --no-cache-dir \
     "numpy>=1.24,<2.1" \
     "Pillow>=10.0,<11" \
@@ -18,21 +17,30 @@ RUN pip install --no-cache-dir \
 RUN pip install --no-cache-dir \
     torch torchvision --extra-index-url https://download.pytorch.org/whl/cpu
 
-# Install remaining deps (easyocr and others) — scipy/numpy/Pillow already satisfied
+# Install remaining deps — scipy/numpy/Pillow already satisfied
 RUN pip install --no-cache-dir \
     pydantic>=2.0 \
     jsonschema>=4.20 \
     easyocr>=1.7
 
-# Pre-download EasyOCR models into a fixed path baked into the image
+# Pre-download EasyOCR models into the image
 ENV EASYOCR_MODULE_PATH=${LAMBDA_TASK_ROOT}/models
 RUN mkdir -p ${EASYOCR_MODULE_PATH} && \
     python -c "import easyocr; easyocr.Reader(['en'], gpu=False, download_enabled=True, model_storage_directory='${LAMBDA_TASK_ROOT}/models')"
 
-# Copy parser source as a package
+# Copy parser source
 COPY parsers/src/puzzle_parsers/ ${LAMBDA_TASK_ROOT}/puzzle_parsers/
-# Replace __init__.py with minimal version (avoid importing anthropic via registry)
-RUN echo "" > ${LAMBDA_TASK_ROOT}/puzzle_parsers/__init__.py
+
+# Blank ALL __init__.py files to prevent import chains that pull in anthropic
+RUN echo "" > ${LAMBDA_TASK_ROOT}/puzzle_parsers/__init__.py && \
+    echo "" > ${LAMBDA_TASK_ROOT}/puzzle_parsers/combo_sudoku/__init__.py && \
+    echo "" > ${LAMBDA_TASK_ROOT}/puzzle_parsers/sudoku/__init__.py
+
+# Patch out ClaudeOcrBackend import from sudoku/parser.py (it's not used in container)
+RUN sed -i 's/from puzzle_parsers.combo_sudoku.ocr import ClaudeOcrBackend, OcrBackend/from puzzle_parsers.combo_sudoku.ocr import OcrBackend/' \
+    ${LAMBDA_TASK_ROOT}/puzzle_parsers/sudoku/parser.py && \
+    sed -i 's/from puzzle_parsers.combo_sudoku.ocr import ClaudeOcrBackend, OcrBackend/from puzzle_parsers.combo_sudoku.ocr import OcrBackend/' \
+    ${LAMBDA_TASK_ROOT}/puzzle_parsers/combo_sudoku/parser.py
 
 # Copy the handler
 COPY parsers/lambda_handler.py ${LAMBDA_TASK_ROOT}/
