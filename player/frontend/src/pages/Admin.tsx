@@ -173,8 +173,6 @@ function QuestionForm({
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
   const [difficulty, setDifficulty] = useState("");
-  const [width, setWidth] = useState("");
-  const [height, setHeight] = useState("");
   const [canonRepr, setCanonRepr] = useState("");
   const [srcCollection, setSrcCollection] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -210,22 +208,31 @@ function QuestionForm({
 
     setSubmitting(true);
     try {
+      const canon = JSON.parse(canonRepr);
+      const typeId = Number(puzzleType);
+      let w: number | undefined;
+      let h: number | undefined;
+      if (typeId === 1) {
+        w = 9;
+        h = 9;
+      } else if (typeId === 2 && canon.subboards) {
+        w = Math.max(...canon.subboards.map((b: { x: number }) => b.x)) + 9;
+        h = Math.max(...canon.subboards.map((b: { y: number }) => b.y)) + 9;
+      }
       const res = await createPuzzle({
-        puzzleType: Number(puzzleType),
+        puzzleType: typeId,
         difficulty: Number(difficulty),
-        canonRepr: JSON.parse(canonRepr),
+        canonRepr: canon,
         title: title.trim() || undefined,
         author: author.trim() || undefined,
-        width: width ? Number(width) : undefined,
-        height: height ? Number(height) : undefined,
+        width: w,
+        height: h,
         ...(srcCollection ? { srcCollection: Number(srcCollection) } : {}),
       });
       setSuccess(`Puzzle created (id: ${res.id})`);
       setTitle("");
       setAuthor("");
       setCanonRepr("");
-      setWidth("");
-      setHeight("");
       setImagePreview(null);
       setErrors({});
     } catch (err: unknown) {
@@ -306,16 +313,6 @@ function QuestionForm({
         <div style={fieldStyle}>
           <label>Author</label>
           <input style={inputStyle} value={author} onChange={(e) => setAuthor(e.target.value)} />
-        </div>
-        <div style={{ display: "flex", gap: "1rem" }}>
-          <div style={{ ...fieldStyle, flex: 1 }}>
-            <label>Width</label>
-            <input style={inputStyle} type="number" value={width} onChange={(e) => setWidth(e.target.value)} />
-          </div>
-          <div style={{ ...fieldStyle, flex: 1 }}>
-            <label>Height</label>
-            <input style={inputStyle} type="number" value={height} onChange={(e) => setHeight(e.target.value)} />
-          </div>
         </div>
         <div style={fieldStyle}>
           <label>Source collection</label>
