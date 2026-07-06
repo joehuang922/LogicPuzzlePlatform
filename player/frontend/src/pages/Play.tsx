@@ -5,6 +5,7 @@ import { PuzzleDefinition } from "../types/puzzle";
 import PuzzleBoard from "../components/PuzzleBoard";
 import { DIFFICULTY_LABELS } from "../constants";
 import { extractAnswer } from "../extractors";
+import { useIsMobile } from "../hooks/useIsMobile";
 
 function formatElapsed(seconds: number): string {
   const h = Math.floor(seconds / 3600);
@@ -52,6 +53,7 @@ const Timer = forwardRef<TimerHandle, { startOffset?: number; resetKey?: number 
 );
 
 export default function Play() {
+  const isMobile = useIsMobile();
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -147,24 +149,26 @@ export default function Play() {
   return (
     <div>
       <Link to="/">&larr; Back to puzzles</Link>
-      <h2>{puzzle.title ?? "Untitled"}</h2>
-      <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "0.75rem" }}>
-        <p style={{ margin: 0 }}>
+      <h2 style={{ fontSize: isMobile ? "1.2rem" : undefined }}>{puzzle.title ?? "Untitled"}</h2>
+      <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "flex-start" : "center", gap: isMobile ? "0.5rem" : "1rem", marginBottom: "0.75rem" }}>
+        <p style={{ margin: 0, fontSize: isMobile ? "0.85rem" : undefined }}>
           Type: {puzzle.puzzleTypeName} | Difficulty: {DIFFICULTY_LABELS[puzzle.difficulty] || `${puzzle.difficulty}/5`}
           {puzzle.author && ` | Author: ${puzzle.author}`}
           {puzzle.srcCollectionName && ` | Collection: ${puzzle.srcCollectionName}`}
         </p>
-        <Timer ref={timerRef} startOffset={timerOffset} resetKey={boardKey} />
-        {attemptId && (
-          <div style={{ display: "flex", gap: "0.5rem" }}>
-            <button onClick={handleSave} disabled={saving} style={btnStyle}>
-              {saving ? "Saving..." : "Save"}
-            </button>
-            <button onClick={handleLoadClick} disabled={snapshotsLoading} style={btnStyle}>
-              {snapshotsLoading ? "Loading..." : "Load"}
-            </button>
-          </div>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <Timer ref={timerRef} startOffset={timerOffset} resetKey={boardKey} />
+          {attemptId && (
+            <>
+              <button onClick={handleSave} disabled={saving} style={btnStyle}>
+                {saving ? "Saving..." : "Save"}
+              </button>
+              <button onClick={handleLoadClick} disabled={snapshotsLoading} style={btnStyle}>
+                {snapshotsLoading ? "Loading..." : "Load"}
+              </button>
+            </>
+          )}
+        </div>
       </div>
       {toast && (
         <div style={toastStyle}>

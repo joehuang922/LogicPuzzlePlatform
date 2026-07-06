@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useIsMobile } from "../hooks/useIsMobile";
+import DigitBar from "./DigitBar";
 
 interface SudokuBoardProps {
   hints: number[][];
@@ -15,6 +17,7 @@ const RADIAL_RADIUS = 44;
 const CIRCLE_RADIUS = 13;
 
 export default function SudokuBoard({ hints, initialUserValues, onValuesChange }: SudokuBoardProps) {
+  const isMobile = useIsMobile();
   const width = 9 * CELL_SIZE + PAD * 2;
   const height = 9 * CELL_SIZE + PAD * 2;
 
@@ -144,206 +147,216 @@ export default function SudokuBoard({ hints, initialUserValues, onValuesChange }
   }
 
   return (
-    <svg
-      width={width}
-      height={height}
-      viewBox={`0 0 ${width} ${height}`}
-      style={{ border: "1px solid #ccc", outline: "none", userSelect: "none" }}
-      tabIndex={0}
-      onContextMenu={(e) => {
-        if (activeCell) {
-          e.preventDefault();
-          setActiveCell(null);
-        }
-      }}
-    >
-      <g transform={`translate(${PAD},${PAD})`}>
-        {/* Highlight layer */}
-        {highlightSource && (
-          <g>
-            <rect
-              x={parseInt(highlightSource.split(",")[0]) * CELL_SIZE + 1}
-              y={parseInt(highlightSource.split(",")[1]) * CELL_SIZE + 1}
-              width={CELL_SIZE - 2}
-              height={CELL_SIZE - 2}
-              fill="#bbdefb"
-              fillOpacity={0.6}
-            />
-            {Array.from(highlightedCells).map((key) => {
-              const [col, row] = key.split(",").map(Number);
+    <div style={{ maxWidth: width, width: "100%", paddingBottom: isMobile && activeCell ? 60 : 0 }}>
+      <svg
+        width="100%"
+        viewBox={`0 0 ${width} ${height}`}
+        style={{ border: "1px solid #ccc", outline: "none", userSelect: "none", display: "block" }}
+        tabIndex={0}
+        onContextMenu={(e) => {
+          if (activeCell) {
+            e.preventDefault();
+            setActiveCell(null);
+          }
+        }}
+      >
+        <g transform={`translate(${PAD},${PAD})`}>
+          {/* Highlight layer */}
+          {highlightSource && (
+            <g>
+              <rect
+                x={parseInt(highlightSource.split(",")[0]) * CELL_SIZE + 1}
+                y={parseInt(highlightSource.split(",")[1]) * CELL_SIZE + 1}
+                width={CELL_SIZE - 2}
+                height={CELL_SIZE - 2}
+                fill="#bbdefb"
+                fillOpacity={0.6}
+              />
+              {Array.from(highlightedCells).map((key) => {
+                const [col, row] = key.split(",").map(Number);
+                return (
+                  <rect
+                    key={`hl-${key}`}
+                    x={col * CELL_SIZE + 1}
+                    y={row * CELL_SIZE + 1}
+                    width={CELL_SIZE - 2}
+                    height={CELL_SIZE - 2}
+                    fill="#e3f2fd"
+                    fillOpacity={0.5}
+                  />
+                );
+              })}
+            </g>
+          )}
+
+          {/* Grid lines */}
+          {gridLines}
+
+          {/* Hint values */}
+          {hints.map((row, rowIdx) =>
+            row.map((val, colIdx) => {
+              if (val <= 0) return null;
               return (
-                <rect
-                  key={`hl-${key}`}
-                  x={col * CELL_SIZE + 1}
-                  y={row * CELL_SIZE + 1}
-                  width={CELL_SIZE - 2}
-                  height={CELL_SIZE - 2}
-                  fill="#e3f2fd"
-                  fillOpacity={0.5}
-                />
+                <text
+                  key={`hint-${rowIdx}-${colIdx}`}
+                  x={colIdx * CELL_SIZE + CELL_SIZE / 2}
+                  y={rowIdx * CELL_SIZE + CELL_SIZE / 2}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fontSize={20}
+                  fontFamily="sans-serif"
+                  pointerEvents="none"
+                >
+                  {val}
+                </text>
               );
-            })}
-          </g>
-        )}
+            })
+          )}
 
-        {/* Grid lines */}
-        {gridLines}
+          {/* Click targets */}
+          {Array.from({ length: 81 }, (_, i) => {
+            const col = i % 9;
+            const row = Math.floor(i / 9);
+            const key = `${col},${row}`;
+            const isHint = hintCells.has(key);
+            return (
+              <rect
+                key={`click-${key}`}
+                x={col * CELL_SIZE}
+                y={row * CELL_SIZE}
+                width={CELL_SIZE}
+                height={CELL_SIZE}
+                fill="transparent"
+                style={{ cursor: isHint ? "default" : "pointer" }}
+                onMouseEnter={() => { if (!activeCell) setHoveredCell(key); }}
+                onMouseLeave={() => { if (!activeCell) setHoveredCell(null); }}
+                onClick={() => handleCellClick(key)}
+              />
+            );
+          })}
 
-        {/* Hint values */}
-        {hints.map((row, rowIdx) =>
-          row.map((val, colIdx) => {
-            if (val <= 0) return null;
+          {/* User-entered values */}
+          {Object.entries(userValues).map(([key, val]) => {
+            if (activeCell === key) return null;
+            const [col, row] = key.split(",").map(Number);
             return (
               <text
-                key={`hint-${rowIdx}-${colIdx}`}
-                x={colIdx * CELL_SIZE + CELL_SIZE / 2}
-                y={rowIdx * CELL_SIZE + CELL_SIZE / 2}
+                key={`uv-${key}`}
+                x={col * CELL_SIZE + CELL_SIZE / 2}
+                y={row * CELL_SIZE + CELL_SIZE / 2}
                 textAnchor="middle"
                 dominantBaseline="central"
                 fontSize={20}
                 fontFamily="sans-serif"
+                fill="#888"
                 pointerEvents="none"
               >
                 {val}
               </text>
             );
-          })
-        )}
+          })}
 
-        {/* Click targets */}
-        {Array.from({ length: 81 }, (_, i) => {
-          const col = i % 9;
-          const row = Math.floor(i / 9);
-          const key = `${col},${row}`;
-          const isHint = hintCells.has(key);
-          return (
-            <rect
-              key={`click-${key}`}
-              x={col * CELL_SIZE}
-              y={row * CELL_SIZE}
-              width={CELL_SIZE}
-              height={CELL_SIZE}
-              fill="transparent"
-              style={{ cursor: isHint ? "default" : "pointer" }}
-              onMouseEnter={() => { if (!activeCell) setHoveredCell(key); }}
-              onMouseLeave={() => { if (!activeCell) setHoveredCell(null); }}
-              onClick={() => handleCellClick(key)}
-            />
-          );
-        })}
+          {/* Radial input menu (desktop only) */}
+          {activeCell && !isMobile && (() => {
+            const [col, row] = activeCell.split(",").map(Number);
+            const cx = col * CELL_SIZE + CELL_SIZE / 2;
+            const cy = row * CELL_SIZE + CELL_SIZE / 2;
+            return (
+              <g>
+                <rect
+                  x={-PAD}
+                  y={-PAD}
+                  width={width}
+                  height={height}
+                  fill="transparent"
+                  onClick={() => setActiveCell(null)}
+                  onContextMenu={(e) => { e.preventDefault(); setActiveCell(null); }}
+                />
+                <circle
+                  cx={cx}
+                  cy={cy}
+                  r={RADIAL_RADIUS + CIRCLE_RADIUS + 4}
+                  fill="white"
+                  fillOpacity={0.9}
+                  stroke="#ccc"
+                  strokeWidth={1}
+                />
+                {radialPositions.map((pos, i) => {
+                  const isErase = i === 0;
+                  const digit = i;
+                  return (
+                    <g
+                      key={`rad-${i}`}
+                      style={{ cursor: "pointer" }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (isErase) {
+                          clearValue();
+                        } else {
+                          enterValue(digit);
+                        }
+                      }}
+                    >
+                      <circle
+                        cx={cx + pos.x}
+                        cy={cy + pos.y}
+                        r={CIRCLE_RADIUS}
+                        fill="white"
+                        stroke={isErase ? "#c62828" : "#666"}
+                        strokeWidth={1.5}
+                      />
+                      {isErase ? (
+                        <g pointerEvents="none">
+                          <line
+                            x1={cx + pos.x - 5}
+                            y1={cy + pos.y - 5}
+                            x2={cx + pos.x + 5}
+                            y2={cy + pos.y + 5}
+                            stroke="#c62828"
+                            strokeWidth={2}
+                            strokeLinecap="round"
+                          />
+                          <line
+                            x1={cx + pos.x + 5}
+                            y1={cy + pos.y - 5}
+                            x2={cx + pos.x - 5}
+                            y2={cy + pos.y + 5}
+                            stroke="#c62828"
+                            strokeWidth={2}
+                            strokeLinecap="round"
+                          />
+                        </g>
+                      ) : (
+                        <text
+                          x={cx + pos.x}
+                          y={cy + pos.y}
+                          textAnchor="middle"
+                          dominantBaseline="central"
+                          fontSize={14}
+                          fontFamily="sans-serif"
+                          fill="#444"
+                          pointerEvents="none"
+                        >
+                          {digit}
+                        </text>
+                      )}
+                    </g>
+                  );
+                })}
+              </g>
+            );
+          })()}
+        </g>
+      </svg>
 
-        {/* User-entered values */}
-        {Object.entries(userValues).map(([key, val]) => {
-          if (activeCell === key) return null;
-          const [col, row] = key.split(",").map(Number);
-          return (
-            <text
-              key={`uv-${key}`}
-              x={col * CELL_SIZE + CELL_SIZE / 2}
-              y={row * CELL_SIZE + CELL_SIZE / 2}
-              textAnchor="middle"
-              dominantBaseline="central"
-              fontSize={20}
-              fontFamily="sans-serif"
-              fill="#888"
-              pointerEvents="none"
-            >
-              {val}
-            </text>
-          );
-        })}
-
-        {/* Radial input menu */}
-        {activeCell && (() => {
-          const [col, row] = activeCell.split(",").map(Number);
-          const cx = col * CELL_SIZE + CELL_SIZE / 2;
-          const cy = row * CELL_SIZE + CELL_SIZE / 2;
-          return (
-            <g>
-              <rect
-                x={-PAD}
-                y={-PAD}
-                width={width}
-                height={height}
-                fill="transparent"
-                onClick={() => setActiveCell(null)}
-                onContextMenu={(e) => { e.preventDefault(); setActiveCell(null); }}
-              />
-              <circle
-                cx={cx}
-                cy={cy}
-                r={RADIAL_RADIUS + CIRCLE_RADIUS + 4}
-                fill="white"
-                fillOpacity={0.9}
-                stroke="#ccc"
-                strokeWidth={1}
-              />
-              {radialPositions.map((pos, i) => {
-                const isErase = i === 0;
-                const digit = i;
-                return (
-                  <g
-                    key={`rad-${i}`}
-                    style={{ cursor: "pointer" }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (isErase) {
-                        clearValue();
-                      } else {
-                        enterValue(digit);
-                      }
-                    }}
-                  >
-                    <circle
-                      cx={cx + pos.x}
-                      cy={cy + pos.y}
-                      r={CIRCLE_RADIUS}
-                      fill="white"
-                      stroke={isErase ? "#c62828" : "#666"}
-                      strokeWidth={1.5}
-                    />
-                    {isErase ? (
-                      <g pointerEvents="none">
-                        <line
-                          x1={cx + pos.x - 5}
-                          y1={cy + pos.y - 5}
-                          x2={cx + pos.x + 5}
-                          y2={cy + pos.y + 5}
-                          stroke="#c62828"
-                          strokeWidth={2}
-                          strokeLinecap="round"
-                        />
-                        <line
-                          x1={cx + pos.x + 5}
-                          y1={cy + pos.y - 5}
-                          x2={cx + pos.x - 5}
-                          y2={cy + pos.y + 5}
-                          stroke="#c62828"
-                          strokeWidth={2}
-                          strokeLinecap="round"
-                        />
-                      </g>
-                    ) : (
-                      <text
-                        x={cx + pos.x}
-                        y={cy + pos.y}
-                        textAnchor="middle"
-                        dominantBaseline="central"
-                        fontSize={14}
-                        fontFamily="sans-serif"
-                        fill="#444"
-                        pointerEvents="none"
-                      >
-                        {digit}
-                      </text>
-                    )}
-                  </g>
-                );
-              })}
-            </g>
-          );
-        })()}
-      </g>
-    </svg>
+      {/* Mobile digit bar */}
+      {activeCell && isMobile && (
+        <DigitBar
+          onDigit={enterValue}
+          onClear={clearValue}
+          onDismiss={() => setActiveCell(null)}
+        />
+      )}
+    </div>
   );
 }
