@@ -13,14 +13,7 @@ import {
 } from "../api/client";
 import SudokuBoard from "../components/SudokuBoard";
 import ComboSudokuBoard from "../components/ComboSudokuBoard";
-
-const DIFFICULTY_OPTIONS = [
-  { value: 1, label: "Very easy" },
-  { value: 2, label: "Easy" },
-  { value: 3, label: "Normal" },
-  { value: 4, label: "Hard" },
-  { value: 5, label: "Super hard" },
-];
+import { DIFFICULTY_OPTIONS, DIFFICULTY_LABELS } from "../constants";
 
 const fieldStyle: React.CSSProperties = {
   display: "flex",
@@ -382,14 +375,6 @@ function QuestionForm({
     </div>
   );
 }
-
-const DIFFICULTY_LABELS: Record<number, string> = {
-  1: "Very easy",
-  2: "Easy",
-  3: "Normal",
-  4: "Hard",
-  5: "Super hard",
-};
 
 function CollectionBrowser({
   collections,

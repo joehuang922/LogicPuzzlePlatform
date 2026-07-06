@@ -12,9 +12,10 @@ export function getRenderer(puzzleType: number): PuzzleRenderer | undefined {
 
 interface PuzzleBoardProps {
   puzzle: PuzzleDefinition;
+  initialAnswer?: Record<string, unknown> | null;
 }
 
-export default function PuzzleBoard({ puzzle }: PuzzleBoardProps) {
+export default function PuzzleBoard({ puzzle, initialAnswer }: PuzzleBoardProps) {
   const renderer = getRenderer(puzzle.puzzleType);
 
   if (!renderer) {
@@ -29,5 +30,5 @@ export default function PuzzleBoard({ puzzle }: PuzzleBoardProps) {
     );
   }
 
-  return <>{renderer.render(puzzle, { puzzleId: puzzle.id, playerGrid: {}, startedAt: "", lastUpdatedAt: "" })}</>;
+  return <>{renderer.render(puzzle, { puzzleId: puzzle.id, playerGrid: initialAnswer ?? {}, startedAt: "", lastUpdatedAt: "" })}</>;
 }

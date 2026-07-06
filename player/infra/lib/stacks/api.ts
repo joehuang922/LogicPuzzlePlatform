@@ -98,6 +98,31 @@ export class ApiStack extends cdk.Stack {
     const puzzleTypes = api.root.addResource("puzzle-types");
     puzzleTypes.addMethod("GET", new apigw.LambdaIntegration(puzzleTypesHandler));
 
+    const attemptsHandler = new lambda.Function(this, "AttemptsHandler", {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: "handlers/attempts.handler",
+      code: lambda.Code.fromAsset(path.join(__dirname, "../../../api/dist")),
+      environment: {
+        CLUSTER_ARN: props.cluster.clusterArn,
+        SECRET_ARN: props.cluster.secret!.secretArn,
+        DATABASE_NAME: props.databaseName,
+      },
+      timeout: cdk.Duration.seconds(10),
+    });
+
+    props.cluster.secret!.grantRead(attemptsHandler);
+    props.cluster.grantDataApiAccess(attemptsHandler);
+
+    const attempts = api.root.addResource("attempts");
+    const attemptIntegration = new apigw.LambdaIntegration(attemptsHandler);
+    attempts.addMethod("GET", attemptIntegration);
+    attempts.addMethod("POST", attemptIntegration);
+
+    const singleAttempt = attempts.addResource("{id}");
+    const attemptSubResource = singleAttempt.addResource("{proxy}");
+    attemptSubResource.addMethod("GET", attemptIntegration);
+    attemptSubResource.addMethod("POST", attemptIntegration);
+
     // Parser Lambda — container-based with Function URL (bypasses APIGW 29s timeout)
     const parserHandler = new lambda.DockerImageFunction(this, "OcrParserHandler", {
       code: lambda.DockerImageCode.fromImageAsset(

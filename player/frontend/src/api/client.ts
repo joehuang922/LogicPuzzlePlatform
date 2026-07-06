@@ -98,6 +98,59 @@ export function listPuzzleTypes() {
   return request<{ puzzleTypes: PuzzleType[] }>("/puzzle-types");
 }
 
+export interface Attempt {
+  id: string;
+  createdAt: string;
+  latestProgress: number;
+  latestElapsedSeconds: number;
+}
+
+export interface Snapshot {
+  id: string;
+  attempt: string;
+  currentAnswer: string;
+  progress: number;
+  elapsedSeconds: number;
+  finished: boolean;
+  createdAt: string;
+}
+
+export function createAttempt(data: {
+  player: number;
+  question: string;
+  initialAnswer: Record<string, unknown>;
+}) {
+  return request<{ attemptId: string; snapshotId: string }>("/attempts", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export function listAttempts(player: number, question: string) {
+  return request<{ attempts: Attempt[] }>(
+    `/attempts?player=${player}&question=${encodeURIComponent(question)}`
+  );
+}
+
+export function getAttemptSnapshot(attemptId: string) {
+  return request<{ snapshot: Snapshot }>(`/attempts/${attemptId}/snapshot`);
+}
+
+export function saveSnapshot(
+  attemptId: string,
+  data: {
+    currentAnswer: Record<string, unknown>;
+    progress: number;
+    elapsedSeconds: number;
+    finished?: boolean;
+  }
+) {
+  return request<{ snapshotId: string }>(`/attempts/${attemptId}/snapshot`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
 const PARSER_URL = import.meta.env.VITE_PARSER_URL ?? `${API_BASE}/parse`;
 
 export async function parseImage(image: string, puzzleType: number) {

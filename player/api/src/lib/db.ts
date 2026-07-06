@@ -45,7 +45,7 @@ export async function executeStatement(
   const result = await client.send(command);
 
   const columns =
-    result.columnMetadata?.map((col) => col.name ?? "") ?? [];
+    result.columnMetadata?.map((col) => col.label || col.name || "") ?? [];
   const records: Record<string, unknown>[] = [];
 
   if (result.records) {

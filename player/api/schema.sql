@@ -19,6 +19,13 @@ CREATE TABLE IF NOT EXISTS puzzle_collections (
   cover_src    VARCHAR(512) NULL
 );
 
+CREATE TABLE IF NOT EXISTS player_account (
+  id           INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  name         VARCHAR(255) NOT NULL,
+  password     VARCHAR(255) NOT NULL,
+  role         VARCHAR(64)  NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS puzzle_questions (
   id              VARCHAR(36)  NOT NULL PRIMARY KEY,
   puzzle_type     INT          NOT NULL,
@@ -33,4 +40,25 @@ CREATE TABLE IF NOT EXISTS puzzle_questions (
   updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (puzzle_type) REFERENCES puzzle_types(id),
   FOREIGN KEY (src_collection) REFERENCES puzzle_collections(id)
+);
+
+CREATE TABLE IF NOT EXISTS player_attempt (
+  id           VARCHAR(36)  NOT NULL PRIMARY KEY,
+  player       INT          NOT NULL,
+  question     VARCHAR(36)  NOT NULL,
+  created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  finished_at  TIMESTAMP    NULL,
+  FOREIGN KEY (player) REFERENCES player_account(id),
+  FOREIGN KEY (question) REFERENCES puzzle_questions(id)
+);
+
+CREATE TABLE IF NOT EXISTS player_attempt_snapshot (
+  id              VARCHAR(36)  NOT NULL PRIMARY KEY,
+  attempt         VARCHAR(36)  NOT NULL,
+  current_answer  JSON         NOT NULL,
+  progress        FLOAT        NOT NULL,
+  elapsed_seconds INT          NOT NULL DEFAULT 0,
+  finished        BOOLEAN      NOT NULL DEFAULT FALSE,
+  created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (attempt) REFERENCES player_attempt(id)
 );
