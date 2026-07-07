@@ -14,9 +14,10 @@ interface PuzzleBoardProps {
   puzzle: PuzzleDefinition;
   initialAnswer?: Record<string, unknown> | null;
   onValuesChange?: (values: Record<string, number>) => void;
+  onComplete?: () => void;
 }
 
-export default function PuzzleBoard({ puzzle, initialAnswer, onValuesChange }: PuzzleBoardProps) {
+export default function PuzzleBoard({ puzzle, initialAnswer, onValuesChange, onComplete }: PuzzleBoardProps) {
   const renderer = getRenderer(puzzle.puzzleType);
 
   if (!renderer) {
@@ -31,5 +32,5 @@ export default function PuzzleBoard({ puzzle, initialAnswer, onValuesChange }: P
     );
   }
 
-  return <>{renderer.render(puzzle, { puzzleId: puzzle.id, playerGrid: initialAnswer ?? {}, startedAt: "", lastUpdatedAt: "" }, onValuesChange)}</>;
+  return <>{renderer.render(puzzle, { puzzleId: puzzle.id, playerGrid: initialAnswer ?? {}, startedAt: "", lastUpdatedAt: "" }, onValuesChange, onComplete)}</>;
 }

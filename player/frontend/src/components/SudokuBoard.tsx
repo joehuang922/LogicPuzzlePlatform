@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useIsMobile } from "../hooks/useIsMobile";
 import DigitBar from "./DigitBar";
 
@@ -6,6 +6,7 @@ interface SudokuBoardProps {
   hints: number[][];
   initialUserValues?: Record<string, number>;
   onValuesChange?: (values: Record<string, number>) => void;
+  onComplete?: () => void;
 }
 
 const CELL_SIZE = 40;
@@ -16,7 +17,7 @@ const THICK = 3;
 const RADIAL_RADIUS = 44;
 const CIRCLE_RADIUS = 13;
 
-export default function SudokuBoard({ hints, initialUserValues, onValuesChange }: SudokuBoardProps) {
+export default function SudokuBoard({ hints, initialUserValues, onValuesChange, onComplete }: SudokuBoardProps) {
   const isMobile = useIsMobile();
   const width = 9 * CELL_SIZE + PAD * 2;
   const height = 9 * CELL_SIZE + PAD * 2;
@@ -65,6 +66,74 @@ export default function SudokuBoard({ hints, initialUserValues, onValuesChange }
     }
     return map;
   }, []);
+
+  const conflictCells = useMemo(() => {
+    const conflicts = new Set<string>();
+    const fullGrid: number[][] = Array.from({ length: 9 }, (_, row) =>
+      Array.from({ length: 9 }, (_, col) => {
+        const hint = hints[row]?.[col] ?? 0;
+        if (hint > 0) return hint;
+        return userValues[`${col},${row}`] ?? 0;
+      })
+    );
+
+    for (let row = 0; row < 9; row++) {
+      const seen = new Map<number, number[]>();
+      for (let col = 0; col < 9; col++) {
+        const val = fullGrid[row][col];
+        if (val === 0) continue;
+        if (!seen.has(val)) seen.set(val, []);
+        seen.get(val)!.push(col);
+      }
+      for (const [, cols] of seen) {
+        if (cols.length > 1) cols.forEach((c) => conflicts.add(`${c},${row}`));
+      }
+    }
+
+    for (let col = 0; col < 9; col++) {
+      const seen = new Map<number, number[]>();
+      for (let row = 0; row < 9; row++) {
+        const val = fullGrid[row][col];
+        if (val === 0) continue;
+        if (!seen.has(val)) seen.set(val, []);
+        seen.get(val)!.push(row);
+      }
+      for (const [, rows] of seen) {
+        if (rows.length > 1) rows.forEach((r) => conflicts.add(`${col},${r}`));
+      }
+    }
+
+    for (let boxRow = 0; boxRow < 3; boxRow++) {
+      for (let boxCol = 0; boxCol < 3; boxCol++) {
+        const seen = new Map<number, string[]>();
+        for (let r = boxRow * 3; r < boxRow * 3 + 3; r++) {
+          for (let c = boxCol * 3; c < boxCol * 3 + 3; c++) {
+            const val = fullGrid[r][c];
+            if (val === 0) continue;
+            if (!seen.has(val)) seen.set(val, []);
+            seen.get(val)!.push(`${c},${r}`);
+          }
+        }
+        for (const [, keys] of seen) {
+          if (keys.length > 1) keys.forEach((k) => conflicts.add(k));
+        }
+      }
+    }
+
+    return conflicts;
+  }, [hints, userValues]);
+
+  const completedRef = useRef(false);
+
+  useEffect(() => {
+    if (completedRef.current) return;
+    const totalHints = hints.flat().filter((v) => v > 0).length;
+    const totalFilled = totalHints + Object.keys(userValues).length;
+    if (totalFilled === 81 && conflictCells.size === 0) {
+      completedRef.current = true;
+      onComplete?.();
+    }
+  }, [userValues, conflictCells, hints, onComplete]);
 
   const highlightSource = activeCell ?? hoveredCell;
   const highlightedCells = useMemo(() => {
@@ -196,6 +265,7 @@ export default function SudokuBoard({ hints, initialUserValues, onValuesChange }
           {hints.map((row, rowIdx) =>
             row.map((val, colIdx) => {
               if (val <= 0) return null;
+              const hintKey = `${colIdx},${rowIdx}`;
               return (
                 <text
                   key={`hint-${rowIdx}-${colIdx}`}
@@ -205,6 +275,7 @@ export default function SudokuBoard({ hints, initialUserValues, onValuesChange }
                   dominantBaseline="central"
                   fontSize={20}
                   fontFamily="sans-serif"
+                  fill={conflictCells.has(hintKey) ? "#d32f2f" : "black"}
                   pointerEvents="none"
                 >
                   {val}
@@ -248,7 +319,7 @@ export default function SudokuBoard({ hints, initialUserValues, onValuesChange }
                 dominantBaseline="central"
                 fontSize={20}
                 fontFamily="sans-serif"
-                fill="#888"
+                fill={conflictCells.has(key) ? "#d32f2f" : "#888"}
                 pointerEvents="none"
               >
                 {val}

@@ -32,7 +32,7 @@ export interface AnswerExtractor {
 
 export interface PuzzleRenderer {
   puzzleType: number;
-  render(puzzle: PuzzleDefinition, state: PuzzleState, onValuesChange?: (values: Record<string, number>) => void): ReactNode;
+  render(puzzle: PuzzleDefinition, state: PuzzleState, onValuesChange?: (values: Record<string, number>) => void, onComplete?: () => void): ReactNode;
   handleInput(state: PuzzleState, action: PlayerAction): PuzzleState;
   checkSolution(state: PuzzleState, puzzle: PuzzleDefinition): boolean;
 }

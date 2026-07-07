@@ -16,28 +16,33 @@ function formatElapsed(seconds: number): string {
 
 interface TimerHandle {
   getElapsed: () => number;
+  stop: () => void;
 }
 
 const Timer = forwardRef<TimerHandle, { startOffset?: number; resetKey?: number }>(
   function Timer({ startOffset = 0, resetKey }, ref) {
     const [elapsed, setElapsed] = useState(startOffset);
     const startRef = useRef(Date.now() - startOffset * 1000);
+    const [stopped, setStopped] = useState(false);
 
     useEffect(() => {
       startRef.current = Date.now() - startOffset * 1000;
       setElapsed(startOffset);
+      setStopped(false);
     }, [startOffset, resetKey]);
 
     useImperativeHandle(ref, () => ({
       getElapsed: () => Math.floor((Date.now() - startRef.current) / 1000),
+      stop: () => setStopped(true),
     }));
 
     useEffect(() => {
+      if (stopped) return;
       const interval = setInterval(() => {
         setElapsed(Math.floor((Date.now() - startRef.current) / 1000));
       }, 1000);
       return () => clearInterval(interval);
-    }, [resetKey]);
+    }, [resetKey, stopped]);
 
     const hours = Math.floor(elapsed / 3600);
     const minutes = Math.floor((elapsed % 3600) / 60);
@@ -74,6 +79,8 @@ export default function Play() {
   const [snapshots, setSnapshots] = useState<SnapshotSummary[]>([]);
   const [selectedSnapshotId, setSelectedSnapshotId] = useState<string | null>(null);
   const [snapshotsLoading, setSnapshotsLoading] = useState(false);
+  const [showCongratsDialog, setShowCongratsDialog] = useState(false);
+  const [finalTime, setFinalTime] = useState(0);
 
   const timerRef = useRef<TimerHandle>(null);
   const userValuesRef = useRef<Record<string, number>>({});
@@ -81,6 +88,25 @@ export default function Play() {
   const handleValuesChange = useCallback((values: Record<string, number>) => {
     userValuesRef.current = values;
   }, []);
+
+  const handleComplete = useCallback(async () => {
+    if (!puzzle || !attemptId) return;
+    const elapsedSeconds = timerRef.current?.getElapsed() ?? 0;
+    timerRef.current?.stop();
+    setFinalTime(elapsedSeconds);
+
+    try {
+      const answer = extractAnswer(puzzle, userValuesRef.current);
+      await saveSnapshot(attemptId, {
+        currentAnswer: answer,
+        progress: 1,
+        elapsedSeconds,
+        finished: true,
+      });
+    } catch {}
+
+    setShowCongratsDialog(true);
+  }, [puzzle, attemptId]);
 
   useEffect(() => {
     if (!id) return;
@@ -175,7 +201,24 @@ export default function Play() {
           {toast}
         </div>
       )}
-      <PuzzleBoard key={boardKey} puzzle={puzzle} initialAnswer={currentAnswer} onValuesChange={handleValuesChange} />
+      <PuzzleBoard key={boardKey} puzzle={puzzle} initialAnswer={currentAnswer} onValuesChange={handleValuesChange} onComplete={handleComplete} />
+
+      {showCongratsDialog && (
+        <div style={overlayStyle}>
+          <div style={dialogStyle}>
+            <h3>Congratulations!</h3>
+            <p>You solved the puzzle in <strong>{formatElapsed(finalTime)}</strong>!</p>
+            <div style={{ display: "flex", gap: "1rem", justifyContent: "center", marginTop: "1rem" }}>
+              <Link to="/" style={{ ...btnPrimary, textDecoration: "none", display: "inline-block" }}>
+                Back to Puzzles
+              </Link>
+              <button onClick={() => setShowCongratsDialog(false)} style={btnCancel}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showLoadDialog && (
         <div style={overlayStyle}>
