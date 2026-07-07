@@ -9,6 +9,7 @@ import pytest
 
 from puzzle_parsers.sudoku.models import SudokuBoard
 from puzzle_parsers.combo_sudoku.models import ComboSudokuBoard
+from puzzle_parsers.nurimaze.models import NurimazeBoard
 from puzzle_parsers.validate import validate_canon
 
 SCHEMA_DIR = Path(__file__).parents[2] / "schemas" / "canon"
@@ -16,6 +17,7 @@ SCHEMA_DIR = Path(__file__).parents[2] / "schemas" / "canon"
 MODELS = {
     "sudoku": SudokuBoard,
     "combo-sudoku": ComboSudokuBoard,
+    "nurimaze": NurimazeBoard,
 }
 
 
@@ -69,3 +71,23 @@ def test_invalid_combo_sudoku_fails():
     data = {"subboards": [{"x": 0, "y": 0, "hints": [[0] * 9]}]}
     with pytest.raises(Exception):
         validate_canon("combo-sudoku", data)
+
+
+def test_valid_nurimaze_passes():
+    data = {
+        "cells": [[0, 3], [4, 0]],
+        "grids": {
+            "h": [[0, 1]],
+            "v": [[1], [0]],
+        },
+    }
+    validate_canon("nurimaze", data)
+
+
+def test_invalid_nurimaze_fails():
+    data = {
+        "cells": [[0, 5]],  # 5 is out of range
+        "grids": {"h": [], "v": [[0]]},
+    }
+    with pytest.raises(Exception):
+        validate_canon("nurimaze", data)

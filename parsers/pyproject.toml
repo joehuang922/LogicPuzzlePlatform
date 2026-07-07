@@ -33,6 +33,7 @@ dev = [
 
 [project.scripts]
 parse-combo-sudoku = "puzzle_parsers.combo_sudoku.__main__:main"
+parse-nurimaze = "puzzle_parsers.nurimaze.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/puzzle_parsers"]

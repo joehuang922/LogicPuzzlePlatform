@@ -1,0 +1,41 @@
+{
+  "title": "Nurimaze Canonical Representation",
+  "description": "Rectangle grid with rooms defined by thick borders, containing special symbols",
+  "type": "object",
+  "required": ["cells", "grids"],
+  "additionalProperties": false,
+  "properties": {
+    "cells": {
+      "description": "m x n grid: 0=empty, 1=circle, 2=triangle, 3=S, 4=G",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": { "type": "integer", "minimum": 0, "maximum": 4 }
+      },
+      "minItems": 1
+    },
+    "grids": {
+      "type": "object",
+      "required": ["h", "v"],
+      "additionalProperties": false,
+      "properties": {
+        "h": {
+          "description": "(m-1) x n array: h[r][c] = thick border below cell[r][c]. 0=thin, 1=thick",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "type": "integer", "minimum": 0, "maximum": 1 }
+          }
+        },
+        "v": {
+          "description": "m x (n-1) array: v[r][c] = thick border right of cell[r][c]. 0=thin, 1=thick",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "type": "integer", "minimum": 0, "maximum": 1 }
+          }
+        }
+      }
+    }
+  }
+}

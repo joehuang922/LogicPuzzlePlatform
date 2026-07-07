@@ -13,3 +13,11 @@ export interface ComboSudokuCanon {
   room_height?: number;
   subboards: ComboSudokuSubBoard[];
 }
+
+export interface NurimazeCanon {
+  cells: number[][];
+  grids: {
+    h: number[][];
+    v: number[][];
+  };
+}
