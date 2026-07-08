@@ -38,11 +38,14 @@ jobs:
         id: deploy-api
         run: |
           mkdir -p ../frontend/dist && echo '<!DOCTYPE html><html></html>' > ../frontend/dist/index.html
-          npx cdk deploy PuzzleDatabaseStack PuzzleApiStack --require-approval never --outputs-file cdk-outputs.json
+          npx cdk deploy PuzzleDatabaseStack PuzzleApiStack --require-approval never --outputs-file cdk-outputs.json \
+            -c geminiApiKey="${GEMINI_API_KEY}"
           echo "api_url=$(jq -r '.PuzzleApiStack.ApiUrl' cdk-outputs.json)" >> "$GITHUB_OUTPUT"
           echo "parser_url=$(jq -r '.PuzzleApiStack.ParserUrl' cdk-outputs.json)" >> "$GITHUB_OUTPUT"
           cat cdk-outputs.json
         working-directory: player/infra
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
       - name: Build Frontend
         run: npm run build

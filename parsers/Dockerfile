@@ -21,7 +21,8 @@ RUN pip install --no-cache-dir \
 RUN pip install --no-cache-dir \
     pydantic>=2.0 \
     jsonschema>=4.20 \
-    easyocr>=1.7
+    easyocr>=1.7 \
+    "google-generativeai>=0.8"
 
 # Pre-download EasyOCR models into the image
 ENV EASYOCR_MODULE_PATH=${LAMBDA_TASK_ROOT}/models
@@ -34,7 +35,8 @@ COPY parsers/src/puzzle_parsers/ ${LAMBDA_TASK_ROOT}/puzzle_parsers/
 # Blank ALL __init__.py files to prevent import chains that pull in anthropic
 RUN echo "" > ${LAMBDA_TASK_ROOT}/puzzle_parsers/__init__.py && \
     echo "" > ${LAMBDA_TASK_ROOT}/puzzle_parsers/combo_sudoku/__init__.py && \
-    echo "" > ${LAMBDA_TASK_ROOT}/puzzle_parsers/sudoku/__init__.py
+    echo "" > ${LAMBDA_TASK_ROOT}/puzzle_parsers/sudoku/__init__.py && \
+    echo "" > ${LAMBDA_TASK_ROOT}/puzzle_parsers/nurimaze/__init__.py
 
 # Patch out ClaudeOcrBackend import from sudoku/parser.py (it's not used in container)
 RUN sed -i 's/from puzzle_parsers.combo_sudoku.ocr import ClaudeOcrBackend, OcrBackend/from puzzle_parsers.combo_sudoku.ocr import OcrBackend/' \

@@ -11,15 +11,25 @@ from puzzle_parsers.base import PuzzleParser
 from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.nurimaze.grid_detector import (
     classify_borders,
-    classify_symbols,
     detect_nurimaze_grid,
 )
 from puzzle_parsers.nurimaze.models import NurimazeBoard, NurimazeGrids
+from puzzle_parsers.nurimaze.symbol_classifier import (
+    CvSymbolClassifier,
+    GeminiSymbolClassifier,
+    SymbolClassifier,
+)
 from puzzle_parsers.validate import validate_canon
 
 
 class NurimazeParser(PuzzleParser):
     puzzle_type = "nurimaze"
+
+    def __init__(self, symbol_backend: str = "cv", **backend_kwargs) -> None:
+        if symbol_backend == "gemini":
+            self._classifier: SymbolClassifier = GeminiSymbolClassifier(**backend_kwargs)
+        else:
+            self._classifier = CvSymbolClassifier()
 
     def parse(self, image: Image.Image) -> PuzzleData:
         img_array = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
@@ -44,7 +54,7 @@ class NurimazeParser(PuzzleParser):
         warped_gray = cv2.cvtColor(geom.warped, cv2.COLOR_BGR2GRAY)
 
         h_borders, v_borders = classify_borders(warped_gray, geom, debug_dir=debug_dir)
-        cells = classify_symbols(warped_gray, geom, debug_dir=debug_dir)
+        cells = self._classifier.classify(warped_gray, geom, debug_dir=debug_dir)
 
         return NurimazeBoard(
             cells=cells,
@@ -60,13 +70,11 @@ class NurimazeParser(PuzzleParser):
             cols = len(board.cells[0]) if rows > 0 else 0
             if rows < 2 or cols < 2:
                 return False
-            # Check cells values
             for row in board.cells:
                 if len(row) != cols:
                     return False
                 if not all(0 <= v <= 4 for v in row):
                     return False
-            # Check h dimensions: (rows-1) x cols
             if len(board.grids.h) != rows - 1:
                 return False
             for row in board.grids.h:
@@ -74,7 +82,6 @@ class NurimazeParser(PuzzleParser):
                     return False
                 if not all(v in (0, 1) for v in row):
                     return False
-            # Check v dimensions: rows x (cols-1)
             if len(board.grids.v) != rows:
                 return False
             for row in board.grids.v:

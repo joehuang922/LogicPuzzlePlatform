@@ -8,6 +8,8 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.signal import find_peaks
 
+from puzzle_parsers.grid_utils import order_points
+
 
 @dataclass
 class GridGeometry:
@@ -725,7 +727,7 @@ def _find_puzzle_border(gray: NDArray) -> NDArray:
             pts[:, 1].min() < -h * 0.3 or pts[:, 1].max() > h * 1.3):
         return _find_border_fallback(gray)
 
-    return _order_points(pts)
+    return order_points(pts)
 
 
 def _find_lr_borders_from_crossings(
@@ -831,21 +833,9 @@ def _find_border_fallback(gray: NDArray) -> NDArray:
     largest = max(contours, key=cv2.contourArea)
     rect = cv2.minAreaRect(largest)
     box = cv2.boxPoints(rect)
-    return _order_points(np.float32(box))
+    return order_points(np.float32(box))
 
 
-def _order_points(pts: NDArray) -> NDArray:
-    """Order 4 points as: top-left, top-right, bottom-right, bottom-left."""
-    # Sort by y first
-    sorted_by_y = pts[np.argsort(pts[:, 1])]
-    # Top two points (smallest y)
-    top = sorted_by_y[:2]
-    bottom = sorted_by_y[2:]
-    # Sort top by x
-    top = top[np.argsort(top[:, 0])]
-    # Sort bottom by x
-    bottom = bottom[np.argsort(bottom[:, 0])]
-    return np.float32([top[0], top[1], bottom[1], bottom[0]])
 
 
 def _detect_lines_in_warped(

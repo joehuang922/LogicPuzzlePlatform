@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import base64
-import io
-import json
 from abc import ABC, abstractmethod
 
 import cv2
 import numpy as np
 from numpy.typing import NDArray
-from PIL import Image
+
+from puzzle_parsers.vision_utils import cells_to_png_bytes, parse_json_response
 
 
 class OcrBackend(ABC):
@@ -39,50 +38,6 @@ class OcrBackend(ABC):
         ...
 
 
-def cells_to_png_bytes(cells: list[list[NDArray]]) -> bytes:
-    """Compose a grid of cell images into a single labeled PNG for batch OCR."""
-    grid_size = len(cells)
-    if grid_size == 0:
-        return b""
-
-    cell_display_size = 40
-    label_height = 16
-    tile_h = cell_display_size + label_height
-    tile_w = cell_display_size
-
-    canvas_h = grid_size * tile_h
-    canvas_w = grid_size * tile_w
-    canvas = np.ones((canvas_h, canvas_w, 3), dtype=np.uint8) * 255
-
-    for row in range(grid_size):
-        for col in range(grid_size):
-            cell = cells[row][col]
-            resized = cv2.resize(cell, (cell_display_size, cell_display_size))
-            if len(resized.shape) == 2:
-                resized = cv2.cvtColor(resized, cv2.COLOR_GRAY2BGR)
-
-            y_offset = row * tile_h + label_height
-            x_offset = col * tile_w
-            canvas[
-                y_offset : y_offset + cell_display_size,
-                x_offset : x_offset + cell_display_size,
-            ] = resized
-
-            label = f"{row},{col}"
-            cv2.putText(
-                canvas,
-                label,
-                (x_offset + 2, row * tile_h + label_height - 3),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.3,
-                (100, 100, 100),
-                1,
-            )
-
-    img = Image.fromarray(cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB))
-    buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    return buf.getvalue()
 
 
 class ClaudeOcrBackend(OcrBackend):
@@ -134,11 +89,7 @@ class ClaudeOcrBackend(OcrBackend):
             ],
         )
 
-        text = response.content[0].text.strip()
-        if text.startswith("```"):
-            lines = text.split("\n")
-            text = "\n".join(lines[1:-1])
-        return json.loads(text)
+        return parse_json_response(response.content[0].text)
 
     def recognize_full_image(
         self, image_path: str, num_subboards: int
@@ -184,11 +135,7 @@ class ClaudeOcrBackend(OcrBackend):
             ],
         )
 
-        text = response.content[0].text.strip()
-        if text.startswith("```"):
-            lines = text.split("\n")
-            text = "\n".join(lines[1:-1])
-        return json.loads(text)
+        return parse_json_response(response.content[0].text)
 
 
 class EasyOcrBackend(OcrBackend):

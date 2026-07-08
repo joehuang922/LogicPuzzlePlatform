@@ -131,6 +131,9 @@ export class ApiStack extends cdk.Stack {
       ),
       timeout: cdk.Duration.minutes(2),
       memorySize: 2048,
+      environment: {
+        GEMINI_API_KEY: this.node.tryGetContext("geminiApiKey") ?? "",
+      },
     });
 
     const parserUrl = parserHandler.addFunctionUrl({
