@@ -10,9 +10,9 @@ from puzzle_parsers.base import PuzzleParser
 from puzzle_parsers.combo_sudoku.grid_detector import (
     GridGeometry,
     extract_cells_from_geometry,
-    _order_points,
     _detect_internal_grid,
 )
+from puzzle_parsers.grid_utils import order_points
 from puzzle_parsers.combo_sudoku.ocr import ClaudeOcrBackend, OcrBackend
 from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.sudoku.models import SudokuBoard
@@ -176,11 +176,11 @@ def _find_single_board_border(gray: np.ndarray) -> np.ndarray:
 
     if len(approx) == 4:
         pts = approx.reshape(4, 2).astype(np.float32)
-        return _order_points(pts)
+        return order_points(pts)
 
     rect = cv2.minAreaRect(largest)
     box = cv2.boxPoints(rect)
-    return _order_points(np.float32(box))
+    return order_points(np.float32(box))
 
 
 def _save_cells_debug(debug_path: Path, cells: list[list[np.ndarray]]) -> None:
