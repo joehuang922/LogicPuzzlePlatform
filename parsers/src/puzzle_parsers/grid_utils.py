@@ -93,14 +93,14 @@ def detect_grid_lines(
     )
 
     # Horizontal lines
-    min_h_len = warp_w // 4
+    min_h_len = warp_w // 6
     h_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (min_h_len, 1))
     h_mask = cv2.morphologyEx(binary, cv2.MORPH_OPEN, h_kernel)
     row_sums = h_mask.sum(axis=1) / 255
     h_peaks, _ = find_peaks(row_sums, height=warp_w * 0.2, distance=warp_h // 20)
 
     # Vertical lines
-    min_v_len = warp_h // 4
+    min_v_len = warp_h // 6
     v_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, min_v_len))
     v_mask = cv2.morphologyEx(binary, cv2.MORPH_OPEN, v_kernel)
     col_sums = v_mask.sum(axis=0) / 255
