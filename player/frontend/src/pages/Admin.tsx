@@ -13,6 +13,8 @@ import {
 } from "../api/client";
 import SudokuBoard from "../components/SudokuBoard";
 import ComboSudokuBoard from "../components/ComboSudokuBoard";
+import NurimazeBoard from "../components/NurimazeBoard";
+import { NurimazeCanon } from "../types/canon";
 import { DIFFICULTY_OPTIONS, DIFFICULTY_LABELS } from "../constants";
 
 const fieldStyle: React.CSSProperties = {
@@ -155,6 +157,9 @@ function CanonPreview({ puzzleType, canonRepr }: { puzzleType: number; canonRepr
   if (puzzleType === 2 && parsed.subboards) {
     return <ComboSudokuBoard subboards={parsed.subboards as { x: number; y: number; hints: number[][] }[]} />;
   }
+  if (puzzleType === 3 && parsed.cells && parsed.grids) {
+    return <NurimazeBoard canon={parsed as unknown as NurimazeCanon} />;
+  }
   return <p style={{ color: "#666", fontSize: "0.85rem" }}>No preview available for this puzzle type.</p>;
 }
 
@@ -214,6 +219,9 @@ function QuestionForm({
       } else if (typeId === 2 && canon.subboards) {
         w = Math.max(...canon.subboards.map((b: { x: number }) => b.x)) + 9;
         h = Math.max(...canon.subboards.map((b: { y: number }) => b.y)) + 9;
+      } else if (typeId === 3 && canon.cells) {
+        h = canon.cells.length;
+        w = canon.cells[0].length;
       }
       const res = await createPuzzle({
         puzzleType: typeId,
