@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { listPuzzles, listCollections, listAttempts, createAttempt, getAttemptSnapshot, Collection, Attempt } from "../api/client";
+import { listPuzzles, listCollections, listPuzzleTypes, listAttempts, createAttempt, getAttemptSnapshot, Collection, Attempt, PuzzleType, Puzzle } from "../api/client";
 import { PuzzleDefinition } from "../types/puzzle";
 import { DIFFICULTY_LABELS } from "../constants";
 import { extractAnswer } from "../extractors";
@@ -14,10 +14,69 @@ function formatElapsed(seconds: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
+function CollectionPuzzleList({
+  puzzles,
+  puzzleTypes,
+  attemptedIds,
+  onPuzzleClick,
+}: {
+  puzzles: Puzzle[];
+  puzzleTypes: PuzzleType[];
+  attemptedIds: Set<string>;
+  onPuzzleClick: (puzzle: Puzzle) => void;
+}) {
+  const puzzleTypeMap = Object.fromEntries(puzzleTypes.map((pt) => [pt.id, pt.name]));
+  const groupedByType = puzzles.reduce<Record<number, Puzzle[]>>((acc, p) => {
+    (acc[p.puzzleType] ??= []).push(p);
+    return acc;
+  }, {});
+
+  return (
+    <div>
+      {Object.entries(groupedByType).map(([typeId, items]) => (
+        <div key={typeId} style={{ marginBottom: "0.75rem" }}>
+          <div style={{ fontWeight: "bold", fontSize: "0.85rem", padding: "0.3rem 0.5rem", background: "#e8e8e8", borderRadius: 4, marginBottom: "0.25rem" }}>
+            {puzzleTypeMap[Number(typeId)] || `Type ${typeId}`} ({items.length})
+          </div>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.8rem" }}>
+            <thead>
+              <tr style={{ borderBottom: "1px solid #ddd", textAlign: "left" }}>
+                <th style={{ padding: "0.3rem" }}>Title</th>
+                <th style={{ padding: "0.3rem" }}>Difficulty</th>
+                <th style={{ padding: "0.3rem" }}>Author</th>
+                <th style={{ padding: "0.3rem" }}>Size</th>
+                <th style={{ padding: "0.3rem", width: 30, textAlign: "center" }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((p) => (
+                <tr
+                  key={p.id}
+                  onClick={() => onPuzzleClick(p)}
+                  style={{ borderBottom: "1px solid #f0f0f0", cursor: "pointer" }}
+                >
+                  <td style={{ padding: "0.3rem" }}>{p.title || "(none)"}</td>
+                  <td style={{ padding: "0.3rem" }}>{DIFFICULTY_LABELS[p.difficulty] || String(p.difficulty)}</td>
+                  <td style={{ padding: "0.3rem" }}>{p.author || "N/A"}</td>
+                  <td style={{ padding: "0.3rem" }}>{p.width && p.height ? `${p.width} x ${p.height}` : "—"}</td>
+                  <td style={{ padding: "0.3rem", textAlign: "center", color: "green" }}>
+                    {attemptedIds.has(p.id) && "✓"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function Home() {
   const navigate = useNavigate();
   const [puzzles, setPuzzles] = useState<PuzzleDefinition[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
+  const [puzzleTypes, setPuzzleTypes] = useState<PuzzleType[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,11 +87,17 @@ export default function Home() {
   const [selectedAttemptId, setSelectedAttemptId] = useState<string | null>(null);
   const [attemptsLoading, setAttemptsLoading] = useState(false);
 
+  const [expandedCollectionId, setExpandedCollectionId] = useState<number | null>(null);
+  const [collectionPuzzles, setCollectionPuzzles] = useState<Puzzle[]>([]);
+  const [loadingCollectionPuzzles, setLoadingCollectionPuzzles] = useState(false);
+  const [attemptedPuzzleIds, setAttemptedPuzzleIds] = useState<Set<string>>(new Set());
+
   useEffect(() => {
-    Promise.all([listPuzzles(), listCollections()])
-      .then(([puzzleRes, collectionRes]) => {
+    Promise.all([listPuzzles(), listCollections(), listPuzzleTypes()])
+      .then(([puzzleRes, collectionRes, ptRes]) => {
         setPuzzles(puzzleRes.puzzles as PuzzleDefinition[]);
         setCollections(collectionRes.collections);
+        setPuzzleTypes(ptRes.puzzleTypes);
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -53,6 +118,34 @@ export default function Home() {
     });
     setShowChoiceDialog(false);
     navigate(`/play/${selectedPuzzle.id}?attempt=${result.attemptId}`);
+  }
+
+  async function handleExpandCollection(collectionId: number) {
+    if (expandedCollectionId === collectionId) {
+      setExpandedCollectionId(null);
+      return;
+    }
+    setExpandedCollectionId(collectionId);
+    setLoadingCollectionPuzzles(true);
+    try {
+      const res = await listPuzzles({ srcCollection: collectionId });
+      setCollectionPuzzles(res.puzzles);
+      const attempted = new Set<string>();
+      await Promise.all(
+        res.puzzles.map(async (p) => {
+          const attRes = await listAttempts(HARDCODED_PLAYER_ID, p.id);
+          if (attRes.attempts.length > 0) attempted.add(p.id);
+        })
+      );
+      setAttemptedPuzzleIds(attempted);
+    } finally {
+      setLoadingCollectionPuzzles(false);
+    }
+  }
+
+  function handleCollectionPuzzleClick(puzzle: Puzzle) {
+    setSelectedPuzzle(puzzle as unknown as PuzzleDefinition);
+    setShowChoiceDialog(true);
   }
 
   async function handleLoadPrevious() {
@@ -123,20 +216,49 @@ export default function Home() {
           <table style={{ borderCollapse: "collapse", width: "100%" }}>
             <thead>
               <tr>
-                <th style={{ textAlign: "left", borderBottom: "1px solid #ccc", padding: "0.4rem" }}>Name</th>
-                <th style={{ textAlign: "left", borderBottom: "1px solid #ccc", padding: "0.4rem" }}>Publisher</th>
-                <th style={{ textAlign: "left", borderBottom: "1px solid #ccc", padding: "0.4rem" }}>Published</th>
-                <th style={{ textAlign: "right", borderBottom: "1px solid #ccc", padding: "0.4rem" }}>Puzzles</th>
+                <th style={{ textAlign: "left", borderBottom: "2px solid #ddd", padding: "0.5rem" }}>Name</th>
+                <th style={{ textAlign: "left", borderBottom: "2px solid #ddd", padding: "0.5rem" }}>Publisher</th>
+                <th style={{ textAlign: "left", borderBottom: "2px solid #ddd", padding: "0.5rem" }}>Publish Date</th>
+                <th style={{ textAlign: "right", borderBottom: "2px solid #ddd", padding: "0.5rem" }}>Puzzles</th>
               </tr>
             </thead>
             <tbody>
-              {collections.map((c) => (
-                <tr key={c.id}>
-                  <td style={{ padding: "0.4rem" }}>{c.name}</td>
-                  <td style={{ padding: "0.4rem" }}>{c.publisher ?? "—"}</td>
-                  <td style={{ padding: "0.4rem" }}>{c.publishAt ?? "—"}</td>
-                  <td style={{ textAlign: "right", padding: "0.4rem" }}>{c.puzzleCount}</td>
-                </tr>
+              {[...collections].sort((a, b) => {
+                if (!a.publishAt && !b.publishAt) return 0;
+                if (!a.publishAt) return 1;
+                if (!b.publishAt) return -1;
+                return b.publishAt.localeCompare(a.publishAt);
+              }).map((c) => (
+                <>
+                  <tr
+                    key={c.id}
+                    onClick={() => handleExpandCollection(c.id)}
+                    style={{ cursor: "pointer", borderBottom: "1px solid #eee", background: expandedCollectionId === c.id ? "#f0f7ff" : undefined }}
+                  >
+                    <td style={{ padding: "0.5rem" }}>{c.name}</td>
+                    <td style={{ padding: "0.5rem" }}>{c.publisher ?? "—"}</td>
+                    <td style={{ padding: "0.5rem" }}>{c.publishAt ?? "—"}</td>
+                    <td style={{ textAlign: "right", padding: "0.5rem" }}>{c.puzzleCount}</td>
+                  </tr>
+                  {expandedCollectionId === c.id && (
+                    <tr key={`${c.id}-detail`}>
+                      <td colSpan={4} style={{ padding: "0.75rem 0.5rem", background: "#fafafa" }}>
+                        {loadingCollectionPuzzles ? (
+                          <p style={{ margin: 0, fontSize: "0.85rem" }}>Loading questions...</p>
+                        ) : collectionPuzzles.length === 0 ? (
+                          <p style={{ margin: 0, fontSize: "0.85rem", color: "#666" }}>No questions in this collection.</p>
+                        ) : (
+                          <CollectionPuzzleList
+                            puzzles={collectionPuzzles}
+                            puzzleTypes={puzzleTypes}
+                            attemptedIds={attemptedPuzzleIds}
+                            onPuzzleClick={handleCollectionPuzzleClick}
+                          />
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                </>
               ))}
             </tbody>
           </table>
