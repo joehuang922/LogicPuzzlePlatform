@@ -74,6 +74,11 @@ async function listAttempts(
     return response(400, { error: "player and question query params required" });
   }
 
+  const finished = event.queryStringParameters?.finished;
+  const finishedFilter = finished === "true"
+    ? "AND pa.finished_at IS NOT NULL"
+    : "AND pa.finished_at IS NULL";
+
   const result = await executeStatement(
     `SELECT pa.id, pa.created_at,
             s.progress AS latest_progress,
@@ -86,7 +91,7 @@ async function listAttempts(
      ) s ON s.attempt = pa.id AND s.rn = 1
      WHERE pa.player = :player
        AND pa.question = :question
-       AND pa.finished_at IS NULL
+       ${finishedFilter}
      ORDER BY pa.created_at DESC`,
     [
       { name: "player", value: { longValue: Number(player) } },

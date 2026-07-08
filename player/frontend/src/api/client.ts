@@ -126,10 +126,10 @@ export function createAttempt(data: {
   });
 }
 
-export function listAttempts(player: number, question: string) {
-  return request<{ attempts: Attempt[] }>(
-    `/attempts?player=${player}&question=${encodeURIComponent(question)}`
-  );
+export function listAttempts(player: number, question: string, opts?: { finished?: boolean }) {
+  let url = `/attempts?player=${player}&question=${encodeURIComponent(question)}`;
+  if (opts?.finished != null) url += `&finished=${opts.finished}`;
+  return request<{ attempts: Attempt[] }>(url);
 }
 
 export function getAttemptSnapshot(attemptId: string) {

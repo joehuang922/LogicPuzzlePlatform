@@ -133,7 +133,7 @@ export default function Home() {
       const attempted = new Set<string>();
       await Promise.all(
         res.puzzles.map(async (p) => {
-          const attRes = await listAttempts(HARDCODED_PLAYER_ID, p.id);
+          const attRes = await listAttempts(HARDCODED_PLAYER_ID, p.id, { finished: true });
           if (attRes.attempts.length > 0) attempted.add(p.id);
         })
       );
