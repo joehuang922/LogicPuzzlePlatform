@@ -126,43 +126,56 @@ class GeminiSymbolClassifier(SymbolClassifier):
                 row_crops.append(roi)
             cell_crops.append(row_crops)
 
-        # Build montage
-        png_bytes = cells_to_png_bytes(cell_crops)
+        # For large grids, chunk into row-bands to keep each montage manageable
+        max_cells_per_batch = 200
+        rows_per_batch = max(1, max_cells_per_batch // cols)
+        cells: list[list[int]] = []
 
-        if debug_path:
-            debug_path.mkdir(parents=True, exist_ok=True)
-            (debug_path / "05_montage.png").write_bytes(png_bytes)
+        batch_idx = 0
+        for start_row in range(0, rows, rows_per_batch):
+            end_row = min(start_row + rows_per_batch, rows)
+            batch_crops = cell_crops[start_row:end_row]
+            batch_rows = end_row - start_row
 
-        # Send to Gemini
-        montage_image = Image.open(__import__("io").BytesIO(png_bytes))
+            png_bytes = cells_to_png_bytes(batch_crops)
 
-        prompt = (
-            "This image shows a grid of cells cropped from a nurimaze puzzle. "
-            "Each cell is labeled with its row,col position. "
-            "Classify each cell as one of:\n"
-            "- 0: empty (no symbol)\n"
-            "- 1: circle (hollow ring)\n"
-            "- 2: triangle (hollow triangle)\n"
-            "- 3: S (the letter S, marking the start)\n"
-            "- 4: G (the letter G, marking the goal)\n\n"
-            f"The grid has {rows} rows and {cols} columns. "
-            "Respond with ONLY a JSON array of arrays (rows x cols of integers). "
-            f"Example for a 3x3 grid: [[0,0,1],[3,0,0],[0,4,2]]. No explanation, just the JSON."
-        )
+            if debug_path:
+                debug_path.mkdir(parents=True, exist_ok=True)
+                (debug_path / f"05_montage_{batch_idx:02d}.png").write_bytes(png_bytes)
+            batch_idx += 1
 
-        response = self._model.generate_content([montage_image, prompt])
-        cells = parse_json_response(response.text)
+            montage_image = Image.open(__import__("io").BytesIO(png_bytes))
 
-        # Validate dimensions
-        if not isinstance(cells, list) or len(cells) != rows:
-            raise ValueError(
-                f"Expected {rows} rows from Gemini, got {len(cells) if isinstance(cells, list) else type(cells)}"
+            prompt = (
+                "This image shows a grid of cells cropped from a nurimaze puzzle. "
+                "Each cell is labeled with its row,col position. "
+                "Classify each cell as one of:\n"
+                "- 0: empty (no symbol)\n"
+                "- 1: circle (hollow ring)\n"
+                "- 2: triangle (hollow triangle)\n"
+                "- 3: S (the letter S, marking the start)\n"
+                "- 4: G (the letter G, marking the goal)\n\n"
+                f"This batch has {batch_rows} rows and {cols} columns "
+                f"(rows {start_row} to {end_row - 1} of the full grid). "
+                "Respond with ONLY a JSON array of arrays (rows x cols of integers). "
+                f"Example for a 3x3 grid: [[0,0,1],[3,0,0],[0,4,2]]. No explanation, just the JSON."
             )
-        for r, row in enumerate(cells):
-            if not isinstance(row, list) or len(row) != cols:
+
+            response = self._model.generate_content([montage_image, prompt])
+            batch_cells = parse_json_response(response.text)
+
+            if not isinstance(batch_cells, list) or len(batch_cells) != batch_rows:
                 raise ValueError(
-                    f"Expected {cols} cols in row {r}, got {len(row) if isinstance(row, list) else type(row)}"
+                    f"Expected {batch_rows} rows from Gemini (batch rows {start_row}-{end_row-1}), "
+                    f"got {len(batch_cells) if isinstance(batch_cells, list) else type(batch_cells)}"
                 )
+            for r, row in enumerate(batch_cells):
+                if not isinstance(row, list) or len(row) != cols:
+                    raise ValueError(
+                        f"Expected {cols} cols in row {start_row + r}, "
+                        f"got {len(row) if isinstance(row, list) else type(row)}"
+                    )
+            cells.extend(batch_cells)
 
         return cells
 

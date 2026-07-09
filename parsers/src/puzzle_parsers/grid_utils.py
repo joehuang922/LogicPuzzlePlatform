@@ -331,10 +331,11 @@ def _measure_v_border_width(
 
 
 def _find_thickness_threshold(widths: list[float]) -> float:
-    """Find threshold to separate thick from thin borders.
+    """Find threshold to separate thick from thin borders using Otsu's method.
 
-    Looks for the first significant gap in the sorted unique widths
-    (>= 2px absolute AND >= 40% relative).
+    Finds the threshold that minimizes within-class variance of the width
+    distribution. This works correctly even when unique values form a continuous
+    range (common at high resolution), unlike gap-based methods.
     """
     if not widths:
         return 3.0
@@ -345,13 +346,28 @@ def _find_thickness_threshold(widths: list[float]) -> float:
     if len(arr) < 2:
         return 3.0
 
-    sorted_w = np.sort(np.unique(arr))
-    if len(sorted_w) < 2:
-        return float(sorted_w[0]) + 1.0
+    # Otsu's method: find threshold minimizing intra-class variance
+    sorted_vals = np.sort(arr)
+    n = len(sorted_vals)
+    best_thresh = float(sorted_vals[n // 2])
+    best_var = float("inf")
 
-    for i in range(len(sorted_w) - 1):
-        gap = sorted_w[i + 1] - sorted_w[i]
-        if gap >= 2.0 and gap >= sorted_w[i] * 0.4:
-            return (sorted_w[i] + sorted_w[i + 1]) / 2
+    # Test candidate thresholds at each unique midpoint
+    unique_vals = np.unique(sorted_vals)
+    if len(unique_vals) < 2:
+        return float(unique_vals[0]) + 1.0
 
-    return (sorted_w[0] + sorted_w[-1]) / 2
+    for i in range(len(unique_vals) - 1):
+        t = (unique_vals[i] + unique_vals[i + 1]) / 2
+        c0 = arr[arr <= t]
+        c1 = arr[arr > t]
+        if len(c0) == 0 or len(c1) == 0:
+            continue
+        w0 = len(c0) / n
+        w1 = len(c1) / n
+        var = w0 * c0.var() + w1 * c1.var()
+        if var < best_var:
+            best_var = var
+            best_thresh = t
+
+    return best_thresh
