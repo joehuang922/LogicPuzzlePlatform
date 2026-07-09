@@ -166,6 +166,33 @@ export function getSnapshotById(attemptId: string, snapshotId: string) {
   return request<{ snapshot: Snapshot }>(`/attempts/${attemptId}/snapshots?snapshotId=${encodeURIComponent(snapshotId)}`);
 }
 
+export interface ProfileQuestionStat {
+  typeId: number;
+  typeName: string;
+  total: number;
+  solved: number;
+  tried: number;
+}
+
+export interface ProfileCollectionRow {
+  collectionId: number;
+  collectionName: string;
+  typeId: number;
+  typeName: string;
+  total: number;
+  solved: number;
+}
+
+export interface ProfileResponse {
+  player: { id: number; name: string };
+  questionStats: ProfileQuestionStat[];
+  collectionStats: ProfileCollectionRow[];
+}
+
+export function getProfile(player: number) {
+  return request<ProfileResponse>(`/profile?player=${player}`);
+}
+
 const PARSER_URL = import.meta.env.VITE_PARSER_URL ?? `${API_BASE}/parse`;
 
 export async function parseImage(image: string, puzzleType: number) {

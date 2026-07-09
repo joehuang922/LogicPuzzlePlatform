@@ -113,6 +113,24 @@ export class ApiStack extends cdk.Stack {
     props.cluster.secret!.grantRead(attemptsHandler);
     props.cluster.grantDataApiAccess(attemptsHandler);
 
+    const profileHandler = new lambda.Function(this, "ProfileHandler", {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: "handlers/profile.handler",
+      code: lambda.Code.fromAsset(path.join(__dirname, "../../../api/dist")),
+      environment: {
+        CLUSTER_ARN: props.cluster.clusterArn,
+        SECRET_ARN: props.cluster.secret!.secretArn,
+        DATABASE_NAME: props.databaseName,
+      },
+      timeout: cdk.Duration.seconds(10),
+    });
+
+    props.cluster.secret!.grantRead(profileHandler);
+    props.cluster.grantDataApiAccess(profileHandler);
+
+    const profile = api.root.addResource("profile");
+    profile.addMethod("GET", new apigw.LambdaIntegration(profileHandler));
+
     const attempts = api.root.addResource("attempts");
     const attemptIntegration = new apigw.LambdaIntegration(attemptsHandler);
     attempts.addMethod("GET", attemptIntegration);
