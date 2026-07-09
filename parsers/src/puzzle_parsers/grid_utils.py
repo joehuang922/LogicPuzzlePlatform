@@ -65,9 +65,12 @@ def order_points(pts: NDArray) -> NDArray:
 
 
 def warp_to_rectangle(
-    image: NDArray, border_pts: NDArray, target_height: int = 800
+    image: NDArray, border_pts: NDArray,
 ) -> tuple[NDArray, int, int]:
-    """Perspective-warp the image to a rectangle preserving aspect ratio.
+    """Perspective-warp the image to a rectangle at source resolution.
+
+    Preserves the native pixel density so that grid line detection works
+    reliably across all board sizes (from 7×7 to 60×100+).
 
     Returns (warped_image, width, height).
     """
@@ -75,7 +78,7 @@ def warp_to_rectangle(
     src_h = float(np.linalg.norm(border_pts[3] - border_pts[0]))
     aspect = src_w / src_h if src_h > 0 else 1.0
 
-    warp_h = target_height
+    warp_h = int(src_h)
     warp_w = int(warp_h * aspect)
     dst = np.float32([[0, 0], [warp_w, 0], [warp_w, warp_h], [0, warp_h]])
     M = cv2.getPerspectiveTransform(border_pts, dst)
@@ -86,30 +89,128 @@ def warp_to_rectangle(
 def detect_grid_lines(
     warped_gray: NDArray, warp_w: int, warp_h: int
 ) -> tuple[list[int], list[int]]:
-    """Detect all horizontal and vertical grid lines via morphological projection."""
+    """Detect all horizontal and vertical grid lines via morphological projection.
+
+    Uses a two-pass approach: first detects lines with a conservative kernel to
+    estimate cell size, then re-detects with adaptive parameters tuned to the
+    actual cell density.
+    """
     binary = cv2.adaptiveThreshold(
         cv2.GaussianBlur(warped_gray, (3, 3), 0),
         255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 3,
     )
 
-    # Horizontal lines
-    min_h_len = warp_w // 6
-    h_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (min_h_len, 1))
-    h_mask = cv2.morphologyEx(binary, cv2.MORPH_OPEN, h_kernel)
-    row_sums = h_mask.sum(axis=1) / 255
-    h_peaks, _ = find_peaks(row_sums, height=warp_w * 0.2, distance=warp_h // 20)
-
-    # Vertical lines
-    min_v_len = warp_h // 6
-    v_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, min_v_len))
-    v_mask = cv2.morphologyEx(binary, cv2.MORPH_OPEN, v_kernel)
-    col_sums = v_mask.sum(axis=0) / 255
-    v_peaks, _ = find_peaks(col_sums, height=warp_h * 0.2, distance=warp_w // 20)
-
-    h_lines = merge_close_peaks(h_peaks.tolist(), min_gap=warp_h // 25)
-    v_lines = merge_close_peaks(v_peaks.tolist(), min_gap=warp_w // 25)
+    h_lines = _detect_lines_1d(binary, axis="h", img_len=warp_w, img_span=warp_h)
+    v_lines = _detect_lines_1d(binary, axis="v", img_len=warp_h, img_span=warp_w)
 
     return h_lines, v_lines
+
+
+def _detect_lines_1d(
+    binary: NDArray, axis: str, img_len: int, img_span: int,
+) -> list[int]:
+    """Detect grid lines along one axis with adaptive parameters.
+
+    Uses progressively shorter morphological kernels until a consistent grid
+    emerges. Picks the kernel that yields the most regular spacing (quasi-square
+    cells). Then merges double-detections from thick lines.
+
+    Args:
+        binary: binarized image (ink=255)
+        axis: "h" for horizontal lines, "v" for vertical
+        img_len: length along the line direction (width for h, height for v)
+        img_span: span perpendicular to lines (height for h, width for v)
+    """
+    kernel_fractions = [1/4, 1/6, 1/8, 1/12, 1/16, 1/20, 1/30]
+
+    best_result: list[int] = []
+    best_regularity = float("inf")
+
+    for frac in kernel_fractions:
+        min_line_len = max(20, int(img_len * frac))
+
+        if axis == "h":
+            kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (min_line_len, 1))
+            mask = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)
+            projection = mask.sum(axis=1) / 255
+        else:
+            kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, min_line_len))
+            mask = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)
+            projection = mask.sum(axis=0) / 255
+
+        peaks, _ = find_peaks(
+            projection, height=img_len * 0.03, distance=3
+        )
+
+        if len(peaks) < 3:
+            continue
+
+        # Adaptive merge: find the natural gap between double-detection
+        # spacings and true cell spacings
+        merge_gap = _estimate_merge_gap(peaks.tolist(), img_span)
+        merged = merge_close_peaks(peaks.tolist(), min_gap=merge_gap)
+
+        if len(merged) < 3:
+            continue
+
+        # Score regularity: coefficient of variation of spacings
+        final_spacings = np.diff(merged)
+        cv_score = float(np.std(final_spacings) / np.mean(final_spacings))
+
+        # Prefer results with more lines AND good regularity.
+        # Among results with similar regularity (cv < 0.15), prefer more lines.
+        if cv_score < 0.15 and len(merged) > len(best_result):
+            best_result = merged
+            best_regularity = cv_score
+        elif cv_score < best_regularity and len(merged) >= len(best_result):
+            best_result = merged
+            best_regularity = cv_score
+
+    if len(best_result) < 2:
+        # Absolute fallback: raw projection without morph
+        if axis == "h":
+            projection = binary.sum(axis=1) / 255
+        else:
+            projection = binary.sum(axis=0) / 255
+        peaks, _ = find_peaks(projection, height=img_len * 0.2, distance=img_span // 20)
+        return merge_close_peaks(peaks.tolist(), min_gap=max(3, img_span // 50))
+
+    return best_result
+
+
+def _estimate_merge_gap(peaks: list[int], img_span: int) -> int:
+    """Find the merge gap that separates double-detections from true cell spacings.
+
+    Looks for the largest jump in sorted pairwise spacings — anything below
+    that jump is a double-detection, anything above is a real cell boundary.
+    """
+    if len(peaks) < 3:
+        return max(3, img_span // 50)
+
+    spacings = sorted(np.diff(peaks).tolist())
+    if not spacings:
+        return max(3, img_span // 50)
+
+    # Find the largest relative gap in the sorted spacings
+    best_gap_idx = 0
+    best_gap_ratio = 0.0
+    for i in range(len(spacings) - 1):
+        if spacings[i] == 0:
+            continue
+        ratio = spacings[i + 1] / spacings[i]
+        if ratio > best_gap_ratio:
+            best_gap_ratio = ratio
+            best_gap_idx = i
+
+    # If there's a clear jump (>2x), merge threshold is midway between
+    # the last small spacing and the first large one
+    if best_gap_ratio > 2.0:
+        merge_threshold = (spacings[best_gap_idx] + spacings[best_gap_idx + 1]) // 2
+        return max(3, merge_threshold)
+
+    # No clear bimodal split — use a fraction of median spacing
+    median_spacing = float(np.median(spacings))
+    return max(3, int(median_spacing * 0.4))
 
 
 def merge_close_peaks(lines: list[int], min_gap: int = 10) -> list[int]:
@@ -149,6 +250,9 @@ def classify_border_thickness(
         255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 3,
     )
 
+    avg_cell_h = (h_lines[-1] - h_lines[0]) / rows if rows > 0 else 50.0
+    avg_cell_w = (v_lines[-1] - v_lines[0]) / cols if cols > 0 else 50.0
+
     # Measure horizontal border widths
     h_widths: list[tuple[int, int, float]] = []
     for r in range(1, rows):
@@ -156,7 +260,7 @@ def classify_border_thickness(
         for c in range(cols):
             x_start = v_lines[c]
             x_end = v_lines[c + 1]
-            width = _measure_h_border_width(binary, y, x_start, x_end)
+            width = _measure_h_border_width(binary, y, x_start, x_end, avg_cell_h)
             h_widths.append((r - 1, c, width))
 
     # Measure vertical border widths
@@ -166,7 +270,7 @@ def classify_border_thickness(
         for r in range(rows):
             y_start = h_lines[r]
             y_end = h_lines[r + 1]
-            width = _measure_v_border_width(binary, x, y_start, y_end)
+            width = _measure_v_border_width(binary, x, y_start, y_end, avg_cell_w)
             v_widths.append((r, c - 1, width))
 
     # Classify using bimodal threshold
@@ -185,15 +289,15 @@ def classify_border_thickness(
 
 
 def _measure_h_border_width(
-    binary: NDArray, y: int, x_start: int, x_end: int
+    binary: NDArray, y: int, x_start: int, x_end: int, cell_h: float = 50.0,
 ) -> float:
     """Measure the width (in pixels) of a horizontal border at row y."""
     h = binary.shape[0]
     samples = []
-    num_samples = 5
+    num_samples = max(3, min(7, (x_end - x_start) // 10))
+    scan_range = max(5, int(cell_h * 0.3))
     for i in range(num_samples):
         x = x_start + (x_end - x_start) * (i + 1) // (num_samples + 1)
-        scan_range = 15
         y0 = max(0, y - scan_range)
         y1 = min(h, y + scan_range)
         col_strip = binary[y0:y1, max(0, x - 1): x + 2].max(axis=1)
@@ -206,15 +310,15 @@ def _measure_h_border_width(
 
 
 def _measure_v_border_width(
-    binary: NDArray, x: int, y_start: int, y_end: int
+    binary: NDArray, x: int, y_start: int, y_end: int, cell_w: float = 50.0,
 ) -> float:
     """Measure the width (in pixels) of a vertical border at column x."""
     w = binary.shape[1]
     samples = []
-    num_samples = 5
+    num_samples = max(3, min(7, (y_end - y_start) // 10))
+    scan_range = max(5, int(cell_w * 0.3))
     for i in range(num_samples):
         y = y_start + (y_end - y_start) * (i + 1) // (num_samples + 1)
-        scan_range = 15
         x0 = max(0, x - scan_range)
         x1 = min(w, x + scan_range)
         row_strip = binary[max(0, y - 1): y + 2, x0:x1].max(axis=0)
