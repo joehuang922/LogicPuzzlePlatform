@@ -187,6 +187,9 @@ function QuestionForm({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editorOpen, setEditorOpen] = useState(false);
 
+  const selectedTypeName = puzzleTypes.find((pt) => String(pt.id) === puzzleType)?.name;
+  const isNurimaze = selectedTypeName === "nurimaze";
+
   function validate(): boolean {
     const errs: Record<string, string> = {};
     if (!puzzleType) errs.puzzleType = "Puzzle type is required";
@@ -361,7 +364,7 @@ function QuestionForm({
         <div style={fieldStyle}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
             <label>Canon repr (JSON) *</label>
-            {puzzleType === "3" && !editorOpen && (
+            {isNurimaze && !editorOpen && (
               <button
                 type="button"
                 onClick={() => setEditorOpen(true)}
@@ -370,13 +373,13 @@ function QuestionForm({
                 Open Board Editor
               </button>
             )}
-            {puzzleType && puzzleType !== "3" && (
+            {puzzleType && !isNurimaze && (
               <span style={{ fontSize: "0.75rem", color: "#999", fontStyle: "italic" }}>
                 No visual editor supported for this puzzle type yet.
               </span>
             )}
           </div>
-          {editorOpen && puzzleType === "3" ? (
+          {editorOpen && isNurimaze ? (
             <NurimazeEditor
               initialJson={canonRepr}
               onComplete={(json) => {
