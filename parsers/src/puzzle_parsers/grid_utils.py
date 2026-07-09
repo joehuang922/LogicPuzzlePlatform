@@ -238,20 +238,18 @@ def classify_border_thickness(
 ) -> tuple[list[list[int]], list[list[int]]]:
     """Classify each internal border as thick (1) or thin (0).
 
-    Measures ink width perpendicular to each border segment and uses a bimodal
-    split to find the threshold between thin and thick.
+    Measures border width from the grayscale profile directly using a local
+    relative threshold (50% between ink minimum and background maximum). This
+    is robust to degraded scan quality where absolute binarization fails.
 
     Returns (h_borders, v_borders):
       h_borders: (rows-1) x cols — border below cell[r][c]
       v_borders: rows x (cols-1) — border right of cell[r][c]
     """
-    binary = cv2.adaptiveThreshold(
-        cv2.GaussianBlur(warped_gray, (3, 3), 0),
-        255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 3,
-    )
-
     avg_cell_h = (h_lines[-1] - h_lines[0]) / rows if rows > 0 else 50.0
     avg_cell_w = (v_lines[-1] - v_lines[0]) / cols if cols > 0 else 50.0
+    scan_range_h = max(5, int(avg_cell_h * 0.3))
+    scan_range_w = max(5, int(avg_cell_w * 0.3))
 
     # Measure horizontal border widths
     h_widths: list[tuple[int, int, float]] = []
@@ -260,7 +258,9 @@ def classify_border_thickness(
         for c in range(cols):
             x_start = v_lines[c]
             x_end = v_lines[c + 1]
-            width = _measure_h_border_width(binary, y, x_start, x_end, avg_cell_h)
+            width = _measure_border_width_gray(
+                warped_gray, "h", y, x_start, x_end, scan_range_h
+            )
             h_widths.append((r - 1, c, width))
 
     # Measure vertical border widths
@@ -270,7 +270,9 @@ def classify_border_thickness(
         for r in range(rows):
             y_start = h_lines[r]
             y_end = h_lines[r + 1]
-            width = _measure_v_border_width(binary, x, y_start, y_end, avg_cell_w)
+            width = _measure_border_width_gray(
+                warped_gray, "v", x, y_start, y_end, scan_range_w
+            )
             v_widths.append((r, c - 1, width))
 
     # Classify using bimodal threshold
@@ -288,66 +290,54 @@ def classify_border_thickness(
     return h_borders, v_borders
 
 
-def _measure_h_border_width(
-    binary: NDArray, y: int, x_start: int, x_end: int, cell_h: float = 50.0,
+def _measure_border_width_gray(
+    gray: NDArray,
+    axis: str,
+    line_pos: int,
+    start: int,
+    end: int,
+    scan_range: int,
 ) -> float:
-    """Measure the width (in pixels) of a horizontal border at row y.
+    """Measure border width from the grayscale profile using a local threshold.
 
-    Uses the longest continuous ink run (not first-to-last span) to avoid
-    inflated measurements from nearby symbols bleeding into the scan window.
+    Instead of relying on a pre-binarized image (which fails in low-contrast
+    regions), this measures the width of the dark valley at each sample point
+    using a threshold set at 50% between the local background and ink levels.
     """
-    h = binary.shape[0]
+    h, w = gray.shape
+    num_samples = max(3, min(7, (end - start) // 10))
     samples = []
-    num_samples = max(3, min(7, (x_end - x_start) // 10))
-    scan_range = max(5, int(cell_h * 0.3))
+
     for i in range(num_samples):
-        x = x_start + (x_end - x_start) * (i + 1) // (num_samples + 1)
-        y0 = max(0, y - scan_range)
-        y1 = min(h, y + scan_range)
-        col_strip = binary[y0:y1, max(0, x - 1): x + 2].max(axis=1)
-        width = _longest_run(col_strip)
-        if width > 0:
-            samples.append(width)
-
-    return float(np.median(samples)) if samples else 0.0
-
-
-def _measure_v_border_width(
-    binary: NDArray, x: int, y_start: int, y_end: int, cell_w: float = 50.0,
-) -> float:
-    """Measure the width (in pixels) of a vertical border at column x.
-
-    Uses the longest continuous ink run (not first-to-last span) to avoid
-    inflated measurements from nearby symbols bleeding into the scan window.
-    """
-    w = binary.shape[1]
-    samples = []
-    num_samples = max(3, min(7, (y_end - y_start) // 10))
-    scan_range = max(5, int(cell_w * 0.3))
-    for i in range(num_samples):
-        y = y_start + (y_end - y_start) * (i + 1) // (num_samples + 1)
-        x0 = max(0, x - scan_range)
-        x1 = min(w, x + scan_range)
-        row_strip = binary[max(0, y - 1): y + 2, x0:x1].max(axis=0)
-        width = _longest_run(row_strip)
-        if width > 0:
-            samples.append(width)
-
-    return float(np.median(samples)) if samples else 0.0
-
-
-def _longest_run(strip: NDArray) -> int:
-    """Find the longest continuous run of nonzero values in a 1D array."""
-    max_run = 0
-    current_run = 0
-    for val in strip:
-        if val:
-            current_run += 1
-            if current_run > max_run:
-                max_run = current_run
+        pos = start + (end - start) * (i + 1) // (num_samples + 1)
+        if axis == "h":
+            y0 = max(0, line_pos - scan_range)
+            y1 = min(h, line_pos + scan_range)
+            strip = gray[y0:y1, max(0, pos - 1): pos + 2].min(axis=1).astype(float)
         else:
-            current_run = 0
-    return max_run
+            x0 = max(0, line_pos - scan_range)
+            x1 = min(w, line_pos + scan_range)
+            strip = gray[max(0, pos - 1): pos + 2, x0:x1].min(axis=0).astype(float)
+
+        bg = float(strip.max())
+        ink = float(strip.min())
+        if bg - ink < 20:
+            continue
+
+        thresh = ink + (bg - ink) * 0.5
+        max_run = 0
+        current_run = 0
+        for val in strip:
+            if val < thresh:
+                current_run += 1
+                if current_run > max_run:
+                    max_run = current_run
+            else:
+                current_run = 0
+        if max_run > 0:
+            samples.append(max_run)
+
+    return float(np.median(samples)) if samples else 0.0
 
 
 def _find_thickness_threshold(widths: list[float]) -> float:
