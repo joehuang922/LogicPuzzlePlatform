@@ -16,6 +16,8 @@ import SudokuBoard from "../components/SudokuBoard";
 import ComboSudokuBoard from "../components/ComboSudokuBoard";
 import NurimazeBoard from "../components/NurimazeBoard";
 import NurimazeEditor from "../components/NurimazeEditor";
+import SudokuEditor from "../components/SudokuEditor";
+import ComboSudokuEditor from "../components/ComboSudokuEditor";
 import { NurimazeCanon } from "../types/canon";
 import { DIFFICULTY_OPTIONS, DIFFICULTY_LABELS } from "../constants";
 
@@ -190,6 +192,9 @@ function QuestionForm({
 
   const selectedTypeName = puzzleTypes.find((pt) => String(pt.id) === puzzleType)?.name;
   const isNurimaze = selectedTypeName === "nurimaze";
+  const isSudoku = selectedTypeName === "sudoku";
+  const isComboSudoku = selectedTypeName === "combo-sudoku";
+  const hasEditor = isNurimaze || isSudoku || isComboSudoku;
 
   function validate(): boolean {
     const errs: Record<string, string> = {};
@@ -365,7 +370,7 @@ function QuestionForm({
         <div style={fieldStyle}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
             <label>Canon repr (JSON) *</label>
-            {isNurimaze && !editorOpen && (
+            {hasEditor && !editorOpen && (
               <button
                 type="button"
                 onClick={() => setEditorOpen(true)}
@@ -374,21 +379,32 @@ function QuestionForm({
                 Open Board Editor
               </button>
             )}
-            {puzzleType && !isNurimaze && (
+            {puzzleType && !hasEditor && (
               <span style={{ fontSize: "0.75rem", color: "#999", fontStyle: "italic" }}>
                 No visual editor supported for this puzzle type yet.
               </span>
             )}
           </div>
-          {editorOpen && isNurimaze ? (
-            <NurimazeEditor
-              initialJson={canonRepr}
-              onComplete={(json) => {
-                setCanonRepr(json);
-                setEditorOpen(false);
-              }}
-              onCancel={() => setEditorOpen(false)}
-            />
+          {editorOpen && hasEditor ? (
+            isNurimaze ? (
+              <NurimazeEditor
+                initialJson={canonRepr}
+                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
+                onCancel={() => setEditorOpen(false)}
+              />
+            ) : isSudoku ? (
+              <SudokuEditor
+                initialJson={canonRepr}
+                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
+                onCancel={() => setEditorOpen(false)}
+              />
+            ) : (
+              <ComboSudokuEditor
+                initialJson={canonRepr}
+                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
+                onCancel={() => setEditorOpen(false)}
+              />
+            )
           ) : (
             <textarea
               style={{ ...inputStyle, minHeight: 120, fontFamily: "monospace", fontSize: "0.8rem" }}
@@ -440,6 +456,9 @@ function PuzzleEditRow({
 
   const typeName = puzzleTypes.find((pt) => pt.id === puzzle.puzzleType)?.name;
   const isNurimaze = typeName === "nurimaze";
+  const isSudoku = typeName === "sudoku";
+  const isComboSudoku = typeName === "combo-sudoku";
+  const hasEditor = isNurimaze || isSudoku || isComboSudoku;
 
   async function handleConfirm() {
     let parsedCanon: Record<string, unknown>;
@@ -492,7 +511,7 @@ function PuzzleEditRow({
           <div style={fieldStyle}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
               <label style={{ fontSize: "0.75rem", fontWeight: "bold" }}>Canon repr (JSON)</label>
-              {isNurimaze && !editorOpen && (
+              {hasEditor && !editorOpen && (
                 <button
                   type="button"
                   onClick={() => setEditorOpen(true)}
@@ -502,15 +521,26 @@ function PuzzleEditRow({
                 </button>
               )}
             </div>
-            {editorOpen && isNurimaze ? (
-              <NurimazeEditor
-                initialJson={canonRepr}
-                onComplete={(json) => {
-                  setCanonRepr(json);
-                  setEditorOpen(false);
-                }}
-                onCancel={() => setEditorOpen(false)}
-              />
+            {editorOpen && hasEditor ? (
+              isNurimaze ? (
+                <NurimazeEditor
+                  initialJson={canonRepr}
+                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
+                  onCancel={() => setEditorOpen(false)}
+                />
+              ) : isSudoku ? (
+                <SudokuEditor
+                  initialJson={canonRepr}
+                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
+                  onCancel={() => setEditorOpen(false)}
+                />
+              ) : (
+                <ComboSudokuEditor
+                  initialJson={canonRepr}
+                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
+                  onCancel={() => setEditorOpen(false)}
+                />
+              )
             ) : (
               <textarea
                 style={{ ...inputStyle, minHeight: 100, fontFamily: "monospace", fontSize: "0.75rem" }}
