@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "esbuild src/handlers/puzzles.ts src/handlers/collections.ts src/handlers/puzzle-types.ts src/handlers/attempts.ts --bundle --platform=node --target=node20 --outdir=dist/handlers --external:@aws-sdk",
+    "build": "esbuild src/handlers/puzzles.ts src/handlers/collections.ts src/handlers/puzzle-types.ts src/handlers/attempts.ts src/handlers/profile.ts --bundle --platform=node --target=node20 --outdir=dist/handlers --external:@aws-sdk",
     "test": "jest"
   },
   "dependencies": {
