@@ -59,6 +59,18 @@ export function createPuzzle(data: {
   });
 }
 
+export function updatePuzzle(id: string, data: {
+  title?: string | null;
+  author?: string | null;
+  difficulty?: number;
+  canonRepr?: Record<string, unknown>;
+}) {
+  return request<{ puzzle: Puzzle }>(`/puzzles/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
 export function deletePuzzle(id: string) {
   return request<null>(`/puzzles/${id}`, { method: "DELETE" });
 }

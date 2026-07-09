@@ -73,6 +73,7 @@ export class ApiStack extends cdk.Stack {
 
     const singlePuzzle = puzzles.addResource("{id}");
     singlePuzzle.addMethod("GET", puzzleIntegration);
+    singlePuzzle.addMethod("PATCH", puzzleIntegration);
     singlePuzzle.addMethod("DELETE", puzzleIntegration);
 
     const collections = api.root.addResource("collections");

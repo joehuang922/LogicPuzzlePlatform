@@ -5,6 +5,7 @@ import {
   listPuzzles,
   createCollection,
   createPuzzle,
+  updatePuzzle,
   deletePuzzle,
   parseImage,
   PuzzleType,
@@ -416,6 +417,137 @@ function QuestionForm({
   );
 }
 
+function PuzzleEditRow({
+  puzzle,
+  puzzleTypes,
+  onSaved,
+  onCancel,
+}: {
+  puzzle: Puzzle;
+  puzzleTypes: PuzzleType[];
+  onSaved: (updated: Puzzle) => void;
+  onCancel: () => void;
+}) {
+  const [title, setTitle] = useState(puzzle.title || "");
+  const [author, setAuthor] = useState(puzzle.author || "");
+  const [difficulty, setDifficulty] = useState(String(puzzle.difficulty));
+  const [canonRepr, setCanonRepr] = useState(
+    typeof puzzle.canonRepr === "string" ? puzzle.canonRepr : JSON.stringify(puzzle.canonRepr, null, 2)
+  );
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const typeName = puzzleTypes.find((pt) => pt.id === puzzle.puzzleType)?.name;
+  const isNurimaze = typeName === "nurimaze";
+
+  async function handleConfirm() {
+    let parsedCanon: Record<string, unknown>;
+    try {
+      parsedCanon = JSON.parse(canonRepr);
+    } catch {
+      setError("Canon repr must be valid JSON");
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await updatePuzzle(puzzle.id, {
+        title: title.trim() || null,
+        author: author.trim() || null,
+        difficulty: Number(difficulty),
+        canonRepr: parsedCanon,
+      });
+      onSaved(res.puzzle as unknown as Puzzle);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <tr>
+      <td colSpan={6} style={{ padding: "0.75rem", background: "#fffbe6", borderBottom: "2px solid #e8c840" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+            <div style={fieldStyle}>
+              <label style={{ fontSize: "0.75rem", fontWeight: "bold" }}>Title</label>
+              <input style={{ ...inputStyle, width: 200 }} value={title} onChange={(e) => setTitle(e.target.value)} />
+            </div>
+            <div style={fieldStyle}>
+              <label style={{ fontSize: "0.75rem", fontWeight: "bold" }}>Difficulty</label>
+              <select style={{ ...inputStyle, width: 140 }} value={difficulty} onChange={(e) => setDifficulty(e.target.value)}>
+                {DIFFICULTY_OPTIONS.map((d) => (
+                  <option key={d.value} value={d.value}>{d.label}</option>
+                ))}
+              </select>
+            </div>
+            <div style={fieldStyle}>
+              <label style={{ fontSize: "0.75rem", fontWeight: "bold" }}>Author</label>
+              <input style={{ ...inputStyle, width: 160 }} value={author} onChange={(e) => setAuthor(e.target.value)} />
+            </div>
+          </div>
+          <div style={fieldStyle}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+              <label style={{ fontSize: "0.75rem", fontWeight: "bold" }}>Canon repr (JSON)</label>
+              {isNurimaze && !editorOpen && (
+                <button
+                  type="button"
+                  onClick={() => setEditorOpen(true)}
+                  style={{ padding: "0.2rem 0.5rem", fontSize: "0.75rem", border: "1px solid #4a90d9", borderRadius: 4, background: "#f0f7ff", color: "#4a90d9", cursor: "pointer" }}
+                >
+                  Open Board Editor
+                </button>
+              )}
+            </div>
+            {editorOpen && isNurimaze ? (
+              <NurimazeEditor
+                initialJson={canonRepr}
+                onComplete={(json) => {
+                  setCanonRepr(json);
+                  setEditorOpen(false);
+                }}
+                onCancel={() => setEditorOpen(false)}
+              />
+            ) : (
+              <textarea
+                style={{ ...inputStyle, minHeight: 100, fontFamily: "monospace", fontSize: "0.75rem" }}
+                value={canonRepr}
+                onChange={(e) => setCanonRepr(e.target.value)}
+              />
+            )}
+          </div>
+          {canonRepr.trim() && (
+            <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: "0.75rem", background: "#fff" }}>
+              <label style={{ fontWeight: "bold", fontSize: "0.75rem", marginBottom: "0.25rem", display: "block" }}>Preview</label>
+              <CanonPreview puzzleType={puzzle.puzzleType} canonRepr={canonRepr} />
+            </div>
+          )}
+          {error && <span style={errorStyle}>{error}</span>}
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            <button
+              onClick={handleConfirm}
+              disabled={saving}
+              style={{ padding: "0.3rem 0.75rem", fontSize: "0.8rem", background: "#4a90d9", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer" }}
+            >
+              {saving ? "Saving..." : "Confirm"}
+            </button>
+            <button
+              onClick={onCancel}
+              disabled={saving}
+              style={{ padding: "0.3rem 0.75rem", fontSize: "0.8rem", border: "1px solid #ccc", borderRadius: 4, background: "#fff", cursor: "pointer" }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 function CollectionBrowser({
   collections,
   puzzleTypes,
@@ -437,6 +569,7 @@ function CollectionBrowser({
   const [loadingPuzzles, setLoadingPuzzles] = useState(false);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const puzzleTypeMap = Object.fromEntries(puzzleTypes.map((pt) => [pt.id, pt.name]));
 
@@ -447,6 +580,7 @@ function CollectionBrowser({
     }
     setExpandedId(collectionId);
     setChecked(new Set());
+    setEditingId(null);
     setLoadingPuzzles(true);
     try {
       const res = await listPuzzles({ srcCollection: collectionId });
@@ -479,6 +613,11 @@ function CollectionBrowser({
     } finally {
       setDeleting(false);
     }
+  }
+
+  function handleSaved(updated: Puzzle) {
+    setPuzzles((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+    setEditingId(null);
   }
 
   const groupedByType = puzzles.reduce<Record<number, Puzzle[]>>((acc, p) => {
@@ -540,23 +679,43 @@ function CollectionBrowser({
                                   <th style={{ padding: "0.3rem" }}>Difficulty</th>
                                   <th style={{ padding: "0.3rem" }}>Author</th>
                                   <th style={{ padding: "0.3rem" }}>Size</th>
+                                  <th style={{ padding: "0.3rem", width: 50 }}></th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {items.map((p) => (
-                                  <tr key={p.id} style={{ borderBottom: "1px solid #f0f0f0" }}>
-                                    <td style={{ padding: "0.3rem", textAlign: "center" }}>
-                                      <input
-                                        type="checkbox"
-                                        checked={checked.has(p.id)}
-                                        onChange={() => toggleCheck(p.id)}
+                                  <>
+                                    <tr key={p.id} style={{ borderBottom: editingId === p.id ? "none" : "1px solid #f0f0f0" }}>
+                                      <td style={{ padding: "0.3rem", textAlign: "center" }}>
+                                        <input
+                                          type="checkbox"
+                                          checked={checked.has(p.id)}
+                                          onChange={() => toggleCheck(p.id)}
+                                        />
+                                      </td>
+                                      <td style={{ padding: "0.3rem" }}>{p.title || "(none)"}</td>
+                                      <td style={{ padding: "0.3rem" }}>{DIFFICULTY_LABELS[p.difficulty] || String(p.difficulty)}</td>
+                                      <td style={{ padding: "0.3rem" }}>{p.author || "N/A"}</td>
+                                      <td style={{ padding: "0.3rem" }}>{p.width && p.height ? `${p.width} x ${p.height}` : "—"}</td>
+                                      <td style={{ padding: "0.3rem", textAlign: "center" }}>
+                                        <button
+                                          onClick={() => setEditingId(editingId === p.id ? null : p.id)}
+                                          style={{ padding: "0.15rem 0.4rem", fontSize: "0.75rem", border: "1px solid #4a90d9", borderRadius: 3, background: editingId === p.id ? "#4a90d9" : "#f0f7ff", color: editingId === p.id ? "#fff" : "#4a90d9", cursor: "pointer" }}
+                                        >
+                                          Edit
+                                        </button>
+                                      </td>
+                                    </tr>
+                                    {editingId === p.id && (
+                                      <PuzzleEditRow
+                                        key={`${p.id}-edit`}
+                                        puzzle={p}
+                                        puzzleTypes={puzzleTypes}
+                                        onSaved={handleSaved}
+                                        onCancel={() => setEditingId(null)}
                                       />
-                                    </td>
-                                    <td style={{ padding: "0.3rem" }}>{p.title || "(none)"}</td>
-                                    <td style={{ padding: "0.3rem" }}>{DIFFICULTY_LABELS[p.difficulty] || String(p.difficulty)}</td>
-                                    <td style={{ padding: "0.3rem" }}>{p.author || "N/A"}</td>
-                                    <td style={{ padding: "0.3rem" }}>{p.width && p.height ? `${p.width} x ${p.height}` : "—"}</td>
-                                  </tr>
+                                    )}
+                                  </>
                                 ))}
                               </tbody>
                             </table>
