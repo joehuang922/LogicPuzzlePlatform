@@ -291,7 +291,11 @@ def classify_border_thickness(
 def _measure_h_border_width(
     binary: NDArray, y: int, x_start: int, x_end: int, cell_h: float = 50.0,
 ) -> float:
-    """Measure the width (in pixels) of a horizontal border at row y."""
+    """Measure the width (in pixels) of a horizontal border at row y.
+
+    Uses the longest continuous ink run (not first-to-last span) to avoid
+    inflated measurements from nearby symbols bleeding into the scan window.
+    """
     h = binary.shape[0]
     samples = []
     num_samples = max(3, min(7, (x_end - x_start) // 10))
@@ -301,9 +305,8 @@ def _measure_h_border_width(
         y0 = max(0, y - scan_range)
         y1 = min(h, y + scan_range)
         col_strip = binary[y0:y1, max(0, x - 1): x + 2].max(axis=1)
-        nz = np.nonzero(col_strip)[0]
-        if len(nz) > 0:
-            width = nz[-1] - nz[0] + 1
+        width = _longest_run(col_strip)
+        if width > 0:
             samples.append(width)
 
     return float(np.median(samples)) if samples else 0.0
@@ -312,7 +315,11 @@ def _measure_h_border_width(
 def _measure_v_border_width(
     binary: NDArray, x: int, y_start: int, y_end: int, cell_w: float = 50.0,
 ) -> float:
-    """Measure the width (in pixels) of a vertical border at column x."""
+    """Measure the width (in pixels) of a vertical border at column x.
+
+    Uses the longest continuous ink run (not first-to-last span) to avoid
+    inflated measurements from nearby symbols bleeding into the scan window.
+    """
     w = binary.shape[1]
     samples = []
     num_samples = max(3, min(7, (y_end - y_start) // 10))
@@ -322,20 +329,33 @@ def _measure_v_border_width(
         x0 = max(0, x - scan_range)
         x1 = min(w, x + scan_range)
         row_strip = binary[max(0, y - 1): y + 2, x0:x1].max(axis=0)
-        nz = np.nonzero(row_strip)[0]
-        if len(nz) > 0:
-            width = nz[-1] - nz[0] + 1
+        width = _longest_run(row_strip)
+        if width > 0:
             samples.append(width)
 
     return float(np.median(samples)) if samples else 0.0
+
+
+def _longest_run(strip: NDArray) -> int:
+    """Find the longest continuous run of nonzero values in a 1D array."""
+    max_run = 0
+    current_run = 0
+    for val in strip:
+        if val:
+            current_run += 1
+            if current_run > max_run:
+                max_run = current_run
+        else:
+            current_run = 0
+    return max_run
 
 
 def _find_thickness_threshold(widths: list[float]) -> float:
     """Find threshold to separate thick from thin borders using Otsu's method.
 
     Finds the threshold that minimizes within-class variance of the width
-    distribution. This works correctly even when unique values form a continuous
-    range (common at high resolution), unlike gap-based methods.
+    distribution — the optimal bimodal split regardless of which class is
+    larger. Works for nurimaze where thick borders are typically the majority.
     """
     if not widths:
         return 3.0
@@ -346,16 +366,13 @@ def _find_thickness_threshold(widths: list[float]) -> float:
     if len(arr) < 2:
         return 3.0
 
-    # Otsu's method: find threshold minimizing intra-class variance
-    sorted_vals = np.sort(arr)
-    n = len(sorted_vals)
-    best_thresh = float(sorted_vals[n // 2])
-    best_var = float("inf")
-
-    # Test candidate thresholds at each unique midpoint
-    unique_vals = np.unique(sorted_vals)
+    unique_vals = np.unique(arr)
     if len(unique_vals) < 2:
         return float(unique_vals[0]) + 1.0
+
+    n = len(arr)
+    best_thresh = float(unique_vals[len(unique_vals) // 2])
+    best_var = float("inf")
 
     for i in range(len(unique_vals) - 1):
         t = (unique_vals[i] + unique_vals[i + 1]) / 2
