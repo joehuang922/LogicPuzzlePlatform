@@ -159,7 +159,7 @@ function CanonPreview({ puzzleType, canonRepr }: { puzzleType: number; canonRepr
     return <ComboSudokuBoard subboards={parsed.subboards as { x: number; y: number; hints: number[][] }[]} />;
   }
   if (puzzleType === 3 && parsed.cells && parsed.grids) {
-    return <NurimazeBoard canon={parsed as unknown as NurimazeCanon} />;
+    return <NurimazeBoard canon={parsed as unknown as NurimazeCanon} readonly />;
   }
   return <p style={{ color: "#666", fontSize: "0.85rem" }}>No preview available for this puzzle type.</p>;
 }

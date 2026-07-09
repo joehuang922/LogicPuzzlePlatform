@@ -6,6 +6,7 @@ interface NurimazeBoardProps {
   initialUserValues?: Record<string, number>;
   onValuesChange?: (values: Record<string, number>) => void;
   onComplete?: () => void;
+  readonly?: boolean;
 }
 
 const CELL_SIZE = 36;
@@ -188,7 +189,7 @@ function validateSolution(
   return true;
 }
 
-export default function NurimazeBoard({ canon, initialUserValues, onValuesChange, onComplete }: NurimazeBoardProps) {
+export default function NurimazeBoard({ canon, initialUserValues, onValuesChange, onComplete, readonly }: NurimazeBoardProps) {
   const { cells, grids } = canon;
   const rows = cells.length;
   const cols = cells[0].length;
@@ -455,7 +456,7 @@ export default function NurimazeBoard({ canon, initialUserValues, onValuesChange
           {symbols}
 
           {/* Click targets */}
-          {Array.from({ length: rows * cols }, (_, i) => {
+          {!readonly && Array.from({ length: rows * cols }, (_, i) => {
             const r = Math.floor(i / cols);
             const c = i % cols;
             return (
