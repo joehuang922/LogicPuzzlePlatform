@@ -14,6 +14,7 @@ import {
 import SudokuBoard from "../components/SudokuBoard";
 import ComboSudokuBoard from "../components/ComboSudokuBoard";
 import NurimazeBoard from "../components/NurimazeBoard";
+import NurimazeEditor from "../components/NurimazeEditor";
 import { NurimazeCanon } from "../types/canon";
 import { DIFFICULTY_OPTIONS, DIFFICULTY_LABELS } from "../constants";
 
@@ -184,6 +185,7 @@ function QuestionForm({
   const [parsing, setParsing] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
 
   function validate(): boolean {
     const errs: Record<string, string> = {};
@@ -357,12 +359,39 @@ function QuestionForm({
         </div>
 
         <div style={fieldStyle}>
-          <label>Canon repr (JSON) *</label>
-          <textarea
-            style={{ ...inputStyle, minHeight: 120, fontFamily: "monospace", fontSize: "0.8rem" }}
-            value={canonRepr}
-            onChange={(e) => setCanonRepr(e.target.value)}
-          />
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+            <label>Canon repr (JSON) *</label>
+            {puzzleType === "3" && !editorOpen && (
+              <button
+                type="button"
+                onClick={() => setEditorOpen(true)}
+                style={{ padding: "0.25rem 0.75rem", fontSize: "0.8rem", border: "1px solid #4a90d9", borderRadius: 4, background: "#f0f7ff", color: "#4a90d9", cursor: "pointer" }}
+              >
+                Open Board Editor
+              </button>
+            )}
+            {puzzleType && puzzleType !== "3" && (
+              <span style={{ fontSize: "0.75rem", color: "#999", fontStyle: "italic" }}>
+                No visual editor supported for this puzzle type yet.
+              </span>
+            )}
+          </div>
+          {editorOpen && puzzleType === "3" ? (
+            <NurimazeEditor
+              initialJson={canonRepr}
+              onComplete={(json) => {
+                setCanonRepr(json);
+                setEditorOpen(false);
+              }}
+              onCancel={() => setEditorOpen(false)}
+            />
+          ) : (
+            <textarea
+              style={{ ...inputStyle, minHeight: 120, fontFamily: "monospace", fontSize: "0.8rem" }}
+              value={canonRepr}
+              onChange={(e) => setCanonRepr(e.target.value)}
+            />
+          )}
           {errors.canonRepr && <span style={errorStyle}>{errors.canonRepr}</span>}
         </div>
 
