@@ -15,10 +15,12 @@ import {
 import SudokuBoard from "../components/SudokuBoard";
 import ComboSudokuBoard from "../components/ComboSudokuBoard";
 import NurimazeBoard from "../components/NurimazeBoard";
+import DoubleChocoBoard from "../components/DoubleChocoBoard";
 import NurimazeEditor from "../components/NurimazeEditor";
 import SudokuEditor from "../components/SudokuEditor";
 import ComboSudokuEditor from "../components/ComboSudokuEditor";
-import { NurimazeCanon } from "../types/canon";
+import DoubleChocoEditor from "../components/DoubleChocoEditor";
+import { NurimazeCanon, DoubleChocoCanon } from "../types/canon";
 import { DIFFICULTY_OPTIONS, DIFFICULTY_LABELS } from "../constants";
 
 const fieldStyle: React.CSSProperties = {
@@ -164,6 +166,9 @@ function CanonPreview({ puzzleType, canonRepr }: { puzzleType: number; canonRepr
   if (puzzleType === 3 && parsed.cells && parsed.grids) {
     return <NurimazeBoard canon={parsed as unknown as NurimazeCanon} readonly />;
   }
+  if (puzzleType === 4 && parsed.cells) {
+    return <DoubleChocoBoard canon={parsed as unknown as DoubleChocoCanon} readonly />;
+  }
   return <p style={{ color: "#666", fontSize: "0.85rem" }}>No preview available for this puzzle type.</p>;
 }
 
@@ -194,7 +199,8 @@ function QuestionForm({
   const isNurimaze = selectedTypeName === "nurimaze";
   const isSudoku = selectedTypeName === "sudoku";
   const isComboSudoku = selectedTypeName === "combo-sudoku";
-  const hasEditor = isNurimaze || isSudoku || isComboSudoku;
+  const isDoubleChoco = selectedTypeName === "double-choco";
+  const hasEditor = isNurimaze || isSudoku || isComboSudoku || isDoubleChoco;
 
   function validate(): boolean {
     const errs: Record<string, string> = {};
@@ -231,6 +237,9 @@ function QuestionForm({
         w = Math.max(...canon.subboards.map((b: { x: number }) => b.x)) + 9;
         h = Math.max(...canon.subboards.map((b: { y: number }) => b.y)) + 9;
       } else if (typeId === 3 && canon.cells) {
+        h = canon.cells.length;
+        w = canon.cells[0].length;
+      } else if (typeId === 4 && canon.cells) {
         h = canon.cells.length;
         w = canon.cells[0].length;
       }
@@ -398,6 +407,12 @@ function QuestionForm({
                 onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
                 onCancel={() => setEditorOpen(false)}
               />
+            ) : isDoubleChoco ? (
+              <DoubleChocoEditor
+                initialJson={canonRepr}
+                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
+                onCancel={() => setEditorOpen(false)}
+              />
             ) : (
               <ComboSudokuEditor
                 initialJson={canonRepr}
@@ -458,7 +473,8 @@ function PuzzleEditRow({
   const isNurimaze = typeName === "nurimaze";
   const isSudoku = typeName === "sudoku";
   const isComboSudoku = typeName === "combo-sudoku";
-  const hasEditor = isNurimaze || isSudoku || isComboSudoku;
+  const isDoubleChoco = typeName === "double-choco";
+  const hasEditor = isNurimaze || isSudoku || isComboSudoku || isDoubleChoco;
 
   async function handleConfirm() {
     let parsedCanon: Record<string, unknown>;
@@ -530,6 +546,12 @@ function PuzzleEditRow({
                 />
               ) : isSudoku ? (
                 <SudokuEditor
+                  initialJson={canonRepr}
+                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
+                  onCancel={() => setEditorOpen(false)}
+                />
+              ) : isDoubleChoco ? (
+                <DoubleChocoEditor
                   initialJson={canonRepr}
                   onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
                   onCancel={() => setEditorOpen(false)}
