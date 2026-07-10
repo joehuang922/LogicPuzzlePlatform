@@ -3,6 +3,7 @@ import sudokuSchema from "../../../../schemas/canon/sudoku.json";
 import comboSudokuSchema from "../../../../schemas/canon/combo-sudoku.json";
 import nurimazeSchema from "../../../../schemas/canon/nurimaze.json";
 import doubleChocoSchema from "../../../../schemas/canon/double-choco.json";
+import slitherlinkSchema from "../../../../schemas/canon/slitherlink.json";
 
 const ajv = new Ajv();
 
@@ -11,6 +12,7 @@ const validators: Record<number, ValidateFunction> = {
   2: ajv.compile(comboSudokuSchema),
   3: ajv.compile(nurimazeSchema),
   4: ajv.compile(doubleChocoSchema),
+  5: ajv.compile(slitherlinkSchema),
 };
 
 export function validateCanon(puzzleType: number, data: unknown): void {

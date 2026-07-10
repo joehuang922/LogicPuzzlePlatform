@@ -32,3 +32,14 @@ export interface DoubleChocoAnswer {
     v: number[][];
   };
 }
+
+export interface SlitherlinkCanon {
+  cells: number[][];
+}
+
+export interface SlitherlinkAnswer {
+  edges: {
+    h: number[][];
+    v: number[][];
+  };
+}

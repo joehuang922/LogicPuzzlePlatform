@@ -1,0 +1,19 @@
+{
+  "title": "Slitherlink Canonical Representation",
+  "description": "Rectangle grid where some cells carry numbers 0-3. Players draw edges between intersection dots to form a single loop.",
+  "type": "object",
+  "required": ["cells"],
+  "additionalProperties": false,
+  "properties": {
+    "cells": {
+      "description": "m x n grid of integers. -1 = empty (no clue), 0-3 = number clue indicating how many edges surround the cell.",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": { "type": "integer", "minimum": -1, "maximum": 3 },
+        "minItems": 1
+      },
+      "minItems": 1
+    }
+  }
+}
