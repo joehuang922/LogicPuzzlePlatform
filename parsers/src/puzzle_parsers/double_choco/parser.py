@@ -13,6 +13,7 @@ from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.double_choco.grid_detector import detect_double_choco_grid
 from puzzle_parsers.double_choco.models import DoubleChocoBoard
 from puzzle_parsers.validate import validate_canon
+from puzzle_parsers.vision_utils import ocr_read_digit
 
 if TYPE_CHECKING:
     from puzzle_parsers.combo_sudoku.ocr import OcrBackend
@@ -129,21 +130,8 @@ class DoubleChocoParser(PuzzleParser):
 
     def _ocr_single_cell(self, cell_roi: np.ndarray) -> int:
         """Use EasyOCR to read a number from a single cell."""
-        resized = cv2.resize(cell_roi, (128, 128), interpolation=cv2.INTER_CUBIC)
-        results = self._ocr._reader.readtext(
-            resized,
-            allowlist="0123456789",
-            detail=0,
-            paragraph=False,
-        )
-        if not results:
-            return 0
-
-        text = "".join(results).strip()
-        if text.isdigit():
-            val = int(text)
-            return val if val > 0 else 0
-        return 0
+        val = ocr_read_digit(cell_roi, self._ocr._reader, allowlist="0123456789", empty_val=0)
+        return val if val > 0 else 0
 
     def _contour_estimate(self, cell_roi: np.ndarray, contours: list) -> int:
         """Fallback heuristic: estimate number from contour properties.
