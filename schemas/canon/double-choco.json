@@ -1,0 +1,24 @@
+{
+  "title": "Double Choco Canonical Representation",
+  "description": "Rectangle grid where each cell has a color (white/gray) and optional number. Players draw room boundaries.",
+  "type": "object",
+  "required": ["cells"],
+  "additionalProperties": false,
+  "properties": {
+    "cells": {
+      "description": "m x n grid of [color, number] pairs. color: 0=white, 1=gray. number: 0=empty, otherwise the clue number.",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0 },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "minItems": 1
+      },
+      "minItems": 1
+    }
+  }
+}
