@@ -86,6 +86,7 @@ export default function Home() {
   const [attempts, setAttempts] = useState<Attempt[]>([]);
   const [selectedAttemptId, setSelectedAttemptId] = useState<string | null>(null);
   const [attemptsLoading, setAttemptsLoading] = useState(false);
+  const [hasPreviousAttempts, setHasPreviousAttempts] = useState(false);
 
   const [expandedCollectionId, setExpandedCollectionId] = useState<number | null>(null);
   const [collectionPuzzles, setCollectionPuzzles] = useState<Puzzle[]>([]);
@@ -103,9 +104,12 @@ export default function Home() {
       .finally(() => setLoading(false));
   }, []);
 
-  function handlePuzzleClick(puzzle: PuzzleDefinition) {
+  async function handlePuzzleClick(puzzle: PuzzleDefinition) {
     setSelectedPuzzle(puzzle);
     setShowChoiceDialog(true);
+    setHasPreviousAttempts(false);
+    const res = await listAttempts(HARDCODED_PLAYER_ID, puzzle.id);
+    setHasPreviousAttempts(res.attempts.length > 0);
   }
 
   async function handleNewAttempt() {
@@ -275,7 +279,7 @@ export default function Home() {
               <button onClick={handleNewAttempt} style={btnPrimary}>
                 New Attempt
               </button>
-              <button onClick={handleLoadPrevious} disabled={attemptsLoading} style={btnSecondary}>
+              <button onClick={handleLoadPrevious} disabled={attemptsLoading || !hasPreviousAttempts} style={!hasPreviousAttempts ? { ...btnSecondary, opacity: 0.5, cursor: "not-allowed" } : btnSecondary}>
                 {attemptsLoading ? "Loading..." : "Load Previous"}
               </button>
             </div>
