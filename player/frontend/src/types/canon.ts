@@ -21,3 +21,14 @@ export interface NurimazeCanon {
     v: number[][];
   };
 }
+
+export interface DoubleChocoCanon {
+  cells: [number, number][][];
+}
+
+export interface DoubleChocoAnswer {
+  grids: {
+    h: number[][];
+    v: number[][];
+  };
+}
