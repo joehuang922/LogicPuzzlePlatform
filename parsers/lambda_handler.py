@@ -43,10 +43,14 @@ def _init_parsers():
     from puzzle_parsers.nurimaze.parser import NurimazeParser
     print("  - NurimazeParser imported")
 
+    from puzzle_parsers.double_choco.parser import DoubleChocoParser
+    print("  - DoubleChocoParser imported")
+
     _parsers = {
         1: SudokuParser(ocr_backend=_ocr),
         2: ComboSudokuParser(ocr_backend=_ocr),
         3: NurimazeParser(symbol_backend="gemini"),
+        4: DoubleChocoParser(ocr_backend=_ocr),
     }
     print("=== Parsers ready ===")
 
