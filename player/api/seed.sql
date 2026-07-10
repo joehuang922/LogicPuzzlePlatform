@@ -70,7 +70,9 @@ CREATE TABLE IF NOT EXISTS player_attempt_snapshot (
 INSERT INTO puzzle_types (id, name, rule) VALUES
   (1, 'sudoku', ''),
   (2, 'combo-sudoku', ''),
-  (3, 'nurimaze', 'Paint rooms black or mark them to create a maze. The shortest path from S to G must pass all circles and no triangles. No 2x2 blocks of same color allowed.');
+  (3, 'nurimaze', 'Paint rooms black or mark them to create a maze. The shortest path from S to G must pass all circles and no triangles. No 2x2 blocks of same color allowed.'),
+  (4, 'double-choco', 'Divide the grid into rooms. Each room contains equal numbers of white and gray cells with the same shape (one is a translation of the other). Numbers indicate how many cells of that color are in the room.'),
+  (5, 'slitherlink', 'Draw a single closed loop along the grid edges. Each number indicates how many of its four surrounding edges are part of the loop.');
 
 -- Seed sample puzzle: sudoku (difficulty 4 = hard)
 INSERT INTO puzzle_questions (id, puzzle_type, title, difficulty, width, height, canon_repr) VALUES (
