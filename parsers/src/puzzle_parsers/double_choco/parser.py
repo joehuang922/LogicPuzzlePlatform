@@ -10,13 +10,9 @@ from PIL import Image
 
 from puzzle_parsers.base import PuzzleParser
 from puzzle_parsers.models import PuzzleData
+from puzzle_parsers.double_choco.grid_detector import detect_double_choco_grid
 from puzzle_parsers.double_choco.models import DoubleChocoBoard
 from puzzle_parsers.validate import validate_canon
-from puzzle_parsers.grid_utils import (
-    detect_grid_lines,
-    find_quadrilateral_border,
-    warp_to_rectangle,
-)
 
 if TYPE_CHECKING:
     from puzzle_parsers.combo_sudoku.ocr import OcrBackend
@@ -47,62 +43,56 @@ class DoubleChocoParser(PuzzleParser):
     def _parse_image(
         self, img_array: np.ndarray, debug_dir: str | None = None
     ) -> DoubleChocoBoard:
-        debug_path = Path(debug_dir) if debug_dir else None
-        if debug_path:
-            debug_path.mkdir(parents=True, exist_ok=True)
+        from pathlib import Path as _Path
 
-        gray = cv2.cvtColor(img_array, cv2.COLOR_BGR2GRAY)
-        border_pts = find_quadrilateral_border(gray)
+        geom = detect_double_choco_grid(img_array, debug_dir=debug_dir)
+        warped_gray = cv2.cvtColor(geom.warped, cv2.COLOR_BGR2GRAY)
 
-        if debug_path:
-            vis = img_array.copy()
-            cv2.polylines(vis, [border_pts.astype(int)], True, (0, 255, 0), 3)
-            cv2.imwrite(str(debug_path / "01_border.png"), vis)
+        rows = geom.rows
+        cols = geom.cols
+        h_lines = geom.h_lines
+        v_lines = geom.v_lines
 
-        warped, warp_w, warp_h = warp_to_rectangle(img_array, border_pts)
+        debug_path = _Path(debug_dir) if debug_dir else None
 
-        if debug_path:
-            cv2.imwrite(str(debug_path / "02_warped.png"), warped)
-
-        warped_gray = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
-        h_lines, v_lines = detect_grid_lines(warped_gray, warp_w, warp_h)
-
-        rows = len(h_lines) - 1
-        cols = len(v_lines) - 1
-
-        if debug_path:
-            vis = warped.copy()
-            for y in h_lines:
-                cv2.line(vis, (0, y), (warp_w, y), (0, 180, 0), 1)
-            for x in v_lines:
-                cv2.line(vis, (x, 0), (x, warp_h), (180, 0, 0), 1)
-            cv2.imwrite(str(debug_path / "03_gridlines.png"), vis)
-
-        cells: list[list[list[int]]] = []
+        # First pass: collect all cell ROIs and their mean intensities
+        cell_rois: list[list[np.ndarray]] = []
+        cell_means: list[float] = []
         for r in range(rows):
-            row: list[list[int]] = []
+            row_rois: list[np.ndarray] = []
             for c in range(cols):
                 y1 = h_lines[r]
                 y2 = h_lines[r + 1]
                 x1 = v_lines[c]
                 x2 = v_lines[c + 1]
 
-                # Shrink ROI to avoid border pixels
-                margin_y = int((y2 - y1) * 0.15)
-                margin_x = int((x2 - x1) * 0.15)
+                margin_y = int((y2 - y1) * 0.2)
+                margin_x = int((x2 - x1) * 0.2)
                 cell_roi = warped_gray[y1 + margin_y : y2 - margin_y, x1 + margin_x : x2 - margin_x]
+                row_rois.append(cell_roi)
+                cell_means.append(float(np.mean(cell_roi)))
+            cell_rois.append(row_rois)
 
-                # Classify color: gray cells have lower mean intensity
-                mean_val = float(np.mean(cell_roi))
-                color = 1 if mean_val < 200 else 0
+        # Adaptive color threshold using Otsu on cell mean intensities
+        means_arr = np.array(cell_means)
+        scaled = ((means_arr - means_arr.min()) / (means_arr.max() - means_arr.min() + 1e-6) * 255).astype(np.uint8)
+        otsu_val, _ = cv2.threshold(scaled, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        color_threshold = means_arr.min() + (otsu_val / 255) * (means_arr.max() - means_arr.min())
 
-                # Detect number
-                number = self._recognize_number(cell_roi)
+        # Second pass: classify and recognize
+        cells: list[list[list[int]]] = []
+        idx = 0
+        for r in range(rows):
+            row: list[list[int]] = []
+            for c in range(cols):
+                color = 1 if cell_means[idx] < color_threshold else 0
+                number = self._recognize_number(cell_rois[r][c])
                 row.append([color, number])
+                idx += 1
             cells.append(row)
 
         if debug_path:
-            vis = warped.copy()
+            vis = geom.warped.copy()
             for r in range(rows):
                 for c in range(cols):
                     color, num = cells[r][c]
