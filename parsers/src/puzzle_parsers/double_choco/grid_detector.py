@@ -1,16 +1,20 @@
 """Grid detection for double-choco puzzles with dashed internal lines.
 
-Uses Hough line detection + FFT period analysis instead of morphological
-projection, since dashed lines are destroyed by long morphological kernels.
+Uses a deterministic morphological pipeline:
+1. Erode with small directional kernel to remove halftone dots
+2. Close with medium kernel to bridge dash gaps
+3. Open with long kernel to keep only line-like structures
+4. Find peaks in projection, determine cell count from median spacing
+5. Generate uniform grid snapped to detected peaks
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import cv2
 import numpy as np
 from numpy.typing import NDArray
-from scipy.ndimage import gaussian_filter1d
 from scipy.signal import find_peaks
 
 from puzzle_parsers.grid_utils import find_quadrilateral_border, warp_to_rectangle
@@ -30,8 +34,6 @@ class DoubleChocoGeometry:
 def detect_double_choco_grid(
     image: NDArray, debug_dir: str | None = None
 ) -> DoubleChocoGeometry:
-    from pathlib import Path
-
     debug_path = Path(debug_dir) if debug_dir else None
     if debug_path:
         debug_path.mkdir(parents=True, exist_ok=True)
@@ -79,115 +81,91 @@ def detect_double_choco_grid(
 def _detect_dashed_grid(
     warped_gray: NDArray, warp_w: int, warp_h: int
 ) -> tuple[list[int], list[int]]:
-    """Detect grid lines in a dashed-line puzzle using Hough + FFT."""
-    edges = cv2.Canny(warped_gray, 50, 150, apertureSize=3)
-    lines = cv2.HoughLinesP(
-        edges, 1, np.pi / 180, threshold=50, minLineLength=30, maxLineGap=20
+    """Detect grid lines using deterministic morphological pipeline."""
+    binary = cv2.adaptiveThreshold(
+        cv2.GaussianBlur(warped_gray, (3, 3), 0),
+        255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY_INV,
+        11,
+        3,
     )
 
-    if lines is None or len(lines) == 0:
-        return _fallback_uniform(warp_w, warp_h)
+    h_peaks = _find_line_peaks(binary, "h", warp_w, warp_h)
+    v_peaks = _find_line_peaks(binary, "v", warp_h, warp_w)
 
-    # Separate into horizontal and vertical segments
-    h_hist = np.zeros(warp_h, dtype=float)
-    v_hist = np.zeros(warp_w, dtype=float)
+    n_rows = _cell_count_from_peaks(h_peaks, warp_h)
+    n_cols = _cell_count_from_peaks(v_peaks, warp_w)
 
-    for line in lines:
-        x1, y1, x2, y2 = line[0]
-        angle = abs(np.arctan2(y2 - y1, x2 - x1) * 180 / np.pi)
-        if angle < 10 or angle > 170:
-            y_mid = (y1 + y2) // 2
-            if 0 <= y_mid < warp_h:
-                h_hist[y_mid] += 1
-        elif 80 < angle < 100:
-            x_mid = (x1 + x2) // 2
-            if 0 <= x_mid < warp_w:
-                v_hist[x_mid] += 1
-
-    h_smooth = gaussian_filter1d(h_hist, sigma=5)
-    v_smooth = gaussian_filter1d(v_hist, sigma=5)
-
-    # Find grid cell count using FFT period detection
-    n_rows = _detect_cell_count(h_smooth, warp_h)
-    n_cols = _detect_cell_count(v_smooth, warp_w)
-
-    if n_rows < 2 or n_cols < 2:
-        return _fallback_uniform(warp_w, warp_h)
-
-    # Find grid extents from strong peaks (outer border)
-    h_start, h_end = _find_grid_extents(h_smooth)
-    v_start, v_end = _find_grid_extents(v_smooth)
-
-    # Generate evenly-spaced grid lines, then snap each to nearest detected peak
-    h_lines = _generate_and_snap(h_smooth, h_start, h_end, n_rows)
-    v_lines = _generate_and_snap(v_smooth, v_start, v_end, n_cols)
+    h_lines = _uniform_grid_snapped(h_peaks, warp_h, n_rows)
+    v_lines = _uniform_grid_snapped(v_peaks, warp_w, n_cols)
 
     return h_lines, v_lines
 
 
-def _detect_cell_count(smooth_hist: NDArray, total_span: int) -> int:
-    """Find the number of cells using FFT dominant period detection."""
-    signal = smooth_hist - smooth_hist.mean()
-    fft = np.fft.rfft(signal)
-    magnitudes = np.abs(fft)
-    freqs = np.fft.rfftfreq(len(signal))
+def _find_line_peaks(
+    binary: NDArray, axis: str, line_len: int, span: int
+) -> NDArray:
+    """Find grid line positions along one axis.
 
-    # Expected cell size between total/15 and total/5
-    min_period = total_span / 15
-    max_period = total_span / 5
-    min_freq = 1.0 / max_period
-    max_freq = 1.0 / min_period
+    Pipeline: erode (kill dots) -> close (bridge dashes) -> open (keep lines).
+    """
+    if axis == "h":
+        erode_k = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 1))
+        close_k = cv2.getStructuringElement(cv2.MORPH_RECT, (40, 1))
+        open_k = cv2.getStructuringElement(cv2.MORPH_RECT, (line_len // 8, 1))
+    else:
+        erode_k = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 5))
+        close_k = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 40))
+        open_k = cv2.getStructuringElement(cv2.MORPH_RECT, (1, line_len // 8))
 
-    mask = (freqs >= min_freq) & (freqs <= max_freq)
-    if not mask.any():
-        return 0
+    cleaned = cv2.erode(binary, erode_k)
+    closed = cv2.morphologyEx(cleaned, cv2.MORPH_CLOSE, close_k)
+    lines_mask = cv2.morphologyEx(closed, cv2.MORPH_OPEN, open_k)
 
-    masked_mags = magnitudes.copy()
-    masked_mags[~mask] = 0
-    peak_idx = int(np.argmax(masked_mags))
+    if axis == "h":
+        proj = lines_mask.sum(axis=1).astype(float) / 255
+    else:
+        proj = lines_mask.sum(axis=0).astype(float) / 255
 
-    if freqs[peak_idx] == 0:
-        return 0
-
-    period = 1.0 / freqs[peak_idx]
-    return round(total_span / period)
-
-
-def _find_grid_extents(smooth_hist: NDArray) -> tuple[int, int]:
-    """Find start and end of the grid from the histogram envelope."""
-    threshold = float(np.max(smooth_hist)) * 0.25
-    strong = np.where(smooth_hist > threshold)[0]
-    if len(strong) < 2:
-        return 0, len(smooth_hist) - 1
-    return int(strong[0]), int(strong[-1])
+    peaks, _ = find_peaks(proj, height=line_len * 0.15, distance=span // 20)
+    return peaks
 
 
-def _generate_and_snap(
-    smooth_hist: NDArray, start: int, end: int, n_cells: int
+def _cell_count_from_peaks(peaks: NDArray, total_span: int) -> int:
+    """Determine cell count from the median spacing of detected peaks."""
+    if len(peaks) < 3:
+        return 10
+
+    spacings = np.diff(peaks)
+    med = float(np.median(spacings))
+    good = spacings[spacings > med * 0.5]
+    if len(good) == 0:
+        return 10
+
+    cell_size = float(np.median(good))
+    count = round(total_span / cell_size)
+    return max(2, count)
+
+
+def _uniform_grid_snapped(
+    peaks: NDArray, total_span: int, n_cells: int
 ) -> list[int]:
-    """Generate uniform grid and snap each line to the nearest local peak."""
-    cell_size = (end - start) / n_cells
-    snap_radius = int(cell_size * 0.15)
+    """Generate a uniform grid and snap each position to the nearest peak."""
+    cell_size = total_span / n_cells
+    tolerance = int(cell_size * 0.25)
 
     result: list[int] = []
     for i in range(n_cells + 1):
-        expected = int(start + i * cell_size)
-        # Search for local peak within snap radius
-        lo = max(0, expected - snap_radius)
-        hi = min(len(smooth_hist), expected + snap_radius + 1)
-        local = smooth_hist[lo:hi]
-        if len(local) > 0:
-            snapped = lo + int(np.argmax(local))
+        expected = int(i * cell_size)
+        if len(peaks) > 0:
+            dists = np.abs(peaks - expected)
+            min_dist = int(np.min(dists))
+            if min_dist < tolerance:
+                result.append(int(peaks[np.argmin(dists)]))
+            else:
+                result.append(expected)
         else:
-            snapped = expected
-        result.append(snapped)
+            result.append(expected)
 
     return result
-
-
-def _fallback_uniform(warp_w: int, warp_h: int) -> tuple[list[int], list[int]]:
-    """Fallback: assume 10x10 grid, evenly divide the image."""
-    n = 10
-    h_lines = [int(i * warp_h / n) for i in range(n + 1)]
-    v_lines = [int(i * warp_w / n) for i in range(n + 1)]
-    return h_lines, v_lines
