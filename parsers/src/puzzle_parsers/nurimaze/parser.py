@@ -18,20 +18,16 @@ from puzzle_parsers.nurimaze.grid_detector import (
 from puzzle_parsers.nurimaze.models import NurimazeBoard, NurimazeGrids
 from puzzle_parsers.recognition import CellRecognizer, GeminiRecognizer
 from puzzle_parsers.recognition_schemas import SYMBOL_CELL_PROMPT
-from puzzle_parsers.validate import validate_canon
-
-
 class NurimazeParser(PuzzleParser):
     puzzle_type = "nurimaze"
 
     def __init__(self, recognizer: CellRecognizer | None = None, **kwargs) -> None:
         self._recognizer = recognizer or GeminiRecognizer(**kwargs)
 
-    def parse(self, image: Image.Image) -> PuzzleData:
+    def _parse(self, image: Image.Image) -> PuzzleData:
         img_array = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
         board = self._parse_image(img_array)
         grid = board.model_dump()
-        validate_canon(self.puzzle_type, grid)
         return PuzzleData(puzzle_type=self.puzzle_type, grid=grid)
 
     def parse_file(

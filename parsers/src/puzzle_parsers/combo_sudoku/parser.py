@@ -19,9 +19,6 @@ from puzzle_parsers.combo_sudoku.grid_detector import (
 from puzzle_parsers.combo_sudoku.models import ComboSudokuBoard, SubBoard
 from puzzle_parsers.recognition import GeminiOcrBackend, OcrBackend
 from puzzle_parsers.models import PuzzleData
-from puzzle_parsers.validate import validate_canon
-
-
 class ComboSudokuParser(PuzzleParser):
     puzzle_type = "combo_sudoku"
 
@@ -39,11 +36,10 @@ class ComboSudokuParser(PuzzleParser):
             self._ocr = GeminiOcrBackend()
         return self._ocr
 
-    def parse(self, image: Image.Image) -> PuzzleData:
+    def _parse(self, image: Image.Image) -> PuzzleData:
         img_array = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
         board = self._parse_image(img_array)
         grid = board.model_dump()
-        validate_canon("combo-sudoku", grid)
         return PuzzleData(
             puzzle_type=self.puzzle_type,
             grid=grid,

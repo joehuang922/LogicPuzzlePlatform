@@ -14,8 +14,6 @@ from puzzle_parsers.recognition import CellRecognizer, GeminiRecognizer
 from puzzle_parsers.recognition_schemas import INT_CELL_PROMPT
 from puzzle_parsers.slitherlink.grid_detector import detect_slitherlink_grid
 from puzzle_parsers.slitherlink.models import SlitherlinkBoard
-from puzzle_parsers.validate import validate_canon
-
 if TYPE_CHECKING:
     from puzzle_parsers.recognition import OcrBackend
 
@@ -47,11 +45,10 @@ class SlitherlinkParser(PuzzleParser):
             self._recognizer = GeminiRecognizer()
         return self._recognizer
 
-    def parse(self, image: Image.Image) -> PuzzleData:
+    def _parse(self, image: Image.Image) -> PuzzleData:
         img_array = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
         board = self._parse_image(img_array, expected_rows=None, expected_cols=None)
         grid = board.model_dump()
-        validate_canon(self.puzzle_type, grid)
         return PuzzleData(puzzle_type=self.puzzle_type, grid=grid)
 
     def parse_file(

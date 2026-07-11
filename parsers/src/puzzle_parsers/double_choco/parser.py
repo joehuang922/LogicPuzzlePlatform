@@ -12,7 +12,6 @@ from puzzle_parsers.base import PuzzleParser
 from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.double_choco.grid_detector import detect_double_choco_grid
 from puzzle_parsers.double_choco.models import DoubleChocoBoard
-from puzzle_parsers.validate import validate_canon
 from puzzle_parsers.ocr_utils import ocr_read_digit
 
 if TYPE_CHECKING:
@@ -25,11 +24,10 @@ class DoubleChocoParser(PuzzleParser):
     def __init__(self, ocr_backend: OcrBackend | None = None) -> None:
         self._ocr = ocr_backend
 
-    def parse(self, image: Image.Image) -> PuzzleData:
+    def _parse(self, image: Image.Image) -> PuzzleData:
         img_array = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
         board = self._parse_image(img_array)
         grid = board.model_dump()
-        validate_canon(self.puzzle_type, grid)
         return PuzzleData(puzzle_type=self.puzzle_type, grid=grid)
 
     def parse_file(
