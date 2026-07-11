@@ -7,10 +7,10 @@ import numpy as np
 from PIL import Image
 
 from puzzle_parsers.base import PuzzleParser
-from puzzle_parsers.combo_sudoku.grid_detector import (
+from puzzle_parsers.cell_extraction import (
     GridGeometry,
+    detect_internal_grid,
     extract_cells_from_geometry,
-    _detect_internal_grid,
 )
 from puzzle_parsers.grid_utils import order_points
 from puzzle_parsers.recognition import GeminiOcrBackend, OcrBackend
@@ -87,7 +87,7 @@ class SudokuParser(PuzzleParser):
 
         # Detect internal grid lines
         warped_gray = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
-        h_lines, v_lines = _detect_internal_grid(warped_gray, warp_size)
+        h_lines, v_lines = detect_internal_grid(warped_gray, warp_size)
 
         # Compute cell geometry
         cell_w = warp_size / 9.0
