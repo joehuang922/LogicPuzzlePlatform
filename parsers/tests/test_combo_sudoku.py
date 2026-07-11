@@ -4,7 +4,7 @@ import numpy as np
 from PIL import Image
 
 from puzzle_parsers.combo_sudoku.models import ComboSudokuBoard, SubBoard
-from puzzle_parsers.combo_sudoku.ocr import OcrBackend
+from puzzle_parsers.recognition import OcrBackend
 from puzzle_parsers.combo_sudoku.parser import ComboSudokuParser
 
 

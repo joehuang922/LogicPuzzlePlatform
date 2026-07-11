@@ -17,7 +17,7 @@ from puzzle_parsers.combo_sudoku.grid_detector import (
     save_cell_debug,
 )
 from puzzle_parsers.combo_sudoku.models import ComboSudokuBoard, SubBoard
-from puzzle_parsers.combo_sudoku.ocr import ClaudeOcrBackend, OcrBackend
+from puzzle_parsers.recognition import GeminiOcrBackend, OcrBackend
 from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.validate import validate_canon
 
@@ -36,7 +36,7 @@ class ComboSudokuParser(PuzzleParser):
     @property
     def ocr(self) -> OcrBackend:
         if self._ocr is None:
-            self._ocr = ClaudeOcrBackend()
+            self._ocr = GeminiOcrBackend()
         return self._ocr
 
     def parse(self, image: Image.Image) -> PuzzleData:

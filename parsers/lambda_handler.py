@@ -26,7 +26,7 @@ def _init_parsers():
 
     print("=== Initializing OCR + parsers ===")
 
-    from puzzle_parsers.combo_sudoku.ocr import EasyOcrBackend
+    from puzzle_parsers.recognition import EasyOcrBackend
     print("  - EasyOcrBackend imported")
 
     model_dir = os.environ.get("EASYOCR_MODULE_PATH")

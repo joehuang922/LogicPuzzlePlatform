@@ -16,7 +16,7 @@ from puzzle_parsers.validate import validate_canon
 from puzzle_parsers.vision_utils import ocr_read_digit
 
 if TYPE_CHECKING:
-    from puzzle_parsers.combo_sudoku.ocr import OcrBackend
+    from puzzle_parsers.recognition import OcrBackend
 
 
 class DoubleChocoParser(PuzzleParser):

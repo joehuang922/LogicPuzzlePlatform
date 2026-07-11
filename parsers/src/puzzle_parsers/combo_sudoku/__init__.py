@@ -1,4 +1,15 @@
-from puzzle_parsers.combo_sudoku.ocr import ClaudeOcrBackend, EasyOcrBackend, OcrBackend
 from puzzle_parsers.combo_sudoku.parser import ComboSudokuParser
+from puzzle_parsers.recognition import (
+    ClaudeOcrBackend,
+    EasyOcrBackend,
+    GeminiOcrBackend,
+    OcrBackend,
+)
 
-__all__ = ["ClaudeOcrBackend", "ComboSudokuParser", "EasyOcrBackend", "OcrBackend"]
+__all__ = [
+    "ClaudeOcrBackend",
+    "ComboSudokuParser",
+    "EasyOcrBackend",
+    "GeminiOcrBackend",
+    "OcrBackend",
+]

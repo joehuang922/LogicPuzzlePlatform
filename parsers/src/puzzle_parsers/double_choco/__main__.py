@@ -27,9 +27,9 @@ def main() -> None:
     )
     parser.add_argument(
         "--ocr",
-        choices=["easyocr", "none"],
-        default="easyocr",
-        help="OCR backend for number recognition (default: easyocr)",
+        choices=["gemini", "easyocr", "none"],
+        default="gemini",
+        help="OCR backend for number recognition (default: gemini)",
     )
     args = parser.parse_args()
 
@@ -39,8 +39,11 @@ def main() -> None:
         sys.exit(1)
 
     ocr_backend = None
-    if args.ocr == "easyocr":
-        from puzzle_parsers.combo_sudoku.ocr import EasyOcrBackend
+    if args.ocr == "gemini":
+        from puzzle_parsers.recognition import GeminiOcrBackend
+        ocr_backend = GeminiOcrBackend()
+    elif args.ocr == "easyocr":
+        from puzzle_parsers.recognition import EasyOcrBackend
         ocr_backend = EasyOcrBackend()
 
     dc_parser = DoubleChocoParser(ocr_backend=ocr_backend)

@@ -6,17 +6,24 @@ import json
 import sys
 from pathlib import Path
 
-from puzzle_parsers.combo_sudoku.ocr import ClaudeOcrBackend, EasyOcrBackend, OcrBackend
+from puzzle_parsers.recognition import (
+    ClaudeOcrBackend,
+    EasyOcrBackend,
+    GeminiOcrBackend,
+    OcrBackend,
+)
 from puzzle_parsers.sudoku.parser import SudokuParser
 
 
 def _make_backend(name: str) -> OcrBackend:
-    if name == "claude":
+    if name == "gemini":
+        return GeminiOcrBackend()
+    elif name == "claude":
         return ClaudeOcrBackend()
     elif name == "easyocr":
         return EasyOcrBackend()
     else:
-        raise ValueError(f"Unknown OCR backend: {name!r}. Choose 'claude' or 'easyocr'.")
+        raise ValueError(f"Unknown OCR backend: {name!r}. Choose 'gemini', 'claude', or 'easyocr'.")
 
 
 def main() -> None:
@@ -32,9 +39,9 @@ def main() -> None:
     )
     parser.add_argument(
         "--backend",
-        choices=["claude", "easyocr"],
-        default="claude",
-        help="OCR backend to use (default: claude)",
+        choices=["gemini", "claude", "easyocr"],
+        default="gemini",
+        help="OCR backend to use (default: gemini)",
     )
     parser.add_argument(
         "--debug",
