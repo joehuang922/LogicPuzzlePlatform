@@ -13,7 +13,7 @@ from abc import ABC, abstractmethod
 from numpy.typing import NDArray
 from PIL import Image
 
-from puzzle_parsers.vision_utils import cells_to_png_bytes, parse_json_response
+from puzzle_parsers.llm_vision import cells_to_png_bytes, parse_json_response
 
 
 class CellRecognizer(ABC):

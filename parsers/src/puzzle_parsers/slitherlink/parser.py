@@ -13,7 +13,7 @@ from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.slitherlink.grid_detector import detect_slitherlink_grid
 from puzzle_parsers.slitherlink.models import SlitherlinkBoard
 from puzzle_parsers.validate import validate_canon
-from puzzle_parsers.vision_utils import ocr_read_digit
+from puzzle_parsers.ocr_utils import ocr_read_digit
 
 if TYPE_CHECKING:
     from puzzle_parsers.recognition import OcrBackend

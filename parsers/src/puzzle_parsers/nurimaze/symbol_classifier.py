@@ -14,7 +14,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from puzzle_parsers.nurimaze.grid_detector import NurimazeGeometry
-from puzzle_parsers.vision_utils import cells_to_png_bytes, parse_json_response
+from puzzle_parsers.llm_vision import cells_to_png_bytes, parse_json_response
 
 
 class SymbolClassifier(ABC):
