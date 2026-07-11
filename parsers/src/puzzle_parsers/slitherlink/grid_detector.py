@@ -196,16 +196,14 @@ def _cluster_dots_to_grid(
 ) -> NDArray:
     """Cluster detected dots into a regular grid.
 
-    Uses a uniform-spacing model: find the best (origin, spacing) pair that
-    explains the most dots along each axis. Pre-filters dots to remove stray
-    points that don't belong to a row/column of sufficient density.
+    Groups dots into rows (by Y proximity) and columns (by X proximity)
+    using the estimated spacing as a merge threshold. Uses actual cluster
+    medians as grid line positions to avoid drift from non-uniform spacing.
     """
     if len(dots) == 0:
         h, w = img_shape[:2]
         return _synthetic_grid(w, h, expected_rows, expected_cols)
 
-    # Pre-filter: only keep dots that are part of dense horizontal rows
-    # A real puzzle row should have at least expected_cols/2 dots at similar Y
     dots = _filter_dots_by_row_density(dots, expected_cols)
     if len(dots) < expected_rows * expected_cols * 0.3:
         h, w = img_shape[:2]
@@ -214,14 +212,13 @@ def _cluster_dots_to_grid(
     xs = dots[:, 0]
     ys = dots[:, 1]
 
-    row_positions = _fit_uniform_grid_1d(ys, expected_rows)
-    col_positions = _fit_uniform_grid_1d(xs, expected_cols)
+    row_positions = _cluster_positions_1d(ys, expected_rows)
+    col_positions = _cluster_positions_1d(xs, expected_cols)
 
     if row_positions is None or col_positions is None:
         h, w = img_shape[:2]
         return _synthetic_grid(w, h, expected_rows, expected_cols)
 
-    # Build the grid by assigning dots to nearest (row, col)
     grid = np.zeros((expected_rows, expected_cols, 2), dtype=np.float64)
     assigned = np.zeros((expected_rows, expected_cols), dtype=bool)
 
@@ -235,13 +232,65 @@ def _cluster_dots_to_grid(
         r_dist = abs(cy - row_positions[r_idx])
         c_dist = abs(cx - col_positions[c_idx])
 
-        if r_dist < r_spacing * 0.3 and c_dist < c_spacing * 0.3:
+        if r_dist < r_spacing * 0.4 and c_dist < c_spacing * 0.4:
             if not assigned[r_idx, c_idx]:
                 grid[r_idx, c_idx] = [cx, cy]
                 assigned[r_idx, c_idx] = True
 
     _fill_missing(grid, assigned, row_positions, col_positions)
     return grid
+
+
+def _cluster_positions_1d(values: NDArray, expected_count: int) -> NDArray | None:
+    """Cluster 1D values into expected_count groups and return their medians.
+
+    Uses a merge-threshold approach: sort values, split into groups where
+    consecutive gaps exceed half the estimated spacing. If the cluster count
+    doesn't match expected_count, fall back to uniform grid fitting.
+    """
+    if len(values) < expected_count:
+        return None
+
+    sorted_vals = np.sort(values)
+    v_min = float(sorted_vals[0])
+    v_max = float(sorted_vals[-1])
+    span = v_max - v_min
+    if span < 10:
+        return None
+
+    est_spacing = span / (expected_count - 1)
+    merge_threshold = est_spacing * 0.4
+
+    # Group values by proximity
+    groups: list[list[float]] = [[float(sorted_vals[0])]]
+    for i in range(1, len(sorted_vals)):
+        if sorted_vals[i] - sorted_vals[i - 1] < merge_threshold:
+            groups[-1].append(float(sorted_vals[i]))
+        else:
+            groups.append([float(sorted_vals[i])])
+
+    if len(groups) == expected_count:
+        positions = np.array([np.median(g) for g in groups])
+        return positions
+
+    # If we got more groups than expected, merge the closest pairs
+    while len(groups) > expected_count:
+        min_gap = float("inf")
+        min_idx = 0
+        for i in range(len(groups) - 1):
+            gap = np.median(groups[i + 1]) - np.median(groups[i])
+            if gap < min_gap:
+                min_gap = gap
+                min_idx = i
+        groups[min_idx].extend(groups[min_idx + 1])
+        del groups[min_idx + 1]
+
+    if len(groups) == expected_count:
+        positions = np.array([np.median(g) for g in groups])
+        return positions
+
+    # Fallback to uniform fit
+    return _fit_uniform_grid_1d(values, expected_count)
 
 
 def _filter_dots_by_row_density(
