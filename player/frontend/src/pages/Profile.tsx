@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getProfile, ProfileQuestionStat, ProfileCollectionRow } from "../api/client";
+import { getProfile, ProfileQuestionStat, ProfileCollectionRow, ProfileAchievement } from "../api/client";
 
 const HARDCODED_PLAYER_ID = 1;
 
@@ -36,6 +36,7 @@ export default function Profile() {
   const [playerName, setPlayerName] = useState<string>("");
   const [questionStats, setQuestionStats] = useState<ProfileQuestionStat[]>([]);
   const [collectionGroups, setCollectionGroups] = useState<CollectionGroup[]>([]);
+  const [achievements, setAchievements] = useState<ProfileAchievement[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,6 +46,7 @@ export default function Profile() {
         setPlayerName(res.player.name);
         setQuestionStats(res.questionStats);
         setCollectionGroups(groupCollectionStats(res.collectionStats));
+        setAchievements(res.achievements);
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -53,9 +55,52 @@ export default function Profile() {
   if (loading) return <p>Loading profile...</p>;
   if (error) return <p style={{ color: "red" }}>Error: {error}</p>;
 
+  const unlockedCount = achievements.filter((a) => a.unlocked).length;
+
   return (
     <div>
       <h1>{playerName}</h1>
+
+      <h2>Achievements ({unlockedCount} / {achievements.length})</h2>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "0.75rem", marginBottom: "2rem" }}>
+        {achievements.map((a) => (
+          <div key={a.id} style={{
+            padding: "0.75rem",
+            border: "1px solid",
+            borderColor: a.unlocked ? (CATEGORY_COLORS[a.category] ?? "#a5d6a7") : "#ddd",
+            borderRadius: 8,
+            backgroundColor: a.unlocked ? "#fff" : "#fafafa",
+            opacity: a.unlocked ? 1 : 0.5,
+            display: "flex",
+            gap: "0.75rem",
+            alignItems: "center",
+          }}>
+            <div style={{
+              width: 48,
+              height: 48,
+              borderRadius: "50%",
+              border: `3px solid ${a.unlocked ? (CATEGORY_COLORS[a.category] ?? "#a5d6a7") : "#ccc"}`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "1.5rem",
+              filter: a.unlocked ? "none" : "grayscale(1)",
+              flexShrink: 0,
+            }}>
+              {a.icon}
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <strong>{a.name}</strong>
+              <div style={{ fontSize: "0.85rem", color: "#555" }}>{a.description}</div>
+              {a.unlockedAt && (
+                <div style={{ fontSize: "0.8rem", color: "#888", marginTop: "0.15rem" }}>
+                  Unlocked: {new Date(a.unlockedAt).toLocaleDateString()}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
 
       <h2>Question Stats</h2>
       <table style={{ borderCollapse: "collapse", width: "100%" }}>
@@ -113,6 +158,14 @@ export default function Profile() {
     </div>
   );
 }
+
+const CATEGORY_COLORS: Record<string, string> = {
+  total: "#ffc107",
+  diversity: "#2196f3",
+  type: "#4caf50",
+  difficulty: "#f44336",
+  collection: "#9c27b0",
+};
 
 const thStyle: React.CSSProperties = {
   textAlign: "left",

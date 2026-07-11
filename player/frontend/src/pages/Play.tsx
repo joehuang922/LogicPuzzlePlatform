@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback, useImperativeHandle, forwardRef } from "react";
 import { useParams, useLocation, useSearchParams, Link } from "react-router-dom";
-import { getPuzzle, saveSnapshot, listSnapshots, getSnapshotById, SnapshotSummary } from "../api/client";
+import { getPuzzle, saveSnapshot, listSnapshots, getSnapshotById, SnapshotSummary, AchievementUnlock } from "../api/client";
 import { PuzzleDefinition } from "../types/puzzle";
 import PuzzleBoard from "../components/PuzzleBoard";
 import { DIFFICULTY_LABELS } from "../constants";
@@ -81,6 +81,7 @@ export default function Play() {
   const [snapshotsLoading, setSnapshotsLoading] = useState(false);
   const [showCongratsDialog, setShowCongratsDialog] = useState(false);
   const [finalTime, setFinalTime] = useState(0);
+  const [newAchievements, setNewAchievements] = useState<AchievementUnlock[]>([]);
 
   const timerRef = useRef<TimerHandle>(null);
   const userValuesRef = useRef<Record<string, number>>({});
@@ -97,12 +98,15 @@ export default function Play() {
 
     try {
       const answer = extractAnswer(puzzle, userValuesRef.current);
-      await saveSnapshot(attemptId, {
+      const result = await saveSnapshot(attemptId, {
         currentAnswer: answer,
         progress: 1,
         elapsedSeconds,
         finished: true,
       });
+      if (result.newAchievements?.length) {
+        setNewAchievements(result.newAchievements);
+      }
     } catch {}
 
     setShowCongratsDialog(true);
@@ -208,6 +212,20 @@ export default function Play() {
           <div style={dialogStyle}>
             <h3>Congratulations!</h3>
             <p>You solved the puzzle in <strong>{formatElapsed(finalTime)}</strong>!</p>
+            {newAchievements.length > 0 && (
+              <div style={{ marginTop: "1rem", textAlign: "left" }}>
+                <p style={{ fontWeight: "bold", marginBottom: "0.5rem" }}>Achievements Unlocked!</p>
+                {newAchievements.map((a) => (
+                  <div key={a.id} style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.5rem", marginBottom: "0.5rem", backgroundColor: "#e8f5e9", border: "1px solid #a5d6a7", borderRadius: 6 }}>
+                    <span style={{ fontSize: "1.5rem" }}>{a.icon}</span>
+                    <div>
+                      <strong>{a.name}</strong>
+                      <div style={{ fontSize: "0.85rem", color: "#555" }}>{a.description}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             <div style={{ display: "flex", gap: "1rem", justifyContent: "center", marginTop: "1rem" }}>
               <Link to="/" style={{ ...btnPrimary, textDecoration: "none", display: "inline-block" }}>
                 Back to Puzzles

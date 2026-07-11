@@ -1,5 +1,6 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { executeStatement } from "../lib/db";
+import { evaluateAndUnlock, getAllDefinitions } from "../lib/achievements";
 
 function toCamelCase(str: string): string {
   return str.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
@@ -91,7 +92,32 @@ async function getProfile(
 
   const collectionRows = collectionStatsResult.records.map(mapRecord);
 
-  return response(200, { player, questionStats, collectionStats: collectionRows });
+  await evaluateAndUnlock(Number(playerId));
+
+  const [definitions, achievementsResult] = await Promise.all([
+    getAllDefinitions(),
+    executeStatement(
+      `SELECT achievement_id, unlocked_at FROM player_achievement WHERE player = :player`,
+      [{ name: "player", value: { longValue: Number(playerId) } }]
+    ),
+  ]);
+
+  const unlockedMap = new Map<string, string>();
+  for (const row of achievementsResult.records) {
+    unlockedMap.set(row.achievement_id as string, row.unlocked_at as string);
+  }
+
+  const achievements = definitions.map((def) => ({
+    id: def.id,
+    name: def.name,
+    description: def.description,
+    icon: def.icon,
+    category: def.category,
+    unlocked: unlockedMap.has(def.id),
+    unlockedAt: unlockedMap.get(def.id) ?? null,
+  }));
+
+  return response(200, { player, questionStats, collectionStats: collectionRows, achievements });
 }
 
 export async function handler(

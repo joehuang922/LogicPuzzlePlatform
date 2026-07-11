@@ -148,6 +148,15 @@ export function getAttemptSnapshot(attemptId: string) {
   return request<{ snapshot: Snapshot }>(`/attempts/${attemptId}/snapshot`);
 }
 
+export interface AchievementUnlock {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  category: string;
+  unlockedAt: string;
+}
+
 export function saveSnapshot(
   attemptId: string,
   data: {
@@ -157,7 +166,7 @@ export function saveSnapshot(
     finished?: boolean;
   }
 ) {
-  return request<{ snapshotId: string }>(`/attempts/${attemptId}/snapshot`, {
+  return request<{ snapshotId: string; newAchievements?: AchievementUnlock[] }>(`/attempts/${attemptId}/snapshot`, {
     method: "POST",
     body: JSON.stringify(data),
   });
@@ -195,10 +204,21 @@ export interface ProfileCollectionRow {
   solved: number;
 }
 
+export interface ProfileAchievement {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  category: string;
+  unlocked: boolean;
+  unlockedAt: string | null;
+}
+
 export interface ProfileResponse {
   player: { id: number; name: string };
   questionStats: ProfileQuestionStat[];
   collectionStats: ProfileCollectionRow[];
+  achievements: ProfileAchievement[];
 }
 
 export function getProfile(player: number) {

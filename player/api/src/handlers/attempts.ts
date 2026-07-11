@@ -1,6 +1,7 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { v4 as uuidv4 } from "uuid";
 import { executeStatement } from "../lib/db";
+import { evaluateAndUnlock } from "../lib/achievements";
 
 function toCamelCase(str: string): string {
   return str.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
@@ -192,6 +193,17 @@ async function saveSnapshot(
       `UPDATE player_attempt SET finished_at = CURRENT_TIMESTAMP WHERE id = :id`,
       [{ name: "id", value: { stringValue: attemptId } }]
     );
+
+    const attemptRow = await executeStatement(
+      `SELECT player FROM player_attempt WHERE id = :id`,
+      [{ name: "id", value: { stringValue: attemptId } }]
+    );
+    const playerId = attemptRow.records[0]?.player as number;
+
+    if (playerId) {
+      const newAchievements = await evaluateAndUnlock(playerId);
+      return response(201, { snapshotId, newAchievements });
+    }
   }
 
   return response(201, { snapshotId });

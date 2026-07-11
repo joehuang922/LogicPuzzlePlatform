@@ -62,3 +62,12 @@ CREATE TABLE IF NOT EXISTS player_attempt_snapshot (
   created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (attempt) REFERENCES player_attempt(id)
 );
+
+CREATE TABLE IF NOT EXISTS player_achievement (
+  id              INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  player          INT          NOT NULL,
+  achievement_id  VARCHAR(64)  NOT NULL,
+  unlocked_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (player) REFERENCES player_account(id),
+  UNIQUE KEY uq_player_achievement (player, achievement_id)
+);
