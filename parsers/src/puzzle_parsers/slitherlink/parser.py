@@ -27,7 +27,7 @@ class SlitherlinkParser(PuzzleParser):
 
     def parse(self, image: Image.Image) -> PuzzleData:
         img_array = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-        board = self._parse_image(img_array)
+        board = self._parse_image(img_array, expected_rows=None, expected_cols=None)
         grid = board.model_dump()
         validate_canon(self.puzzle_type, grid)
         return PuzzleData(puzzle_type=self.puzzle_type, grid=grid)
@@ -48,7 +48,7 @@ class SlitherlinkParser(PuzzleParser):
 
     def _parse_image(
         self, img_array: np.ndarray,
-        expected_rows: int = 10, expected_cols: int = 10,
+        expected_rows: int | None = None, expected_cols: int | None = None,
         debug_dir: str | None = None,
     ) -> SlitherlinkBoard:
         geom = detect_slitherlink_grid(

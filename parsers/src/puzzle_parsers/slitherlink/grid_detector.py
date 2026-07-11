@@ -27,7 +27,7 @@ class SlitherlinkGeometry:
 
 
 def detect_slitherlink_grid(
-    image: NDArray, expected_rows: int = 10, expected_cols: int = 10,
+    image: NDArray, expected_rows: int | None = None, expected_cols: int | None = None,
     debug_dir: str | None = None,
 ) -> SlitherlinkGeometry:
     debug_path = Path(debug_dir) if debug_dir else None
@@ -43,6 +43,13 @@ def detect_slitherlink_grid(
         for (cx, cy) in dots:
             cv2.circle(vis, (int(cx), int(cy)), 5, (0, 0, 255), 2)
         cv2.imwrite(str(debug_path / "01_dots_raw.png"), vis)
+
+    if expected_rows is None or expected_cols is None:
+        det_rows, det_cols = _auto_detect_dimensions(dots)
+        if expected_rows is None:
+            expected_rows = det_rows
+        if expected_cols is None:
+            expected_cols = det_cols
 
     dot_grid = _cluster_dots_to_grid(
         dots, expected_rows + 1, expected_cols + 1, gray.shape
@@ -74,6 +81,66 @@ def detect_slitherlink_grid(
         cell_h=cell_h,
         cell_w=cell_w,
     )
+
+
+def _auto_detect_dimensions(dots: NDArray) -> tuple[int, int]:
+    """Infer grid cell dimensions (rows, cols) from detected dots.
+
+    Uses autocorrelation on X positions to find the cell spacing, then
+    derives cols from the X span and rows from the filtered Y span.
+    """
+    if len(dots) < 4:
+        return 10, 10
+
+    xs = dots[:, 0]
+    x_min, x_max = float(xs.min()), float(xs.max())
+    x_span = x_max - x_min
+    if x_span < 10:
+        return 10, 10
+
+    spacing = _estimate_spacing_autocorrelation(xs)
+    if spacing is None:
+        return 10, 10
+
+    est_cols = max(2, round(x_span / spacing))
+
+    filtered = _filter_dots_by_row_density(dots, est_cols + 1)
+    ys_filt = filtered[:, 1]
+    y_span = float(ys_filt.max() - ys_filt.min())
+    est_rows = max(2, round(y_span / spacing))
+
+    return est_rows, est_cols
+
+
+def _estimate_spacing_autocorrelation(values: NDArray) -> float | None:
+    """Estimate regular grid spacing via autocorrelation of a 1D histogram."""
+    from numpy.fft import fft, ifft
+
+    sorted_vals = np.sort(values)
+    v_min, v_max = float(sorted_vals[0]), float(sorted_vals[-1])
+    span = v_max - v_min
+    if span < 10:
+        return None
+
+    bins = np.arange(v_min, v_max + 1, 1)
+    density, _ = np.histogram(sorted_vals, bins=bins)
+    n = len(density)
+    if n < 100:
+        return None
+
+    f = fft(density - density.mean())
+    acf = np.real(ifft(f * np.conj(f)))
+    acf = acf[: n // 2]
+    if acf[0] == 0:
+        return None
+    acf = acf / acf[0]
+
+    min_lag = max(50, int(span * 0.02))
+    for i in range(min_lag, len(acf) - 1):
+        if acf[i] > acf[i - 1] and acf[i] > acf[i + 1] and acf[i] > 0.3:
+            return float(i)
+
+    return None
 
 
 def _detect_dots(gray: NDArray) -> NDArray:
