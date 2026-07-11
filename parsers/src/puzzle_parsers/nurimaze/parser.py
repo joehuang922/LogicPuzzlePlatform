@@ -5,31 +5,27 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+from numpy.typing import NDArray
 from PIL import Image
 
 from puzzle_parsers.base import PuzzleParser
 from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.nurimaze.grid_detector import (
+    NurimazeGeometry,
     classify_borders,
     detect_nurimaze_grid,
 )
 from puzzle_parsers.nurimaze.models import NurimazeBoard, NurimazeGrids
-from puzzle_parsers.nurimaze.symbol_classifier import (
-    CvSymbolClassifier,
-    GeminiSymbolClassifier,
-    SymbolClassifier,
-)
+from puzzle_parsers.recognition import CellRecognizer, GeminiRecognizer
+from puzzle_parsers.recognition_schemas import SYMBOL_CELL_PROMPT
 from puzzle_parsers.validate import validate_canon
 
 
 class NurimazeParser(PuzzleParser):
     puzzle_type = "nurimaze"
 
-    def __init__(self, symbol_backend: str = "cv", **backend_kwargs) -> None:
-        if symbol_backend == "gemini":
-            self._classifier: SymbolClassifier = GeminiSymbolClassifier(**backend_kwargs)
-        else:
-            self._classifier = CvSymbolClassifier()
+    def __init__(self, recognizer: CellRecognizer | None = None, **kwargs) -> None:
+        self._recognizer = recognizer or GeminiRecognizer(**kwargs)
 
     def parse(self, image: Image.Image) -> PuzzleData:
         img_array = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
@@ -54,12 +50,42 @@ class NurimazeParser(PuzzleParser):
         warped_gray = cv2.cvtColor(geom.warped, cv2.COLOR_BGR2GRAY)
 
         h_borders, v_borders = classify_borders(warped_gray, geom, debug_dir=debug_dir)
-        cells = self._classifier.classify(warped_gray, geom, debug_dir=debug_dir)
+        cells = self._classify_symbols(warped_gray, geom, debug_dir=debug_dir)
 
         return NurimazeBoard(
             cells=cells,
             grids=NurimazeGrids(h=h_borders, v=v_borders),
         )
+
+    def _classify_symbols(
+        self,
+        warped_gray: NDArray,
+        geom: NurimazeGeometry,
+        debug_dir: str | None = None,
+    ) -> list[list[int]]:
+        """Classify cell symbols using the LLM recognizer."""
+        rows, cols = geom.rows, geom.cols
+        margin_ratio = 0.2
+
+        cell_crops: list[list[NDArray]] = []
+        for r in range(rows):
+            row_crops: list[NDArray] = []
+            for c in range(cols):
+                y1 = geom.h_lines[r]
+                y2 = geom.h_lines[r + 1]
+                x1 = geom.v_lines[c]
+                x2 = geom.v_lines[c + 1]
+
+                cell_h = y2 - y1
+                cell_w = x2 - x1
+                my = int(cell_h * margin_ratio)
+                mx = int(cell_w * margin_ratio)
+
+                roi = warped_gray[y1 + my: y2 - my, x1 + mx: x2 - mx]
+                row_crops.append(roi)
+            cell_crops.append(row_crops)
+
+        return self._recognizer.recognize(cell_crops, SYMBOL_CELL_PROMPT)
 
     def validate(self, data: PuzzleData) -> bool:
         if data.puzzle_type != self.puzzle_type:

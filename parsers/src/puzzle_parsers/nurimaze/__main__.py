@@ -25,12 +25,6 @@ def main() -> None:
         help="Directory to save intermediate debug images",
         default=None,
     )
-    parser.add_argument(
-        "--backend",
-        choices=["cv", "gemini"],
-        default="cv",
-        help="Symbol classification backend (default: cv)",
-    )
     args = parser.parse_args()
 
     image_path = Path(args.image)
@@ -38,7 +32,7 @@ def main() -> None:
         print(f"Error: Image file not found: {image_path}", file=sys.stderr)
         sys.exit(1)
 
-    nurimaze_parser = NurimazeParser(symbol_backend=args.backend)
+    nurimaze_parser = NurimazeParser()
     board = nurimaze_parser.parse_file(image_path, debug_dir=args.debug)
 
     output_json = json.dumps(board.model_dump(), indent=4)
