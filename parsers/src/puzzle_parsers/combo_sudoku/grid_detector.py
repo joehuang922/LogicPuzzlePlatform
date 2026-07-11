@@ -14,7 +14,7 @@ from puzzle_parsers.cell_extraction import (
     extract_cells_from_geometry,
     find_best_grid_group,
 )
-from puzzle_parsers.grid_utils import order_points
+from puzzle_parsers.grid_utils import merge_close_peaks, order_points
 
 
 # Standard combo-sudoku layouts (subboard positions in room coordinates)
@@ -796,25 +796,9 @@ def _detect_lines_in_warped(
     return h_lines, v_lines, v_lines_top
 
 
-def _merge_close_peaks(lines: list[int], min_gap: int = 60) -> list[int]:
-    """Merge peaks that are closer than min_gap (thick border double-detections)."""
-    if not lines:
-        return lines
-    merged: list[int] = []
-    group: list[int] = [lines[0]]
-    for i in range(1, len(lines)):
-        if lines[i] - group[-1] < min_gap:
-            group.append(lines[i])
-        else:
-            merged.append(int(np.mean(group)))
-            group = [lines[i]]
-    merged.append(int(np.mean(group)))
-    return merged
-
-
 def _filter_grid_lines(lines: list[int]) -> list[int]:
     """Merge double-peaks, then find the longest run of consistently-spaced lines."""
-    lines = _merge_close_peaks(lines)
+    lines = merge_close_peaks(lines, min_gap=60)
     if len(lines) < 3:
         return lines
 
