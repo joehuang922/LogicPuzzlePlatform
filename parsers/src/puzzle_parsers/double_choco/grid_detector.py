@@ -1,11 +1,7 @@
 """Grid detection for double-choco puzzles with dashed internal lines.
 
-Uses a deterministic morphological pipeline:
-1. Erode with small directional kernel to remove halftone dots
-2. Close with medium kernel to bridge dash gaps
-3. Open with long kernel to keep only line-like structures
-4. Find peaks in projection, determine cell count from median spacing
-5. Generate uniform grid snapped to detected peaks
+Uses preprocess_dashed_lines() from grid_utils to bridge dashes, then
+finds peaks and snaps a uniform grid to them.
 """
 from __future__ import annotations
 
@@ -17,7 +13,11 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.signal import find_peaks
 
-from puzzle_parsers.grid_utils import find_quadrilateral_border, warp_to_rectangle
+from puzzle_parsers.grid_utils import (
+    find_quadrilateral_border,
+    preprocess_dashed_lines,
+    warp_to_rectangle,
+)
 
 
 @dataclass
@@ -81,18 +81,11 @@ def detect_double_choco_grid(
 def _detect_dashed_grid(
     warped_gray: NDArray, warp_w: int, warp_h: int
 ) -> tuple[list[int], list[int]]:
-    """Detect grid lines using deterministic morphological pipeline."""
-    binary = cv2.adaptiveThreshold(
-        cv2.GaussianBlur(warped_gray, (3, 3), 0),
-        255,
-        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY_INV,
-        11,
-        3,
-    )
+    """Detect grid lines from dashed-line image using shared preprocessing."""
+    mask = preprocess_dashed_lines(warped_gray)
 
-    h_peaks = _find_line_peaks(binary, "h", warp_w, warp_h)
-    v_peaks = _find_line_peaks(binary, "v", warp_h, warp_w)
+    h_peaks = _find_line_peaks(mask, "h", warp_w, warp_h)
+    v_peaks = _find_line_peaks(mask, "v", warp_h, warp_w)
 
     n_rows = _cell_count_from_peaks(h_peaks, warp_h)
     n_cols = _cell_count_from_peaks(v_peaks, warp_w)
@@ -104,28 +97,16 @@ def _detect_dashed_grid(
 
 
 def _find_line_peaks(
-    binary: NDArray, axis: str, line_len: int, span: int
+    mask: NDArray, axis: str, line_len: int, span: int
 ) -> NDArray:
-    """Find grid line positions along one axis.
-
-    Pipeline: erode (kill dots) -> close (bridge dashes) -> open (keep lines).
-    """
+    """Find grid line positions along one axis via morphological opening + projection."""
     if axis == "h":
-        erode_k = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 1))
-        close_k = cv2.getStructuringElement(cv2.MORPH_RECT, (40, 1))
         open_k = cv2.getStructuringElement(cv2.MORPH_RECT, (line_len // 8, 1))
-    else:
-        erode_k = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 5))
-        close_k = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 40))
-        open_k = cv2.getStructuringElement(cv2.MORPH_RECT, (1, line_len // 8))
-
-    cleaned = cv2.erode(binary, erode_k)
-    closed = cv2.morphologyEx(cleaned, cv2.MORPH_CLOSE, close_k)
-    lines_mask = cv2.morphologyEx(closed, cv2.MORPH_OPEN, open_k)
-
-    if axis == "h":
+        lines_mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, open_k)
         proj = lines_mask.sum(axis=1).astype(float) / 255
     else:
+        open_k = cv2.getStructuringElement(cv2.MORPH_RECT, (1, line_len // 8))
+        lines_mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, open_k)
         proj = lines_mask.sum(axis=0).astype(float) / 255
 
     peaks, _ = find_peaks(proj, height=line_len * 0.15, distance=span // 20)

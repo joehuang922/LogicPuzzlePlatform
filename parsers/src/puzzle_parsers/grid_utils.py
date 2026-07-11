@@ -3,6 +3,7 @@
 Provides reusable building blocks for:
 - Finding quadrilateral puzzle borders
 - Perspective warping to rectify the image
+- Preprocessing dashed/dotted grid lines into solid-like masks
 - Detecting grid lines via morphological projection
 - Classifying internal border thickness (thick/thin for rooms/walls)
 """
@@ -86,19 +87,75 @@ def warp_to_rectangle(
     return warped, warp_w, warp_h
 
 
+def preprocess_dashed_lines(
+    warped_gray: NDArray,
+    *,
+    erode_cross_size: int = 5,
+    close_gap_size: int = 40,
+) -> NDArray:
+    """Convert dashed/dotted grid lines to a solid-like binary mask.
+
+    Pipeline:
+    1. Adaptive threshold to binarize
+    2. Erode with small directional kernels to remove halftone dots
+    3. Close with medium kernels to bridge dash gaps
+
+    The returned mask can be passed as `preprocessed_mask` to detect_grid_lines().
+
+    Args:
+        warped_gray: Grayscale warped puzzle image.
+        erode_cross_size: Size of the erosion kernel (removes dots smaller than this).
+        close_gap_size: Size of the closing kernel (bridges dash gaps up to this length).
+
+    Returns:
+        Binary mask (255 = ink) with dashes bridged into continuous lines.
+    """
+    binary = cv2.adaptiveThreshold(
+        cv2.GaussianBlur(warped_gray, (3, 3), 0),
+        255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 3,
+    )
+
+    # Erode in both directions to remove halftone dots
+    h_erode_k = cv2.getStructuringElement(cv2.MORPH_RECT, (erode_cross_size, 1))
+    v_erode_k = cv2.getStructuringElement(cv2.MORPH_RECT, (1, erode_cross_size))
+    h_cleaned = cv2.erode(binary, h_erode_k)
+    v_cleaned = cv2.erode(binary, v_erode_k)
+
+    # Close in both directions to bridge dash gaps
+    h_close_k = cv2.getStructuringElement(cv2.MORPH_RECT, (close_gap_size, 1))
+    v_close_k = cv2.getStructuringElement(cv2.MORPH_RECT, (1, close_gap_size))
+    h_closed = cv2.morphologyEx(h_cleaned, cv2.MORPH_CLOSE, h_close_k)
+    v_closed = cv2.morphologyEx(v_cleaned, cv2.MORPH_CLOSE, v_close_k)
+
+    # Combine both directions
+    return cv2.bitwise_or(h_closed, v_closed)
+
+
 def detect_grid_lines(
-    warped_gray: NDArray, warp_w: int, warp_h: int
+    warped_gray: NDArray, warp_w: int, warp_h: int,
+    *,
+    preprocessed_mask: NDArray | None = None,
 ) -> tuple[list[int], list[int]]:
     """Detect all horizontal and vertical grid lines via morphological projection.
 
     Uses a two-pass approach: first detects lines with a conservative kernel to
     estimate cell size, then re-detects with adaptive parameters tuned to the
     actual cell density.
+
+    Args:
+        warped_gray: Grayscale warped puzzle image.
+        warp_w: Width of the warped image.
+        warp_h: Height of the warped image.
+        preprocessed_mask: Optional pre-binarized mask (e.g., from
+            preprocess_dashed_lines). If provided, skips internal binarization.
     """
-    binary = cv2.adaptiveThreshold(
-        cv2.GaussianBlur(warped_gray, (3, 3), 0),
-        255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 3,
-    )
+    if preprocessed_mask is not None:
+        binary = preprocessed_mask
+    else:
+        binary = cv2.adaptiveThreshold(
+            cv2.GaussianBlur(warped_gray, (3, 3), 0),
+            255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 3,
+        )
 
     h_lines = _detect_lines_1d(binary, axis="h", img_len=warp_w, img_span=warp_h)
     v_lines = _detect_lines_1d(binary, axis="v", img_len=warp_h, img_span=warp_w)
