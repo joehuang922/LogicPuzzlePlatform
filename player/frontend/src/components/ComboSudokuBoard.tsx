@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useIsMobile } from "../hooks/useIsMobile";
 import DigitBar from "./DigitBar";
 
@@ -12,6 +12,7 @@ interface ComboSudokuBoardProps {
   subboards: Subboard[];
   initialUserValues?: Record<string, number>;
   onValuesChange?: (values: Record<string, number>) => void;
+  onComplete?: () => void;
 }
 
 const CELL_SIZE = 40;
@@ -22,7 +23,7 @@ const THICK = 3;
 const RADIAL_RADIUS = 44;
 const CIRCLE_RADIUS = 13;
 
-export default function ComboSudokuBoard({ subboards, initialUserValues, onValuesChange }: ComboSudokuBoardProps) {
+export default function ComboSudokuBoard({ subboards, initialUserValues, onValuesChange, onComplete }: ComboSudokuBoardProps) {
   const isMobile = useIsMobile();
   const totalCols = Math.max(...subboards.map((sb) => 3 * sb.x + 9));
   const totalRows = Math.max(...subboards.map((sb) => 3 * sb.y + 9));
@@ -33,9 +34,69 @@ export default function ComboSudokuBoard({ subboards, initialUserValues, onValue
   const [activeCell, setActiveCell] = useState<string | null>(null);
   const [hoveredCell, setHoveredCell] = useState<string | null>(null);
 
+  const completedRef = useRef(false);
+
   useEffect(() => {
     onValuesChange?.(userValues);
   }, [userValues, onValuesChange]);
+
+  useEffect(() => {
+    if (completedRef.current) return;
+
+    // Check all cells are filled and no conflicts exist
+    const filledGrid = new Map<string, number>();
+    for (const sb of subboards) {
+      for (let row = 0; row < 9; row++) {
+        for (let col = 0; col < 9; col++) {
+          const key = `${3 * sb.x + col},${3 * sb.y + row}`;
+          const hint = sb.hints[row]?.[col] ?? 0;
+          const val = hint > 0 ? hint : (userValues[key] ?? 0);
+          if (val === 0) return;
+          filledGrid.set(key, val);
+        }
+      }
+    }
+
+    // Validate each subboard's rows, columns, and 3x3 boxes
+    for (const sb of subboards) {
+      const ox = 3 * sb.x;
+      const oy = 3 * sb.y;
+
+      for (let row = 0; row < 9; row++) {
+        const rowVals = new Set<number>();
+        for (let col = 0; col < 9; col++) {
+          const val = filledGrid.get(`${ox + col},${oy + row}`)!;
+          if (rowVals.has(val)) return;
+          rowVals.add(val);
+        }
+      }
+
+      for (let col = 0; col < 9; col++) {
+        const colVals = new Set<number>();
+        for (let row = 0; row < 9; row++) {
+          const val = filledGrid.get(`${ox + col},${oy + row}`)!;
+          if (colVals.has(val)) return;
+          colVals.add(val);
+        }
+      }
+
+      for (let boxR = 0; boxR < 3; boxR++) {
+        for (let boxC = 0; boxC < 3; boxC++) {
+          const boxVals = new Set<number>();
+          for (let r = boxR * 3; r < boxR * 3 + 3; r++) {
+            for (let c = boxC * 3; c < boxC * 3 + 3; c++) {
+              const val = filledGrid.get(`${ox + c},${oy + r}`)!;
+              if (boxVals.has(val)) return;
+              boxVals.add(val);
+            }
+          }
+        }
+      }
+    }
+
+    completedRef.current = true;
+    onComplete?.();
+  }, [userValues, subboards, onComplete]);
 
   const hintCells = useMemo(() => {
     const set = new Set<string>();

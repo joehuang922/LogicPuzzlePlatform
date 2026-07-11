@@ -35,11 +35,11 @@ function extractUserValues(
 export const comboSudokuRenderer: PuzzleRenderer = {
   puzzleType: 2,
 
-  render(puzzle: PuzzleDefinition, state: PuzzleState, onValuesChange?: (values: Record<string, number>) => void, _onComplete?: () => void) {
+  render(puzzle: PuzzleDefinition, state: PuzzleState, onValuesChange?: (values: Record<string, number>) => void, onComplete?: () => void) {
     const canonRepr = (typeof puzzle.canonRepr === "string" ? JSON.parse(puzzle.canonRepr) : puzzle.canonRepr) as ComboSudokuCanon;
     const savedAnswer = state.playerGrid as { subboards?: AnswerSubboard[] } | undefined;
     const initialUserValues = extractUserValues(canonRepr, savedAnswer);
-    return <ComboSudokuBoard subboards={canonRepr.subboards} initialUserValues={initialUserValues} onValuesChange={onValuesChange} />;
+    return <ComboSudokuBoard subboards={canonRepr.subboards} initialUserValues={initialUserValues} onValuesChange={onValuesChange} onComplete={onComplete} />;
   },
 
   handleInput(state: PuzzleState, _action: PlayerAction) {
