@@ -72,7 +72,8 @@ INSERT INTO puzzle_types (id, name, rule) VALUES
   (2, 'combo-sudoku', ''),
   (3, 'nurimaze', 'Paint rooms black or mark them to create a maze. The shortest path from S to G must pass all circles and no triangles. No 2x2 blocks of same color allowed.'),
   (4, 'double-choco', 'Divide the grid into rooms. Each room contains equal numbers of white and gray cells with the same shape (one is a translation of the other). Numbers indicate how many cells of that color are in the room.'),
-  (5, 'slitherlink', 'Draw a single closed loop along the grid edges. Each number indicates how many of its four surrounding edges are part of the loop.');
+  (5, 'slitherlink', 'Draw a single closed loop along the grid edges. Each number indicates how many of its four surrounding edges are part of the loop.'),
+  (6, 'nonogram', 'Fill cells black according to row and column clues. Each clue number represents a consecutive group of filled cells. Groups within a line must appear in order with at least one empty cell between them.');
 
 -- Seed sample puzzle: sudoku (difficulty 4 = hard)
 INSERT INTO puzzle_questions (id, puzzle_type, title, difficulty, width, height, canon_repr) VALUES (

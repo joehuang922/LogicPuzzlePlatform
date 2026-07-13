@@ -1,0 +1,29 @@
+{
+  "title": "Nonogram Canonical Representation",
+  "description": "Grid defined by row and column clues. Each clue is a list of positive integers representing consecutive filled-cell groups. An empty line uses [0].",
+  "type": "object",
+  "required": ["rowClues", "colClues"],
+  "additionalProperties": false,
+  "properties": {
+    "rowClues": {
+      "description": "Array of length rows. Each element is an array of positive integers (or [0] for an empty row) representing consecutive filled-cell groups left to right.",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": { "type": "integer", "minimum": 0 },
+        "minItems": 1
+      },
+      "minItems": 1
+    },
+    "colClues": {
+      "description": "Array of length cols. Each element is an array of positive integers (or [0] for an empty column) representing consecutive filled-cell groups top to bottom.",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": { "type": "integer", "minimum": 0 },
+        "minItems": 1
+      },
+      "minItems": 1
+    }
+  }
+}

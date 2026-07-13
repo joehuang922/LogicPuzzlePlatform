@@ -43,3 +43,12 @@ export interface SlitherlinkAnswer {
     v: number[][];
   };
 }
+
+export interface NonogramCanon {
+  rowClues: number[][];
+  colClues: number[][];
+}
+
+export interface NonogramAnswer {
+  cells: number[][];
+}

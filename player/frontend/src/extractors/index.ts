@@ -4,6 +4,7 @@ import { comboSudokuExtractor } from "./comboSudoku";
 import { nurimazeExtractor } from "./nurimaze";
 import { doubleChocoExtractor } from "./doubleChoco";
 import { slitherlinkExtractor } from "./slitherlink";
+import { nonogramExtractor } from "./nonogram";
 
 const extractorRegistry = new Map<number, AnswerExtractor>();
 
@@ -16,6 +17,7 @@ registerExtractor(comboSudokuExtractor);
 registerExtractor(nurimazeExtractor);
 registerExtractor(doubleChocoExtractor);
 registerExtractor(slitherlinkExtractor);
+registerExtractor(nonogramExtractor);
 
 export function getExtractor(puzzleType: number): AnswerExtractor | undefined {
   return extractorRegistry.get(puzzleType);
