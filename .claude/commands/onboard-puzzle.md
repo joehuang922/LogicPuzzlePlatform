@@ -51,29 +51,43 @@ If any of these are missing, ask before proceeding.
 2. Must accept `initialJson`, `onComplete`, `onCancel`.
 3. Show a visual editor alongside a JSON textarea (source of truth, bidirectional sync).
 
-## Phase 6: Renderer
+## Phase 6: Admin integration
+
+1. Add the new Board component to `player/frontend/src/components/CanonPreview.tsx`:
+   - Import the Board component and canon type.
+   - Add a `puzzleType === <ID>` branch that renders the board in readonly mode.
+2. Add the new Editor component to `player/frontend/src/pages/Admin.tsx`:
+   - Import the Editor component.
+   - In both `QuestionForm` and `PuzzleEditRow`: add the type to `isXxx`/`hasEditor` checks, and add an editor branch in the ternary chain.
+3. Add the new Editor component to `player/frontend/src/components/BatchUploadForm.tsx`:
+   - Import the Editor component.
+   - Add the type name to the `hasEditor` array.
+   - Add a branch in `InlineEditor` that renders the new editor.
+4. If the new type uses `cells` for dimension computation, verify `computeDimensions` in `BatchUploadForm.tsx` handles the new type ID (it may already be covered by the generic `cells` branch).
+
+## Phase 7: Renderer
 
 1. Create `player/frontend/src/renderers/<puzzleName>.tsx`.
 2. Register it in `player/frontend/src/components/PuzzleBoard.tsx`.
 3. Must pass `onComplete` through to the board component.
 
-## Phase 7: Extractor
+## Phase 8: Extractor
 
 1. Create `player/frontend/src/extractors/<puzzleName>.ts`.
 2. Register it in `player/frontend/src/extractors/index.ts`.
 3. The extracted answer JSON shape must match the "Answer structure" from the doc.
 
-## Phase 8: Parser
+## Phase 9: Parser
 
 1. Create `parsers/src/puzzle_parsers/<puzzle_name>/` with `__init__.py`, `__main__.py`, `models.py`, `grid_detector.py`, `parser.py`.
 2. Parser class must extend `PuzzleParser` and implement `_parse()` (base class handles schema validation automatically).
 3. Implement `validate()` method.
 
-## Phase 9: Database
+## Phase 10: Database
 
 1. Add an `INSERT INTO puzzle_types` entry in `player/api/seed.sql` with the new ID, name, and rule text.
 
-## Phase 10: Verify
+## Phase 11: Verify
 
 1. Run `npx tsc --noEmit` in `player/frontend/` to verify no type errors.
 2. Run `pytest` in `parsers/` to verify no test regressions.
