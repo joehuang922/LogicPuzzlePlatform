@@ -24,6 +24,7 @@ interface BatchItem {
   status: "pending" | "parsing" | "success" | "error";
   error?: string;
   canonRepr?: string;
+  title: string;
   difficulty: number;
   checked: boolean;
   editorOpen: boolean;
@@ -90,6 +91,7 @@ function BatchItemRow({
   onToggleCheck,
   onRemove,
   onRetry,
+  onTitleChange,
   onDifficultyChange,
   onCanonChange,
   onToggleEditor,
@@ -100,6 +102,7 @@ function BatchItemRow({
   onToggleCheck: () => void;
   onRemove: () => void;
   onRetry: () => void;
+  onTitleChange: (t: string) => void;
   onDifficultyChange: (d: number) => void;
   onCanonChange: (json: string) => void;
   onToggleEditor: () => void;
@@ -142,6 +145,14 @@ function BatchItemRow({
         )}
 
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          {item.status === "success" && (
+            <input
+              style={{ ...inputStyle, fontSize: "0.75rem", padding: "0.2rem", width: 120 }}
+              placeholder="Title"
+              value={item.title}
+              onChange={(e) => onTitleChange(e.target.value)}
+            />
+          )}
           {item.status === "success" && (
             <select
               style={{ ...inputStyle, fontSize: "0.75rem", padding: "0.2rem" }}
@@ -211,6 +222,7 @@ export default function BatchUploadForm({
 }) {
   const [puzzleType, setPuzzleType] = useState("");
   const [defaultDifficulty, setDefaultDifficulty] = useState("3");
+  const [author, setAuthor] = useState("");
   const [srcCollection, setSrcCollection] = useState("");
   const [items, setItems] = useState<BatchItem[]>([]);
   const [extracting, setExtracting] = useState(false);
@@ -292,6 +304,7 @@ export default function BatchUploadForm({
           thumbnailUrl: url,
           dataUrl: "",
           status: "pending" as const,
+          title: "",
           difficulty: Number(defaultDifficulty),
           checked: true,
           editorOpen: false,
@@ -406,6 +419,8 @@ export default function BatchUploadForm({
           puzzleType: typeId,
           difficulty: item.difficulty,
           canonRepr: canon,
+          title: item.title.trim() || undefined,
+          author: author.trim() || undefined,
           width: w,
           height: h,
           ...(srcCollection ? { srcCollection: Number(srcCollection) } : {}),
@@ -464,6 +479,10 @@ export default function BatchUploadForm({
               <option key={d.value} value={d.value}>{d.label}</option>
             ))}
           </select>
+        </div>
+        <div style={fieldStyle}>
+          <label style={{ fontSize: "0.8rem", fontWeight: "bold" }}>Author</label>
+          <input style={inputStyle} placeholder="Author" value={author} onChange={(e) => setAuthor(e.target.value)} />
         </div>
         <div style={fieldStyle}>
           <label style={{ fontSize: "0.8rem", fontWeight: "bold" }}>Source collection</label>
@@ -536,6 +555,7 @@ export default function BatchUploadForm({
                 onToggleCheck={() => updateItem(item.id, { checked: !item.checked })}
                 onRemove={() => setItems((prev) => prev.filter((i) => i.id !== item.id))}
                 onRetry={() => handleRetry(item.id)}
+                onTitleChange={(t) => updateItem(item.id, { title: t })}
                 onDifficultyChange={(d) => updateItem(item.id, { difficulty: d })}
                 onCanonChange={(json) => updateItem(item.id, { canonRepr: json })}
                 onToggleEditor={() => updateItem(item.id, { editorOpen: !item.editorOpen })}
