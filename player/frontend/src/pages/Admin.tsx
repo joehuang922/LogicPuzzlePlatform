@@ -12,43 +12,16 @@ import {
   Collection,
   Puzzle,
 } from "../api/client";
-import SudokuBoard from "../components/SudokuBoard";
-import ComboSudokuBoard from "../components/ComboSudokuBoard";
-import NurimazeBoard from "../components/NurimazeBoard";
-import DoubleChocoBoard from "../components/DoubleChocoBoard";
 import NurimazeEditor from "../components/NurimazeEditor";
 import SudokuEditor from "../components/SudokuEditor";
 import ComboSudokuEditor from "../components/ComboSudokuEditor";
 import DoubleChocoEditor from "../components/DoubleChocoEditor";
-import SlitherlinkBoard from "../components/SlitherlinkBoard";
 import SlitherlinkEditor from "../components/SlitherlinkEditor";
-import { NurimazeCanon, DoubleChocoCanon, SlitherlinkCanon } from "../types/canon";
+import CanonPreview from "../components/CanonPreview";
+import BatchUploadForm from "../components/BatchUploadForm";
+import { resizeImage } from "../utils/image";
+import { cardStyle, fieldStyle, inputStyle, errorStyle } from "../styles/admin";
 import { DIFFICULTY_OPTIONS, DIFFICULTY_LABELS } from "../constants";
-
-const fieldStyle: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "0.25rem",
-};
-
-const inputStyle: React.CSSProperties = {
-  padding: "0.4rem",
-  fontSize: "0.9rem",
-  border: "1px solid #ccc",
-  borderRadius: 4,
-};
-
-const errorStyle: React.CSSProperties = {
-  color: "red",
-  fontSize: "0.8rem",
-};
-
-const cardStyle: React.CSSProperties = {
-  border: "1px solid #ddd",
-  borderRadius: 8,
-  padding: "1.5rem",
-  marginBottom: "2rem",
-};
 
 function CollectionForm({ onCreated }: { onCreated: () => void }) {
   const [name, setName] = useState("");
@@ -125,57 +98,6 @@ function CollectionForm({ onCreated }: { onCreated: () => void }) {
 }
 
 const PARSE_TIMEOUT_MS = 120_000;
-const MAX_IMAGE_DIMENSION = 2048;
-
-function resizeImage(dataUrl: string): Promise<string> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      let { width, height } = img;
-      if (width <= MAX_IMAGE_DIMENSION && height <= MAX_IMAGE_DIMENSION) {
-        resolve(dataUrl.split(",")[1]);
-        return;
-      }
-      const scale = MAX_IMAGE_DIMENSION / Math.max(width, height);
-      width = Math.round(width * scale);
-      height = Math.round(height * scale);
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d")!;
-      ctx.drawImage(img, 0, 0, width, height);
-      const resized = canvas.toDataURL("image/jpeg", 0.85);
-      resolve(resized.split(",")[1]);
-    };
-    img.src = dataUrl;
-  });
-}
-
-function CanonPreview({ puzzleType, canonRepr }: { puzzleType: number; canonRepr: string }) {
-  let parsed: Record<string, unknown>;
-  try {
-    parsed = JSON.parse(canonRepr);
-  } catch {
-    return null;
-  }
-
-  if (puzzleType === 1 && parsed.hints) {
-    return <SudokuBoard hints={parsed.hints as number[][]} />;
-  }
-  if (puzzleType === 2 && parsed.subboards) {
-    return <ComboSudokuBoard subboards={parsed.subboards as { x: number; y: number; hints: number[][] }[]} />;
-  }
-  if (puzzleType === 3 && parsed.cells && parsed.grids) {
-    return <NurimazeBoard canon={parsed as unknown as NurimazeCanon} readonly />;
-  }
-  if (puzzleType === 4 && parsed.cells) {
-    return <DoubleChocoBoard canon={parsed as unknown as DoubleChocoCanon} readonly />;
-  }
-  if (puzzleType === 5 && parsed.cells) {
-    return <SlitherlinkBoard canon={parsed as unknown as SlitherlinkCanon} readonly />;
-  }
-  return <p style={{ color: "#666", fontSize: "0.85rem" }}>No preview available for this puzzle type.</p>;
-}
 
 function QuestionForm({
   puzzleTypes,
@@ -831,6 +753,7 @@ export default function Admin() {
       <h1>Admin</h1>
       <CollectionBrowser collections={collections} puzzleTypes={puzzleTypes} onDataChanged={loadData} />
       <CollectionForm onCreated={loadData} />
+      <BatchUploadForm puzzleTypes={puzzleTypes} collections={collections} />
       <QuestionForm puzzleTypes={puzzleTypes} collections={collections} />
     </div>
   );
