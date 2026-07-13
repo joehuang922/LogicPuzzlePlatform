@@ -20,7 +20,7 @@ import SlitherlinkEditor from "../components/SlitherlinkEditor";
 import NonogramEditor from "../components/NonogramEditor";
 import CanonPreview from "../components/CanonPreview";
 import BatchUploadForm from "../components/BatchUploadForm";
-import { resizeImage } from "../utils/image";
+import { extractBase64 } from "../utils/image";
 import { cardStyle, fieldStyle, inputStyle, errorStyle } from "../styles/admin";
 import { DIFFICULTY_OPTIONS, DIFFICULTY_LABELS } from "../constants";
 
@@ -216,7 +216,7 @@ function QuestionForm({
       setParsing(true);
 
       try {
-        const base64 = await resizeImage(dataUrl);
+        const base64 = extractBase64(dataUrl);
 
         const timeout = new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error("Parsing timed out (2min). Cold start may take a while — try again.")), PARSE_TIMEOUT_MS)

@@ -113,20 +113,9 @@ def detect_nonogram_grid(
     if expected_rows and expected_cols:
         rows, cols = expected_rows, expected_cols
     else:
-        # Count internal lines within the playable grid to infer dimensions
         playable_roi = thresh[grid_y : grid_y + grid_h, grid_x : grid_x + grid_w]
-
-        ph_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (grid_w // 3, 1))
-        ph_lines = cv2.morphologyEx(playable_roi, cv2.MORPH_OPEN, ph_kernel)
-        ph_proj = np.sum(ph_lines, axis=1)
-        ph_positions = _find_line_positions(ph_proj, grid_w * 0.2 * 255)
-        rows = max(1, len(ph_positions) - 1)
-
-        pv_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, grid_h // 3))
-        pv_lines = cv2.morphologyEx(playable_roi, cv2.MORPH_OPEN, pv_kernel)
-        pv_proj = np.sum(pv_lines, axis=0)
-        pv_positions = _find_line_positions(pv_proj, grid_h * 0.2 * 255)
-        cols = max(1, len(pv_positions) - 1)
+        rows = _count_cells_in_axis(playable_roi, axis="horizontal", debug_path=debug_path)
+        cols = _count_cells_in_axis(playable_roi, axis="vertical", debug_path=debug_path)
 
     cell_w = grid_w / cols
     cell_h = grid_h / rows
@@ -158,6 +147,71 @@ def detect_nonogram_grid(
         cell_w=cell_w,
         cell_h=cell_h,
     )
+
+
+def _count_cells_in_axis(
+    roi: NDArray,
+    axis: str,
+    debug_path: Path | None = None,
+) -> int:
+    """Count cells along an axis by detecting grid lines and inferring cell size.
+
+    Strategy:
+    1. Use a moderate kernel to detect lines spanning >=20% of the cross-axis.
+    2. Filter double-detections (lines too close together).
+    3. Compute median spacing between remaining lines = cell size.
+    4. Use total extent / cell size for the final count (handles missing lines).
+    """
+    h, w = roi.shape[:2]
+
+    if axis == "horizontal":
+        kernel_len = max(1, w // 5)
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_len, 1))
+        lines = cv2.morphologyEx(roi, cv2.MORPH_OPEN, kernel)
+        proj = np.sum(lines, axis=1)
+        threshold = w * 0.15 * 255
+        positions = _find_line_positions(proj, threshold)
+        extent = h
+    else:
+        kernel_len = max(1, h // 5)
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, kernel_len))
+        lines = cv2.morphologyEx(roi, cv2.MORPH_OPEN, kernel)
+        proj = np.sum(lines, axis=0)
+        threshold = h * 0.15 * 255
+        positions = _find_line_positions(proj, threshold)
+        extent = w
+
+    if len(positions) < 3:
+        return 10  # fallback default
+
+    # Compute raw gaps and find median to identify cell spacing
+    raw_gaps = [positions[i + 1] - positions[i] for i in range(len(positions) - 1)]
+    sorted_gaps = sorted(raw_gaps)
+    median_gap = sorted_gaps[len(sorted_gaps) // 2]
+
+    # Filter out double-detections: merge lines closer than 40% of median gap
+    min_gap = median_gap * 0.4
+    filtered = [positions[0]]
+    for p in positions[1:]:
+        if p - filtered[-1] >= min_gap:
+            filtered.append(p)
+
+    if len(filtered) < 2:
+        return 10
+
+    # Recompute gaps from filtered positions
+    gaps = [filtered[i + 1] - filtered[i] for i in range(len(filtered) - 1)]
+    # The cell size is the median of the smaller gaps (not the large ones from
+    # missing lines at edges). Take the 25th-percentile gap as cell size since
+    # most gaps should be exactly 1 cell width.
+    gaps_sorted = sorted(gaps)
+    cell_size = gaps_sorted[len(gaps_sorted) // 4] if len(gaps_sorted) > 3 else gaps_sorted[0]
+
+    # Total cells = total extent (first line to last line) / cell size
+    span = filtered[-1] - filtered[0]
+    count = max(1, round(span / cell_size))
+
+    return count
 
 
 def _find_line_positions(projection: NDArray, threshold: float) -> list[int]:

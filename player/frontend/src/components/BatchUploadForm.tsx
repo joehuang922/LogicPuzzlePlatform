@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { unzip } from "fflate";
 import { parseImage, createPuzzle, PuzzleType, Collection } from "../api/client";
-import { resizeImage, blobToDataUrl } from "../utils/image";
+import { extractBase64, blobToDataUrl } from "../utils/image";
 import { cardStyle, fieldStyle, inputStyle, errorStyle } from "../styles/admin";
 import { DIFFICULTY_OPTIONS } from "../constants";
 import CanonPreview from "./CanonPreview";
@@ -357,7 +357,7 @@ export default function BatchUploadForm({
     try {
       const blob = new Blob([data]);
       const dataUrl = await blobToDataUrl(blob);
-      const base64 = await resizeImage(dataUrl);
+      const base64 = extractBase64(dataUrl);
 
       const timeout = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error("Timed out (2min)")), PARSE_TIMEOUT_MS)
