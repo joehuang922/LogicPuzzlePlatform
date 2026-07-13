@@ -37,6 +37,12 @@ def main() -> None:
         help="Directory to save intermediate debug images",
         default=None,
     )
+    parser.add_argument(
+        "--ocr",
+        choices=["gemini", "easyocr"],
+        default="gemini",
+        help="OCR backend for clue recognition (default: gemini)",
+    )
     args = parser.parse_args()
 
     image_path = Path(args.image)
@@ -50,6 +56,7 @@ def main() -> None:
         expected_rows=args.rows,
         expected_cols=args.cols,
         debug_dir=args.debug,
+        ocr=args.ocr,
     )
 
     output_json = json.dumps(board.model_dump(), indent=4)

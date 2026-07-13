@@ -49,12 +49,16 @@ def _init_parsers():
     from puzzle_parsers.slitherlink.parser import SlitherlinkParser
     print("  - SlitherlinkParser imported")
 
+    from puzzle_parsers.nonogram.parser import NonogramParser
+    print("  - NonogramParser imported")
+
     _parsers = {
         1: SudokuParser(ocr_backend=_ocr),
         2: ComboSudokuParser(ocr_backend=_ocr),
-        3: NurimazeParser(symbol_backend="gemini"),
+        3: NurimazeParser(),
         4: DoubleChocoParser(ocr_backend=_ocr),
         5: SlitherlinkParser(ocr_backend=_ocr),
+        6: NonogramParser(),
     }
     print("=== Parsers ready ===")
 
