@@ -23,17 +23,21 @@ ROW_CLUE_PROMPT = (
     "This image shows a cropped section of row clues from a nonogram puzzle. "
     "Each row of the grid has a sequence of numbers to the left indicating "
     "the lengths of consecutive filled groups in that row. "
-    "Output a JSON array of arrays, where each inner array contains the clue "
+    "There are exactly {n} rows. "
+    "Output a JSON array of exactly {n} arrays, where each inner array contains the clue "
     "numbers for that row, from top to bottom. A row with no clue has [0]. "
     "Example for 3 rows: [[3,2],[1],[5,1,2]]. No explanation, just the JSON."
 )
 
 COL_CLUE_PROMPT = (
     "This image shows a cropped section of column clues from a nonogram puzzle. "
-    "Each column of the grid has a sequence of numbers above indicating "
-    "the lengths of consecutive filled groups in that column. "
-    "Output a JSON array of arrays, where each inner array contains the clue "
-    "numbers for that column, from left to right. A column with no clue has [0]. "
+    "The clues are arranged in a grid of cells. Each column has numbers stacked "
+    "vertically, read from top to bottom, indicating the lengths of consecutive "
+    "filled groups in that column. Empty cells (no number) should be skipped. "
+    "There are exactly {n} columns. "
+    "For each column, collect all numbers from top to bottom (ignoring empty cells). "
+    "The bottom row always has a number for every column. "
+    "Output a JSON array of exactly {n} arrays, one per column from left to right. "
     "Example for 3 columns: [[2,1],[4],[1,1,3]]. No explanation, just the JSON."
 )
 
@@ -118,8 +122,12 @@ class NonogramParser(PuzzleParser):
                 col_clue_img, geom.cols, geom.cell_w, grid_cell_h=geom.cell_h
             )
         else:
-            row_clues = self._llm_recognize_clues(row_clue_img, ROW_CLUE_PROMPT)
-            col_clues = self._llm_recognize_clues(col_clue_img, COL_CLUE_PROMPT)
+            row_clues = self._llm_recognize_clues(
+                row_clue_img, ROW_CLUE_PROMPT.format(n=geom.rows)
+            )
+            col_clues = self._llm_recognize_col_clues(
+                col_clue_img, geom.cols, geom.cell_w
+            )
 
         if debug_path:
             debug_path.mkdir(parents=True, exist_ok=True)
@@ -136,6 +144,30 @@ class NonogramParser(PuzzleParser):
             cv2.imwrite(f.name, clue_img)
             result = self.recognizer.recognize_full_image(f.name, prompt)
         return result
+
+    def _llm_recognize_col_clues(
+        self, col_clue_img: np.ndarray, num_cols: int, cell_w: float,
+        chunk_size: int = 5,
+    ) -> list[list[int]]:
+        """Split column clue image into chunks and recognize each separately."""
+        h, w = col_clue_img.shape[:2]
+        all_clues: list[list[int]] = []
+
+        for start in range(0, num_cols, chunk_size):
+            end = min(start + chunk_size, num_cols)
+            n = end - start
+            x1 = int(start * cell_w)
+            x2 = int(end * cell_w)
+            x1 = max(0, min(x1, w))
+            x2 = max(0, min(x2, w))
+            chunk_img = col_clue_img[:, x1:x2]
+            prompt = COL_CLUE_PROMPT.format(n=n)
+            clues = self._llm_recognize_clues(chunk_img, prompt)
+            if len(clues) < n:
+                clues.extend([[0]] * (n - len(clues)))
+            all_clues.extend(clues[:n])
+
+        return all_clues
 
     def _ocr_row_clues(
         self, row_clue_img: np.ndarray, num_rows: int, cell_h: float,

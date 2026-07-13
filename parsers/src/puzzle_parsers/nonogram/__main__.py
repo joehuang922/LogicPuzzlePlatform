@@ -6,6 +6,10 @@ import json
 import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parents[3] / ".env")
+
 from puzzle_parsers.nonogram.parser import NonogramParser
 
 
