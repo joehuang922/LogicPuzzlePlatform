@@ -3,7 +3,8 @@ import ComboSudokuBoard from "./ComboSudokuBoard";
 import NurimazeBoard from "./NurimazeBoard";
 import DoubleChocoBoard from "./DoubleChocoBoard";
 import SlitherlinkBoard from "./SlitherlinkBoard";
-import { NurimazeCanon, DoubleChocoCanon, SlitherlinkCanon } from "../types/canon";
+import NonogramBoard from "./NonogramBoard";
+import { NurimazeCanon, DoubleChocoCanon, SlitherlinkCanon, NonogramCanon } from "../types/canon";
 
 export default function CanonPreview({ puzzleType, canonRepr }: { puzzleType: number; canonRepr: string }) {
   let parsed: Record<string, unknown>;
@@ -27,6 +28,9 @@ export default function CanonPreview({ puzzleType, canonRepr }: { puzzleType: nu
   }
   if (puzzleType === 5 && parsed.cells) {
     return <SlitherlinkBoard canon={parsed as unknown as SlitherlinkCanon} readonly />;
+  }
+  if (puzzleType === 6 && parsed.rowClues && parsed.colClues) {
+    return <NonogramBoard canon={parsed as unknown as NonogramCanon} readonly />;
   }
   return <p style={{ color: "#666", fontSize: "0.85rem" }}>No preview available for this puzzle type.</p>;
 }

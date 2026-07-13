@@ -17,6 +17,7 @@ import SudokuEditor from "../components/SudokuEditor";
 import ComboSudokuEditor from "../components/ComboSudokuEditor";
 import DoubleChocoEditor from "../components/DoubleChocoEditor";
 import SlitherlinkEditor from "../components/SlitherlinkEditor";
+import NonogramEditor from "../components/NonogramEditor";
 import CanonPreview from "../components/CanonPreview";
 import BatchUploadForm from "../components/BatchUploadForm";
 import { resizeImage } from "../utils/image";
@@ -128,7 +129,8 @@ function QuestionForm({
   const isComboSudoku = selectedTypeName === "combo-sudoku";
   const isDoubleChoco = selectedTypeName === "double-choco";
   const isSlitherlink = selectedTypeName === "slitherlink";
-  const hasEditor = isNurimaze || isSudoku || isComboSudoku || isDoubleChoco || isSlitherlink;
+  const isNonogram = selectedTypeName === "nonogram";
+  const hasEditor = isNurimaze || isSudoku || isComboSudoku || isDoubleChoco || isSlitherlink || isNonogram;
 
   function validate(): boolean {
     const errs: Record<string, string> = {};
@@ -350,6 +352,12 @@ function QuestionForm({
                 onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
                 onCancel={() => setEditorOpen(false)}
               />
+            ) : isNonogram ? (
+              <NonogramEditor
+                initialCanon={canonRepr}
+                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
+                onCancel={() => setEditorOpen(false)}
+              />
             ) : (
               <ComboSudokuEditor
                 initialJson={canonRepr}
@@ -412,7 +420,8 @@ function PuzzleEditRow({
   const isComboSudoku = typeName === "combo-sudoku";
   const isDoubleChoco = typeName === "double-choco";
   const isSlitherlink = typeName === "slitherlink";
-  const hasEditor = isNurimaze || isSudoku || isComboSudoku || isDoubleChoco || isSlitherlink;
+  const isNonogram = typeName === "nonogram";
+  const hasEditor = isNurimaze || isSudoku || isComboSudoku || isDoubleChoco || isSlitherlink || isNonogram;
 
   async function handleConfirm() {
     let parsedCanon: Record<string, unknown>;
@@ -496,6 +505,12 @@ function PuzzleEditRow({
                 />
               ) : isSlitherlink ? (
                 <SlitherlinkEditor
+                  initialCanon={canonRepr}
+                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
+                  onCancel={() => setEditorOpen(false)}
+                />
+              ) : isNonogram ? (
+                <NonogramEditor
                   initialCanon={canonRepr}
                   onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
                   onCancel={() => setEditorOpen(false)}
