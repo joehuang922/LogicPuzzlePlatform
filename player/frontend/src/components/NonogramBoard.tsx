@@ -208,6 +208,9 @@ export default function NonogramBoard({
   const [isDragging, setIsDragging] = useState(false);
   const dragTargetState = useRef<CellState>(1);
   const completedRef = useRef(false);
+  const [hoverCell, setHoverCell] = useState<{ r: number; c: number } | null>(null);
+  const [showHighlight, setShowHighlight] = useState(true);
+  const [showCoords, setShowCoords] = useState(true);
 
   useEffect(() => {
     const answer: NonogramAnswer = { cells };
@@ -293,8 +296,24 @@ export default function NonogramBoard({
     return () => window.removeEventListener("mouseup", handleMouseUp);
   }, [endDrag]);
 
-  const clueAreaWidth = maxRowClueLen * CELL_SIZE;
-  const clueAreaHeight = maxColClueLen * CELL_SIZE;
+  const MIN_THUMB_CELL = 2;
+  const MAX_THUMB_CELL = 4;
+  const THUMB_PAD = 4;
+
+  const baseClueAreaWidth = maxRowClueLen * CELL_SIZE;
+  const baseClueAreaHeight = maxColClueLen * CELL_SIZE;
+
+  // Thumbnail cell size: fit within the clue corner, but at least MIN_THUMB_CELL
+  const thumbFitW = Math.floor((baseClueAreaWidth - THUMB_PAD * 2) / cols);
+  const thumbFitH = Math.floor((baseClueAreaHeight - THUMB_PAD * 2) / rows);
+  const thumbCell = Math.max(MIN_THUMB_CELL, Math.min(MAX_THUMB_CELL, thumbFitW, thumbFitH));
+
+  // If thumbnail overflows, expand clue areas
+  const thumbTotalW = thumbCell * cols + THUMB_PAD * 2;
+  const thumbTotalH = thumbCell * rows + THUMB_PAD * 2;
+  const clueAreaWidth = Math.max(baseClueAreaWidth, thumbTotalW);
+  const clueAreaHeight = Math.max(baseClueAreaHeight, thumbTotalH);
+
   const gridWidth = cols * CELL_SIZE;
   const gridHeight = rows * CELL_SIZE;
   const svgWidth = clueAreaWidth + gridWidth + PAD * 2;
@@ -304,6 +323,38 @@ export default function NonogramBoard({
   const gridY = PAD + clueAreaHeight;
 
   const elements: JSX.Element[] = [];
+
+  // Thumbnail preview in upper-left corner
+  const thumbX = PAD + Math.floor((clueAreaWidth - thumbCell * cols) / 2);
+  const thumbY = PAD + Math.floor((clueAreaHeight - thumbCell * rows) / 2);
+  elements.push(
+    <rect
+      key="thumb-bg"
+      x={thumbX}
+      y={thumbY}
+      width={thumbCell * cols}
+      height={thumbCell * rows}
+      fill="#fff"
+      stroke="#ccc"
+      strokeWidth={0.5}
+    />
+  );
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (cells[r][c] === 1) {
+        elements.push(
+          <rect
+            key={`th-${r}-${c}`}
+            x={thumbX + c * thumbCell}
+            y={thumbY + r * thumbCell}
+            width={thumbCell}
+            height={thumbCell}
+            fill="#222"
+          />
+        );
+      }
+    }
+  }
 
   // Row clue area: vertical lines between number cells (dashed)
   for (let ci = 0; ci <= maxRowClueLen; ci++) {
@@ -485,6 +536,70 @@ export default function NonogramBoard({
     }
   }
 
+  // Hover highlight
+  const highlights: JSX.Element[] = [];
+  if (!readonly && showHighlight && hoverCell) {
+    const { r, c } = hoverCell;
+    // Row highlight: spans row clue area + grid
+    highlights.push(
+      <rect
+        key="hl-row"
+        x={PAD}
+        y={gridY + r * CELL_SIZE}
+        width={clueAreaWidth + gridWidth}
+        height={CELL_SIZE}
+        fill="rgba(173,216,230,0.35)"
+        pointerEvents="none"
+      />
+    );
+    // Column highlight: spans col clue area + grid
+    highlights.push(
+      <rect
+        key="hl-col"
+        x={gridX + c * CELL_SIZE}
+        y={PAD}
+        width={CELL_SIZE}
+        height={clueAreaHeight + gridHeight}
+        fill="rgba(173,216,230,0.35)"
+        pointerEvents="none"
+      />
+    );
+  }
+
+  // Coordinate tooltip
+  const coordLabel: JSX.Element[] = [];
+  if (!readonly && showCoords && hoverCell) {
+    const { r, c } = hoverCell;
+    const labelX = gridX + (c + 1) * CELL_SIZE + 3;
+    const labelY = gridY + (r + 1) * CELL_SIZE + 3;
+    const text = `${c + 1}, ${r + 1}`;
+    coordLabel.push(
+      <rect
+        key="coord-bg"
+        x={labelX}
+        y={labelY}
+        width={text.length * 5.5 + 6}
+        height={12}
+        rx={2}
+        fill="rgba(0,0,0,0.7)"
+        pointerEvents="none"
+      />
+    );
+    coordLabel.push(
+      <text
+        key="coord-text"
+        x={labelX + 3}
+        y={labelY + 9}
+        fontSize={9}
+        fontFamily="monospace"
+        fill="#fff"
+        pointerEvents="none"
+      >
+        {text}
+      </text>
+    );
+  }
+
   // Interaction targets
   const targets: JSX.Element[] = [];
   if (!readonly) {
@@ -505,7 +620,7 @@ export default function NonogramBoard({
               e.preventDefault();
               startDrag(r, c, e.button === 2);
             }}
-            onMouseEnter={() => continueDrag(r, c)}
+            onMouseEnter={() => { setHoverCell({ r, c }); continueDrag(r, c); }}
             onContextMenu={(e) => e.preventDefault()}
           />
         );
@@ -521,13 +636,16 @@ export default function NonogramBoard({
           viewBox={`0 0 ${svgWidth} ${svgHeight}`}
           style={{ border: "1px solid #ccc", userSelect: "none", display: "block" }}
           onContextMenu={(e) => e.preventDefault()}
+          onMouseLeave={() => setHoverCell(null)}
         >
           {elements}
+          {highlights}
           {targets}
+          {coordLabel}
         </svg>
       </div>
       {!readonly && (
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <button
             onClick={() => setDrawMode("fill")}
             style={{
@@ -560,6 +678,24 @@ export default function NonogramBoard({
           >
             X
           </button>
+          <label style={{ fontSize: 12, marginLeft: 12, cursor: "pointer", userSelect: "none" }}>
+            <input
+              type="checkbox"
+              checked={showHighlight}
+              onChange={(e) => setShowHighlight(e.target.checked)}
+              style={{ marginRight: 4 }}
+            />
+            Highlight
+          </label>
+          <label style={{ fontSize: 12, cursor: "pointer", userSelect: "none" }}>
+            <input
+              type="checkbox"
+              checked={showCoords}
+              onChange={(e) => setShowCoords(e.target.checked)}
+              style={{ marginRight: 4 }}
+            />
+            Coords
+          </label>
         </div>
       )}
     </div>
