@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 
 interface NonogramEditorProps {
   initialCanon?: string;
@@ -51,25 +51,23 @@ export default function NonogramEditor({ initialCanon, onComplete, onCancel }: N
     setJsonError(null);
   }, []);
 
-  function handleRowClueChange(r: number, value: string) {
+  function commitRowClue(r: number, value: string) {
     const nums = value
-      .split(",")
+      .split(/[,\s]+/)
       .map((s) => parseInt(s.trim(), 10))
       .filter((n) => !isNaN(n) && n >= 0);
-    if (nums.length === 0) return;
     const newRowClues = [...rowClues];
-    newRowClues[r] = nums;
+    newRowClues[r] = nums.length > 0 ? nums : [0];
     syncToJson(newRowClues, colClues);
   }
 
-  function handleColClueChange(c: number, value: string) {
+  function commitColClue(c: number, value: string) {
     const nums = value
-      .split(",")
+      .split(/[,\s]+/)
       .map((s) => parseInt(s.trim(), 10))
       .filter((n) => !isNaN(n) && n >= 0);
-    if (nums.length === 0) return;
     const newColClues = [...colClues];
-    newColClues[c] = nums;
+    newColClues[c] = nums.length > 0 ? nums : [0];
     syncToJson(rowClues, newColClues);
   }
 
@@ -93,6 +91,29 @@ export default function NonogramEditor({ initialCanon, onComplete, onCancel }: N
 
   function handleDone() {
     onComplete(JSON.stringify({ rowClues, colClues }, null, 2));
+  }
+
+  function ClueInput({ value, onCommit }: { value: string; onCommit: (v: string) => void }) {
+    const [local, setLocal] = useState(value);
+    const prevValue = useRef(value);
+
+    useEffect(() => {
+      if (value !== prevValue.current) {
+        setLocal(value);
+        prevValue.current = value;
+      }
+    }, [value]);
+
+    return (
+      <input
+        type="text"
+        value={local}
+        onChange={(e) => setLocal(e.target.value)}
+        onBlur={() => onCommit(local)}
+        onKeyDown={(e) => { if (e.key === "Enter") onCommit(local); }}
+        style={{ width: 120, fontFamily: "monospace", fontSize: "0.85rem" }}
+      />
+    );
   }
 
   return (
@@ -127,15 +148,16 @@ export default function NonogramEditor({ initialCanon, onComplete, onCancel }: N
       <div style={{ display: "flex", gap: "2rem", flexWrap: "wrap" }}>
         <div>
           <h4 style={{ margin: "0 0 0.5rem" }}>Row Clues</h4>
+          <p style={{ fontSize: "0.75rem", color: "#666", margin: "0 0 0.5rem" }}>
+            Comma or space separated. Commits on blur or Enter.
+          </p>
           {rowClues.map((clue, r) => (
             <div key={r} style={{ marginBottom: 4 }}>
               <label style={{ fontSize: "0.85rem" }}>
                 R{r}:{" "}
-                <input
-                  type="text"
+                <ClueInput
                   value={clue.join(",")}
-                  onChange={(e) => handleRowClueChange(r, e.target.value)}
-                  style={{ width: 120 }}
+                  onCommit={(v) => commitRowClue(r, v)}
                 />
               </label>
             </div>
@@ -143,15 +165,16 @@ export default function NonogramEditor({ initialCanon, onComplete, onCancel }: N
         </div>
         <div>
           <h4 style={{ margin: "0 0 0.5rem" }}>Column Clues</h4>
+          <p style={{ fontSize: "0.75rem", color: "#666", margin: "0 0 0.5rem" }}>
+            Comma or space separated. Commits on blur or Enter.
+          </p>
           {colClues.map((clue, c) => (
             <div key={c} style={{ marginBottom: 4 }}>
               <label style={{ fontSize: "0.85rem" }}>
                 C{c}:{" "}
-                <input
-                  type="text"
+                <ClueInput
                   value={clue.join(",")}
-                  onChange={(e) => handleColClueChange(c, e.target.value)}
-                  style={{ width: 120 }}
+                  onCommit={(v) => commitColClue(c, v)}
                 />
               </label>
             </div>

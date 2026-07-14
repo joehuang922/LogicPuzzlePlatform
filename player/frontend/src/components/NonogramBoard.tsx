@@ -9,7 +9,7 @@ interface NonogramBoardProps {
   readonly?: boolean;
 }
 
-const CELL_SIZE = 28;
+const CELL_SIZE = 21;
 const PAD = 8;
 
 type CellState = 0 | 1 | 2; // 0=unset, 1=filled, 2=crossed
@@ -204,7 +204,71 @@ export default function NonogramBoard({
 
   const elements: JSX.Element[] = [];
 
-  // Column clues
+  // Row clue area: vertical lines between number cells (dashed)
+  for (let ci = 0; ci <= maxRowClueLen; ci++) {
+    const x = PAD + ci * CELL_SIZE;
+    const isEdge = ci === 0 || ci === maxRowClueLen;
+    elements.push(
+      <line
+        key={`rcv-${ci}`}
+        x1={x}
+        y1={gridY}
+        x2={x}
+        y2={gridY + gridHeight}
+        stroke={isEdge ? "#333" : "#999"}
+        strokeWidth={isEdge ? 1.5 : 0.5}
+        strokeDasharray={isEdge ? undefined : "3,3"}
+      />
+    );
+  }
+  // Row clue area: horizontal lines at row boundaries (solid)
+  for (let r = 0; r <= rows; r++) {
+    elements.push(
+      <line
+        key={`rch-${r}`}
+        x1={PAD}
+        y1={gridY + r * CELL_SIZE}
+        x2={PAD + clueAreaWidth}
+        y2={gridY + r * CELL_SIZE}
+        stroke="#333"
+        strokeWidth={r % 5 === 0 ? 1.5 : 0.5}
+      />
+    );
+  }
+
+  // Col clue area: horizontal lines between number cells (dashed)
+  for (let ci = 0; ci <= maxColClueLen; ci++) {
+    const y = PAD + ci * CELL_SIZE;
+    const isEdge = ci === 0 || ci === maxColClueLen;
+    elements.push(
+      <line
+        key={`cch-${ci}`}
+        x1={gridX}
+        y1={y}
+        x2={gridX + gridWidth}
+        y2={y}
+        stroke={isEdge ? "#333" : "#999"}
+        strokeWidth={isEdge ? 1.5 : 0.5}
+        strokeDasharray={isEdge ? undefined : "3,3"}
+      />
+    );
+  }
+  // Col clue area: vertical lines at column boundaries (solid)
+  for (let c = 0; c <= cols; c++) {
+    elements.push(
+      <line
+        key={`ccv-${c}`}
+        x1={gridX + c * CELL_SIZE}
+        y1={PAD}
+        x2={gridX + c * CELL_SIZE}
+        y2={PAD + clueAreaHeight}
+        stroke="#333"
+        strokeWidth={c % 5 === 0 ? 1.5 : 0.5}
+      />
+    );
+  }
+
+  // Column clue numbers
   for (let c = 0; c < cols; c++) {
     const clue = colClues[c];
     const satisfied = isColSatisfied(colClues[c], cells, c);
@@ -218,7 +282,7 @@ export default function NonogramBoard({
           y={y}
           textAnchor="middle"
           dominantBaseline="central"
-          fontSize={CELL_SIZE * 0.45}
+          fontSize={CELL_SIZE * 0.55}
           fontFamily="sans-serif"
           fontWeight="bold"
           fill={satisfied ? "#aaa" : "#333"}
@@ -229,7 +293,7 @@ export default function NonogramBoard({
     }
   }
 
-  // Row clues
+  // Row clue numbers
   for (let r = 0; r < rows; r++) {
     const clue = rowClues[r];
     const satisfied = isRowSatisfied(rowClues[r], cells[r]);
@@ -243,7 +307,7 @@ export default function NonogramBoard({
           y={y}
           textAnchor="middle"
           dominantBaseline="central"
-          fontSize={CELL_SIZE * 0.45}
+          fontSize={CELL_SIZE * 0.55}
           fontFamily="sans-serif"
           fontWeight="bold"
           fill={satisfied ? "#aaa" : "#333"}
