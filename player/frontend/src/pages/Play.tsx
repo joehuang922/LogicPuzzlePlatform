@@ -5,6 +5,7 @@ import { PuzzleDefinition } from "../types/puzzle";
 import PuzzleBoard from "../components/PuzzleBoard";
 import { DIFFICULTY_LABELS } from "../constants";
 import { extractAnswer } from "../extractors";
+import { computeProgress } from "../progress";
 import { useIsMobile } from "../hooks/useIsMobile";
 
 function formatElapsed(seconds: number): string {
@@ -82,13 +83,17 @@ export default function Play() {
   const [showCongratsDialog, setShowCongratsDialog] = useState(false);
   const [finalTime, setFinalTime] = useState(0);
   const [newAchievements, setNewAchievements] = useState<AchievementUnlock[]>([]);
+  const [progress, setProgress] = useState(0);
 
   const timerRef = useRef<TimerHandle>(null);
   const userValuesRef = useRef<Record<string, number>>({});
 
   const handleValuesChange = useCallback((values: Record<string, number>) => {
     userValuesRef.current = values;
-  }, []);
+    if (puzzle) {
+      setProgress(computeProgress(puzzle, values));
+    }
+  }, [puzzle]);
 
   const handleComplete = useCallback(async () => {
     if (!puzzle || !attemptId) return;
@@ -98,9 +103,10 @@ export default function Play() {
 
     try {
       const answer = extractAnswer(puzzle, userValuesRef.current);
+      const currentProgress = computeProgress(puzzle, userValuesRef.current) / 100;
       const result = await saveSnapshot(attemptId, {
         currentAnswer: answer,
-        progress: 1,
+        progress: currentProgress,
         elapsedSeconds,
         finished: true,
       });
@@ -132,9 +138,10 @@ export default function Play() {
     try {
       const answer = extractAnswer(puzzle, userValuesRef.current);
       const elapsedSeconds = timerRef.current?.getElapsed() ?? 0;
+      const currentProgress = computeProgress(puzzle, userValuesRef.current) / 100;
       await saveSnapshot(attemptId, {
         currentAnswer: answer,
-        progress: 0,
+        progress: currentProgress,
         elapsedSeconds,
       });
       setToast("Progress saved successfully.");
@@ -200,6 +207,14 @@ export default function Play() {
           )}
         </div>
       </div>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
+        <div style={{ flex: 1, height: 8, backgroundColor: "#e0e0e0", borderRadius: 4, overflow: "hidden" }}>
+          <div style={{ width: `${Math.min(progress, 100)}%`, height: "100%", backgroundColor: progress >= 100 ? "#4caf50" : "#1976d2", borderRadius: 4, transition: "width 0.3s ease" }} />
+        </div>
+        <span style={{ fontSize: "0.85rem", fontFamily: "monospace", minWidth: "3.5rem", textAlign: "right" }}>
+          {progress.toFixed(1)} %
+        </span>
+      </div>
       {toast && (
         <div style={toastStyle}>
           {toast}
@@ -264,7 +279,7 @@ export default function Play() {
                       }}
                     >
                       <td style={tdStyle}>{new Date(s.createdAt).toLocaleString()}</td>
-                      <td style={tdStyle}>{Math.round((s.progress ?? 0) * 100)}%</td>
+                      <td style={tdStyle}>{((s.progress ?? 0) * 100).toFixed(1)}%</td>
                       <td style={tdStyle}>{formatElapsed(s.elapsedSeconds ?? 0)}</td>
                     </tr>
                   ))}

@@ -72,7 +72,7 @@ All 81 cells are filled AND no conflicts exist (no duplicate digits in any row, 
 
 ### Progress calculation
 
-(Left empty for now)
+`(cells assigned by the player / total empty cells that need assignment) * 100`. Only cells that were originally empty (hint = 0) count toward the total; pre-filled hints are excluded. A cell is "assigned" once the player enters any digit 1-9.
 
 ## Puzzle Editor
 

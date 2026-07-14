@@ -92,7 +92,7 @@ All cells across the combined grid are filled AND no conflicts exist in any row,
 
 ### Progress calculation
 
-(Left empty for now)
+`(cells assigned by the player / total empty cells that need assignment) * 100`. Across all sub-boards, cells that were originally empty (hint = 0) are counted. Overlapping cells shared between sub-boards are deduplicated (counted once). A cell is "assigned" once the player enters any digit 1-9.
 
 ## Puzzle Editor
 

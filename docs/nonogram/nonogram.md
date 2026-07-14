@@ -92,7 +92,7 @@ Every row and every column satisfies its clue simultaneously.
 
 ### Progress calculation
 
-(Left empty for now)
+`(cells whose state != empty / total cell count) * 100`. A cell is considered non-empty once the player has assigned it any state (filled = 1 or crossed = 2). Unset cells (state = 0) are not counted.
 
 ## Puzzle Editor
 

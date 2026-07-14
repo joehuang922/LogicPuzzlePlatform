@@ -82,7 +82,7 @@ All rooms are assigned a state (no unset rooms remain) AND all rules above are s
 
 ### Progress calculation
 
-(Left empty for now)
+`(cells whose state != empty / total cell count) * 100`. A cell is considered non-empty once the player has assigned it any state (black = 1 or marked = 2). Unset cells (state = 0) are not counted.
 
 ## Puzzle Editor
 

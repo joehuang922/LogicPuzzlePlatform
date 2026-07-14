@@ -68,7 +68,7 @@ At least one edge exists AND the edges form a single connected loop with no bran
 
 ### Progress calculation
 
-(Left empty for now)
+`(cells which have at least one adjacent edge that is not empty / total cell count) * 100`. Each cell has 4 surrounding edges (top, bottom, left, right). If any of those edges has a non-empty state (line = 1 or cross = 2), that cell counts as having progress.
 
 ## Puzzle Editor
 

@@ -69,7 +69,7 @@ At least one thick border exists AND all rules above are satisfied for every roo
 
 ### Progress calculation
 
-(Left empty for now)
+`(area of rooms where gray cell count = white cell count / total cell count) * 100`. Rooms are determined by flood-filling cells connected by edges that have no thick border. A room is "established" (valid) when it contains an equal number of gray and white cells. All cells in established rooms count toward progress.
 
 ## Puzzle Editor
 
