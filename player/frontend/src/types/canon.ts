@@ -52,3 +52,14 @@ export interface NonogramCanon {
 export interface NonogramAnswer {
   cells: number[][];
 }
+
+export interface MasyuCanon {
+  cells: number[][];
+}
+
+export interface MasyuAnswer {
+  edges: {
+    h: number[][];
+    v: number[][];
+  };
+}

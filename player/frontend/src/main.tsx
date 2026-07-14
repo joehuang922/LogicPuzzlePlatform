@@ -9,6 +9,7 @@ import { nurimazeRenderer } from "./renderers/nurimaze";
 import { doubleChocoRenderer } from "./renderers/doubleChoco";
 import { slitherlinkRenderer } from "./renderers/slitherlink";
 import { nonogramRenderer } from "./renderers/nonogram";
+import { masyuRenderer } from "./renderers/masyu";
 
 registerRenderer(comboSudokuRenderer);
 registerRenderer(sudokuRenderer);
@@ -16,6 +17,7 @@ registerRenderer(nurimazeRenderer);
 registerRenderer(doubleChocoRenderer);
 registerRenderer(slitherlinkRenderer);
 registerRenderer(nonogramRenderer);
+registerRenderer(masyuRenderer);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

@@ -1,0 +1,19 @@
+{
+  "title": "Masyu Canonical Representation",
+  "description": "Rectangle grid where some cells contain white or black circles. Players draw line segments between adjacent cell centers to form a single closed loop.",
+  "type": "object",
+  "required": ["cells"],
+  "additionalProperties": false,
+  "properties": {
+    "cells": {
+      "description": "m x n grid of integers. 0 = empty, 1 = white circle (hollow), 2 = black circle (filled).",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": { "type": "integer", "minimum": 0, "maximum": 2 },
+        "minItems": 1
+      },
+      "minItems": 1
+    }
+  }
+}

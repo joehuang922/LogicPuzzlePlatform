@@ -5,6 +5,7 @@ import { nurimazeExtractor } from "./nurimaze";
 import { doubleChocoExtractor } from "./doubleChoco";
 import { slitherlinkExtractor } from "./slitherlink";
 import { nonogramExtractor } from "./nonogram";
+import { masyuExtractor } from "./masyu";
 
 const extractorRegistry = new Map<number, AnswerExtractor>();
 
@@ -18,6 +19,7 @@ registerExtractor(nurimazeExtractor);
 registerExtractor(doubleChocoExtractor);
 registerExtractor(slitherlinkExtractor);
 registerExtractor(nonogramExtractor);
+registerExtractor(masyuExtractor);
 
 export function getExtractor(puzzleType: number): AnswerExtractor | undefined {
   return extractorRegistry.get(puzzleType);
