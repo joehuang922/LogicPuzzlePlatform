@@ -186,6 +186,10 @@ async function updatePuzzle(
       sets.push("width = :width, height = :height");
       params.push({ name: "width", value: { longValue: body.canonRepr.cells[0].length } });
       params.push({ name: "height", value: { longValue: body.canonRepr.cells.length } });
+    } else if (body.canonRepr.rowClues && body.canonRepr.colClues) {
+      sets.push("width = :width, height = :height");
+      params.push({ name: "width", value: { longValue: body.canonRepr.colClues.length } });
+      params.push({ name: "height", value: { longValue: body.canonRepr.rowClues.length } });
     }
   }
 
