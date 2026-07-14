@@ -58,29 +58,130 @@ function validateSolution(
   return true;
 }
 
-function isRowSatisfied(rowClue: number[], row: CellState[]): boolean {
-  const groups: number[] = [];
-  let count = 0;
-  for (const cell of row) {
-    if (cell === 1) {
-      count++;
-    } else {
-      if (count > 0) groups.push(count);
-      count = 0;
-    }
-  }
-  if (count > 0) groups.push(count);
-  const actual = groups.length === 0 ? [0] : groups;
-  if (actual.length !== rowClue.length) return false;
-  return actual.every((v, i) => v === rowClue[i]);
+type ClueStatus = "normal" | "satisfied" | "error";
+
+interface LineAnalysis {
+  perClue: ClueStatus[];
+  hasError: boolean;
+  allSatisfied: boolean;
 }
 
-function isColSatisfied(colClue: number[], cells: CellState[][], c: number): boolean {
+function analyzeLineStatus(clue: number[], line: CellState[]): LineAnalysis {
+  const n = line.length;
+  const clueLen = clue.length;
+
+  // Extract "sealed" groups: groups of filled cells bounded by crossed (2) or edges
+  // A group is sealed if it cannot grow further (both ends are crossed or edge)
+  interface Group {
+    start: number;
+    end: number; // exclusive
+    size: number;
+    sealedLeft: boolean;
+    sealedRight: boolean;
+  }
+
+  const groups: Group[] = [];
+  let i = 0;
+  while (i < n) {
+    if (line[i] === 1) {
+      const start = i;
+      while (i < n && line[i] === 1) i++;
+      const end = i;
+      const sealedLeft = start === 0 || line[start - 1] === 2;
+      const sealedRight = end === n || line[end] === 2;
+      groups.push({ start, end, size: end - start, sealedLeft, sealedRight });
+    } else {
+      i++;
+    }
+  }
+
+  const perClue: ClueStatus[] = Array(clueLen).fill("normal");
+
+  // Check for full satisfaction first
+  if (groups.length === clueLen && groups.every((g, idx) => g.size === clue[idx])) {
+    return { perClue: Array(clueLen).fill("satisfied"), hasError: false, allSatisfied: true };
+  }
+
+  // Error detection: any sealed group larger than allowed, or more sealed groups than clues
+  const sealedGroups = groups.filter((g) => g.sealedLeft && g.sealedRight);
+  if (sealedGroups.length > clueLen) {
+    return { perClue: Array(clueLen).fill("error"), hasError: true, allSatisfied: false };
+  }
+  if (clueLen === 1 && clue[0] === 0) {
+    // Clue is [0] meaning empty row — any filled cell is an error
+    if (groups.length > 0) {
+      return { perClue: ["error"], hasError: true, allSatisfied: false };
+    }
+    return { perClue: ["satisfied"], hasError: false, allSatisfied: true };
+  }
+
+  // Check for sealed groups that are too large for any clue
+  for (const g of sealedGroups) {
+    if (g.size > Math.max(...clue)) {
+      return { perClue: Array(clueLen).fill("error"), hasError: true, allSatisfied: false };
+    }
+  }
+
+  // Partial satisfaction from the beginning:
+  // Walk sealed groups from left; if they match clues in order, mark those clues satisfied
+  let satisfiedFromStart = 0;
+  for (const g of groups) {
+    if (!g.sealedLeft || !g.sealedRight) break;
+    if (satisfiedFromStart >= clueLen) break;
+    if (g.size === clue[satisfiedFromStart]) {
+      satisfiedFromStart++;
+    } else {
+      // Mismatch with expected clue — this is an error
+      return { perClue: Array(clueLen).fill("error"), hasError: true, allSatisfied: false };
+    }
+  }
+
+  // Partial satisfaction from the end:
+  let satisfiedFromEnd = 0;
+  for (let gi = groups.length - 1; gi >= 0; gi--) {
+    const g = groups[gi];
+    if (!g.sealedLeft || !g.sealedRight) break;
+    const clueIdx = clueLen - 1 - satisfiedFromEnd;
+    if (clueIdx < satisfiedFromStart) break; // don't double-count
+    if (g.size === clue[clueIdx]) {
+      satisfiedFromEnd++;
+    } else {
+      return { perClue: Array(clueLen).fill("error"), hasError: true, allSatisfied: false };
+    }
+  }
+
+  // Additional error check: count all sealed groups between the satisfied ones
+  // and verify they don't exceed remaining clues
+  const remainingClues = clueLen - satisfiedFromStart - satisfiedFromEnd;
+  const middleSealedGroups = sealedGroups.filter((g) => {
+    // Groups not accounted for by start/end satisfaction
+    const startBound = satisfiedFromStart > 0 ? groups[satisfiedFromStart - 1].end : 0;
+    const endBound = satisfiedFromEnd > 0 ? groups[groups.length - satisfiedFromEnd].start : n;
+    return g.start >= startBound && g.end <= endBound;
+  });
+  // Subtract the ones we already counted
+  const uncountedMiddle = middleSealedGroups.length - 0; // all middle ones are uncounted
+  if (uncountedMiddle > remainingClues) {
+    return { perClue: Array(clueLen).fill("error"), hasError: true, allSatisfied: false };
+  }
+
+  // Mark satisfied clues
+  for (let ci = 0; ci < satisfiedFromStart; ci++) {
+    perClue[ci] = "satisfied";
+  }
+  for (let ci = 0; ci < satisfiedFromEnd; ci++) {
+    perClue[clueLen - 1 - ci] = "satisfied";
+  }
+
+  return { perClue, hasError: false, allSatisfied: satisfiedFromStart + satisfiedFromEnd === clueLen };
+}
+
+function getColLine(cells: CellState[][], c: number): CellState[] {
   const col: CellState[] = [];
   for (let r = 0; r < cells.length; r++) {
     col.push(cells[r][c]);
   }
-  return isRowSatisfied(colClue, col);
+  return col;
 }
 
 export default function NonogramBoard({
@@ -268,10 +369,17 @@ export default function NonogramBoard({
     );
   }
 
+  // Analyze all rows and columns
+  const rowAnalyses = rowClues.map((clue, r) => analyzeLineStatus(clue, cells[r]));
+  const colAnalyses = colClues.map((clue, c) => analyzeLineStatus(clue, getColLine(cells, c)));
+
+  const clueColor = (status: ClueStatus) =>
+    status === "satisfied" ? "#aaa" : status === "error" ? "#d33" : "#333";
+
   // Column clue numbers
   for (let c = 0; c < cols; c++) {
     const clue = colClues[c];
-    const satisfied = isColSatisfied(colClues[c], cells, c);
+    const analysis = colAnalyses[c];
     for (let i = 0; i < clue.length; i++) {
       const x = gridX + c * CELL_SIZE + CELL_SIZE / 2;
       const y = gridY - (clue.length - i) * CELL_SIZE + CELL_SIZE / 2;
@@ -285,7 +393,7 @@ export default function NonogramBoard({
           fontSize={CELL_SIZE * 0.55}
           fontFamily="sans-serif"
           fontWeight="bold"
-          fill={satisfied ? "#aaa" : "#333"}
+          fill={clueColor(analysis.perClue[i])}
         >
           {clue[i]}
         </text>
@@ -296,7 +404,7 @@ export default function NonogramBoard({
   // Row clue numbers
   for (let r = 0; r < rows; r++) {
     const clue = rowClues[r];
-    const satisfied = isRowSatisfied(rowClues[r], cells[r]);
+    const analysis = rowAnalyses[r];
     for (let i = 0; i < clue.length; i++) {
       const x = gridX - (clue.length - i) * CELL_SIZE + CELL_SIZE / 2;
       const y = gridY + r * CELL_SIZE + CELL_SIZE / 2;
@@ -310,7 +418,7 @@ export default function NonogramBoard({
           fontSize={CELL_SIZE * 0.55}
           fontFamily="sans-serif"
           fontWeight="bold"
-          fill={satisfied ? "#aaa" : "#333"}
+          fill={clueColor(analysis.perClue[i])}
         >
           {clue[i]}
         </text>
@@ -351,6 +459,7 @@ export default function NonogramBoard({
     for (let c = 0; c < cols; c++) {
       const x = gridX + c * CELL_SIZE;
       const y = gridY + r * CELL_SIZE;
+      const hasError = rowAnalyses[r].hasError || colAnalyses[c].hasError;
       if (cells[r][c] === 1) {
         elements.push(
           <rect
@@ -359,7 +468,7 @@ export default function NonogramBoard({
             y={y + 1}
             width={CELL_SIZE - 2}
             height={CELL_SIZE - 2}
-            fill="#222"
+            fill={hasError ? "#d33" : "#222"}
           />
         );
       } else if (cells[r][c] === 2) {
@@ -368,8 +477,8 @@ export default function NonogramBoard({
         const s = CELL_SIZE * 0.25;
         elements.push(
           <g key={`cx-${r}-${c}`}>
-            <line x1={cx - s} y1={cy - s} x2={cx + s} y2={cy + s} stroke="#999" strokeWidth={1.5} />
-            <line x1={cx + s} y1={cy - s} x2={cx - s} y2={cy + s} stroke="#999" strokeWidth={1.5} />
+            <line x1={cx - s} y1={cy - s} x2={cx + s} y2={cy + s} stroke={hasError ? "#d33" : "#999"} strokeWidth={1.5} />
+            <line x1={cx + s} y1={cy - s} x2={cx - s} y2={cy + s} stroke={hasError ? "#d33" : "#999"} strokeWidth={1.5} />
           </g>
         );
       }
