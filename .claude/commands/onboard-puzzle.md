@@ -33,6 +33,9 @@ If any of these are missing, ask before proceeding.
 
 1. Create `schemas/canon/<puzzle-name>.json` — JSON Schema for the canonical representation.
 2. Validate it against the sample JSON from the doc.
+3. Register the schema in `player/api/src/lib/schema.ts`:
+   - Import the new schema JSON.
+   - Add a `<type_id>: ajv.compile(<schema>)` entry to the `validators` map.
 
 ## Phase 3: Frontend types
 

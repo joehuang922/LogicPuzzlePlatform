@@ -4,6 +4,7 @@ import comboSudokuSchema from "../../../../schemas/canon/combo-sudoku.json";
 import nurimazeSchema from "../../../../schemas/canon/nurimaze.json";
 import doubleChocoSchema from "../../../../schemas/canon/double-choco.json";
 import slitherlinkSchema from "../../../../schemas/canon/slitherlink.json";
+import nonogramSchema from "../../../../schemas/canon/nonogram.json";
 
 const ajv = new Ajv();
 
@@ -13,6 +14,7 @@ const validators: Record<number, ValidateFunction> = {
   3: ajv.compile(nurimazeSchema),
   4: ajv.compile(doubleChocoSchema),
   5: ajv.compile(slitherlinkSchema),
+  6: ajv.compile(nonogramSchema),
 };
 
 export function validateCanon(puzzleType: number, data: unknown): void {
