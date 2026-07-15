@@ -28,15 +28,15 @@ class MasyuParser(PuzzleParser):
 
     def _parse(self, image: Image.Image) -> PuzzleData:
         img_array = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-        board = self._parse_image(img_array, expected_rows=10, expected_cols=10)
+        board = self._parse_image(img_array)
         grid = board.model_dump()
         return PuzzleData(puzzle_type=self.puzzle_type, grid=grid)
 
     def parse_file(
         self,
         image_path: str | Path,
-        expected_rows: int = 10,
-        expected_cols: int = 10,
+        expected_rows: int | None = None,
+        expected_cols: int | None = None,
         debug_dir: str | None = None,
     ) -> MasyuBoard:
         image_path = Path(image_path)
@@ -53,8 +53,8 @@ class MasyuParser(PuzzleParser):
     def _parse_image(
         self,
         img_array: np.ndarray,
-        expected_rows: int = 10,
-        expected_cols: int = 10,
+        expected_rows: int | None = None,
+        expected_cols: int | None = None,
         debug_dir: str | None = None,
     ) -> MasyuBoard:
         geom = detect_masyu_grid(

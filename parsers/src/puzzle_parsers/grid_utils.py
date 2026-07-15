@@ -195,9 +195,12 @@ def _detect_lines_1d(
             mask = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)
             projection = mask.sum(axis=0) / 255
 
+        # Pad with zeros so find_peaks can detect boundary plateaus
+        padded = np.concatenate([[0], projection, [0]])
         peaks, _ = find_peaks(
-            projection, height=img_len * 0.03, distance=3
+            padded, height=img_len * 0.03, distance=3
         )
+        peaks = peaks - 1  # undo padding offset
 
         if len(peaks) < 3:
             continue
