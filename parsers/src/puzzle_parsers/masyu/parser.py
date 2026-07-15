@@ -9,23 +9,11 @@ from PIL import Image
 
 from puzzle_parsers.base import PuzzleParser
 from puzzle_parsers.models import PuzzleData
-from puzzle_parsers.recognition import CellRecognizer, GeminiRecognizer
 from puzzle_parsers.masyu.grid_detector import detect_masyu_grid
 from puzzle_parsers.masyu.models import MasyuBoard
 
 if TYPE_CHECKING:
     from puzzle_parsers.recognition import OcrBackend
-
-
-MASYU_PROMPT = (
-    "This image shows a grid of cells cropped from a masyu puzzle. "
-    "Each cell is labeled with its row,col position. "
-    "Each cell may contain a white circle (hollow/empty circle with dark outline), "
-    "a black circle (filled dark circle), or be empty (no circle). "
-    "For each cell, output: 0 if empty, 1 if white circle, 2 if black circle. "
-    "Respond with ONLY a JSON array of arrays (rows of integers). "
-    "Example for a 3x3: [[0,1,0],[2,0,1],[0,0,2]]. No explanation, just the JSON."
-)
 
 
 class MasyuParser(PuzzleParser):
@@ -34,16 +22,9 @@ class MasyuParser(PuzzleParser):
     def __init__(
         self,
         ocr_backend: OcrBackend | None = None,
-        recognizer: CellRecognizer | None = None,
+        recognizer: object | None = None,
     ) -> None:
-        self._ocr = ocr_backend
-        self._recognizer = recognizer
-
-    @property
-    def recognizer(self) -> CellRecognizer:
-        if self._recognizer is None:
-            self._recognizer = GeminiRecognizer()
-        return self._recognizer
+        pass
 
     def _parse(self, image: Image.Image) -> PuzzleData:
         img_array = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
@@ -84,49 +65,27 @@ class MasyuParser(PuzzleParser):
         )
 
         debug_path = Path(debug_dir) if debug_dir else None
-        gray = cv2.cvtColor(img_array, cv2.COLOR_BGR2GRAY)
-
         rows = geom.rows
         cols = geom.cols
-        cell_centers = geom.cell_centers
 
-        # Extract cell ROIs (center 60% of each cell to avoid grid lines)
-        cell_crops: list[list[np.ndarray]] = []
-        roi_size_h = int(geom.cell_h * 0.6)
-        roi_size_w = int(geom.cell_w * 0.6)
-        for r in range(rows):
-            row_crops: list[np.ndarray] = []
-            for c in range(cols):
-                cx, cy = cell_centers[r, c]
-                x1 = max(0, int(cx - roi_size_w / 2))
-                y1 = max(0, int(cy - roi_size_h / 2))
-                x2 = min(gray.shape[1], int(cx + roi_size_w / 2))
-                y2 = min(gray.shape[0], int(cy + roi_size_h / 2))
-                cell_roi = gray[y1:y2, x1:x2]
-                row_crops.append(cell_roi)
-            cell_crops.append(row_crops)
-
-        # Recognize circles via LLM
-        cells = self.recognizer.recognize(cell_crops, MASYU_PROMPT)
+        cells = _detect_circles(
+            geom.warped_gray, geom.h_lines, geom.v_lines, rows, cols, geom.cell_h
+        )
 
         if debug_path:
-            vis = img_array.copy()
+            vis = geom.warped.copy()
             labels = {0: ".", 1: "W", 2: "B"}
             for r in range(rows):
                 for c in range(cols):
                     val = cells[r][c]
                     label = labels.get(val, "?")
-                    cx, cy = cell_centers[r, c]
+                    cx = (geom.v_lines[c] + geom.v_lines[c + 1]) // 2
+                    cy = (geom.h_lines[r] + geom.h_lines[r + 1]) // 2
                     cv2.putText(
-                        vis,
-                        label,
-                        (int(cx) - 5, int(cy) + 5),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.5,
-                        (0, 0, 255),
-                        2,
+                        vis, label, (cx - 5, cy + 5),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255), 1,
                     )
-            cv2.imwrite(str(debug_path / "03_cells.png"), vis)
+            cv2.imwrite(str(debug_path / "04_classified.png"), vis)
 
         return MasyuBoard(cells=cells)
 
@@ -141,3 +100,66 @@ class MasyuParser(PuzzleParser):
             return True
         except Exception:
             return False
+
+
+def _detect_circles(
+    gray: np.ndarray,
+    h_lines: list[int],
+    v_lines: list[int],
+    rows: int,
+    cols: int,
+    cell_size: float,
+) -> list[list[int]]:
+    """Detect circles using HoughCircles on the full warped image.
+
+    Runs circle detection globally (more robust than per-cell), then assigns
+    each detected circle to its grid cell and classifies by center intensity.
+    """
+    cells = [[0] * cols for _ in range(rows)]
+
+    blurred = cv2.medianBlur(gray, 5)
+    min_r = int(cell_size * 0.15)
+    max_r = int(cell_size * 0.4)
+    min_dist = int(cell_size * 0.5)
+
+    circles = cv2.HoughCircles(
+        blurred,
+        cv2.HOUGH_GRADIENT,
+        dp=1.2,
+        minDist=min_dist,
+        param1=100,
+        param2=20,
+        minRadius=min_r,
+        maxRadius=max_r,
+    )
+
+    if circles is None:
+        return cells
+
+    for cx, cy, _ in circles[0]:
+        # Determine which cell this circle belongs to
+        col = -1
+        row = -1
+        for c_idx in range(cols):
+            if v_lines[c_idx] <= cx < v_lines[c_idx + 1]:
+                col = c_idx
+                break
+        for r_idx in range(rows):
+            if h_lines[r_idx] <= cy < h_lines[r_idx + 1]:
+                row = r_idx
+                break
+
+        if row < 0 or col < 0:
+            continue
+
+        # Classify by center intensity
+        ci, cj = int(cy), int(cx)
+        patch = gray[max(0, ci - 2) : ci + 3, max(0, cj - 2) : cj + 3]
+        mean_center = float(patch.mean())
+
+        if mean_center < 128:
+            cells[row][col] = 2  # Black circle
+        else:
+            cells[row][col] = 1  # White circle
+
+    return cells
