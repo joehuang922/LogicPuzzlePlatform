@@ -580,6 +580,47 @@ function PuzzleEditRow({
   );
 }
 
+type SortKey = "title" | "difficulty" | "author" | "size";
+type SortDir = "asc" | "desc";
+
+function comparePuzzles(a: Puzzle, b: Puzzle, key: SortKey, dir: SortDir): number {
+  let cmp = 0;
+  switch (key) {
+    case "title":
+      cmp = (a.title || "").localeCompare(b.title || "");
+      break;
+    case "difficulty":
+      cmp = a.difficulty - b.difficulty;
+      break;
+    case "author":
+      cmp = (a.author || "").localeCompare(b.author || "");
+      break;
+    case "size":
+      cmp = ((a.width ?? 0) * (a.height ?? 0)) - ((b.width ?? 0) * (b.height ?? 0));
+      break;
+  }
+  return dir === "asc" ? cmp : -cmp;
+}
+
+function SortableHeader({ label, sortKey, currentKey, currentDir, onSort, style }: {
+  label: string;
+  sortKey: SortKey;
+  currentKey: SortKey | null;
+  currentDir: SortDir;
+  onSort: (key: SortKey) => void;
+  style?: React.CSSProperties;
+}) {
+  const indicator = currentKey === sortKey ? (currentDir === "asc" ? " ▲" : " ▼") : "";
+  return (
+    <th
+      style={{ padding: "0.3rem", cursor: "pointer", userSelect: "none", ...style }}
+      onClick={() => onSort(sortKey)}
+    >
+      {label}{indicator}
+    </th>
+  );
+}
+
 function CollectionBrowser({
   collections,
   puzzleTypes,
@@ -602,8 +643,24 @@ function CollectionBrowser({
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   const puzzleTypeMap = Object.fromEntries(puzzleTypes.map((pt) => [pt.id, pt.name]));
+
+  function handleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
+
+  function sortItems(items: Puzzle[]): Puzzle[] {
+    if (!sortKey) return items;
+    return [...items].sort((a, b) => comparePuzzles(a, b, sortKey, sortDir));
+  }
 
   async function handleExpand(collectionId: number) {
     if (expandedId === collectionId) {
@@ -613,6 +670,7 @@ function CollectionBrowser({
     setExpandedId(collectionId);
     setChecked(new Set());
     setEditingId(null);
+    setSortKey(null);
     setLoadingPuzzles(true);
     try {
       const res = await listPuzzles({ srcCollection: collectionId });
@@ -707,15 +765,15 @@ function CollectionBrowser({
                               <thead>
                                 <tr style={{ borderBottom: "1px solid #ddd", textAlign: "left" }}>
                                   <th style={{ padding: "0.3rem", width: 30 }}></th>
-                                  <th style={{ padding: "0.3rem" }}>Title</th>
-                                  <th style={{ padding: "0.3rem" }}>Difficulty</th>
-                                  <th style={{ padding: "0.3rem" }}>Author</th>
-                                  <th style={{ padding: "0.3rem" }}>Size</th>
+                                  <SortableHeader label="Title" sortKey="title" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
+                                  <SortableHeader label="Difficulty" sortKey="difficulty" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
+                                  <SortableHeader label="Author" sortKey="author" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
+                                  <SortableHeader label="Size" sortKey="size" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
                                   <th style={{ padding: "0.3rem", width: 50 }}></th>
                                 </tr>
                               </thead>
                               <tbody>
-                                {items.map((p) => (
+                                {sortItems(items).map((p) => (
                                   <>
                                     <tr key={p.id} style={{ borderBottom: editingId === p.id ? "none" : "1px solid #f0f0f0" }}>
                                       <td style={{ padding: "0.3rem", textAlign: "center" }}>

@@ -14,6 +14,47 @@ function formatElapsed(seconds: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
+type SortKey = "title" | "difficulty" | "author" | "size";
+type SortDir = "asc" | "desc";
+
+function comparePuzzles(a: Puzzle, b: Puzzle, key: SortKey, dir: SortDir): number {
+  let cmp = 0;
+  switch (key) {
+    case "title":
+      cmp = (a.title || "").localeCompare(b.title || "");
+      break;
+    case "difficulty":
+      cmp = a.difficulty - b.difficulty;
+      break;
+    case "author":
+      cmp = (a.author || "").localeCompare(b.author || "");
+      break;
+    case "size":
+      cmp = ((a.width ?? 0) * (a.height ?? 0)) - ((b.width ?? 0) * (b.height ?? 0));
+      break;
+  }
+  return dir === "asc" ? cmp : -cmp;
+}
+
+function SortableHeader({ label, sortKey, currentKey, currentDir, onSort, style }: {
+  label: string;
+  sortKey: SortKey;
+  currentKey: SortKey | null;
+  currentDir: SortDir;
+  onSort: (key: SortKey) => void;
+  style?: React.CSSProperties;
+}) {
+  const indicator = currentKey === sortKey ? (currentDir === "asc" ? " ▲" : " ▼") : "";
+  return (
+    <th
+      style={{ padding: "0.3rem", cursor: "pointer", userSelect: "none", ...style }}
+      onClick={() => onSort(sortKey)}
+    >
+      {label}{indicator}
+    </th>
+  );
+}
+
 function CollectionPuzzleList({
   puzzles,
   puzzleTypes,
@@ -31,6 +72,23 @@ function CollectionPuzzleList({
     return acc;
   }, {});
 
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  function handleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
+
+  function sortItems(items: Puzzle[]): Puzzle[] {
+    if (!sortKey) return items;
+    return [...items].sort((a, b) => comparePuzzles(a, b, sortKey, sortDir));
+  }
+
   return (
     <div>
       {Object.entries(groupedByType).map(([typeId, items]) => (
@@ -41,15 +99,15 @@ function CollectionPuzzleList({
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.8rem" }}>
             <thead>
               <tr style={{ borderBottom: "1px solid #ddd", textAlign: "left" }}>
-                <th style={{ padding: "0.3rem" }}>Title</th>
-                <th style={{ padding: "0.3rem" }}>Difficulty</th>
-                <th style={{ padding: "0.3rem" }}>Author</th>
-                <th style={{ padding: "0.3rem" }}>Size</th>
+                <SortableHeader label="Title" sortKey="title" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
+                <SortableHeader label="Difficulty" sortKey="difficulty" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
+                <SortableHeader label="Author" sortKey="author" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
+                <SortableHeader label="Size" sortKey="size" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
                 <th style={{ padding: "0.3rem", width: 30, textAlign: "center" }}></th>
               </tr>
             </thead>
             <tbody>
-              {items.map((p) => (
+              {sortItems(items).map((p) => (
                 <tr
                   key={p.id}
                   onClick={() => onPuzzleClick(p)}
@@ -94,7 +152,7 @@ export default function Home() {
   const [attemptedPuzzleIds, setAttemptedPuzzleIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    Promise.all([listPuzzles(), listCollections(), listPuzzleTypes()])
+    Promise.all([listPuzzles({ limit: 10 }), listCollections(), listPuzzleTypes()])
       .then(([puzzleRes, collectionRes, ptRes]) => {
         setPuzzles(puzzleRes.puzzles as PuzzleDefinition[]);
         setCollections(collectionRes.collections);
@@ -198,7 +256,7 @@ export default function Home() {
 
   return (
     <div>
-      <h2>Available Puzzles</h2>
+      <h2>Recent Puzzles</h2>
       <ul>
         {puzzles.map((p) => (
           <li key={p.id}>

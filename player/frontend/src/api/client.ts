@@ -31,10 +31,11 @@ export interface Puzzle {
   srcCollectionName: string | null;
 }
 
-export function listPuzzles(filters?: { puzzleType?: string; srcCollection?: number }) {
+export function listPuzzles(filters?: { puzzleType?: string; srcCollection?: number; limit?: number }) {
   const params = new URLSearchParams();
   if (filters?.puzzleType) params.set("puzzleType", filters.puzzleType);
   if (filters?.srcCollection != null) params.set("srcCollection", String(filters.srcCollection));
+  if (filters?.limit != null) params.set("limit", String(filters.limit));
   const qs = params.toString();
   return request<{ puzzles: Puzzle[] }>(`/puzzles${qs ? `?${qs}` : ""}`);
 }

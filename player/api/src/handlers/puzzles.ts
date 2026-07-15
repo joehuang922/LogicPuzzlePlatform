@@ -40,6 +40,7 @@ async function listPuzzles(
 ): Promise<APIGatewayProxyResult> {
   const puzzleType = event.queryStringParameters?.puzzleType;
   const srcCollection = event.queryStringParameters?.srcCollection;
+  const limit = event.queryStringParameters?.limit;
 
   let sql = PUZZLE_SELECT;
   const params: { name: string; value: any }[] = [];
@@ -66,6 +67,10 @@ async function listPuzzles(
   }
 
   sql += " ORDER BY pq.created_at DESC";
+
+  if (limit && Number(limit) > 0) {
+    sql += ` LIMIT ${Number(limit)}`;
+  }
 
   const result = await executeStatement(sql, params);
   return response(200, { puzzles: result.records.map(mapRecord) });
