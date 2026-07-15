@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -10,22 +11,33 @@ from PIL import Image
 from puzzle_parsers.base import PuzzleParser
 from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.recognition import CellRecognizer, GeminiRecognizer
-from puzzle_parsers.masyu.grid_detector import detect_masyu_grid
 from puzzle_parsers.masyu.models import MasyuBoard
 
 if TYPE_CHECKING:
     from puzzle_parsers.recognition import OcrBackend
 
 
-MASYU_PROMPT = (
-    "This image shows a grid of cells cropped from a masyu puzzle. "
-    "Each cell is labeled with its row,col position. "
+MASYU_PROMPT_AUTO = (
+    "This image shows a masyu puzzle grid. "
+    "Count the rows and columns of the grid carefully. "
     "Each cell may contain a white circle (hollow/empty circle with dark outline), "
     "a black circle (filled dark circle), or be empty (no circle). "
     "For each cell, output: 0 if empty, 1 if white circle, 2 if black circle. "
     "Respond with ONLY a JSON array of arrays (rows of integers). "
     "Example for a 3x3: [[0,1,0],[2,0,1],[0,0,2]]. No explanation, just the JSON."
 )
+
+
+def _make_prompt(rows: int, cols: int) -> str:
+    return (
+        "This image shows a masyu puzzle grid. "
+        f"The grid has {rows} rows and {cols} columns. "
+        "Each cell may contain a white circle (hollow/empty circle with dark outline), "
+        "a black circle (filled dark circle), or be empty (no circle). "
+        "For each cell, output: 0 if empty, 1 if white circle, 2 if black circle. "
+        f"Respond with ONLY a JSON array of {rows} arrays, each with {cols} integers. "
+        "Example for a 3x3: [[0,1,0],[2,0,1],[0,0,2]]. No explanation, just the JSON."
+    )
 
 
 class MasyuParser(PuzzleParser):
@@ -47,9 +59,21 @@ class MasyuParser(PuzzleParser):
 
     def _parse(self, image: Image.Image) -> PuzzleData:
         img_array = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-        board = self._parse_image(img_array, expected_rows=None, expected_cols=None)
-        grid = board.model_dump()
-        return PuzzleData(puzzle_type=self.puzzle_type, grid=grid)
+
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+            cv2.imwrite(f.name, img_array)
+            cells = self.recognizer.recognize_full_image(f.name, MASYU_PROMPT_AUTO)
+
+        if not isinstance(cells, list) or len(cells) == 0:
+            raise ValueError(
+                f"Expected non-empty grid from recognizer, got {type(cells)}"
+            )
+        for r, row in enumerate(cells):
+            if not isinstance(row, list) or len(row) == 0:
+                raise ValueError(f"Row {r} is not a valid list")
+
+        board = MasyuBoard(cells=cells)
+        return PuzzleData(puzzle_type=self.puzzle_type, grid=board.model_dump())
 
     def parse_file(
         self,
@@ -72,61 +96,36 @@ class MasyuParser(PuzzleParser):
     def _parse_image(
         self,
         img_array: np.ndarray,
-        expected_rows: int | None = None,
-        expected_cols: int | None = None,
+        expected_rows: int = 10,
+        expected_cols: int = 10,
         debug_dir: str | None = None,
     ) -> MasyuBoard:
-        geom = detect_masyu_grid(
-            img_array,
-            expected_rows=expected_rows,
-            expected_cols=expected_cols,
-            debug_dir=debug_dir,
-        )
-
         debug_path = Path(debug_dir) if debug_dir else None
-        gray = cv2.cvtColor(img_array, cv2.COLOR_BGR2GRAY)
 
-        rows = geom.rows
-        cols = geom.cols
-        cell_centers = geom.cell_centers
+        prompt = _make_prompt(expected_rows, expected_cols)
 
-        # Extract cell ROIs
-        cell_crops: list[list[np.ndarray]] = []
-        roi_size_h = int(geom.cell_h * 0.7)
-        roi_size_w = int(geom.cell_w * 0.7)
-        for r in range(rows):
-            row_crops: list[np.ndarray] = []
-            for c in range(cols):
-                cx, cy = cell_centers[r, c]
-                x1 = max(0, int(cx - roi_size_w / 2))
-                y1 = max(0, int(cy - roi_size_h / 2))
-                x2 = min(gray.shape[1], int(cx + roi_size_w / 2))
-                y2 = min(gray.shape[0], int(cy + roi_size_h / 2))
-                cell_roi = gray[y1:y2, x1:x2]
-                row_crops.append(cell_roi)
-            cell_crops.append(row_crops)
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+            cv2.imwrite(f.name, img_array)
+            cells = self.recognizer.recognize_full_image(f.name, prompt)
 
-        # Recognize circles via LLM
-        cells = self.recognizer.recognize(cell_crops, MASYU_PROMPT)
+        if not isinstance(cells, list) or len(cells) != expected_rows:
+            raise ValueError(
+                f"Expected {expected_rows} rows from recognizer, "
+                f"got {len(cells) if isinstance(cells, list) else type(cells)}"
+            )
+        for r, row in enumerate(cells):
+            if not isinstance(row, list) or len(row) != expected_cols:
+                raise ValueError(
+                    f"Expected {expected_cols} cols in row {r}, "
+                    f"got {len(row) if isinstance(row, list) else type(row)}"
+                )
 
         if debug_path:
-            vis = img_array.copy()
-            labels = {0: ".", 1: "W", 2: "B"}
-            for r in range(rows):
-                for c in range(cols):
-                    val = cells[r][c]
-                    label = labels.get(val, "?")
-                    cx, cy = cell_centers[r, c]
-                    cv2.putText(
-                        vis,
-                        label,
-                        (int(cx) - 5, int(cy) + 5),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.5,
-                        (0, 0, 255),
-                        2,
-                    )
-            cv2.imwrite(str(debug_path / "03_cells.png"), vis)
+            debug_path.mkdir(parents=True, exist_ok=True)
+            import json
+            (debug_path / "01_cells.json").write_text(
+                json.dumps({"cells": cells}, indent=2)
+            )
 
         return MasyuBoard(cells=cells)
 

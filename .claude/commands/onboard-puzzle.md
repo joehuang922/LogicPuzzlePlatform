@@ -85,6 +85,7 @@ If any of these are missing, ask before proceeding.
 1. Create `parsers/src/puzzle_parsers/<puzzle_name>/` with `__init__.py`, `__main__.py`, `models.py`, `grid_detector.py`, `parser.py`.
 2. Parser class must extend `PuzzleParser` and implement `_parse()` (base class handles schema validation automatically).
 3. Implement `validate()` method.
+4. Register the new parser in `lambda_handler.py`: import it and add a `<type_id>: <Parser>(ocr_backend=_ocr)` entry to the `_parsers` dict inside `_init_parsers()`.
 
 ## Phase 10: Database
 
