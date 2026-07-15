@@ -77,7 +77,7 @@ export default function MasyuEditor({ initialCanon, onComplete, onCancel }: Masy
           <input
             type="number"
             min={1}
-            max={30}
+            max={100}
             value={rows}
             onChange={(e) => resizeGrid(Number(e.target.value) || 1, cols)}
             style={{ width: 50 }}
@@ -88,7 +88,7 @@ export default function MasyuEditor({ initialCanon, onComplete, onCancel }: Masy
           <input
             type="number"
             min={1}
-            max={30}
+            max={100}
             value={cols}
             onChange={(e) => resizeGrid(rows, Number(e.target.value) || 1)}
             style={{ width: 50 }}
