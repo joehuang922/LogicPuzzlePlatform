@@ -1,9 +1,9 @@
-"""Grid detection for masyu puzzles via line detection.
+"""Grid detection for masyu puzzles via outer boundary + uniform subdivision.
 
 Pipeline:
-1. Detect grid lines using Hough transform or contour analysis
-2. Cluster lines into rows and columns
-3. Compute cell centers from grid intersections
+1. Find the largest rectangular contour (the board boundary)
+2. Subdivide uniformly into expected_rows x expected_cols cells
+3. Return cell center coordinates for ROI extraction
 """
 from __future__ import annotations
 
@@ -23,12 +23,14 @@ class MasyuGeometry:
     cell_centers: NDArray  # (rows, cols, 2) array of cell center coordinates
     cell_h: float
     cell_w: float
+    x0: float
+    y0: float
 
 
 def detect_masyu_grid(
     image: NDArray,
-    expected_rows: int | None = None,
-    expected_cols: int | None = None,
+    expected_rows: int = 10,
+    expected_cols: int = 10,
     debug_dir: str | None = None,
 ) -> MasyuGeometry:
     debug_path = Path(debug_dir) if debug_dir else None
@@ -38,34 +40,25 @@ def detect_masyu_grid(
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     h_img, w_img = gray.shape[:2]
 
-    h_lines, v_lines = _detect_grid_lines(gray)
+    # Find the board boundary (largest rectangle)
+    x0, y0, x1, y1 = _find_board_boundary(gray)
 
     if debug_path:
         vis = image.copy()
-        for y in h_lines:
-            cv2.line(vis, (0, int(y)), (w_img, int(y)), (0, 0, 255), 1)
-        for x in v_lines:
-            cv2.line(vis, (int(x), 0), (int(x), h_img), (255, 0, 0), 1)
-        cv2.imwrite(str(debug_path / "01_grid_lines.png"), vis)
+        cv2.rectangle(vis, (int(x0), int(y0)), (int(x1), int(y1)), (0, 255, 0), 2)
+        cv2.imwrite(str(debug_path / "01_boundary.png"), vis)
 
-    if expected_rows is None:
-        expected_rows = max(2, len(h_lines) - 1) if len(h_lines) > 2 else 10
-    if expected_cols is None:
-        expected_cols = max(2, len(v_lines) - 1) if len(v_lines) > 2 else 10
+    board_w = x1 - x0
+    board_h = y1 - y0
+    cell_w = board_w / expected_cols
+    cell_h = board_h / expected_rows
 
-    # Ensure we have expected_rows + 1 horizontal lines and expected_cols + 1 vertical
-    h_positions = _fit_lines(h_lines, expected_rows + 1, h_img)
-    v_positions = _fit_lines(v_lines, expected_cols + 1, w_img)
-
-    cell_h = float(np.mean(np.diff(h_positions)))
-    cell_w = float(np.mean(np.diff(v_positions)))
-
-    # Compute cell centers
+    # Compute cell centers via uniform subdivision
     cell_centers = np.zeros((expected_rows, expected_cols, 2), dtype=np.float64)
     for r in range(expected_rows):
         for c in range(expected_cols):
-            cx = (v_positions[c] + v_positions[c + 1]) / 2
-            cy = (h_positions[r] + h_positions[r + 1]) / 2
+            cx = x0 + (c + 0.5) * cell_w
+            cy = y0 + (r + 0.5) * cell_h
             cell_centers[r, c] = [cx, cy]
 
     if debug_path:
@@ -83,68 +76,50 @@ def detect_masyu_grid(
         cell_centers=cell_centers,
         cell_h=cell_h,
         cell_w=cell_w,
+        x0=x0,
+        y0=y0,
     )
 
 
-def _detect_grid_lines(gray: NDArray) -> tuple[NDArray, NDArray]:
-    """Detect horizontal and vertical grid lines via projection profiles."""
+def _find_board_boundary(gray: NDArray) -> tuple[float, float, float, float]:
+    """Find the board's outer boundary rectangle.
+
+    Strategy: detect long horizontal and vertical lines using morphological
+    operations, then find the bounding rectangle of the grid structure.
+    This avoids picking up metadata/title areas outside the grid.
+    """
     h_img, w_img = gray.shape[:2]
 
     blurred = cv2.GaussianBlur(gray, (3, 3), 0)
     _, binary = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
 
-    # Horizontal projection (sum along rows)
-    h_proj = np.sum(binary, axis=1).astype(np.float64)
-    h_proj = h_proj / h_proj.max() if h_proj.max() > 0 else h_proj
+    # Detect long horizontal lines
+    h_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (w_img // 4, 1))
+    h_lines = cv2.morphologyEx(binary, cv2.MORPH_OPEN, h_kernel)
 
-    # Vertical projection (sum along columns)
-    v_proj = np.sum(binary, axis=0).astype(np.float64)
-    v_proj = v_proj / v_proj.max() if v_proj.max() > 0 else v_proj
+    # Detect long vertical lines
+    v_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, h_img // 4))
+    v_lines = cv2.morphologyEx(binary, cv2.MORPH_OPEN, v_kernel)
 
-    h_lines = _find_peaks(h_proj, min_distance=h_img // 30)
-    v_lines = _find_peaks(v_proj, min_distance=w_img // 30)
+    # Combine to get grid structure
+    grid_mask = cv2.bitwise_or(h_lines, v_lines)
 
-    return np.array(h_lines, dtype=np.float64), np.array(v_lines, dtype=np.float64)
+    # Find bounding rect of the grid lines
+    coords = cv2.findNonZero(grid_mask)
+    if coords is None:
+        return _fallback_boundary(w_img, h_img)
+
+    x, y, w, h = cv2.boundingRect(coords)
+
+    # Sanity check
+    if w < w_img * 0.3 or h < h_img * 0.3:
+        return _fallback_boundary(w_img, h_img)
+
+    return float(x), float(y), float(x + w), float(y + h)
 
 
-def _find_peaks(profile: NDArray, min_distance: int = 10, threshold: float = 0.3) -> list[float]:
-    """Find peaks in a 1D profile above a threshold with minimum spacing."""
-    peaks = []
-    for i in range(1, len(profile) - 1):
-        if profile[i] > threshold and profile[i] >= profile[i - 1] and profile[i] >= profile[i + 1]:
-            if not peaks or (i - peaks[-1]) >= min_distance:
-                peaks.append(float(i))
-    return peaks
-
-
-def _fit_lines(detected: NDArray, expected_count: int, dimension: int) -> NDArray:
-    """Fit detected lines to expected count, filling in missing ones."""
-    if len(detected) >= expected_count:
-        # Use the best-fitting subset
-        detected = np.sort(detected)
-        if len(detected) == expected_count:
-            return detected
-        # Pick the most evenly-spaced subset
-        span = detected[-1] - detected[0]
-        ideal_spacing = span / (expected_count - 1)
-        best_set = detected[:expected_count]
-        best_score = float("inf")
-        for start_idx in range(len(detected) - expected_count + 1):
-            subset = detected[start_idx : start_idx + expected_count]
-            diffs = np.diff(subset)
-            score = float(np.std(diffs))
-            if score < best_score:
-                best_score = score
-                best_set = subset
-        return best_set
-
-    if len(detected) >= 2:
-        # Extrapolate from detected lines
-        detected = np.sort(detected)
-        spacing = float(np.median(np.diff(detected)))
-        first = float(detected[0])
-        return np.array([first + i * spacing for i in range(expected_count)])
-
-    # Fallback: uniform grid
-    margin = dimension * 0.05
-    return np.linspace(margin, dimension - margin, expected_count)
+def _fallback_boundary(w_img: int, h_img: int) -> tuple[float, float, float, float]:
+    """Fall back to image edges with 5% margin."""
+    margin_x = w_img * 0.05
+    margin_y = h_img * 0.05
+    return margin_x, margin_y, w_img - margin_x, h_img - margin_y
