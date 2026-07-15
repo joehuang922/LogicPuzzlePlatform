@@ -76,9 +76,9 @@ At least one edge exists AND the edges form a single connected closed loop with 
 
 ### Interactions
 
-- Click/drag between two adjacent cell centers to toggle a line segment: empty → drawn → empty.
-- Drawn segments render as solid dark lines connecting cell centers.
-- Dots are displayed at each cell center for visual reference.
+- **Drag to draw/erase**: Press on any cell to start. As the cursor moves through edges between adjacent cells, those edges are set. If the first edge crossed was already drawn, the drag enters "erase mode" and removes edges; otherwise it enters "draw mode" and adds them.
+- Drawn segments render as solid dark lines connecting cell centers, **on top of circles** (lines layer above the circle layer so the path is always visible).
+- No dots at empty cell centers (circles are sufficient landmarks).
 - White circles render as hollow circles with a dark border.
 - Black circles render as filled dark circles.
 

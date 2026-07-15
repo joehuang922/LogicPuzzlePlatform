@@ -11,9 +11,7 @@ interface MasyuBoardProps {
 
 const CELL_SIZE = 36;
 const PAD = 20;
-const DOT_RADIUS = 3;
 const CIRCLE_RADIUS = 11;
-const EDGE_HIT_WIDTH = 14;
 
 type Direction = "up" | "down" | "left" | "right";
 
@@ -54,7 +52,6 @@ function validateSolution(
   const rows = cells.length;
   const cols = cells[0].length;
 
-  // Compute degree per cell
   const degree: number[][] = Array.from({ length: rows }, () =>
     Array(cols).fill(0)
   );
@@ -75,7 +72,6 @@ function validateSolution(
     }
   }
 
-  // Every cell on the loop must have degree 2, others 0
   let loopCellCount = 0;
   let startR = -1,
     startC = -1;
@@ -93,14 +89,12 @@ function validateSolution(
   }
   if (loopCellCount === 0) return false;
 
-  // All circles must be on the loop
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       if (cells[r][c] !== 0 && degree[r][c] !== 2) return false;
     }
   }
 
-  // Connectivity check — BFS from start cell through edges
   const visited: boolean[][] = Array.from({ length: rows }, () =>
     Array(cols).fill(false)
   );
@@ -110,25 +104,21 @@ function validateSolution(
 
   while (queue.length > 0) {
     const [cr, cc] = queue.pop()!;
-    // right
     if (cc < cols - 1 && hEdges[cr][cc] === 1 && !visited[cr][cc + 1]) {
       visited[cr][cc + 1] = true;
       visitedCount++;
       queue.push([cr, cc + 1]);
     }
-    // left
     if (cc > 0 && hEdges[cr][cc - 1] === 1 && !visited[cr][cc - 1]) {
       visited[cr][cc - 1] = true;
       visitedCount++;
       queue.push([cr, cc - 1]);
     }
-    // down
     if (cr < rows - 1 && vEdges[cr][cc] === 1 && !visited[cr + 1][cc]) {
       visited[cr + 1][cc] = true;
       visitedCount++;
       queue.push([cr + 1, cc]);
     }
-    // up
     if (cr > 0 && vEdges[cr - 1][cc] === 1 && !visited[cr - 1][cc]) {
       visited[cr - 1][cc] = true;
       visitedCount++;
@@ -138,7 +128,6 @@ function validateSolution(
 
   if (visitedCount !== loopCellCount) return false;
 
-  // Circle constraints
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       if (cells[r][c] === 0) continue;
@@ -146,7 +135,6 @@ function validateSolution(
       if (dirs.length !== 2) return false;
 
       if (cells[r][c] === 1) {
-        // White circle: must go straight, at least one neighbor must turn
         if (!isStraight(dirs)) return false;
         let neighborTurns = false;
         if (dirs.includes("left") && dirs.includes("right")) {
@@ -160,7 +148,6 @@ function validateSolution(
         }
         if (!neighborTurns) return false;
       } else if (cells[r][c] === 2) {
-        // Black circle: must turn, both immediate neighbors along incoming directions must go straight
         if (!isTurn(dirs)) return false;
         for (const d of dirs) {
           let nr = r,
@@ -205,6 +192,12 @@ export default function MasyuBoard({
   );
   const completedRef = useRef(false);
 
+  const svgRef = useRef<SVGSVGElement>(null);
+  const draggingRef = useRef(false);
+  // null = not yet determined, true = erasing, false = drawing
+  const eraseModeRef = useRef<boolean | null>(null);
+  const lastCellRef = useRef<{ r: number; c: number } | null>(null);
+
   useEffect(() => {
     const answer: MasyuAnswer = { edges: { h: hEdges, v: vEdges } };
     onAnswerChange?.(answer);
@@ -223,207 +216,214 @@ export default function MasyuBoard({
     }
   }, [hEdges, vEdges, cells, onComplete]);
 
-  const handleHEdgeClick = useCallback(
-    (r: number, c: number) => {
-      if (readonly) return;
-      setHEdges((prev) => {
-        const next = prev.map((row) => [...row]);
-        next[r][c] = next[r][c] === 1 ? 0 : 1;
-        return next;
-      });
+  const getCellFromPoint = useCallback(
+    (clientX: number, clientY: number): { r: number; c: number } | null => {
+      const svg = svgRef.current;
+      if (!svg) return null;
+      const rect = svg.getBoundingClientRect();
+      const scaleX = svgWidth / rect.width;
+      const x = (clientX - rect.left) * scaleX - PAD;
+      const y = (clientY - rect.top) * scaleX - PAD;
+      const c = Math.floor(x / CELL_SIZE);
+      const r = Math.floor(y / CELL_SIZE);
+      if (r < 0 || r >= rows || c < 0 || c >= cols) return null;
+      return { r, c };
     },
-    [readonly]
+    [rows, cols, svgWidth]
   );
 
-  const handleVEdgeClick = useCallback(
-    (r: number, c: number) => {
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent) => {
       if (readonly) return;
-      setVEdges((prev) => {
-        const next = prev.map((row) => [...row]);
-        next[r][c] = next[r][c] === 1 ? 0 : 1;
-        return next;
-      });
+      const cell = getCellFromPoint(e.clientX, e.clientY);
+      if (!cell) return;
+      draggingRef.current = true;
+      eraseModeRef.current = null;
+      lastCellRef.current = cell;
+      (e.target as Element).setPointerCapture(e.pointerId);
     },
-    [readonly]
+    [readonly, getCellFromPoint]
   );
 
-  const elements: JSX.Element[] = [];
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!draggingRef.current) return;
+      const cell = getCellFromPoint(e.clientX, e.clientY);
+      if (!cell) return;
+      const last = lastCellRef.current;
+      if (!last) return;
+      if (cell.r === last.r && cell.c === last.c) return;
 
-  // Draw grid lines (light)
-  for (let r = 0; r <= rows; r++) {
-    elements.push(
-      <line
-        key={`grid-h-${r}`}
-        x1={0}
-        y1={r * CELL_SIZE}
-        x2={cols * CELL_SIZE}
-        y2={r * CELL_SIZE}
-        stroke="#ddd"
-        strokeWidth={0.5}
-      />
-    );
-  }
-  for (let c = 0; c <= cols; c++) {
-    elements.push(
-      <line
-        key={`grid-v-${c}`}
-        x1={c * CELL_SIZE}
-        y1={0}
-        x2={c * CELL_SIZE}
-        y2={rows * CELL_SIZE}
-        stroke="#ddd"
-        strokeWidth={0.5}
-      />
-    );
-  }
+      const dr = cell.r - last.r;
+      const dc = cell.c - last.c;
+      if (Math.abs(dr) + Math.abs(dc) !== 1) {
+        lastCellRef.current = cell;
+        return;
+      }
 
-  // Draw connected edges (lines between cell centers)
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols - 1; c++) {
-      if (hEdges[r][c] === 1) {
-        elements.push(
-          <line
-            key={`hl-${r}-${c}`}
-            x1={(c + 0.5) * CELL_SIZE}
-            y1={(r + 0.5) * CELL_SIZE}
-            x2={(c + 1.5) * CELL_SIZE}
-            y2={(r + 0.5) * CELL_SIZE}
-            stroke="#222"
-            strokeWidth={3}
-            strokeLinecap="round"
-          />
-        );
+      let edgeVal: number;
+      if (dc === 1) {
+        edgeVal = hEdges[last.r][last.c];
+      } else if (dc === -1) {
+        edgeVal = hEdges[last.r][cell.c];
+      } else if (dr === 1) {
+        edgeVal = vEdges[last.r][last.c];
+      } else {
+        edgeVal = vEdges[cell.r][last.c];
       }
-    }
-  }
-  for (let r = 0; r < rows - 1; r++) {
-    for (let c = 0; c < cols; c++) {
-      if (vEdges[r][c] === 1) {
-        elements.push(
-          <line
-            key={`vl-${r}-${c}`}
-            x1={(c + 0.5) * CELL_SIZE}
-            y1={(r + 0.5) * CELL_SIZE}
-            x2={(c + 0.5) * CELL_SIZE}
-            y2={(r + 1.5) * CELL_SIZE}
-            stroke="#222"
-            strokeWidth={3}
-            strokeLinecap="round"
-          />
-        );
-      }
-    }
-  }
 
-  // Draw dots at cell centers
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      if (cells[r][c] === 0) {
-        elements.push(
-          <circle
-            key={`dot-${r}-${c}`}
-            cx={(c + 0.5) * CELL_SIZE}
-            cy={(r + 0.5) * CELL_SIZE}
-            r={DOT_RADIUS}
-            fill="#999"
-          />
-        );
+      if (eraseModeRef.current === null) {
+        eraseModeRef.current = edgeVal === 1;
       }
-    }
-  }
 
-  // Draw circles
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const cx = (c + 0.5) * CELL_SIZE;
-      const cy = (r + 0.5) * CELL_SIZE;
-      if (cells[r][c] === 1) {
-        // White circle
-        elements.push(
-          <circle
-            key={`wc-${r}-${c}`}
-            cx={cx}
-            cy={cy}
-            r={CIRCLE_RADIUS}
-            fill="#fff"
-            stroke="#222"
-            strokeWidth={2}
-          />
-        );
-      } else if (cells[r][c] === 2) {
-        // Black circle
-        elements.push(
-          <circle
-            key={`bc-${r}-${c}`}
-            cx={cx}
-            cy={cy}
-            r={CIRCLE_RADIUS}
-            fill="#222"
-            stroke="#222"
-            strokeWidth={2}
-          />
-        );
-      }
-    }
-  }
+      const newVal = eraseModeRef.current ? 0 : 1;
 
-  // Edge click targets
-  const edgeTargets: JSX.Element[] = [];
-  if (!readonly) {
-    // Horizontal edge targets (between adjacent cell centers)
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols - 1; c++) {
-        const x = (c + 0.5) * CELL_SIZE;
-        const y = (r + 0.5) * CELL_SIZE - EDGE_HIT_WIDTH / 2;
-        edgeTargets.push(
-          <rect
-            key={`he-${r}-${c}`}
-            x={x}
-            y={y}
-            width={CELL_SIZE}
-            height={EDGE_HIT_WIDTH}
-            fill="transparent"
-            style={{ cursor: "pointer" }}
-            onClick={() => handleHEdgeClick(r, c)}
-          />
-        );
+      if (dc === 1) {
+        setHEdges((prev) => {
+          const next = prev.map((row) => [...row]);
+          next[last.r][last.c] = newVal;
+          return next;
+        });
+      } else if (dc === -1) {
+        setHEdges((prev) => {
+          const next = prev.map((row) => [...row]);
+          next[last.r][cell.c] = newVal;
+          return next;
+        });
+      } else if (dr === 1) {
+        setVEdges((prev) => {
+          const next = prev.map((row) => [...row]);
+          next[last.r][last.c] = newVal;
+          return next;
+        });
+      } else {
+        setVEdges((prev) => {
+          const next = prev.map((row) => [...row]);
+          next[cell.r][last.c] = newVal;
+          return next;
+        });
       }
-    }
-    // Vertical edge targets
-    for (let r = 0; r < rows - 1; r++) {
-      for (let c = 0; c < cols; c++) {
-        const x = (c + 0.5) * CELL_SIZE - EDGE_HIT_WIDTH / 2;
-        const y = (r + 0.5) * CELL_SIZE;
-        edgeTargets.push(
-          <rect
-            key={`ve-${r}-${c}`}
-            x={x}
-            y={y}
-            width={EDGE_HIT_WIDTH}
-            height={CELL_SIZE}
-            fill="transparent"
-            style={{ cursor: "pointer" }}
-            onClick={() => handleVEdgeClick(r, c)}
-          />
-        );
-      }
-    }
-  }
+
+      lastCellRef.current = cell;
+    },
+    [getCellFromPoint, hEdges, vEdges]
+  );
+
+  const handlePointerUp = useCallback(() => {
+    draggingRef.current = false;
+    lastCellRef.current = null;
+  }, []);
 
   return (
     <div style={{ maxWidth: svgWidth, width: "100%" }}>
       <svg
+        ref={svgRef}
         width="100%"
         viewBox={`0 0 ${svgWidth} ${svgHeight}`}
         style={{
           border: "1px solid #ccc",
           userSelect: "none",
           display: "block",
+          touchAction: "none",
         }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
       >
         <g transform={`translate(${PAD},${PAD})`}>
-          {elements}
-          {edgeTargets}
+          {/* Grid lines */}
+          {Array.from({ length: rows + 1 }, (_, r) => (
+            <line
+              key={`grid-h-${r}`}
+              x1={0}
+              y1={r * CELL_SIZE}
+              x2={cols * CELL_SIZE}
+              y2={r * CELL_SIZE}
+              stroke="#ddd"
+              strokeWidth={0.5}
+            />
+          ))}
+          {Array.from({ length: cols + 1 }, (_, c) => (
+            <line
+              key={`grid-v-${c}`}
+              x1={c * CELL_SIZE}
+              y1={0}
+              x2={c * CELL_SIZE}
+              y2={rows * CELL_SIZE}
+              stroke="#ddd"
+              strokeWidth={0.5}
+            />
+          ))}
+
+          {/* Circles */}
+          {cells.flatMap((row, r) =>
+            row.map((val, c) => {
+              if (val === 0) return null;
+              const cx = (c + 0.5) * CELL_SIZE;
+              const cy = (r + 0.5) * CELL_SIZE;
+              if (val === 1) {
+                return (
+                  <circle
+                    key={`wc-${r}-${c}`}
+                    cx={cx}
+                    cy={cy}
+                    r={CIRCLE_RADIUS}
+                    fill="#fff"
+                    stroke="#222"
+                    strokeWidth={2}
+                  />
+                );
+              }
+              return (
+                <circle
+                  key={`bc-${r}-${c}`}
+                  cx={cx}
+                  cy={cy}
+                  r={CIRCLE_RADIUS}
+                  fill="#222"
+                  stroke="#222"
+                  strokeWidth={2}
+                />
+              );
+            })
+          )}
+
+          {/* Drawn edges (on top of circles) */}
+          {hEdges.flatMap((row, r) =>
+            row.map((val, c) =>
+              val === 1 ? (
+                <line
+                  key={`hl-${r}-${c}`}
+                  x1={(c + 0.5) * CELL_SIZE}
+                  y1={(r + 0.5) * CELL_SIZE}
+                  x2={(c + 1.5) * CELL_SIZE}
+                  y2={(r + 0.5) * CELL_SIZE}
+                  stroke="#222"
+                  strokeWidth={3}
+                  strokeLinecap="round"
+                  pointerEvents="none"
+                />
+              ) : null
+            )
+          )}
+          {vEdges.flatMap((row, r) =>
+            row.map((val, c) =>
+              val === 1 ? (
+                <line
+                  key={`vl-${r}-${c}`}
+                  x1={(c + 0.5) * CELL_SIZE}
+                  y1={(r + 0.5) * CELL_SIZE}
+                  x2={(c + 0.5) * CELL_SIZE}
+                  y2={(r + 1.5) * CELL_SIZE}
+                  stroke="#222"
+                  strokeWidth={3}
+                  strokeLinecap="round"
+                  pointerEvents="none"
+                />
+              ) : null
+            )
+          )}
         </g>
       </svg>
     </div>
