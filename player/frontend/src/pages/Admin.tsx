@@ -410,23 +410,27 @@ function QuestionForm({
 function PuzzleEditRow({
   puzzle,
   puzzleTypes,
+  collections,
   onSaved,
   onCancel,
 }: {
   puzzle: Puzzle;
   puzzleTypes: PuzzleType[];
+  collections?: Collection[];
   onSaved: (updated: Puzzle) => void;
   onCancel: () => void;
 }) {
   const [title, setTitle] = useState(puzzle.title || "");
   const [author, setAuthor] = useState(puzzle.author || "");
   const [difficulty, setDifficulty] = useState(String(puzzle.difficulty));
+  const [srcCollection, setSrcCollection] = useState(puzzle.srcCollection ? String(puzzle.srcCollection) : "");
   const [canonRepr, setCanonRepr] = useState(
     typeof puzzle.canonRepr === "string" ? puzzle.canonRepr : JSON.stringify(puzzle.canonRepr, null, 2)
   );
   const [editorOpen, setEditorOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const showCollectionPicker = collections && !puzzle.srcCollection;
 
   const typeName = puzzleTypes.find((pt) => pt.id === puzzle.puzzleType)?.name;
   const isNurimaze = typeName === "nurimaze";
@@ -450,12 +454,16 @@ function PuzzleEditRow({
     setSaving(true);
     setError(null);
     try {
-      const res = await updatePuzzle(puzzle.id, {
+      const updateData: Parameters<typeof updatePuzzle>[1] = {
         title: title.trim() || null,
         author: author.trim() || null,
         difficulty: Number(difficulty),
         canonRepr: parsedCanon,
-      });
+      };
+      if (showCollectionPicker) {
+        updateData.srcCollection = srcCollection ? Number(srcCollection) : null;
+      }
+      const res = await updatePuzzle(puzzle.id, updateData);
       onSaved(res.puzzle as unknown as Puzzle);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to save");
@@ -485,6 +493,17 @@ function PuzzleEditRow({
               <label style={{ fontSize: "0.75rem", fontWeight: "bold" }}>Author</label>
               <input style={{ ...inputStyle, width: 160 }} value={author} onChange={(e) => setAuthor(e.target.value)} />
             </div>
+            {showCollectionPicker && (
+              <div style={fieldStyle}>
+                <label style={{ fontSize: "0.75rem", fontWeight: "bold" }}>Collection</label>
+                <select style={{ ...inputStyle, width: 200 }} value={srcCollection} onChange={(e) => setSrcCollection(e.target.value)}>
+                  <option value="">— None —</option>
+                  {collections!.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
           <div style={fieldStyle}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
@@ -621,6 +640,8 @@ function SortableHeader({ label, sortKey, currentKey, currentDir, onSort, style 
   );
 }
 
+const NO_COLLECTION_ID = -1;
+
 function CollectionBrowser({
   collections,
   puzzleTypes,
@@ -673,7 +694,9 @@ function CollectionBrowser({
     setSortKey(null);
     setLoadingPuzzles(true);
     try {
-      const res = await listPuzzles({ srcCollection: collectionId });
+      const res = await listPuzzles({
+        srcCollection: collectionId === NO_COLLECTION_ID ? "none" : collectionId,
+      });
       setPuzzles(res.puzzles);
     } finally {
       setLoadingPuzzles(false);
@@ -706,8 +729,13 @@ function CollectionBrowser({
   }
 
   function handleSaved(updated: Puzzle) {
-    setPuzzles((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+    if (expandedId === NO_COLLECTION_ID && updated.srcCollection) {
+      setPuzzles((prev) => prev.filter((p) => p.id !== updated.id));
+    } else {
+      setPuzzles((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+    }
     setEditingId(null);
+    onDataChanged();
   }
 
   const groupedByType = puzzles.reduce<Record<number, Puzzle[]>>((acc, p) => {
@@ -727,6 +755,93 @@ function CollectionBrowser({
           </tr>
         </thead>
         <tbody>
+          <tr
+            onClick={() => handleExpand(NO_COLLECTION_ID)}
+            style={{ cursor: "pointer", borderBottom: "1px solid #eee", background: expandedId === NO_COLLECTION_ID ? "#f0f7ff" : undefined }}
+          >
+            <td style={{ padding: "0.5rem", fontStyle: "italic", color: "#666" }}>(No Collection)</td>
+            <td style={{ padding: "0.5rem" }}>—</td>
+            <td style={{ padding: "0.5rem" }}>—</td>
+          </tr>
+          {expandedId === NO_COLLECTION_ID && (
+            <tr>
+              <td colSpan={3} style={{ padding: "0.75rem 0.5rem", background: "#fafafa" }}>
+                {loadingPuzzles ? (
+                  <p style={{ margin: 0, fontSize: "0.85rem" }}>Loading questions...</p>
+                ) : puzzles.length === 0 ? (
+                  <p style={{ margin: 0, fontSize: "0.85rem", color: "#666" }}>No unassigned questions.</p>
+                ) : (
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.5rem" }}>
+                      <button
+                        onClick={handleDelete}
+                        disabled={checked.size === 0 || deleting}
+                        style={{ padding: "0.3rem 0.75rem", fontSize: "0.8rem", color: checked.size > 0 ? "#fff" : undefined, background: checked.size > 0 ? "#d33" : undefined, border: "1px solid #ccc", borderRadius: 4, cursor: checked.size > 0 ? "pointer" : "default" }}
+                      >
+                        {deleting ? "Deleting..." : `Delete (${checked.size})`}
+                      </button>
+                    </div>
+                    {Object.entries(groupedByType).map(([typeId, items]) => (
+                      <div key={typeId} style={{ marginBottom: "0.75rem" }}>
+                        <div style={{ fontWeight: "bold", fontSize: "0.85rem", padding: "0.3rem 0.5rem", background: "#e8e8e8", borderRadius: 4, marginBottom: "0.25rem" }}>
+                          {puzzleTypeMap[Number(typeId)] || `Type ${typeId}`} ({items.length})
+                        </div>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.8rem" }}>
+                          <thead>
+                            <tr style={{ borderBottom: "1px solid #ddd", textAlign: "left" }}>
+                              <th style={{ padding: "0.3rem", width: 30 }}></th>
+                              <SortableHeader label="Title" sortKey="title" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
+                              <SortableHeader label="Difficulty" sortKey="difficulty" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
+                              <SortableHeader label="Author" sortKey="author" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
+                              <SortableHeader label="Size" sortKey="size" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
+                              <th style={{ padding: "0.3rem", width: 50 }}></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {sortItems(items).map((p) => (
+                              <>
+                                <tr key={p.id} style={{ borderBottom: editingId === p.id ? "none" : "1px solid #f0f0f0" }}>
+                                  <td style={{ padding: "0.3rem", textAlign: "center" }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={checked.has(p.id)}
+                                      onChange={() => toggleCheck(p.id)}
+                                    />
+                                  </td>
+                                  <td style={{ padding: "0.3rem" }}>{p.title || "(none)"}</td>
+                                  <td style={{ padding: "0.3rem" }}>{DIFFICULTY_LABELS[p.difficulty] || String(p.difficulty)}</td>
+                                  <td style={{ padding: "0.3rem" }}>{p.author || "N/A"}</td>
+                                  <td style={{ padding: "0.3rem" }}>{p.width && p.height ? `${p.width} x ${p.height}` : "—"}</td>
+                                  <td style={{ padding: "0.3rem", textAlign: "center" }}>
+                                    <button
+                                      onClick={() => setEditingId(editingId === p.id ? null : p.id)}
+                                      style={{ padding: "0.15rem 0.4rem", fontSize: "0.75rem", border: "1px solid #4a90d9", borderRadius: 3, background: editingId === p.id ? "#4a90d9" : "#f0f7ff", color: editingId === p.id ? "#fff" : "#4a90d9", cursor: "pointer" }}
+                                    >
+                                      Edit
+                                    </button>
+                                  </td>
+                                </tr>
+                                {editingId === p.id && (
+                                  <PuzzleEditRow
+                                    key={`${p.id}-edit`}
+                                    puzzle={p}
+                                    puzzleTypes={puzzleTypes}
+                                    collections={collections}
+                                    onSaved={handleSaved}
+                                    onCancel={() => setEditingId(null)}
+                                  />
+                                )}
+                              </>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </td>
+            </tr>
+          )}
           {sorted.map((c) => (
             <>
               <tr

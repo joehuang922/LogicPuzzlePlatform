@@ -31,7 +31,7 @@ export interface Puzzle {
   srcCollectionName: string | null;
 }
 
-export function listPuzzles(filters?: { puzzleType?: string; srcCollection?: number; limit?: number }) {
+export function listPuzzles(filters?: { puzzleType?: string; srcCollection?: number | "none"; limit?: number }) {
   const params = new URLSearchParams();
   if (filters?.puzzleType) params.set("puzzleType", filters.puzzleType);
   if (filters?.srcCollection != null) params.set("srcCollection", String(filters.srcCollection));
@@ -65,6 +65,7 @@ export function updatePuzzle(id: string, data: {
   author?: string | null;
   difficulty?: number;
   canonRepr?: Record<string, unknown>;
+  srcCollection?: number | null;
 }) {
   return request<{ puzzle: Puzzle }>(`/puzzles/${id}`, {
     method: "PATCH",

@@ -54,7 +54,9 @@ async function listPuzzles(
     });
   }
 
-  if (srcCollection) {
+  if (srcCollection === "none") {
+    conditions.push("pq.src_collection IS NULL");
+  } else if (srcCollection) {
     conditions.push("pq.src_collection = :srcCollection");
     params.push({
       name: "srcCollection",
@@ -196,6 +198,14 @@ async function updatePuzzle(
       params.push({ name: "width", value: { longValue: body.canonRepr.colClues.length } });
       params.push({ name: "height", value: { longValue: body.canonRepr.rowClues.length } });
     }
+  }
+
+  if (body.srcCollection !== undefined) {
+    sets.push("src_collection = :srcCollection");
+    params.push({
+      name: "srcCollection",
+      value: body.srcCollection ? { longValue: body.srcCollection } : { isNull: true },
+    });
   }
 
   if (sets.length === 0) return response(400, { error: "No fields to update" });
