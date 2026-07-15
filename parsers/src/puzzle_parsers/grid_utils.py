@@ -235,7 +235,36 @@ def _detect_lines_1d(
         peaks, _ = find_peaks(projection, height=img_len * 0.2, distance=img_span // 20)
         return merge_close_peaks(peaks.tolist(), min_gap=max(3, img_span // 50))
 
+    if best_regularity > 0.15 and len(best_result) >= 3:
+        spacings = np.diff(best_result)
+        median_sp = float(np.median(spacings))
+        re_merged = merge_close_peaks(best_result, min_gap=int(median_sp * 0.6))
+        if len(re_merged) >= 3:
+            re_cv = float(np.std(np.diff(re_merged)) / np.mean(np.diff(re_merged)))
+            if re_cv < best_regularity:
+                best_result = re_merged
+
+    best_result = _split_large_gaps(best_result)
     return best_result
+
+
+def _split_large_gaps(lines: list[int]) -> list[int]:
+    """Insert midpoints for gaps that are ~2x the median spacing (missed lines)."""
+    if len(lines) < 3:
+        return lines
+    spacings = np.diff(lines)
+    median_sp = float(np.median(spacings))
+    if median_sp < 1:
+        return lines
+    result = [lines[0]]
+    for i in range(1, len(lines)):
+        gap = lines[i] - lines[i - 1]
+        n_cells = round(gap / median_sp)
+        if n_cells >= 2:
+            for k in range(1, n_cells):
+                result.append(lines[i - 1] + int(k * gap / n_cells))
+        result.append(lines[i])
+    return result
 
 
 def _estimate_merge_gap(peaks: list[int], img_span: int) -> int:
