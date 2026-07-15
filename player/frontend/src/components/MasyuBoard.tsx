@@ -321,7 +321,6 @@ export default function MasyuBoard({
         width="100%"
         viewBox={`0 0 ${svgWidth} ${svgHeight}`}
         style={{
-          border: "1px solid #ccc",
           userSelect: "none",
           display: "block",
           touchAction: "none",
@@ -332,27 +331,39 @@ export default function MasyuBoard({
         onPointerCancel={handlePointerUp}
       >
         <g transform={`translate(${PAD},${PAD})`}>
-          {/* Grid lines */}
-          {Array.from({ length: rows + 1 }, (_, r) => (
+          {/* Outer border */}
+          <rect
+            x={0}
+            y={0}
+            width={cols * CELL_SIZE}
+            height={rows * CELL_SIZE}
+            fill="none"
+            stroke="#222"
+            strokeWidth={2}
+          />
+          {/* Inner grid lines (dashed) */}
+          {Array.from({ length: rows - 1 }, (_, i) => (
             <line
-              key={`grid-h-${r}`}
+              key={`grid-h-${i}`}
               x1={0}
-              y1={r * CELL_SIZE}
+              y1={(i + 1) * CELL_SIZE}
               x2={cols * CELL_SIZE}
-              y2={r * CELL_SIZE}
-              stroke="#ddd"
+              y2={(i + 1) * CELL_SIZE}
+              stroke="#bbb"
               strokeWidth={0.5}
+              strokeDasharray="4 3"
             />
           ))}
-          {Array.from({ length: cols + 1 }, (_, c) => (
+          {Array.from({ length: cols - 1 }, (_, i) => (
             <line
-              key={`grid-v-${c}`}
-              x1={c * CELL_SIZE}
+              key={`grid-v-${i}`}
+              x1={(i + 1) * CELL_SIZE}
               y1={0}
-              x2={c * CELL_SIZE}
+              x2={(i + 1) * CELL_SIZE}
               y2={rows * CELL_SIZE}
-              stroke="#ddd"
+              stroke="#bbb"
               strokeWidth={0.5}
+              strokeDasharray="4 3"
             />
           ))}
 
@@ -399,7 +410,7 @@ export default function MasyuBoard({
                   y1={(r + 0.5) * CELL_SIZE}
                   x2={(c + 1.5) * CELL_SIZE}
                   y2={(r + 0.5) * CELL_SIZE}
-                  stroke="#222"
+                  stroke="#888"
                   strokeWidth={3}
                   strokeLinecap="round"
                   pointerEvents="none"
@@ -416,7 +427,7 @@ export default function MasyuBoard({
                   y1={(r + 0.5) * CELL_SIZE}
                   x2={(c + 0.5) * CELL_SIZE}
                   y2={(r + 1.5) * CELL_SIZE}
-                  stroke="#222"
+                  stroke="#888"
                   strokeWidth={3}
                   strokeLinecap="round"
                   pointerEvents="none"

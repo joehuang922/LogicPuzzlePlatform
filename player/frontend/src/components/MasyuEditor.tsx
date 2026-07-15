@@ -106,27 +106,39 @@ export default function MasyuEditor({ initialCanon, onComplete, onCancel }: Masy
           style={{ border: "1px solid #ccc", userSelect: "none", display: "block" }}
         >
           <g transform={`translate(${PAD},${PAD})`}>
-            {/* Grid lines */}
-            {Array.from({ length: rows + 1 }, (_, r) => (
+            {/* Outer border */}
+            <rect
+              x={0}
+              y={0}
+              width={cols * CELL_SIZE}
+              height={rows * CELL_SIZE}
+              fill="none"
+              stroke="#222"
+              strokeWidth={2}
+            />
+            {/* Inner grid lines (dashed) */}
+            {Array.from({ length: rows - 1 }, (_, i) => (
               <line
-                key={`gh-${r}`}
+                key={`gh-${i}`}
                 x1={0}
-                y1={r * CELL_SIZE}
+                y1={(i + 1) * CELL_SIZE}
                 x2={cols * CELL_SIZE}
-                y2={r * CELL_SIZE}
-                stroke="#ddd"
+                y2={(i + 1) * CELL_SIZE}
+                stroke="#bbb"
                 strokeWidth={0.5}
+                strokeDasharray="4 3"
               />
             ))}
-            {Array.from({ length: cols + 1 }, (_, c) => (
+            {Array.from({ length: cols - 1 }, (_, i) => (
               <line
-                key={`gv-${c}`}
-                x1={c * CELL_SIZE}
+                key={`gv-${i}`}
+                x1={(i + 1) * CELL_SIZE}
                 y1={0}
-                x2={c * CELL_SIZE}
+                x2={(i + 1) * CELL_SIZE}
                 y2={rows * CELL_SIZE}
-                stroke="#ddd"
+                stroke="#bbb"
                 strokeWidth={0.5}
+                strokeDasharray="4 3"
               />
             ))}
 
