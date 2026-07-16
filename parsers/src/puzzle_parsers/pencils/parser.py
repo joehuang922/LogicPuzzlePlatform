@@ -10,21 +10,25 @@ from PIL import Image
 from puzzle_parsers.base import PuzzleParser
 from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.recognition import GeminiRecognizer, CellRecognizer
+from puzzle_parsers.llm_vision import cells_to_png_bytes, parse_json_response
 from puzzle_parsers.pencils.grid_detector import detect_pencils_grid
 from puzzle_parsers.pencils.models import PencilsBoard
 
 if TYPE_CHECKING:
     from puzzle_parsers.recognition import OcrBackend
 
+
 PENCILS_PROMPT = (
-    "This image shows a grid of cells cropped from a 'Pencils' puzzle. "
-    "Each cell is labeled with its row,col position. "
-    "Each cell contains one of: "
+    "This image shows a montage of cells cropped from a 'Pencils' puzzle. "
+    "Each cell is enclosed in a red border. The coordinate label (row,col) above each red box "
+    "indicates the position of the cell directly below it. "
+    "Ignore any faint dashed lines or partial ink at cell edges — those are grid artifacts, not content. "
+    "Focus only on the main content INSIDE each red box. Each cell contains one of: "
     "  - A positive integer (1, 2, 3, 4, 5, 6, 7, 8, 9, or larger) representing a number clue. "
-    "  - A pencil head icon: a filled triangular arrowhead pointing in one direction. "
-    "    Output -1 if pointing UP, -2 if pointing DOWN, -3 if pointing LEFT, -4 if pointing RIGHT. "
-    "  - Empty (no content visible). Output 0 for empty cells. "
-    "For each cell, output the integer value. "
+    "  - A pencil head icon: a small filled triangular arrowhead pointing in one direction. "
+    "    The head BELONGS TO the cell where the FLAT BASE of the triangle sits, NOT the cell the tip points toward. "
+    "    Output -1 if the tip points UP, -2 if DOWN, -3 if LEFT, -4 if RIGHT. "
+    "  - Empty (no meaningful content). Output 0 for empty cells. "
     "Respond with ONLY a JSON array of arrays (rows of integers). "
     "Example for a 3x3: [[0,-4,3],[0,5,0],[0,0,-1]]. No explanation, just the JSON."
 )
@@ -89,7 +93,7 @@ class PencilsParser(PuzzleParser):
         rows = geom.rows
         cols = geom.cols
 
-        # Extract cell crops for batch LLM recognition
+        # Extract cell crops for batch LLM recognition (full cell, no margin reduction)
         cell_crops: list[list[np.ndarray]] = []
         for r in range(rows):
             row_crops: list[np.ndarray] = []
@@ -98,20 +102,12 @@ class PencilsParser(PuzzleParser):
                 x2 = geom.v_lines[c + 1]
                 y1 = geom.h_lines[r]
                 y2 = geom.h_lines[r + 1]
-                # Use center 70% to avoid grid line artifacts
-                w = x2 - x1
-                h = y2 - y1
-                margin_x = int(w * 0.15)
-                margin_y = int(h * 0.15)
-                cell_roi = geom.warped_gray[
-                    y1 + margin_y : y2 - margin_y,
-                    x1 + margin_x : x2 - margin_x,
-                ]
+                cell_roi = geom.warped_gray[y1:y2, x1:x2]
                 row_crops.append(cell_roi)
             cell_crops.append(row_crops)
 
-        # Recognize all cells via LLM in batch
-        cells = self.recognizer.recognize(cell_crops, PENCILS_PROMPT)
+        # Recognize all cells via LLM using custom montage with red borders
+        cells = self._recognize_with_montage(cell_crops)
 
         if debug_path:
             vis = geom.warped.copy()
@@ -133,6 +129,33 @@ class PencilsParser(PuzzleParser):
             cv2.imwrite(str(debug_path / "04_classified.png"), vis)
 
         return PencilsBoard(cells=cells)
+
+    def _recognize_with_montage(self, cell_crops: list[list[np.ndarray]]) -> list[list[int]]:
+        """Recognize cells using montage with red borders."""
+        import io as _io
+
+        png_bytes = cells_to_png_bytes(cell_crops)
+        montage_image = Image.open(_io.BytesIO(png_bytes))
+
+        num_rows = len(cell_crops)
+        num_cols = len(cell_crops[0])
+        prompt = PENCILS_PROMPT + f"\n\nThe grid has {num_rows} rows and {num_cols} columns."
+
+        # Access the underlying Gemini model directly
+        recognizer = self.recognizer
+        response = recognizer._model.generate_content([montage_image, prompt])
+        result = parse_json_response(response.text)
+
+        if not isinstance(result, list) or len(result) != num_rows:
+            raise ValueError(
+                f"Expected {num_rows} rows, got {len(result) if isinstance(result, list) else type(result)}"
+            )
+        for r, row in enumerate(result):
+            if not isinstance(row, list) or len(row) != num_cols:
+                raise ValueError(
+                    f"Expected {num_cols} cols in row {r}, got {len(row) if isinstance(row, list) else type(row)}"
+                )
+        return result
 
     def validate(self, data: PuzzleData) -> bool:
         if data.puzzle_type != self.puzzle_type:

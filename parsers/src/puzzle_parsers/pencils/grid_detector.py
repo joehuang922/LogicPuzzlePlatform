@@ -76,10 +76,12 @@ def detect_pencils_grid(
 
     if expected_rows and rows != expected_rows:
         rows = expected_rows
-        h_lines = _uniform_lines(h_lines[0], h_lines[-1], rows + 1)
     if expected_cols and cols != expected_cols:
         cols = expected_cols
-        v_lines = _uniform_lines(v_lines[0], v_lines[-1], cols + 1)
+
+    # Always use uniform spacing — the grid cells are evenly distributed
+    h_lines = _uniform_lines(h_lines[0], h_lines[-1], rows + 1)
+    v_lines = _uniform_lines(v_lines[0], v_lines[-1], cols + 1)
 
     cell_h = (h_lines[-1] - h_lines[0]) / rows if rows > 0 else 50.0
     cell_w = (v_lines[-1] - v_lines[0]) / cols if cols > 0 else 50.0

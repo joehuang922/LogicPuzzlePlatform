@@ -19,11 +19,12 @@ def cells_to_png_bytes(
 ) -> bytes:
     """Compose a grid of cell images into a single labeled PNG for batch recognition.
 
-    Each cell is placed in a tile with a row,col label above it. Cells are
-    downscaled if they exceed max_tile_size but never upscaled.
+    Each cell is placed inside a red border with a coordinate label above it.
+    The border provides clear spatial anchoring for LLMs to attribute content
+    to the correct cell position.
 
     Args:
-        cells: 2D list of cell images (arbitrary rows x cols, grayscale or BGR).
+        cells: 2D list of cell ROI images (arbitrary rows x cols, grayscale or BGR).
         max_tile_size: Maximum tile dimension. Cells larger than this are
             downscaled to fit; smaller cells are kept at native size.
 
@@ -41,12 +42,13 @@ def cells_to_png_bytes(
     native_h, native_w = sample.shape[:2]
     tile_size = min(max_tile_size, native_h, native_w)
 
-    label_height = 16
-    tile_h = tile_size + label_height
-    tile_w = tile_size
+    border = 2
+    label_h = 14
+    cell_w = tile_size + border * 2
+    cell_h = tile_size + border * 2 + label_h
 
-    canvas_h = num_rows * tile_h
-    canvas_w = num_cols * tile_w
+    canvas_h = num_rows * cell_h
+    canvas_w = num_cols * cell_w
     canvas = np.ones((canvas_h, canvas_w, 3), dtype=np.uint8) * 255
 
     for row in range(num_rows):
@@ -54,38 +56,40 @@ def cells_to_png_bytes(
             cell = cells[row][col]
             ch, cw = cell.shape[:2]
 
+            x0 = col * cell_w
+            y0 = row * cell_h
+
+            # Coordinate label in blue above the cell
+            label = f"{row},{col}"
+            cv2.putText(
+                canvas, label,
+                (x0 + border + 1, y0 + label_h - 2),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.35, (200, 0, 0), 1,
+            )
+
+            # Red border around the cell area
+            bx0 = x0
+            by0 = y0 + label_h
+            bx1 = x0 + cell_w - 1
+            by1 = y0 + cell_h - 1
+            cv2.rectangle(canvas, (bx0, by0), (bx1, by1), (0, 0, 200), border)
+
+            # Place cell image inside the border
             if ch > tile_size or cw > tile_size:
                 scale = min(tile_size / ch, tile_size / cw)
-                new_w = int(cw * scale)
-                new_h = int(ch * scale)
-                resized = cv2.resize(cell, (new_w, new_h))
+                resized = cv2.resize(cell, (int(cw * scale), int(ch * scale)))
             else:
                 resized = cell
-                new_h, new_w = ch, cw
 
             if len(resized.shape) == 2:
                 resized = cv2.cvtColor(resized, cv2.COLOR_GRAY2BGR)
 
-            y_offset = row * tile_h + label_height
-            x_offset = col * tile_w
-
+            new_h, new_w = resized.shape[:2]
             dy = (tile_size - new_h) // 2
             dx = (tile_size - new_w) // 2
-            canvas[
-                y_offset + dy: y_offset + dy + new_h,
-                x_offset + dx: x_offset + dx + new_w,
-            ] = resized
-
-            label = f"{row},{col}"
-            cv2.putText(
-                canvas,
-                label,
-                (x_offset + 2, row * tile_h + label_height - 3),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.3,
-                (100, 100, 100),
-                1,
-            )
+            py = by0 + border + dy
+            px = bx0 + border + dx
+            canvas[py:py + new_h, px:px + new_w] = resized
 
     img = Image.fromarray(cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB))
     buf = io.BytesIO()
