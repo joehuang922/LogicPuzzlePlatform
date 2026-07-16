@@ -84,6 +84,8 @@ export default function Play() {
   const [finalTime, setFinalTime] = useState(0);
   const [newAchievements, setNewAchievements] = useState<AchievementUnlock[]>([]);
   const [progress, setProgress] = useState(0);
+  const [debugOpen, setDebugOpen] = useState(false);
+  const [debugJson, setDebugJson] = useState("");
 
   const timerRef = useRef<TimerHandle>(null);
   const userValuesRef = useRef<Record<string, number>>({});
@@ -92,6 +94,7 @@ export default function Play() {
     userValuesRef.current = values;
     if (puzzle) {
       setProgress(computeProgress(puzzle, values));
+      setDebugJson(JSON.stringify(extractAnswer(puzzle, values), null, 2));
     }
   }, [puzzle]);
 
@@ -221,6 +224,22 @@ export default function Play() {
         </div>
       )}
       <PuzzleBoard key={boardKey} puzzle={puzzle} initialAnswer={currentAnswer} onValuesChange={handleValuesChange} onComplete={handleComplete} />
+
+      <div style={{ marginTop: "1rem" }}>
+        <button
+          onClick={() => setDebugOpen((o) => !o)}
+          style={{ fontSize: "0.8rem", padding: "0.25rem 0.75rem", background: "#f0f0f0", border: "1px solid #ccc", borderRadius: 4, cursor: "pointer" }}
+        >
+          {debugOpen ? "Hide" : "Show"} Answer JSON
+        </button>
+        {debugOpen && (
+          <textarea
+            readOnly
+            value={debugJson}
+            style={{ display: "block", marginTop: "0.5rem", width: "100%", maxWidth: 600, height: 200, fontFamily: "monospace", fontSize: "0.75rem", resize: "vertical" }}
+          />
+        )}
+      </div>
 
       {showCongratsDialog && (
         <div style={overlayStyle}>
