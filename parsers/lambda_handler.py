@@ -55,6 +55,9 @@ def _init_parsers():
     from puzzle_parsers.masyu.parser import MasyuParser
     print("  - MasyuParser imported")
 
+    from puzzle_parsers.pencils.parser import PencilsParser
+    print("  - PencilsParser imported")
+
     _parsers = {
         1: SudokuParser(ocr_backend=_ocr),
         2: ComboSudokuParser(ocr_backend=_ocr),
@@ -63,6 +66,7 @@ def _init_parsers():
         5: SlitherlinkParser(ocr_backend=_ocr),
         6: NonogramParser(),
         7: MasyuParser(ocr_backend=_ocr),
+        8: PencilsParser(ocr_backend=_ocr),
     }
     print("=== Parsers ready ===")
 

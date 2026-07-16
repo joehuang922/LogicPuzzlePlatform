@@ -19,6 +19,7 @@ import DoubleChocoEditor from "../components/DoubleChocoEditor";
 import SlitherlinkEditor from "../components/SlitherlinkEditor";
 import NonogramEditor from "../components/NonogramEditor";
 import MasyuEditor from "../components/MasyuEditor";
+import PencilsEditor from "../components/PencilsEditor";
 import CanonPreview from "../components/CanonPreview";
 import BatchUploadForm from "../components/BatchUploadForm";
 import { extractBase64 } from "../utils/image";
@@ -132,7 +133,8 @@ function QuestionForm({
   const isSlitherlink = selectedTypeName === "slitherlink";
   const isNonogram = selectedTypeName === "nonogram";
   const isMasyu = selectedTypeName === "masyu";
-  const hasEditor = isNurimaze || isSudoku || isComboSudoku || isDoubleChoco || isSlitherlink || isNonogram || isMasyu;
+  const isPencils = selectedTypeName === "pencils";
+  const hasEditor = isNurimaze || isSudoku || isComboSudoku || isDoubleChoco || isSlitherlink || isNonogram || isMasyu || isPencils;
 
   function validate(): boolean {
     const errs: Record<string, string> = {};
@@ -372,6 +374,12 @@ function QuestionForm({
                 onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
                 onCancel={() => setEditorOpen(false)}
               />
+            ) : isPencils ? (
+              <PencilsEditor
+                initialCanon={canonRepr}
+                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
+                onCancel={() => setEditorOpen(false)}
+              />
             ) : (
               <ComboSudokuEditor
                 initialJson={canonRepr}
@@ -440,7 +448,8 @@ function PuzzleEditRow({
   const isSlitherlink = typeName === "slitherlink";
   const isNonogram = typeName === "nonogram";
   const isMasyu = typeName === "masyu";
-  const hasEditor = isNurimaze || isSudoku || isComboSudoku || isDoubleChoco || isSlitherlink || isNonogram || isMasyu;
+  const isPencils = typeName === "pencils";
+  const hasEditor = isNurimaze || isSudoku || isComboSudoku || isDoubleChoco || isSlitherlink || isNonogram || isMasyu || isPencils;
 
   async function handleConfirm() {
     let parsedCanon: Record<string, unknown>;
@@ -551,6 +560,12 @@ function PuzzleEditRow({
                 />
               ) : isMasyu ? (
                 <MasyuEditor
+                  initialCanon={canonRepr}
+                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
+                  onCancel={() => setEditorOpen(false)}
+                />
+              ) : isPencils ? (
+                <PencilsEditor
                   initialCanon={canonRepr}
                   onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
                   onCancel={() => setEditorOpen(false)}

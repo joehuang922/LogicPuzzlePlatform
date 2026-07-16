@@ -63,3 +63,19 @@ export interface MasyuAnswer {
     v: number[][];
   };
 }
+
+export interface PencilsCanon {
+  cells: number[][];
+}
+
+export interface PencilsAnswer {
+  trails: {
+    h: number[][];
+    v: number[][];
+  };
+  heads: number[][];
+  edges: {
+    h: number[][];
+    v: number[][];
+  };
+}

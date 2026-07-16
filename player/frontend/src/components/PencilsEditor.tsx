@@ -1,0 +1,263 @@
+import { useState } from "react";
+
+interface PencilsEditorProps {
+  initialCanon?: string;
+  onComplete: (json: string) => void;
+  onCancel: () => void;
+}
+
+const CELL_SIZE = 36;
+const PAD = 16;
+
+function headTrianglePath(
+  cx: number,
+  cy: number,
+  dir: number,
+  size: number
+): string {
+  const s = size;
+  switch (dir) {
+    case -1: // up
+      return `M${cx},${cy - s} L${cx - s * 0.7},${cy + s * 0.5} L${cx + s * 0.7},${cy + s * 0.5}Z`;
+    case -2: // down
+      return `M${cx},${cy + s} L${cx - s * 0.7},${cy - s * 0.5} L${cx + s * 0.7},${cy - s * 0.5}Z`;
+    case -3: // left
+      return `M${cx - s},${cy} L${cx + s * 0.5},${cy - s * 0.7} L${cx + s * 0.5},${cy + s * 0.7}Z`;
+    case -4: // right
+      return `M${cx + s},${cy} L${cx - s * 0.5},${cy - s * 0.7} L${cx - s * 0.5},${cy + s * 0.7}Z`;
+    default:
+      return "";
+  }
+}
+
+// Cycle: 0 -> 1 -> 2 -> ... -> 9 -> -1 -> -2 -> -3 -> -4 -> 0
+function nextCellValue(val: number): number {
+  if (val >= 0 && val < 9) return val + 1;
+  if (val === 9) return -1;
+  if (val >= -4 && val < -1) return val + 1;
+  // val === -1 wraps to 0
+  return 0;
+}
+
+export default function PencilsEditor({
+  initialCanon,
+  onComplete,
+  onCancel,
+}: PencilsEditorProps) {
+  let initRows = 7,
+    initCols = 7;
+  let initCells: number[][] | null = null;
+  if (initialCanon) {
+    try {
+      const parsed = JSON.parse(initialCanon);
+      if (parsed.cells) {
+        initCells = parsed.cells;
+        initRows = parsed.cells.length;
+        initCols = parsed.cells[0].length;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const [rows, setRows] = useState(initRows);
+  const [cols, setCols] = useState(initCols);
+  const [cells, setCells] = useState<number[][]>(
+    initCells ??
+      Array.from({ length: initRows }, () => Array(initCols).fill(0))
+  );
+
+  function resizeGrid(newRows: number, newCols: number) {
+    const newCells = Array.from({ length: newRows }, (_, r) =>
+      Array.from({ length: newCols }, (_, c) =>
+        r < cells.length && c < cells[0].length ? cells[r][c] : 0
+      )
+    );
+    setRows(newRows);
+    setCols(newCols);
+    setCells(newCells);
+  }
+
+  function handleCellClick(r: number, c: number) {
+    setCells((prev) => {
+      const next = prev.map((row) => [...row]);
+      next[r][c] = nextCellValue(next[r][c]);
+      return next;
+    });
+  }
+
+  function handleDone() {
+    onComplete(JSON.stringify({ cells }, null, 2));
+  }
+
+  const jsonStr = JSON.stringify({ cells }, null, 2);
+
+  function handleJsonChange(value: string) {
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed.cells && Array.isArray(parsed.cells)) {
+        setCells(parsed.cells);
+        setRows(parsed.cells.length);
+        setCols(parsed.cells[0].length);
+      }
+    } catch {
+      /* ignore invalid JSON while typing */
+    }
+  }
+
+  const svgWidth = cols * CELL_SIZE + PAD * 2;
+  const svgHeight = rows * CELL_SIZE + PAD * 2;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+      <div
+        style={{
+          display: "flex",
+          gap: "1rem",
+          alignItems: "center",
+          flexWrap: "wrap",
+        }}
+      >
+        <label>
+          Rows:{" "}
+          <input
+            type="number"
+            min={1}
+            max={100}
+            value={rows}
+            onChange={(e) => resizeGrid(Number(e.target.value) || 1, cols)}
+            style={{ width: 50 }}
+          />
+        </label>
+        <label>
+          Cols:{" "}
+          <input
+            type="number"
+            min={1}
+            max={100}
+            value={cols}
+            onChange={(e) => resizeGrid(rows, Number(e.target.value) || 1)}
+            style={{ width: 50 }}
+          />
+        </label>
+        <span style={{ fontSize: "0.8rem", color: "#666" }}>
+          Click cells to cycle: empty → 1…9 → ▲ → ▼ → ◀ → ▶ → empty
+        </span>
+      </div>
+
+      <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+        <svg
+          width={Math.min(svgWidth, 500)}
+          viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+          style={{
+            border: "1px solid #ccc",
+            userSelect: "none",
+            display: "block",
+          }}
+        >
+          <g transform={`translate(${PAD},${PAD})`}>
+            <rect
+              x={0}
+              y={0}
+              width={cols * CELL_SIZE}
+              height={rows * CELL_SIZE}
+              fill="none"
+              stroke="#222"
+              strokeWidth={2}
+            />
+            {Array.from({ length: rows - 1 }, (_, i) => (
+              <line
+                key={`gh-${i}`}
+                x1={0}
+                y1={(i + 1) * CELL_SIZE}
+                x2={cols * CELL_SIZE}
+                y2={(i + 1) * CELL_SIZE}
+                stroke="#bbb"
+                strokeWidth={0.5}
+                strokeDasharray="4 3"
+              />
+            ))}
+            {Array.from({ length: cols - 1 }, (_, i) => (
+              <line
+                key={`gv-${i}`}
+                x1={(i + 1) * CELL_SIZE}
+                y1={0}
+                x2={(i + 1) * CELL_SIZE}
+                y2={rows * CELL_SIZE}
+                stroke="#bbb"
+                strokeWidth={0.5}
+                strokeDasharray="4 3"
+              />
+            ))}
+
+            {Array.from({ length: rows * cols }, (_, i) => {
+              const r = Math.floor(i / cols);
+              const c = i % cols;
+              const cx = (c + 0.5) * CELL_SIZE;
+              const cy = (r + 0.5) * CELL_SIZE;
+              const val = cells[r][c];
+              return (
+                <g key={`cell-${r}-${c}`}>
+                  <rect
+                    x={c * CELL_SIZE}
+                    y={r * CELL_SIZE}
+                    width={CELL_SIZE}
+                    height={CELL_SIZE}
+                    fill="transparent"
+                    stroke="none"
+                    style={{ cursor: "pointer" }}
+                    onClick={() => handleCellClick(r, c)}
+                  />
+                  {val === 0 && (
+                    <circle cx={cx} cy={cy} r={3} fill="#999" pointerEvents="none" />
+                  )}
+                  {val > 0 && (
+                    <text
+                      x={cx}
+                      y={cy}
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                      fontSize={14}
+                      fontWeight="bold"
+                      fill="#222"
+                      pointerEvents="none"
+                    >
+                      {val}
+                    </text>
+                  )}
+                  {val < 0 && (
+                    <path
+                      d={headTrianglePath(cx, cy, val, CELL_SIZE * 0.35)}
+                      fill="#222"
+                      pointerEvents="none"
+                    />
+                  )}
+                </g>
+              );
+            })}
+          </g>
+        </svg>
+
+        <textarea
+          value={jsonStr}
+          onChange={(e) => handleJsonChange(e.target.value)}
+          style={{
+            fontFamily: "monospace",
+            fontSize: "0.75rem",
+            width: 300,
+            minHeight: 200,
+          }}
+        />
+      </div>
+
+      <div style={{ display: "flex", gap: "0.5rem" }}>
+        <button onClick={handleDone} style={{ padding: "0.5rem 1rem" }}>
+          Done
+        </button>
+        <button onClick={onCancel} style={{ padding: "0.5rem 1rem" }}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}

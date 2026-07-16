@@ -10,6 +10,7 @@ import { doubleChocoRenderer } from "./renderers/doubleChoco";
 import { slitherlinkRenderer } from "./renderers/slitherlink";
 import { nonogramRenderer } from "./renderers/nonogram";
 import { masyuRenderer } from "./renderers/masyu";
+import { pencilsRenderer } from "./renderers/pencils";
 
 registerRenderer(comboSudokuRenderer);
 registerRenderer(sudokuRenderer);
@@ -18,6 +19,7 @@ registerRenderer(doubleChocoRenderer);
 registerRenderer(slitherlinkRenderer);
 registerRenderer(nonogramRenderer);
 registerRenderer(masyuRenderer);
+registerRenderer(pencilsRenderer);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

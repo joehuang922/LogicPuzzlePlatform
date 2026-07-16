@@ -6,6 +6,7 @@ import { doubleChocoExtractor } from "./doubleChoco";
 import { slitherlinkExtractor } from "./slitherlink";
 import { nonogramExtractor } from "./nonogram";
 import { masyuExtractor } from "./masyu";
+import { pencilsExtractor } from "./pencils";
 
 const extractorRegistry = new Map<number, AnswerExtractor>();
 
@@ -20,6 +21,7 @@ registerExtractor(doubleChocoExtractor);
 registerExtractor(slitherlinkExtractor);
 registerExtractor(nonogramExtractor);
 registerExtractor(masyuExtractor);
+registerExtractor(pencilsExtractor);
 
 export function getExtractor(puzzleType: number): AnswerExtractor | undefined {
   return extractorRegistry.get(puzzleType);

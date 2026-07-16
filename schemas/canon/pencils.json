@@ -1,0 +1,19 @@
+{
+  "title": "Pencils Canonical Representation",
+  "description": "Rectangle grid where some cells contain number clues (positive integers) or pencil head icons (negative integers indicating direction). Players draw pencil bodies, heads, and trail lines to fill the grid.",
+  "type": "object",
+  "required": ["cells"],
+  "additionalProperties": false,
+  "properties": {
+    "cells": {
+      "description": "m x n grid of integers. 0 = empty, positive integers = number clue, -1 = head-up, -2 = head-down, -3 = head-left, -4 = head-right.",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": { "type": "integer", "minimum": -4 },
+        "minItems": 1
+      },
+      "minItems": 1
+    }
+  }
+}

@@ -13,10 +13,11 @@ If any of these are missing, ask before proceeding.
 
 1. Determine the next puzzle type ID by reading `player/api/seed.sql` and finding the highest existing ID.
 2. Look at the sample images to understand the visual structure.
-3. Ask the user targeted questions to fill any gaps:
-   - Is this cell-based input (player fills cells) or edge-based input (player draws on borders)?
-   - What symbols or elements appear in cells?
-   - What constitutes a valid solution (finishing criteria)?
+3. Ask the user to specify any details they care about for the following (they may leave any blank and you'll infer from images/rules):
+   - **Player interaction** — how the player solves (click, drag, erase mode, toggle, etc.)
+   - **Player appearance** — grid styling, colors, line types (solid/dashed), layering, sizing
+   - **Editor interaction** — how the editor creates/edits puzzles (click to cycle, resize controls, etc.)
+   - **Editor appearance** — any differences from the player view (dots for empty cells, extra controls, etc.)
 4. Draft the full documentation file following the template in existing docs (e.g., `docs/nurimaze/nurimaze.md`). Must include all sections:
    - Puzzle Type ID
    - Question structure description + Canonical JSON structure + Sample images
