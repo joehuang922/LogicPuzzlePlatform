@@ -30,25 +30,42 @@ function emptyHeads(rows: number, cols: number) {
   return Array.from({ length: rows }, () => Array(cols).fill(0));
 }
 
-function headTrianglePath(
-  cx: number,
-  cy: number,
-  dir: number,
-  size: number
-): string {
-  const s = size;
+function PencilHead({
+  cx,
+  cy,
+  dir,
+  size,
+  tipFill,
+}: {
+  cx: number;
+  cy: number;
+  dir: number;
+  size: number;
+  tipFill: string;
+}) {
+  // Base shape (down-pointing) in unit cell with origin at top-left:
+  //   White outer: (0,0)-(1,0)-(0.5,0.5)
+  //   Dark inner:  (0.3,0.3)-(0.7,0.3)-(0.5,0.5)
+  // Rotate around cell center for other directions.
+  let angle = 0;
   switch (dir) {
-    case -1: // up
-      return `M${cx},${cy - s} L${cx - s * 0.7},${cy + s * 0.5} L${cx + s * 0.7},${cy + s * 0.5}Z`;
-    case -2: // down
-      return `M${cx},${cy + s} L${cx - s * 0.7},${cy - s * 0.5} L${cx + s * 0.7},${cy - s * 0.5}Z`;
-    case -3: // left
-      return `M${cx - s},${cy} L${cx + s * 0.5},${cy - s * 0.7} L${cx + s * 0.5},${cy + s * 0.7}Z`;
-    case -4: // right
-      return `M${cx + s},${cy} L${cx - s * 0.5},${cy - s * 0.7} L${cx - s * 0.5},${cy + s * 0.7}Z`;
-    default:
-      return "";
+    case -1: angle = 180; break;
+    case -2: angle = 0; break;
+    case -3: angle = 90; break;
+    case -4: angle = -90; break;
   }
+
+  const x0 = cx - size / 2;
+  const y0 = cy - size / 2;
+  const outerPts = `${x0},${y0} ${x0 + size},${y0} ${x0 + size * 0.5},${y0 + size * 0.5}`;
+  const innerPts = `${x0 + size * 0.3},${y0 + size * 0.3} ${x0 + size * 0.7},${y0 + size * 0.3} ${x0 + size * 0.5},${y0 + size * 0.5}`;
+
+  return (
+    <g transform={`rotate(${angle}, ${cx}, ${cy})`} pointerEvents="none">
+      <polygon points={outerPts} fill="white" stroke={tipFill} strokeWidth={1} />
+      <polygon points={innerPts} fill={tipFill} />
+    </g>
+  );
 }
 
 function validateSolution(
@@ -566,11 +583,13 @@ export default function PencilsBoard({
               }
               if (val < 0) {
                 return (
-                  <path
+                  <PencilHead
                     key={`head-${r}-${c}`}
-                    d={headTrianglePath(cx, cy, val, CELL_SIZE * 0.35)}
-                    fill="#222"
-                    pointerEvents="none"
+                    cx={cx}
+                    cy={cy}
+                    dir={val}
+                    size={CELL_SIZE * 0.8}
+                    tipFill="#222"
                   />
                 );
               }
@@ -585,11 +604,13 @@ export default function PencilsBoard({
               const cx = (c + 0.5) * CELL_SIZE;
               const cy = (r + 0.5) * CELL_SIZE;
               return (
-                <path
+                <PencilHead
                   key={`phead-${r}-${c}`}
-                  d={headTrianglePath(cx, cy, val, CELL_SIZE * 0.35)}
-                  fill="#4a7cb5"
-                  pointerEvents="none"
+                  cx={cx}
+                  cy={cy}
+                  dir={val}
+                  size={CELL_SIZE * 0.8}
+                  tipFill="#4a7cb5"
                 />
               );
             })
@@ -618,24 +639,33 @@ export default function PencilsBoard({
                 else if (dir === -2) oy = offset;
                 else if (dir === -3) ox = -offset;
                 else ox = offset;
+                const popupSize = CELL_SIZE * 0.4;
+                const pcx = cx + ox;
+                const pcy = cy + oy;
+                let angle = 0;
+                switch (dir) {
+                  case -1: angle = 180; break;
+                  case -2: angle = 0; break;
+                  case -3: angle = 90; break;
+                  case -4: angle = -90; break;
+                }
+                const x0 = pcx - popupSize / 2;
+                const y0 = pcy - popupSize / 2;
+                const outerPts = `${x0},${y0} ${x0 + popupSize},${y0} ${x0 + popupSize * 0.5},${y0 + popupSize * 0.5}`;
+                const innerPts = `${x0 + popupSize * 0.3},${y0 + popupSize * 0.3} ${x0 + popupSize * 0.7},${y0 + popupSize * 0.3} ${x0 + popupSize * 0.5},${y0 + popupSize * 0.5}`;
                 return (
-                  <path
+                  <g
                     key={`popup-${dir}`}
-                    d={headTrianglePath(
-                      cx + ox,
-                      cy + oy,
-                      dir,
-                      CELL_SIZE * 0.2
-                    )}
-                    fill="#4a7cb5"
-                    stroke="#fff"
-                    strokeWidth={0.5}
+                    transform={`rotate(${angle}, ${pcx}, ${pcy})`}
                     style={{ cursor: "pointer" }}
                     onPointerDown={(e) => {
                       e.stopPropagation();
                       placeHead(dir);
                     }}
-                  />
+                  >
+                    <polygon points={outerPts} fill="white" stroke="#4a7cb5" strokeWidth={1} />
+                    <polygon points={innerPts} fill="#4a7cb5" />
+                  </g>
                 );
               })}
             </g>
