@@ -12,8 +12,6 @@ interface PencilsBoardProps {
 const CELL_SIZE = 36;
 const PAD = 20;
 
-type Mode = "trail" | "edge" | "head";
-
 function emptyTrailsH(rows: number, cols: number) {
   return Array.from({ length: rows }, () => Array(cols - 1).fill(0));
 }
@@ -43,10 +41,6 @@ function PencilHead({
   size: number;
   tipFill: string;
 }) {
-  // Base shape (down-pointing) in unit cell with origin at top-left:
-  //   White outer: (0,0)-(1,0)-(0.5,0.5)
-  //   Dark inner:  (0.3,0.3)-(0.7,0.3)-(0.5,0.5)
-  // Rotate around cell center for other directions.
   let angle = 0;
   switch (dir) {
     case -1: angle = 180; break;
@@ -77,7 +71,6 @@ function validateSolution(
   const rows = canon.cells.length;
   const cols = canon.cells[0].length;
 
-  // Merge given heads from canon with player-placed heads
   const allHeads: number[][] = Array.from({ length: rows }, (_, r) =>
     Array.from({ length: cols }, (_, c) => {
       if (canon.cells[r][c] < 0) return canon.cells[r][c];
@@ -85,20 +78,16 @@ function validateSolution(
     })
   );
 
-  // Check every cell is covered: must be a head, part of a body (enclosed by edges), or on a trail
-  // Build coverage map
   const covered: boolean[][] = Array.from({ length: rows }, () =>
     Array(cols).fill(false)
   );
 
-  // Heads cover their cell
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       if (allHeads[r][c] < 0) covered[r][c] = true;
     }
   }
 
-  // Trail segments cover the two cells they connect
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols - 1; c++) {
       if (trails.h[r][c] === 1) {
@@ -116,22 +105,18 @@ function validateSolution(
     }
   }
 
-  // Body cells: cells enclosed by edges (form rectangles)
-  // For simplicity, cells that have number clues and are bordered by edges count as body cells
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       if (canon.cells[r][c] > 0) covered[r][c] = true;
     }
   }
 
-  // Check all cells covered
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       if (!covered[r][c]) return false;
     }
   }
 
-  // Check no trail overlap: count trail segments touching each cell
   const trailCount: number[][] = Array.from({ length: rows }, () =>
     Array(cols).fill(0)
   );
@@ -151,7 +136,6 @@ function validateSolution(
       }
     }
   }
-  // A trail cell should have at most 2 connections (a path, not a branch)
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       if (trailCount[r][c] > 2) return false;
@@ -160,6 +144,8 @@ function validateSolution(
 
   return true;
 }
+
+const EDGE_ZONE = 0.22;
 
 export default function PencilsBoard({
   canon,
@@ -174,7 +160,6 @@ export default function PencilsBoard({
   const svgWidth = cols * CELL_SIZE + PAD * 2;
   const svgHeight = rows * CELL_SIZE + PAD * 2;
 
-  const [mode, setMode] = useState<Mode>("trail");
   const [trailsH, setTrailsH] = useState<number[][]>(
     initialAnswer?.trails?.h ?? emptyTrailsH(rows, cols)
   );
@@ -196,10 +181,8 @@ export default function PencilsBoard({
   const draggingRef = useRef(false);
   const eraseModeRef = useRef<boolean | null>(null);
   const lastCellRef = useRef<{ r: number; c: number } | null>(null);
-  const [headPopup, setHeadPopup] = useState<{
-    r: number;
-    c: number;
-  } | null>(null);
+  const didDragRef = useRef(false);
+  const [pendingHead, setPendingHead] = useState<{ r: number; c: number } | null>(null);
 
   useEffect(() => {
     const answer: PencilsAnswer = {
@@ -255,16 +238,16 @@ export default function PencilsBoard({
     [getSvgCoord, rows, cols]
   );
 
-  const handleEdgeClick = useCallback(
-    (clientX: number, clientY: number) => {
+  const tryToggleEdge = useCallback(
+    (clientX: number, clientY: number): boolean => {
       const coord = getSvgCoord(clientX, clientY);
-      if (!coord) return;
+      if (!coord) return false;
       const { x, y } = coord;
+      const threshold = CELL_SIZE * EDGE_ZONE;
 
-      // Detect if click is near a horizontal edge (between rows)
       for (let r = 0; r < rows - 1; r++) {
         const edgeY = (r + 1) * CELL_SIZE;
-        if (Math.abs(y - edgeY) < CELL_SIZE * 0.25) {
+        if (Math.abs(y - edgeY) < threshold) {
           const c = Math.floor(x / CELL_SIZE);
           if (c >= 0 && c < cols) {
             setEdgesH((prev) => {
@@ -272,15 +255,14 @@ export default function PencilsBoard({
               next[r][c] = next[r][c] === 1 ? 0 : 1;
               return next;
             });
-            return;
+            return true;
           }
         }
       }
 
-      // Detect if click is near a vertical edge (between cols)
       for (let c = 0; c < cols - 1; c++) {
         const edgeX = (c + 1) * CELL_SIZE;
-        if (Math.abs(x - edgeX) < CELL_SIZE * 0.25) {
+        if (Math.abs(x - edgeX) < threshold) {
           const r = Math.floor(y / CELL_SIZE);
           if (r >= 0 && r < rows) {
             setEdgesV((prev) => {
@@ -288,10 +270,12 @@ export default function PencilsBoard({
               next[r][c] = next[r][c] === 1 ? 0 : 1;
               return next;
             });
-            return;
+            return true;
           }
         }
       }
+
+      return false;
     },
     [getSvgCoord, rows, cols]
   );
@@ -300,44 +284,26 @@ export default function PencilsBoard({
     (e: React.PointerEvent) => {
       if (readonly) return;
 
-      if (mode === "edge") {
-        handleEdgeClick(e.clientX, e.clientY);
+      // Try edge toggle first
+      if (tryToggleEdge(e.clientX, e.clientY)) {
         return;
       }
 
-      if (mode === "head") {
-        const cell = getCellFromPoint(e.clientX, e.clientY);
-        if (!cell) return;
-        // Don't allow placing heads on canon cells with values
-        if (cells[cell.r][cell.c] !== 0) return;
-        if (heads[cell.r][cell.c] !== 0) {
-          // Erase existing head
-          setHeads((prev) => {
-            const next = prev.map((row) => [...row]);
-            next[cell.r][cell.c] = 0;
-            return next;
-          });
-          setHeadPopup(null);
-        } else {
-          setHeadPopup(cell);
-        }
-        return;
-      }
-
-      // Trail mode
+      // Otherwise start trail drag
       const cell = getCellFromPoint(e.clientX, e.clientY);
       if (!cell) return;
       draggingRef.current = true;
+      didDragRef.current = false;
       eraseModeRef.current = null;
       lastCellRef.current = cell;
       (e.target as Element).setPointerCapture(e.pointerId);
     },
-    [readonly, mode, getCellFromPoint, handleEdgeClick, cells, heads]
+    [readonly, getCellFromPoint, tryToggleEdge]
   );
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
-      if (!draggingRef.current || mode !== "trail") return;
+      if (!draggingRef.current) return;
       const cell = getCellFromPoint(e.clientX, e.clientY);
       if (!cell) return;
       const last = lastCellRef.current;
@@ -350,6 +316,8 @@ export default function PencilsBoard({
         lastCellRef.current = cell;
         return;
       }
+
+      didDragRef.current = true;
 
       let edgeVal: number;
       if (dc === 1) edgeVal = trailsH[last.r][last.c];
@@ -391,57 +359,44 @@ export default function PencilsBoard({
 
       lastCellRef.current = cell;
     },
-    [getCellFromPoint, mode, trailsH, trailsV]
+    [getCellFromPoint, trailsH, trailsV]
   );
 
   const handlePointerUp = useCallback(() => {
+    const wasDrag = didDragRef.current;
+    const cell = lastCellRef.current;
     draggingRef.current = false;
     lastCellRef.current = null;
-  }, []);
+
+    if (!wasDrag && cell) {
+      // Click without drag on cell center → toggle head
+      if (cells[cell.r][cell.c] !== 0) return; // don't touch canon cells
+      if (heads[cell.r][cell.c] !== 0) {
+        // Erase existing head
+        setHeads((prev) => {
+          const next = prev.map((row) => [...row]);
+          next[cell.r][cell.c] = 0;
+          return next;
+        });
+        setPendingHead(null);
+      } else {
+        setPendingHead(cell);
+      }
+    }
+  }, [cells, heads]);
 
   const placeHead = (dir: number) => {
-    if (!headPopup) return;
+    if (!pendingHead) return;
     setHeads((prev) => {
       const next = prev.map((row) => [...row]);
-      next[headPopup.r][headPopup.c] = dir;
+      next[pendingHead.r][pendingHead.c] = dir;
       return next;
     });
-    setHeadPopup(null);
+    setPendingHead(null);
   };
 
   return (
     <div style={{ maxWidth: svgWidth, width: "100%" }}>
-      {!readonly && (
-        <div
-          style={{
-            display: "flex",
-            gap: 4,
-            marginBottom: 8,
-            flexWrap: "wrap",
-          }}
-        >
-          {(["trail", "edge", "head"] as Mode[]).map((m) => (
-            <button
-              key={m}
-              onClick={() => {
-                setMode(m);
-                setHeadPopup(null);
-              }}
-              style={{
-                padding: "4px 10px",
-                fontWeight: mode === m ? "bold" : "normal",
-                background: mode === m ? "#444" : "#eee",
-                color: mode === m ? "#fff" : "#333",
-                border: "1px solid #aaa",
-                borderRadius: 4,
-                cursor: "pointer",
-              }}
-            >
-              {m === "trail" ? "Trail" : m === "edge" ? "Edge" : "Head"}
-            </button>
-          ))}
-        </div>
-      )}
       <svg
         ref={svgRef}
         width="100%"
@@ -588,7 +543,7 @@ export default function PencilsBoard({
                     cx={cx}
                     cy={cy}
                     dir={val}
-                    size={CELL_SIZE * 0.8}
+                    size={CELL_SIZE}
                     tipFill="#222"
                   />
                 );
@@ -609,69 +564,88 @@ export default function PencilsBoard({
                   cx={cx}
                   cy={cy}
                   dir={val}
-                  size={CELL_SIZE * 0.8}
+                  size={CELL_SIZE}
                   tipFill="#4a7cb5"
                 />
               );
             })
           )}
 
-          {/* Head placement popup */}
-          {headPopup && (
-            <g>
-              <rect
-                x={headPopup.c * CELL_SIZE - 2}
-                y={headPopup.r * CELL_SIZE - 2}
-                width={CELL_SIZE + 4}
-                height={CELL_SIZE + 4}
-                fill="rgba(255,255,255,0.9)"
-                stroke="#666"
-                strokeWidth={1}
-                rx={3}
-              />
-              {([-1, -2, -3, -4] as number[]).map((dir) => {
-                const cx = (headPopup.c + 0.5) * CELL_SIZE;
-                const cy = (headPopup.r + 0.5) * CELL_SIZE;
-                const offset = CELL_SIZE * 0.28;
-                let ox = 0,
-                  oy = 0;
-                if (dir === -1) oy = -offset;
-                else if (dir === -2) oy = offset;
-                else if (dir === -3) ox = -offset;
-                else ox = offset;
-                const popupSize = CELL_SIZE * 0.4;
-                const pcx = cx + ox;
-                const pcy = cy + oy;
-                let angle = 0;
-                switch (dir) {
-                  case -1: angle = 180; break;
-                  case -2: angle = 0; break;
-                  case -3: angle = 90; break;
-                  case -4: angle = -90; break;
-                }
-                const x0 = pcx - popupSize / 2;
-                const y0 = pcy - popupSize / 2;
-                const outerPts = `${x0},${y0} ${x0 + popupSize},${y0} ${x0 + popupSize * 0.5},${y0 + popupSize * 0.5}`;
-                const innerPts = `${x0 + popupSize * 0.3},${y0 + popupSize * 0.3} ${x0 + popupSize * 0.7},${y0 + popupSize * 0.3} ${x0 + popupSize * 0.5},${y0 + popupSize * 0.5}`;
-                return (
-                  <g
-                    key={`popup-${dir}`}
-                    transform={`rotate(${angle}, ${pcx}, ${pcy})`}
-                    style={{ cursor: "pointer" }}
-                    onPointerDown={(e) => {
-                      e.stopPropagation();
-                      placeHead(dir);
-                    }}
-                  >
-                    <polygon points={outerPts} fill="white" stroke="#4a7cb5" strokeWidth={1} />
-                    <polygon points={innerPts} fill="#4a7cb5" />
-                  </g>
-                );
-              })}
-            </g>
+          {/* Highlight pending head cell */}
+          {pendingHead && (
+            <rect
+              x={pendingHead.c * CELL_SIZE}
+              y={pendingHead.r * CELL_SIZE}
+              width={CELL_SIZE}
+              height={CELL_SIZE}
+              fill="rgba(74, 124, 181, 0.15)"
+              stroke="#4a7cb5"
+              strokeWidth={1.5}
+              strokeDasharray="3 2"
+              pointerEvents="none"
+            />
           )}
         </g>
       </svg>
+
+      {/* Direction picker below the board */}
+      {!readonly && pendingHead && (
+        <div
+          style={{
+            display: "flex",
+            gap: 6,
+            marginTop: 8,
+            alignItems: "center",
+          }}
+        >
+          <span style={{ fontSize: 12, color: "#666" }}>Direction:</span>
+          {(
+            [
+              { dir: -1, label: "Up" },
+              { dir: -2, label: "Down" },
+              { dir: -3, label: "Left" },
+              { dir: -4, label: "Right" },
+            ] as const
+          ).map(({ dir, label }) => (
+            <svg
+              key={dir}
+              width={CELL_SIZE}
+              height={CELL_SIZE}
+              viewBox={`0 0 ${CELL_SIZE} ${CELL_SIZE}`}
+              style={{
+                cursor: "pointer",
+                border: "1px solid #aaa",
+                borderRadius: 4,
+                background: "#fafafa",
+              }}
+              onClick={() => placeHead(dir)}
+              aria-label={label}
+            >
+              <PencilHead
+                cx={CELL_SIZE / 2}
+                cy={CELL_SIZE / 2}
+                dir={dir}
+                size={CELL_SIZE}
+                tipFill="#4a7cb5"
+              />
+            </svg>
+          ))}
+          <button
+            onClick={() => setPendingHead(null)}
+            style={{
+              marginLeft: 4,
+              padding: "2px 8px",
+              fontSize: 12,
+              border: "1px solid #aaa",
+              borderRadius: 4,
+              background: "#eee",
+              cursor: "pointer",
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
     </div>
   );
 }

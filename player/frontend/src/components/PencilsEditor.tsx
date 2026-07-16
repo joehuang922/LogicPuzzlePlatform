@@ -241,7 +241,7 @@ export default function PencilsEditor({
                       cx={cx}
                       cy={cy}
                       dir={val}
-                      size={CELL_SIZE * 0.8}
+                      size={CELL_SIZE}
                       tipFill="#222"
                     />
                   )}
