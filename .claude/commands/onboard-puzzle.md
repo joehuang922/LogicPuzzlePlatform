@@ -23,7 +23,7 @@ If any of these are missing, ask before proceeding.
    - Question structure description + Canonical JSON structure + Sample images
    - Answer structure description + Canonical JSON structure
    - Rules + Success finishing criteria
-   - Puzzle Player > Interactions + Progress calculation (leave empty)
+   - Puzzle Player > Interactions + Progress calculation (ask the user what metric indicates progress — e.g., "cells touched by a trail segment", "edges drawn", "cells filled in". This will be implemented in a later phase.)
    - Puzzle Editor > Interactions
    - Puzzle Parser (notes on visual parsing challenges)
    - Misc > Coordinate convention
@@ -67,7 +67,7 @@ If any of these are missing, ask before proceeding.
    - Import the Editor component.
    - Add the type name to the `hasEditor` array.
    - Add a branch in `InlineEditor` that renders the new editor.
-4. If the new type uses `cells` for dimension computation, verify `computeDimensions` in `BatchUploadForm.tsx` handles the new type ID (it may already be covered by the generic `cells` branch).
+4. **Dimension detection**: Add the new type ID to the dimension computation in `player/frontend/src/pages/Admin.tsx` (in the `handleSubmit` function's `if/else if` chain that extracts `w` and `h` from canon). Also verify `computeDimensions` in `BatchUploadForm.tsx` handles the new type ID (it may already be covered by the generic `cells` branch).
 
 ## Phase 7: Renderer
 
@@ -81,18 +81,26 @@ If any of these are missing, ask before proceeding.
 2. Register it in `player/frontend/src/extractors/index.ts`.
 3. The extracted answer JSON shape must match the "Answer structure" from the doc.
 
-## Phase 9: Parser
+## Phase 9: Progress calculator
+
+1. Create `player/frontend/src/progress/<puzzleName>.ts`.
+2. Implement a `ProgressCalculator` with `puzzleType` set to the new type ID.
+3. The `compute` method should return 0–100 based on the progress metric agreed upon in Phase 1 (e.g., percentage of cells touched by trails/edges/fills). Use the same user-value key prefixes as the extractor and board component.
+4. Register it in `player/frontend/src/progress/index.ts`: import and call `register(...)`.
+5. Reference existing calculators (e.g., `slitherlink.ts`, `pencils.ts`) for the pattern.
+
+## Phase 10: Parser
 
 1. Create `parsers/src/puzzle_parsers/<puzzle_name>/` with `__init__.py`, `__main__.py`, `models.py`, `grid_detector.py`, `parser.py`.
 2. Parser class must extend `PuzzleParser` and implement `_parse()` (base class handles schema validation automatically).
 3. Implement `validate()` method.
 4. Register the new parser in `lambda_handler.py`: import it and add a `<type_id>: <Parser>(ocr_backend=_ocr)` entry to the `_parsers` dict inside `_init_parsers()`.
 
-## Phase 10: Database
+## Phase 11: Database
 
 1. Add an `INSERT INTO puzzle_types` entry in `player/api/seed.sql` with the new ID, name, and rule text.
 
-## Phase 11: Verify
+## Phase 12: Verify
 
 1. Run `npx tsc --noEmit` in `player/frontend/` to verify no type errors.
 2. Run `pytest` in `parsers/` to verify no test regressions.

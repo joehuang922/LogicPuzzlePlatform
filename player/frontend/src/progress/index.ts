@@ -5,6 +5,7 @@ import { computeNurimazeProgress } from "./nurimaze";
 import { computeDoubleChocoProgress } from "./doubleChoco";
 import { computeSlitherlinkProgress } from "./slitherlink";
 import { computeNonogramProgress } from "./nonogram";
+import { computePencilsProgress } from "./pencils";
 
 export interface ProgressCalculator {
   puzzleType: number;
@@ -23,6 +24,7 @@ register(computeNurimazeProgress);
 register(computeDoubleChocoProgress);
 register(computeSlitherlinkProgress);
 register(computeNonogramProgress);
+register(computePencilsProgress);
 
 export function computeProgress(
   puzzle: PuzzleDefinition,

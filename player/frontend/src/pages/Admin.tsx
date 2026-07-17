@@ -185,6 +185,9 @@ function QuestionForm({
       } else if (typeId === 7 && canon.cells) {
         h = canon.cells.length;
         w = canon.cells[0].length;
+      } else if (typeId === 8 && canon.cells) {
+        h = canon.cells.length;
+        w = canon.cells[0].length;
       }
       const res = await createPuzzle({
         puzzleType: typeId,
