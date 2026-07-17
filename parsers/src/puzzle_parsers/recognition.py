@@ -108,7 +108,7 @@ class GeminiRecognizer(CellRecognizer):
             batch_crops = cells[start_row:end_row]
             batch_rows = end_row - start_row
 
-            png_bytes = cells_to_png_bytes(batch_crops)
+            png_bytes = cells_to_png_bytes(batch_crops, row_offset=start_row)
             montage_image = Image.open(io.BytesIO(png_bytes))
 
             batch_prompt = prompt
@@ -181,7 +181,7 @@ class ClaudeRecognizer(CellRecognizer):
             batch_crops = cells[start_row:end_row]
             batch_rows = end_row - start_row
 
-            png_bytes = cells_to_png_bytes(batch_crops)
+            png_bytes = cells_to_png_bytes(batch_crops, row_offset=start_row)
             b64_image = base64.b64encode(png_bytes).decode("utf-8")
 
             batch_prompt = prompt
