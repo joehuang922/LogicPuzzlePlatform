@@ -70,9 +70,32 @@ async function listAttempts(
 ): Promise<APIGatewayProxyResult> {
   const player = event.queryStringParameters?.player;
   const question = event.queryStringParameters?.question;
+  const questions = event.queryStringParameters?.questions;
 
-  if (!player || !question) {
-    return response(400, { error: "player and question query params required" });
+  if (!player) {
+    return response(400, { error: "player query param required" });
+  }
+
+  if (questions) {
+    const ids = questions.split(",").filter(Boolean);
+    if (ids.length === 0) return response(200, { solvedQuestions: [] });
+    const placeholders = ids.map((_, i) => `:q${i}`).join(",");
+    const params = [
+      { name: "player", value: { longValue: Number(player) } },
+      ...ids.map((id, i) => ({ name: `q${i}`, value: { stringValue: id } })),
+    ];
+    const result = await executeStatement(
+      `SELECT DISTINCT question FROM player_attempt
+       WHERE player = :player AND finished_at IS NOT NULL
+         AND question IN (${placeholders})`,
+      params
+    );
+    const solvedQuestions = result.records.map((r) => r.question as string);
+    return response(200, { solvedQuestions });
+  }
+
+  if (!question) {
+    return response(400, { error: "question or questions query param required" });
   }
 
   const finished = event.queryStringParameters?.finished;

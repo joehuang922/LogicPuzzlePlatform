@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { listPuzzles, listCollections, listPuzzleTypes, listAttempts, createAttempt, getAttemptSnapshot, Collection, Attempt, PuzzleType, Puzzle } from "../api/client";
+import { listPuzzles, listCollections, listPuzzleTypes, listAttempts, getSolvedQuestions, createAttempt, getAttemptSnapshot, Collection, Attempt, PuzzleType, Puzzle } from "../api/client";
 import { PuzzleDefinition } from "../types/puzzle";
 import { DIFFICULTY_LABELS } from "../constants";
 import { extractAnswer } from "../extractors";
@@ -192,14 +192,9 @@ export default function Home() {
     try {
       const res = await listPuzzles({ srcCollection: collectionId });
       setCollectionPuzzles(res.puzzles);
-      const attempted = new Set<string>();
-      await Promise.all(
-        res.puzzles.map(async (p) => {
-          const attRes = await listAttempts(HARDCODED_PLAYER_ID, p.id, { finished: true });
-          if (attRes.attempts.length > 0) attempted.add(p.id);
-        })
-      );
-      setAttemptedPuzzleIds(attempted);
+      const ids = res.puzzles.map((p) => p.id);
+      const solvedRes = await getSolvedQuestions(HARDCODED_PLAYER_ID, ids);
+      setAttemptedPuzzleIds(new Set(solvedRes.solvedQuestions));
     } finally {
       setLoadingCollectionPuzzles(false);
     }
