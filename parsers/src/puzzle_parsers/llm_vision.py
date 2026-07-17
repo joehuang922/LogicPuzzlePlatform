@@ -15,7 +15,8 @@ from PIL import Image
 
 
 def cells_to_png_bytes(
-    cells: list[list[NDArray]], max_tile_size: int = 64
+    cells: list[list[NDArray]], max_tile_size: int = 64,
+    row_offset: int = 0, col_offset: int = 0,
 ) -> bytes:
     """Compose a grid of cell images into a single labeled PNG for batch recognition.
 
@@ -59,11 +60,13 @@ def cells_to_png_bytes(
             x0 = col * cell_w
             y0 = row * cell_h
 
-            # Coordinate label in blue above the cell
-            label = f"{row},{col}"
+            # Coordinate label in blue, centered above the cell
+            label = f"{row + row_offset},{col + col_offset}"
+            (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.35, 1)
+            label_x = x0 + (cell_w - tw) // 2
             cv2.putText(
                 canvas, label,
-                (x0 + border + 1, y0 + label_h - 2),
+                (label_x, y0 + label_h - 2),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.35, (200, 0, 0), 1,
             )
 
