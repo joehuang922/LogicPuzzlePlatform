@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 
 interface PencilsEditorProps {
   initialCanon?: string;
@@ -41,14 +41,12 @@ function PencilHead({
   );
 }
 
-// Cycle: 0 -> 1 -> 2 -> ... -> 9 -> -1 -> -2 -> -3 -> -4 -> 0
-function nextCellValue(val: number): number {
-  if (val >= 0 && val < 9) return val + 1;
-  if (val === 9) return -1;
-  if (val >= -4 && val < -1) return val + 1;
-  // val === -1 wraps to 0
-  return 0;
-}
+const DIR_LABELS: { dir: number; label: string; title: string }[] = [
+  { dir: -1, label: "▲", title: "Up" },
+  { dir: -2, label: "▼", title: "Down" },
+  { dir: -3, label: "◀", title: "Left" },
+  { dir: -4, label: "▶", title: "Right" },
+];
 
 export default function PencilsEditor({
   initialCanon,
@@ -77,6 +75,8 @@ export default function PencilsEditor({
     initCells ??
       Array.from({ length: initRows }, () => Array(initCols).fill(0))
   );
+  const [focused, setFocused] = useState<{ r: number; c: number } | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
 
   function resizeGrid(newRows: number, newCols: number) {
     const newCells = Array.from({ length: newRows }, (_, r) =>
@@ -87,15 +87,84 @@ export default function PencilsEditor({
     setRows(newRows);
     setCols(newCols);
     setCells(newCells);
+    if (focused && (focused.r >= newRows || focused.c >= newCols)) {
+      setFocused(null);
+    }
   }
 
-  function handleCellClick(r: number, c: number) {
+  function setCellValue(r: number, c: number, val: number) {
     setCells((prev) => {
       const next = prev.map((row) => [...row]);
-      next[r][c] = nextCellValue(next[r][c]);
+      next[r][c] = val;
       return next;
     });
   }
+
+  function handleCellClick(r: number, c: number) {
+    setFocused({ r, c });
+  }
+
+  function handleSetDirection(dir: number) {
+    if (!focused) return;
+    setCellValue(focused.r, focused.c, dir);
+  }
+
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (!focused) return;
+
+      if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        setCellValue(focused.r, focused.c, 0);
+        return;
+      }
+
+      if (e.key === "Escape") {
+        setFocused(null);
+        return;
+      }
+
+      if (e.key === "ArrowUp" && focused.r > 0) {
+        e.preventDefault();
+        setFocused({ r: focused.r - 1, c: focused.c });
+        return;
+      }
+      if (e.key === "ArrowDown" && focused.r < rows - 1) {
+        e.preventDefault();
+        setFocused({ r: focused.r + 1, c: focused.c });
+        return;
+      }
+      if (e.key === "ArrowLeft" && focused.c > 0) {
+        e.preventDefault();
+        setFocused({ r: focused.r, c: focused.c - 1 });
+        return;
+      }
+      if (e.key === "ArrowRight" && focused.c < cols - 1) {
+        e.preventDefault();
+        setFocused({ r: focused.r, c: focused.c + 1 });
+        return;
+      }
+
+      if (/^[0-9]$/.test(e.key)) {
+        e.preventDefault();
+        const current = cells[focused.r][focused.c];
+        const digit = Number(e.key);
+        let newVal: number;
+        if (current > 0) {
+          newVal = current * 10 + digit;
+        } else {
+          newVal = digit;
+        }
+        setCellValue(focused.r, focused.c, newVal);
+      }
+    },
+    [focused, cells, rows, cols]
+  );
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleKeyDown]);
 
   function handleDone() {
     onComplete(JSON.stringify({ cells }, null, 2));
@@ -152,104 +221,136 @@ export default function PencilsEditor({
           />
         </label>
         <span style={{ fontSize: "0.8rem", color: "#666" }}>
-          Click cells to cycle: empty → 1…9 → ▲ → ▼ → ◀ → ▶ → empty
+          Click cell to select, type number, Delete to clear, arrows to move
         </span>
       </div>
 
       <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
-        <svg
-          width={Math.min(svgWidth, 500)}
-          viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-          style={{
-            border: "1px solid #ccc",
-            userSelect: "none",
-            display: "block",
-          }}
-        >
-          <g transform={`translate(${PAD},${PAD})`}>
-            <rect
-              x={0}
-              y={0}
-              width={cols * CELL_SIZE}
-              height={rows * CELL_SIZE}
-              fill="none"
-              stroke="#222"
-              strokeWidth={2}
-            />
-            {Array.from({ length: rows - 1 }, (_, i) => (
-              <line
-                key={`gh-${i}`}
-                x1={0}
-                y1={(i + 1) * CELL_SIZE}
-                x2={cols * CELL_SIZE}
-                y2={(i + 1) * CELL_SIZE}
-                stroke="#bbb"
-                strokeWidth={0.5}
-                strokeDasharray="4 3"
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <svg
+            ref={svgRef}
+            width={Math.min(svgWidth, 500)}
+            viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+            style={{
+              border: "1px solid #ccc",
+              userSelect: "none",
+              display: "block",
+            }}
+            tabIndex={0}
+          >
+            <g transform={`translate(${PAD},${PAD})`}>
+              <rect
+                x={0}
+                y={0}
+                width={cols * CELL_SIZE}
+                height={rows * CELL_SIZE}
+                fill="none"
+                stroke="#222"
+                strokeWidth={2}
               />
-            ))}
-            {Array.from({ length: cols - 1 }, (_, i) => (
-              <line
-                key={`gv-${i}`}
-                x1={(i + 1) * CELL_SIZE}
-                y1={0}
-                x2={(i + 1) * CELL_SIZE}
-                y2={rows * CELL_SIZE}
-                stroke="#bbb"
-                strokeWidth={0.5}
-                strokeDasharray="4 3"
-              />
-            ))}
+              {Array.from({ length: rows - 1 }, (_, i) => (
+                <line
+                  key={`gh-${i}`}
+                  x1={0}
+                  y1={(i + 1) * CELL_SIZE}
+                  x2={cols * CELL_SIZE}
+                  y2={(i + 1) * CELL_SIZE}
+                  stroke="#bbb"
+                  strokeWidth={0.5}
+                  strokeDasharray="4 3"
+                />
+              ))}
+              {Array.from({ length: cols - 1 }, (_, i) => (
+                <line
+                  key={`gv-${i}`}
+                  x1={(i + 1) * CELL_SIZE}
+                  y1={0}
+                  x2={(i + 1) * CELL_SIZE}
+                  y2={rows * CELL_SIZE}
+                  stroke="#bbb"
+                  strokeWidth={0.5}
+                  strokeDasharray="4 3"
+                />
+              ))}
 
-            {Array.from({ length: rows * cols }, (_, i) => {
-              const r = Math.floor(i / cols);
-              const c = i % cols;
-              const cx = (c + 0.5) * CELL_SIZE;
-              const cy = (r + 0.5) * CELL_SIZE;
-              const val = cells[r][c];
-              return (
-                <g key={`cell-${r}-${c}`}>
-                  <rect
-                    x={c * CELL_SIZE}
-                    y={r * CELL_SIZE}
-                    width={CELL_SIZE}
-                    height={CELL_SIZE}
-                    fill="transparent"
-                    stroke="none"
-                    style={{ cursor: "pointer" }}
-                    onClick={() => handleCellClick(r, c)}
-                  />
-                  {val === 0 && (
-                    <circle cx={cx} cy={cy} r={3} fill="#999" pointerEvents="none" />
-                  )}
-                  {val > 0 && (
-                    <text
-                      x={cx}
-                      y={cy}
-                      textAnchor="middle"
-                      dominantBaseline="central"
-                      fontSize={14}
-                      fontWeight="bold"
-                      fill="#222"
-                      pointerEvents="none"
-                    >
-                      {val}
-                    </text>
-                  )}
-                  {val < 0 && (
-                    <PencilHead
-                      cx={cx}
-                      cy={cy}
-                      dir={val}
-                      size={CELL_SIZE}
-                      tipFill="#222"
+              {Array.from({ length: rows * cols }, (_, i) => {
+                const r = Math.floor(i / cols);
+                const c = i % cols;
+                const cx = (c + 0.5) * CELL_SIZE;
+                const cy = (r + 0.5) * CELL_SIZE;
+                const val = cells[r][c];
+                const isFocused = focused?.r === r && focused?.c === c;
+                return (
+                  <g key={`cell-${r}-${c}`}>
+                    <rect
+                      x={c * CELL_SIZE}
+                      y={r * CELL_SIZE}
+                      width={CELL_SIZE}
+                      height={CELL_SIZE}
+                      fill={isFocused ? "#cde4f7" : "transparent"}
+                      stroke={isFocused ? "#1976d2" : "none"}
+                      strokeWidth={isFocused ? 2 : 0}
+                      style={{ cursor: "pointer" }}
+                      onClick={() => handleCellClick(r, c)}
                     />
-                  )}
-                </g>
-              );
-            })}
-          </g>
-        </svg>
+                    {val > 0 && (
+                      <text
+                        x={cx}
+                        y={cy}
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                        fontSize={14}
+                        fontWeight="bold"
+                        fill="#222"
+                        pointerEvents="none"
+                      >
+                        {val}
+                      </text>
+                    )}
+                    {val < 0 && (
+                      <PencilHead
+                        cx={cx}
+                        cy={cy}
+                        dir={val}
+                        size={CELL_SIZE}
+                        tipFill="#222"
+                      />
+                    )}
+                  </g>
+                );
+              })}
+            </g>
+          </svg>
+
+          {focused && (
+            <div style={{ display: "flex", gap: "0.25rem", alignItems: "center" }}>
+              <span style={{ fontSize: "0.8rem", color: "#555", marginRight: "0.25rem" }}>
+                Set head:
+              </span>
+              {DIR_LABELS.map(({ dir, label, title }) => (
+                <button
+                  key={dir}
+                  title={title}
+                  onClick={() => handleSetDirection(dir)}
+                  style={{
+                    width: 28,
+                    height: 28,
+                    fontSize: "1rem",
+                    cursor: "pointer",
+                    border: cells[focused.r][focused.c] === dir ? "2px solid #1976d2" : "1px solid #aaa",
+                    borderRadius: 4,
+                    background: cells[focused.r][focused.c] === dir ? "#cde4f7" : "#fff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         <textarea
           value={jsonStr}
