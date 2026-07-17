@@ -151,151 +151,71 @@ function validateSolution(
     }
   }
 
-  // Check no trail crosses a wall
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols - 1; c++) {
-      if (trails.h[r][c] === 1 && wallV[r][c + 1]) return false;
-    }
-  }
-  for (let r = 0; r < rows - 1; r++) {
-    for (let c = 0; c < cols; c++) {
-      if (trails.v[r][c] === 1 && wallH[r + 1][c]) return false;
-    }
-  }
+  // Note: trails ARE allowed to cross walls — the head's base wall separates
+  // body from trail, but the trail passes through the head cell and can cross
+  // that wall. Overlap/correctness is enforced by per-pencil checks below.
 
-  // Assign each cell to a pencil via flood-fill within walls
-  const owner: number[][] = Array.from({ length: rows }, () => Array(cols).fill(-1));
-  let pencilId = 0;
-  const pencilCells: { r: number; c: number }[][] = [];
+  // Flood-fill to find connected regions (ignoring walls) to check coverage
+  // But the real structure is: each pencil = head + body (rectangle) + trail (path).
+  // Head is separated from body by the head's base wall, so they're in different
+  // wall-bounded regions. We validate per-head instead.
 
+  // Collect all head positions
+  const allHeadPositions: { r: number; c: number; dir: number }[] = [];
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      if (owner[r][c] >= 0) continue;
-      const queue: [number, number][] = [[r, c]];
-      const cells: { r: number; c: number }[] = [];
-      owner[r][c] = pencilId;
-      while (queue.length > 0) {
-        const [cr, cc] = queue.pop()!;
-        cells.push({ r: cr, c: cc });
-        // up
-        if (cr > 0 && !wallH[cr][cc] && owner[cr - 1][cc] < 0) {
-          owner[cr - 1][cc] = pencilId;
-          queue.push([cr - 1, cc]);
-        }
-        // down
-        if (cr < rows - 1 && !wallH[cr + 1][cc] && owner[cr + 1][cc] < 0) {
-          owner[cr + 1][cc] = pencilId;
-          queue.push([cr + 1, cc]);
-        }
-        // left
-        if (cc > 0 && !wallV[cr][cc] && owner[cr][cc - 1] < 0) {
-          owner[cr][cc - 1] = pencilId;
-          queue.push([cr, cc - 1]);
-        }
-        // right
-        if (cc < cols - 1 && !wallV[cr][cc + 1] && owner[cr][cc + 1] < 0) {
-          owner[cr][cc + 1] = pencilId;
-          queue.push([cr, cc + 1]);
-        }
+      if (allHeads[r][c] < 0) {
+        allHeadPositions.push({ r, c, dir: allHeads[r][c] });
       }
-      pencilCells.push(cells);
-      pencilId++;
     }
   }
 
-  // Validate each pencil region
-  for (let pid = 0; pid < pencilCells.length; pid++) {
-    const regionCells = pencilCells[pid];
+  // Track which cells are claimed by a pencil
+  const claimed: boolean[][] = Array.from({ length: rows }, () => Array(cols).fill(false));
 
-    // Separate into head cells, number cells, and trail cells
-    const headCells: { r: number; c: number; dir: number }[] = [];
-    const numCells: { r: number; c: number; val: number }[] = [];
-    const trailCellSet = new Set<number>();
-
-    for (const { r, c } of regionCells) {
-      const hd = allHeads[r][c];
-      if (hd < 0) {
-        headCells.push({ r, c, dir: hd });
-      } else {
-        const cv = canon.cells[r][c];
-        if (cv > 0) {
-          numCells.push({ r, c, val: cv });
-        }
-      }
-      // A cell is a trail cell if it has trail adjacency within this region
-      if (trailAdj[r][c].length > 0) {
-        trailCellSet.add(r * cols + c);
-      }
-    }
-
-    // Each pencil must have exactly one head
-    if (headCells.length !== 1) return false;
-
-    const head = headCells[0];
-
-    // Body cells: all cells in region that are NOT the head and NOT purely trail
-    // The body is the rectangle adjacent to the head's base. Let's find it.
-    // Body = all region cells reachable from the head's base-neighbor WITHOUT crossing trails
-    // Actually simpler: body cells are the cells that have a number clue OR cells
-    // that are in the rectangle formed by edges (non-trail, non-head cells in this region).
-    // Most correct: body = region cells minus head minus trail-only cells.
-
-    // Trail must form a simple path starting from the head in the pointing direction.
-    // The first trail cell is the cell adjacent to the head in the pointing direction.
-    let tipR = head.r, tipC = head.c;
+  for (const head of allHeadPositions) {
+    // 1. Find the body: flood-fill from the cell on the base side of the head,
+    //    bounded by walls (edges + boundary + head-implied walls).
+    let baseR = head.r, baseC = head.c;
     switch (head.dir) {
-      case -1: tipR--; break; // up
-      case -2: tipR++; break; // down
-      case -3: tipC--; break; // left
-      case -4: tipC++; break; // right
+      case -1: baseR++; break; // up: body below
+      case -2: baseR--; break; // down: body above
+      case -3: baseC++; break; // left: body to right
+      case -4: baseC--; break; // right: body to left
     }
 
-    // Trail must start from the tip cell
-    if (tipR < 0 || tipR >= rows || tipC < 0 || tipC >= cols) return false;
+    if (baseR < 0 || baseR >= rows || baseC < 0 || baseC >= cols) return false;
 
-    // Walk the trail from the head cell through trail segments
-    const headIdx = head.r * cols + head.c;
-    const tipIdx = tipR * cols + tipC;
+    // Flood-fill body from baseR, baseC using walls
+    const bodyVisited = new Set<number>();
+    const bodyQueue: [number, number][] = [[baseR, baseC]];
+    bodyVisited.add(baseR * cols + baseC);
+    const bodyCells: { r: number; c: number }[] = [];
 
-    // Check that the head cell connects to tip cell via trail
-    if (!trailAdj[head.r][head.c].includes(tipIdx)) return false;
-
-    // Walk trail: start from head, follow trail adjacency
-    const visited = new Set<number>();
-    visited.add(headIdx);
-    let current = headIdx;
-    let next = tipIdx;
-    const trailPath: number[] = [headIdx];
-
-    while (next !== -1) {
-      visited.add(next);
-      trailPath.push(next);
-      const nr = Math.floor(next / cols);
-      const nc = next % cols;
-      const neighbors = trailAdj[nr][nc].filter((n) => !visited.has(n));
-      if (neighbors.length > 1) return false; // branching trail
-      if (neighbors.length === 0) {
-        next = -1;
-      } else {
-        current = next;
-        next = neighbors[0];
+    while (bodyQueue.length > 0) {
+      const [cr, cc] = bodyQueue.pop()!;
+      bodyCells.push({ r: cr, c: cc });
+      // up
+      if (cr > 0 && !wallH[cr][cc] && !bodyVisited.has((cr - 1) * cols + cc)) {
+        bodyVisited.add((cr - 1) * cols + cc);
+        bodyQueue.push([cr - 1, cc]);
+      }
+      // down
+      if (cr < rows - 1 && !wallH[cr + 1][cc] && !bodyVisited.has((cr + 1) * cols + cc)) {
+        bodyVisited.add((cr + 1) * cols + cc);
+        bodyQueue.push([cr + 1, cc]);
+      }
+      // left
+      if (cc > 0 && !wallV[cr][cc] && !bodyVisited.has(cr * cols + cc - 1)) {
+        bodyVisited.add(cr * cols + cc - 1);
+        bodyQueue.push([cr, cc - 1]);
+      }
+      // right
+      if (cc < cols - 1 && !wallV[cr][cc + 1] && !bodyVisited.has(cr * cols + cc + 1)) {
+        bodyVisited.add(cr * cols + cc + 1);
+        bodyQueue.push([cr, cc + 1]);
       }
     }
-
-    // Trail length = number of cells in trail path minus the head cell
-    const trailLength = trailPath.length - 1;
-
-    // All number clues in this region must equal trail length
-    if (numCells.length === 0) return false; // body must contain at least one number
-    for (const nc of numCells) {
-      if (nc.val !== trailLength) return false;
-    }
-
-    // Body cells = region cells that are not on the trail path
-    const trailPathSet = new Set(trailPath);
-    const bodyCells = regionCells.filter(
-      ({ r, c }) => !trailPathSet.has(r * cols + c)
-    );
 
     // Body must form a rectangle
     if (bodyCells.length === 0) return false;
@@ -303,38 +223,77 @@ function validateSolution(
     const maxR = Math.max(...bodyCells.map((c) => c.r));
     const minC = Math.min(...bodyCells.map((c) => c.c));
     const maxC = Math.max(...bodyCells.map((c) => c.c));
-    const expectedBodySize = (maxR - minR + 1) * (maxC - minC + 1);
-    if (bodyCells.length !== expectedBodySize) return false;
+    if (bodyCells.length !== (maxR - minR + 1) * (maxC - minC + 1)) return false;
 
-    // All number clues must be inside body
-    for (const nc of numCells) {
-      if (nc.r < minR || nc.r > maxR || nc.c < minC || nc.c > maxC) return false;
-    }
-
-    // Head must be adjacent to body (touching the body rectangle on its base side)
-    let headAdjBody = false;
-    switch (head.dir) {
-      case -1: // up: base at bottom, body below head
-        headAdjBody = head.r + 1 >= minR && head.r + 1 <= maxR && head.c >= minC && head.c <= maxC;
-        break;
-      case -2: // down: base at top, body above head
-        headAdjBody = head.r - 1 >= minR && head.r - 1 <= maxR && head.c >= minC && head.c <= maxC;
-        break;
-      case -3: // left: base at right, body to the right
-        headAdjBody = head.c + 1 >= minC && head.c + 1 <= maxC && head.r >= minR && head.r <= maxR;
-        break;
-      case -4: // right: base at left, body to the left
-        headAdjBody = head.c - 1 >= minC && head.c - 1 <= maxC && head.r >= minR && head.r <= maxR;
-        break;
-    }
-    if (!headAdjBody) return false;
-
-    // Every region cell must be accounted for (either in trail path or body)
-    if (trailPath.length + bodyCells.length !== regionCells.length) return false;
-
-    // Trail cells must not overlap with body
+    // Collect number clues in body; body must not contain heads
+    const numCells: { val: number }[] = [];
     for (const bc of bodyCells) {
-      if (trailPathSet.has(bc.r * cols + bc.c)) return false;
+      const cv = canon.cells[bc.r][bc.c];
+      if (cv > 0) numCells.push({ val: cv });
+      if (allHeads[bc.r][bc.c] < 0) return false;
+    }
+
+    // 2. Walk the trail from the head cell.
+    //    The trail is a non-branching path that includes the head cell.
+    //    Head can be at one end or in the middle of the trail (max 2 connections).
+    const headIdx = head.r * cols + head.c;
+    const headNeighbors = trailAdj[head.r][head.c];
+    if (headNeighbors.length === 0 || headNeighbors.length > 2) return false;
+
+    // Walk in both directions from the head to find the full trail path
+    const trailCells = new Set<number>();
+    trailCells.add(headIdx);
+
+    for (const startNbr of headNeighbors) {
+      let cur = startNbr;
+      const visited = new Set<number>();
+      visited.add(headIdx);
+      while (true) {
+        if (trailCells.has(cur) && cur !== headIdx) break; // rejoining (shouldn't happen)
+        visited.add(cur);
+        trailCells.add(cur);
+        const tr = Math.floor(cur / cols);
+        const tc = cur % cols;
+        const nbrs = trailAdj[tr][tc].filter((n: number) => !visited.has(n));
+        if (nbrs.length > 1) return false; // branching
+        if (nbrs.length === 0) break;
+        cur = nbrs[0];
+      }
+    }
+
+    // Trail length = total trail cells minus the head cell
+    const trailLength = trailCells.size - 1;
+
+    // Trail length must equal body cell count
+    if (trailLength !== bodyCells.length) return false;
+
+    // Any number clues in the body must also match trail length
+    for (const nc of numCells) {
+      if (nc.val !== trailLength) return false;
+    }
+
+    // 3. Trail must not pass through body cells
+    for (const idx of trailCells) {
+      if (idx !== headIdx && bodyVisited.has(idx)) return false;
+    }
+
+    // 4. Claim all cells (head + trail + body)
+    for (const idx of trailCells) {
+      const cr = Math.floor(idx / cols);
+      const cc = idx % cols;
+      if (claimed[cr][cc]) return false; // overlap with another pencil
+      claimed[cr][cc] = true;
+    }
+    for (const bc of bodyCells) {
+      if (claimed[bc.r][bc.c]) return false; // overlap
+      claimed[bc.r][bc.c] = true;
+    }
+  }
+
+  // Every cell must be claimed
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (!claimed[r][c]) return false;
     }
   }
 
