@@ -29,6 +29,7 @@ export interface Puzzle {
   canonRepr: Record<string, unknown>;
   srcCollection: number | null;
   srcCollectionName: string | null;
+  srcCollectionCoverSrc: string | null;
 }
 
 export function listPuzzles(filters?: { puzzleType?: string; srcCollection?: number | "none"; limit?: number }) {

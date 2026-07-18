@@ -186,29 +186,77 @@ export default function Play() {
   if (error) return <p style={{ color: "red" }}>Error: {error}</p>;
   if (!puzzle) return <p>Puzzle not found.</p>;
 
+  const difficultyStars = Array.from({ length: 5 }, (_, i) => i < puzzle.difficulty ? "★" : "☆").join("");
+
   return (
     <div>
-      <Link to="/">&larr; Back to puzzles</Link>
-      <h2 style={{ fontSize: isMobile ? "1.2rem" : undefined }}>{puzzle.title ?? "Untitled"}</h2>
-      <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "flex-start" : "center", gap: isMobile ? "0.5rem" : "1rem", marginBottom: "0.75rem" }}>
-        <p style={{ margin: 0, fontSize: isMobile ? "0.85rem" : undefined }}>
-          Type: {puzzle.puzzleTypeName} | Difficulty: {DIFFICULTY_LABELS[puzzle.difficulty] || `${puzzle.difficulty}/5`}
-          {puzzle.author && ` | Author: ${puzzle.author}`}
-          {puzzle.srcCollectionName && ` | Collection: ${puzzle.srcCollectionName}`}
-        </p>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <Timer ref={timerRef} startOffset={timerOffset} resetKey={boardKey} />
-          {attemptId && (
-            <>
-              <button onClick={handleSave} disabled={saving} style={btnStyle}>
-                {saving ? "Saving..." : "Save"}
-              </button>
-              <button onClick={handleLoadClick} disabled={snapshotsLoading} style={btnStyle}>
-                {snapshotsLoading ? "Loading..." : "Load"}
-              </button>
-            </>
+      <Link to="/" style={{ display: "inline-block", marginBottom: "0.75rem", color: "#666", textDecoration: "none", fontSize: "0.85rem" }}>&larr; Back to puzzles</Link>
+
+      {/* Info card */}
+      <div style={infoCardStyle}>
+        {/* Left content */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {/* Puzzle type badge */}
+          <div style={puzzleTypeBadgeStyle}>
+            {puzzle.puzzleTypeName.toUpperCase()}
+          </div>
+
+          {/* Title */}
+          <div style={{ margin: "0.5rem 0 0.6rem", fontSize: isMobile ? "1.1rem" : "1.25rem", fontWeight: 500, color: "#333" }}>
+            {puzzle.title ?? "Untitled"}
+          </div>
+
+          {/* Metadata chips row */}
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.4rem", marginBottom: "0.5rem" }}>
+            <span style={chipStyle}>
+              <span style={{ color: "#f5a623", letterSpacing: 1 }}>{difficultyStars}</span>
+              {" "}{DIFFICULTY_LABELS[puzzle.difficulty] || `${puzzle.difficulty}/5`}
+            </span>
+            {puzzle.author && (
+              <span style={chipStyle}>
+                <span style={{ opacity: 0.6 }}>by</span> {puzzle.author}
+              </span>
+            )}
+            {puzzle.width && puzzle.height && (
+              <span style={chipStyle}>
+                {puzzle.width}&times;{puzzle.height}
+              </span>
+            )}
+          </div>
+
+          {/* Collection name */}
+          {puzzle.srcCollectionName && (
+            <div style={{ fontSize: "0.82rem", color: "#666", marginTop: "0.25rem" }}>
+              {puzzle.srcCollectionName}
+            </div>
           )}
         </div>
+
+        {/* Right side: cover image */}
+        {puzzle.srcCollectionCoverSrc && (
+          <div style={coverImageStyle}>
+            <img
+              src={puzzle.srcCollectionCoverSrc}
+              alt={`${puzzle.srcCollectionName} cover`}
+              style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 6 }}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Timer and action buttons */}
+      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
+        <Timer ref={timerRef} startOffset={timerOffset} resetKey={boardKey} />
+        {attemptId && (
+          <>
+            <button onClick={handleSave} disabled={saving} style={btnStyle}>
+              {saving ? "Saving..." : "Save"}
+            </button>
+            <button onClick={handleLoadClick} disabled={snapshotsLoading} style={btnStyle}>
+              {snapshotsLoading ? "Loading..." : "Load"}
+            </button>
+          </>
+        )}
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
         <div style={{ flex: 1, height: 8, backgroundColor: "#e0e0e0", borderRadius: 4, overflow: "hidden" }}>
@@ -323,6 +371,50 @@ export default function Play() {
     </div>
   );
 }
+
+const infoCardStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "flex-start",
+  gap: "1rem",
+  padding: "1rem 1.25rem",
+  marginBottom: "0.75rem",
+  background: "#fafbfc",
+  border: "1px solid #e5e7eb",
+  borderRadius: 10,
+};
+
+const puzzleTypeBadgeStyle: React.CSSProperties = {
+  display: "inline-block",
+  padding: "0.3rem 0.9rem",
+  fontSize: "0.95rem",
+  fontWeight: 700,
+  letterSpacing: 2,
+  color: "#fff",
+  background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+  borderRadius: 6,
+};
+
+const chipStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "0.25rem",
+  padding: "0.2rem 0.55rem",
+  fontSize: "0.8rem",
+  backgroundColor: "#fff",
+  border: "1px solid #e5e7eb",
+  borderRadius: 20,
+  color: "#374151",
+};
+
+const coverImageStyle: React.CSSProperties = {
+  width: 80,
+  height: 100,
+  borderRadius: 6,
+  overflow: "hidden",
+  border: "1px solid #e5e7eb",
+  flexShrink: 0,
+  backgroundColor: "#f3f4f6",
+};
 
 const btnStyle: React.CSSProperties = {
   padding: "0.35rem 1rem",

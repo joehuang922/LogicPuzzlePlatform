@@ -11,6 +11,7 @@ export interface PuzzleDefinition {
   height: number | null;
   canonRepr: Record<string, unknown>;
   srcCollectionName: string | null;
+  srcCollectionCoverSrc: string | null;
 }
 
 export interface PuzzleState {
