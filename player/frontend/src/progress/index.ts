@@ -6,6 +6,7 @@ import { computeDoubleChocoProgress } from "./doubleChoco";
 import { computeSlitherlinkProgress } from "./slitherlink";
 import { computeNonogramProgress } from "./nonogram";
 import { computePencilsProgress } from "./pencils";
+import { computeNuritwinProgress } from "./nuritwin";
 
 export interface ProgressCalculator {
   puzzleType: number;
@@ -25,6 +26,7 @@ register(computeDoubleChocoProgress);
 register(computeSlitherlinkProgress);
 register(computeNonogramProgress);
 register(computePencilsProgress);
+register(computeNuritwinProgress);
 
 export function computeProgress(
   puzzle: PuzzleDefinition,

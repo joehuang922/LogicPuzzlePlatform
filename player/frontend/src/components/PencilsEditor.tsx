@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef } from "react";
+import { useGridCellInput } from "../hooks/useGridCellInput";
 
 interface PencilsEditorProps {
   initialCanon?: string;
@@ -75,7 +76,6 @@ export default function PencilsEditor({
     initCells ??
       Array.from({ length: initRows }, () => Array(initCols).fill(0))
   );
-  const [focused, setFocused] = useState<{ r: number; c: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
   function resizeGrid(newRows: number, newCols: number) {
@@ -87,9 +87,6 @@ export default function PencilsEditor({
     setRows(newRows);
     setCols(newCols);
     setCells(newCells);
-    if (focused && (focused.r >= newRows || focused.c >= newCols)) {
-      setFocused(null);
-    }
   }
 
   function setCellValue(r: number, c: number, val: number) {
@@ -100,71 +97,17 @@ export default function PencilsEditor({
     });
   }
 
-  function handleCellClick(r: number, c: number) {
-    setFocused({ r, c });
-  }
+  const { focused, handleCellClick } = useGridCellInput({
+    rows,
+    cols,
+    cells,
+    setCellValue,
+  });
 
   function handleSetDirection(dir: number) {
     if (!focused) return;
     setCellValue(focused.r, focused.c, dir);
   }
-
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (!focused) return;
-
-      if (e.key === "Delete" || e.key === "Backspace") {
-        e.preventDefault();
-        setCellValue(focused.r, focused.c, 0);
-        return;
-      }
-
-      if (e.key === "Escape") {
-        setFocused(null);
-        return;
-      }
-
-      if (e.key === "ArrowUp" && focused.r > 0) {
-        e.preventDefault();
-        setFocused({ r: focused.r - 1, c: focused.c });
-        return;
-      }
-      if (e.key === "ArrowDown" && focused.r < rows - 1) {
-        e.preventDefault();
-        setFocused({ r: focused.r + 1, c: focused.c });
-        return;
-      }
-      if (e.key === "ArrowLeft" && focused.c > 0) {
-        e.preventDefault();
-        setFocused({ r: focused.r, c: focused.c - 1 });
-        return;
-      }
-      if (e.key === "ArrowRight" && focused.c < cols - 1) {
-        e.preventDefault();
-        setFocused({ r: focused.r, c: focused.c + 1 });
-        return;
-      }
-
-      if (/^[0-9]$/.test(e.key)) {
-        e.preventDefault();
-        const current = cells[focused.r][focused.c];
-        const digit = Number(e.key);
-        let newVal: number;
-        if (current > 0) {
-          newVal = current * 10 + digit;
-        } else {
-          newVal = digit;
-        }
-        setCellValue(focused.r, focused.c, newVal);
-      }
-    },
-    [focused, cells, rows, cols]
-  );
-
-  useEffect(() => {
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleKeyDown]);
 
   function handleDone() {
     onComplete(JSON.stringify({ cells }, null, 2));

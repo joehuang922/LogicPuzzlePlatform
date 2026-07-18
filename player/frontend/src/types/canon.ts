@@ -79,3 +79,15 @@ export interface PencilsAnswer {
     v: number[][];
   };
 }
+
+export interface NuritwinCanon {
+  cells: number[][];
+  grids: {
+    h: number[][];
+    v: number[][];
+  };
+}
+
+export interface NuritwinAnswer {
+  states: number[][];
+}

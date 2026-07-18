@@ -75,7 +75,8 @@ INSERT INTO puzzle_types (id, name, rule) VALUES
   (5, 'slitherlink', 'Draw a single closed loop along the grid edges. Each number indicates how many of its four surrounding edges are part of the loop.'),
   (6, 'nonogram', 'Fill cells black according to row and column clues. Each clue number represents a consecutive group of filled cells. Groups within a line must appear in order with at least one empty cell between them.'),
   (7, 'masyu', 'Draw a single closed loop through cell centers. The loop passes through all circles. At white circles the line goes straight but a neighbor must turn. At black circles the line turns but both neighbors must go straight.'),
-  (8, 'pencils', 'Draw pencils (head, body, trail) to fill every cell. Each pencil body is a 1xn rectangle behind its head. The trail extends n segments from the head. Trails cannot overlap or cross. Body length must match the number clue.');
+  (8, 'pencils', 'Draw pencils (head, body, trail) to fill every cell. Each pencil body is a 1xn rectangle behind its head. The trail extends n segments from the head. Trails cannot overlap or cross. Body length must match the number clue.'),
+  (9, 'nuritwin', 'Blacken cells so each room has exactly two connected black components of equal size. If a room has number N, each component is N cells. All black cells globally connected. No 2x2 all-black.');
 
 -- Seed sample puzzle: sudoku (difficulty 4 = hard)
 INSERT INTO puzzle_questions (id, puzzle_type, title, difficulty, width, height, canon_repr) VALUES (
