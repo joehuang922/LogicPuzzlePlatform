@@ -1,0 +1,71 @@
+{
+  "title": "Slalom Canonical Representation",
+  "description": "Grid with walls, gates (dashed segments along grid lines), and a start cell. Player draws a closed loop crossing all gates in order.",
+  "type": "object",
+  "required": ["cells", "start", "gateCount", "gates"],
+  "additionalProperties": false,
+  "properties": {
+    "cells": {
+      "description": "m x n grid. 0 = empty, 1 = black wall.",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": { "type": "integer", "minimum": 0, "maximum": 1 },
+        "minItems": 1
+      },
+      "minItems": 1
+    },
+    "start": {
+      "description": "Position of the circled number (start/end of trail).",
+      "type": "object",
+      "required": ["row", "col"],
+      "additionalProperties": false,
+      "properties": {
+        "row": { "type": "integer", "minimum": 0 },
+        "col": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "gateCount": {
+      "description": "Total number of gates (equals the circled number).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "gates": {
+      "description": "Array of gate definitions.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["orientation", "line", "from", "to", "number"],
+        "additionalProperties": false,
+        "properties": {
+          "orientation": {
+            "description": "h = horizontal gate (crosses vertical trail), v = vertical gate (crosses horizontal trail).",
+            "type": "string",
+            "enum": ["h", "v"]
+          },
+          "line": {
+            "description": "Grid line index. For v: column grid-line (0=left border, cols=right border). For h: row grid-line (0=top border, rows=bottom border).",
+            "type": "integer",
+            "minimum": 0
+          },
+          "from": {
+            "description": "Start of gate span (inclusive). For v: row index. For h: col index.",
+            "type": "integer",
+            "minimum": 0
+          },
+          "to": {
+            "description": "End of gate span (inclusive). For v: row index. For h: col index.",
+            "type": "integer",
+            "minimum": 0
+          },
+          "number": {
+            "description": "Required crossing order (1-indexed), or null if unnumbered.",
+            "type": ["integer", "null"],
+            "minimum": 1
+          }
+        }
+      },
+      "minItems": 1
+    }
+  }
+}

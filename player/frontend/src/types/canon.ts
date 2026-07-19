@@ -91,3 +91,25 @@ export interface NuritwinCanon {
 export interface NuritwinAnswer {
   states: number[][];
 }
+
+export interface SlalomGate {
+  orientation: "h" | "v";
+  line: number;
+  from: number;
+  to: number;
+  number: number | null;
+}
+
+export interface SlalomCanon {
+  cells: number[][];
+  start: { row: number; col: number };
+  gateCount: number;
+  gates: SlalomGate[];
+}
+
+export interface SlalomAnswer {
+  trail: {
+    h: number[][];
+    v: number[][];
+  };
+}

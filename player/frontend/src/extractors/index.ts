@@ -8,6 +8,7 @@ import { nonogramExtractor } from "./nonogram";
 import { masyuExtractor } from "./masyu";
 import { pencilsExtractor } from "./pencils";
 import { nuritwinExtractor } from "./nuritwin";
+import { slalomExtractor } from "./slalom";
 
 const extractorRegistry = new Map<number, AnswerExtractor>();
 
@@ -24,6 +25,7 @@ registerExtractor(nonogramExtractor);
 registerExtractor(masyuExtractor);
 registerExtractor(pencilsExtractor);
 registerExtractor(nuritwinExtractor);
+registerExtractor(slalomExtractor);
 
 export function getExtractor(puzzleType: number): AnswerExtractor | undefined {
   return extractorRegistry.get(puzzleType);

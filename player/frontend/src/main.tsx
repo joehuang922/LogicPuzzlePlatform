@@ -12,6 +12,7 @@ import { nonogramRenderer } from "./renderers/nonogram";
 import { masyuRenderer } from "./renderers/masyu";
 import { pencilsRenderer } from "./renderers/pencils";
 import { nuritwinRenderer } from "./renderers/nuritwin";
+import { slalomRenderer } from "./renderers/slalom";
 
 registerRenderer(comboSudokuRenderer);
 registerRenderer(sudokuRenderer);
@@ -22,6 +23,7 @@ registerRenderer(nonogramRenderer);
 registerRenderer(masyuRenderer);
 registerRenderer(pencilsRenderer);
 registerRenderer(nuritwinRenderer);
+registerRenderer(slalomRenderer);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

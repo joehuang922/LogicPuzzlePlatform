@@ -14,6 +14,7 @@ import NonogramEditor from "./NonogramEditor";
 import MasyuEditor from "./MasyuEditor";
 import PencilsEditor from "./PencilsEditor";
 import NuritwinEditor from "./NuritwinEditor";
+import SlalomEditor from "./SlalomEditor";
 
 const MAX_IMAGES = 50;
 const PARSE_CONCURRENCY = 3;
@@ -43,7 +44,7 @@ function computeDimensions(typeId: number, canon: Record<string, unknown>): { w?
       h: Math.max(...subs.map((b) => b.y)) + 9,
     };
   }
-  if ((typeId === 3 || typeId === 4 || typeId === 5 || typeId === 7 || typeId === 8 || typeId === 9) && canon.cells) {
+  if ((typeId === 3 || typeId === 4 || typeId === 5 || typeId === 7 || typeId === 8 || typeId === 9 || typeId === 10) && canon.cells) {
     const cells = canon.cells as unknown[][];
     return { h: cells.length, w: (cells[0] as unknown[]).length };
   }
@@ -97,6 +98,9 @@ function InlineEditor({
   if (typeName === "nuritwin") {
     return <NuritwinEditor initialJson={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
   }
+  if (typeName === "slalom") {
+    return <SlalomEditor initialCanon={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
+  }
   return null;
 }
 
@@ -124,7 +128,7 @@ function BatchItemRow({
   onToggleEditor: () => void;
 }) {
   const typeName = puzzleTypes.find((pt) => pt.id === puzzleType)?.name;
-  const hasEditor = ["nurimaze", "sudoku", "combo-sudoku", "double-choco", "slitherlink", "nonogram", "masyu", "pencils", "nuritwin"].includes(typeName || "");
+  const hasEditor = ["nurimaze", "sudoku", "combo-sudoku", "double-choco", "slitherlink", "nonogram", "masyu", "pencils", "nuritwin", "slalom"].includes(typeName || "");
 
   return (
     <div style={{ border: "1px solid #eee", borderRadius: 6, padding: "0.75rem", background: item.editorOpen ? "#fffbe6" : "#fff" }}>
