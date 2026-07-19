@@ -123,15 +123,22 @@ function analyzeLineStatus(clue: number[], line: CellState[]): LineAnalysis {
   }
 
   // Partial satisfaction from the beginning:
-  // Walk sealed groups from left; if they match clues in order, mark those clues satisfied
+  // Walk sealed groups from left; if they match clues in order, mark those clues satisfied.
+  // Only match when the gap before the group has no unset cells (otherwise earlier clues could fit there).
   let satisfiedFromStart = 0;
-  for (const g of groups) {
+  for (let gi = 0; gi < groups.length; gi++) {
+    const g = groups[gi];
     if (!g.sealedLeft || !g.sealedRight) break;
     if (satisfiedFromStart >= clueLen) break;
+    const gapStart = gi === 0 ? 0 : groups[gi - 1].end;
+    let hasUnsetInGap = false;
+    for (let j = gapStart; j < g.start; j++) {
+      if (line[j] === 0) { hasUnsetInGap = true; break; }
+    }
+    if (hasUnsetInGap) break;
     if (g.size === clue[satisfiedFromStart]) {
       satisfiedFromStart++;
     } else {
-      // Mismatch with expected clue — this is an error
       return { perClue: Array(clueLen).fill("error"), hasError: true, allSatisfied: false };
     }
   }
@@ -142,7 +149,13 @@ function analyzeLineStatus(clue: number[], line: CellState[]): LineAnalysis {
     const g = groups[gi];
     if (!g.sealedLeft || !g.sealedRight) break;
     const clueIdx = clueLen - 1 - satisfiedFromEnd;
-    if (clueIdx < satisfiedFromStart) break; // don't double-count
+    if (clueIdx < satisfiedFromStart) break;
+    const gapEnd = gi === groups.length - 1 ? n : groups[gi + 1].start;
+    let hasUnsetInGap = false;
+    for (let j = g.end; j < gapEnd; j++) {
+      if (line[j] === 0) { hasUnsetInGap = true; break; }
+    }
+    if (hasUnsetInGap) break;
     if (g.size === clue[clueIdx]) {
       satisfiedFromEnd++;
     } else {
