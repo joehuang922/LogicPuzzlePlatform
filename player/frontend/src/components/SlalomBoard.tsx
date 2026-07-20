@@ -308,46 +308,67 @@ export default function SlalomBoard({
 
           {/* Gates (dashed lines through cell centers) */}
           {gates.map((gate, gi) => {
-            const gateColor = gate.number !== null ? "#c44" : "#666";
+            const gateColor = "#666";
             if (gate.orientation === "v") {
               const x = (gate.line + 0.5) * CELL_SIZE;
-              const y1 = (gate.from + 0.5) * CELL_SIZE;
-              const y2 = (gate.to + 0.5) * CELL_SIZE;
+              const y1 = gate.from * CELL_SIZE;
+              const y2 = (gate.to + 1) * CELL_SIZE;
               return (
                 <line key={`gate-${gi}`} x1={x} y1={y1} x2={x} y2={y2} stroke={gateColor} strokeWidth={2} strokeDasharray="4 3" />
               );
             } else {
               const y = (gate.line + 0.5) * CELL_SIZE;
-              const x1 = (gate.from + 0.5) * CELL_SIZE;
-              const x2 = (gate.to + 0.5) * CELL_SIZE;
+              const x1 = gate.from * CELL_SIZE;
+              const x2 = (gate.to + 1) * CELL_SIZE;
               return (
                 <line key={`gate-${gi}`} x1={x1} y1={y} x2={x2} y2={y} stroke={gateColor} strokeWidth={2} strokeDasharray="4 3" />
               );
             }
           })}
 
-          {/* Gate numbers */}
-          {gates.map((gate, gi) => {
-            if (gate.number === null) return null;
-            let tx: number, ty: number;
-            if (gate.orientation === "v") {
-              tx = (gate.line + 0.5) * CELL_SIZE - CELL_SIZE * 0.55;
-              ty = ((gate.from + gate.to) / 2 + 0.5) * CELL_SIZE;
+          {/* Gate numbers (directed integer in both adjacent wall cells) */}
+          {gates.flatMap((gate, gi) => {
+            if (gate.number === null) return [];
+            const markers: { r: number; c: number; arrow: string }[] = [];
+            if (gate.orientation === "h") {
+              if (gate.from > 0 && cells[gate.line]?.[gate.from - 1] === 1) {
+                markers.push({ r: gate.line, c: gate.from - 1, arrow: "→" });
+              }
+              if (gate.to < cols - 1 && cells[gate.line]?.[gate.to + 1] === 1) {
+                markers.push({ r: gate.line, c: gate.to + 1, arrow: "←" });
+              }
             } else {
-              tx = ((gate.from + gate.to) / 2 + 0.5) * CELL_SIZE;
-              ty = (gate.line + 0.5) * CELL_SIZE - CELL_SIZE * 0.55;
+              if (gate.from > 0 && cells[gate.from - 1]?.[gate.line] === 1) {
+                markers.push({ r: gate.from - 1, c: gate.line, arrow: "↓" });
+              }
+              if (gate.to < rows - 1 && cells[gate.to + 1]?.[gate.line] === 1) {
+                markers.push({ r: gate.to + 1, c: gate.line, arrow: "↑" });
+              }
             }
-            return (
-              <text
-                key={`gn-${gi}`}
-                x={tx} y={ty}
-                textAnchor="middle" dominantBaseline="central"
-                fontSize={CELL_SIZE * 0.35} fontWeight="bold" fill="#c44"
-                pointerEvents="none"
-              >
-                {gate.number}
-              </text>
-            );
+            const fs = CELL_SIZE * 0.3;
+            return markers.map((m, mi) => {
+              const cx = (m.c + 0.5) * CELL_SIZE;
+              const cy = (m.r + 0.5) * CELL_SIZE;
+              if (gate.orientation === "h") {
+                return (
+                  <g key={`gn-${gi}-${mi}`} pointerEvents="none">
+                    <text x={cx} y={cy - fs * 0.45} textAnchor="middle" dominantBaseline="central"
+                      fontSize={fs} fill="#fff">{m.arrow}</text>
+                    <text x={cx} y={cy + fs * 0.55} textAnchor="middle" dominantBaseline="central"
+                      fontSize={fs} fontWeight="bold" fill="#fff">{gate.number}</text>
+                  </g>
+                );
+              } else {
+                return (
+                  <g key={`gn-${gi}-${mi}`} pointerEvents="none">
+                    <text x={cx - fs * 0.45} y={cy} textAnchor="middle" dominantBaseline="central"
+                      fontSize={fs} fontWeight="bold" fill="#fff">{gate.number}</text>
+                    <text x={cx + fs * 0.45} y={cy} textAnchor="middle" dominantBaseline="central"
+                      fontSize={fs} fill="#fff">{m.arrow}</text>
+                  </g>
+                );
+              }
+            });
           })}
 
           {/* Start cell (circled number) */}

@@ -81,30 +81,18 @@ export default function SlalomEditor({ initialCanon, onComplete, onCancel }: Sla
     }
   }
 
-  const getGridLineFromPoint = useCallback(
-    (clientX: number, clientY: number): { orientation: "h" | "v"; line: number; pos: number } | null => {
+  const getCellFromPoint = useCallback(
+    (clientX: number, clientY: number): { row: number; col: number } | null => {
       const svg = svgRef.current;
       if (!svg) return null;
       const rect = svg.getBoundingClientRect();
       const scaleX = (cols * CELL_SIZE + PAD * 2) / rect.width;
       const x = (clientX - rect.left) * scaleX - PAD;
       const y = (clientY - rect.top) * scaleX - PAD;
-
-      // Snap to cell centers (not edges)
       const col = Math.floor(x / CELL_SIZE);
       const row = Math.floor(y / CELL_SIZE);
-      const distV = Math.abs(x - (col + 0.5) * CELL_SIZE);
-      const distH = Math.abs(y - (row + 0.5) * CELL_SIZE);
-
-      const threshold = CELL_SIZE * 0.4;
-
-      if (distV < threshold && distV < distH && col >= 0 && col < cols) {
-        if (row >= 0 && row < rows) return { orientation: "v", line: col, pos: row };
-      }
-      if (distH < threshold && row >= 0 && row < rows) {
-        if (col >= 0 && col < cols) return { orientation: "h", line: row, pos: col };
-      }
-      return null;
+      if (row < 0 || row >= rows || col < 0 || col >= cols) return null;
+      return { row, col };
     },
     [rows, cols]
   );
@@ -112,29 +100,79 @@ export default function SlalomEditor({ initialCanon, onComplete, onCancel }: Sla
   const handleGatePointerDown = useCallback(
     (e: React.PointerEvent) => {
       if (mode !== "gate") return;
-      const hit = getGridLineFromPoint(e.clientX, e.clientY);
-      if (!hit) return;
-      gateDragStart.current = hit;
+      const cell = getCellFromPoint(e.clientX, e.clientY);
+      if (!cell) return;
+      gateDragStart.current = { orientation: "h", line: cell.row, pos: cell.col };
       (e.target as Element).setPointerCapture(e.pointerId);
     },
-    [mode, getGridLineFromPoint]
+    [mode, getCellFromPoint]
   );
 
   const handleGatePointerUp = useCallback(
     (e: React.PointerEvent) => {
       if (!gateDragStart.current) return;
-      const end = getGridLineFromPoint(e.clientX, e.clientY);
-      const start = gateDragStart.current;
+      const startCell = { row: gateDragStart.current.line, col: gateDragStart.current.pos };
       gateDragStart.current = null;
-      if (!end) return;
-      if (start.orientation !== end.orientation || start.line !== end.line) return;
+      const endCell = getCellFromPoint(e.clientX, e.clientY);
+      if (!endCell) return;
 
-      const from = Math.min(start.pos, end.pos);
-      const to = Math.max(start.pos, end.pos);
-      const newGate: SlalomGate = { orientation: start.orientation, line: start.line, from, to, number: null };
+      // If no drag (click in same cell), try to select an existing gate
+      if (startCell.row === endCell.row && startCell.col === endCell.col) {
+        const gi = gates.findIndex((g) => {
+          if (g.orientation === "h") {
+            return g.line === startCell.row && startCell.col >= g.from && startCell.col <= g.to;
+          } else {
+            return g.line === startCell.col && startCell.row >= g.from && startCell.row <= g.to;
+          }
+        });
+        if (gi >= 0) setSelectedGate(gi);
+        return;
+      }
+
+      const dr = Math.abs(endCell.row - startCell.row);
+      const dc = Math.abs(endCell.col - startCell.col);
+
+      let orientation: "h" | "v", line: number, from: number, to: number;
+      if (dc >= dr) {
+        orientation = "h";
+        line = startCell.row;
+        from = Math.min(startCell.col, endCell.col);
+        to = Math.max(startCell.col, endCell.col);
+      } else {
+        orientation = "v";
+        line = startCell.col;
+        from = Math.min(startCell.row, endCell.row);
+        to = Math.max(startCell.row, endCell.row);
+      }
+
+      // Trim span to exclude wall cells
+      if (orientation === "h") {
+        while (from <= to && cells[line]?.[from] === 1) from++;
+        while (to >= from && cells[line]?.[to] === 1) to--;
+      } else {
+        while (from <= to && cells[from]?.[line] === 1) from++;
+        while (to >= from && cells[to]?.[line] === 1) to--;
+      }
+      if (from > to) return;
+
+      // Check no cell in the span is a wall
+      if (orientation === "h") {
+        for (let c = from; c <= to; c++) if (cells[line]?.[c] === 1) return;
+      } else {
+        for (let r = from; r <= to; r++) if (cells[r]?.[line] === 1) return;
+      }
+
+      // Check no overlap with existing gates
+      const overlaps = gates.some((g) => {
+        if (g.orientation !== orientation || g.line !== line) return false;
+        return from <= g.to && to >= g.from;
+      });
+      if (overlaps) return;
+
+      const newGate: SlalomGate = { orientation, line, from, to, number: null };
       setGates((prev) => [...prev, newGate]);
     },
-    [getGridLineFromPoint]
+    [getCellFromPoint, cells, gates]
   );
 
   function handleDeleteGate() {
@@ -168,16 +206,18 @@ export default function SlalomEditor({ initialCanon, onComplete, onCancel }: Sla
 
       {mode === "gate" && (
         <div style={{ fontSize: "0.8rem", color: "#666" }}>
-          Drag along a grid line to create a gate.
+          Drag across cells to create a gate (direction determines h/v). Click a gate to select it.
           {selectedGate !== null && (
             <span>
-              {" "}| Gate #{selectedGate + 1}:
+              {" "}| Selected gate #{selectedGate + 1}:
+              {" "}Crossing order:
               <input
-                type="number" min={1} placeholder="order"
+                type="number" min={1} placeholder="—"
                 value={gates[selectedGate]?.number ?? ""}
                 onChange={(e) => handleSetGateNumber(e.target.value)}
                 style={{ width: 50, marginLeft: 4 }}
               />
+              (blank = unnumbered)
               <button onClick={handleDeleteGate} style={{ marginLeft: 4 }}>Delete</button>
             </span>
           )}
@@ -212,12 +252,12 @@ export default function SlalomEditor({ initialCanon, onComplete, onCancel }: Sla
 
           {/* Gates */}
           {gates.map((gate, gi) => {
-            const color = selectedGate === gi ? "#e91e63" : gate.number !== null ? "#c44" : "#666";
+            const color = selectedGate === gi ? "#e91e63" : "#666";
             if (gate.orientation === "v") {
               return (
                 <line key={`gate-${gi}`}
-                  x1={(gate.line + 0.5) * CELL_SIZE} y1={(gate.from + 0.5) * CELL_SIZE}
-                  x2={(gate.line + 0.5) * CELL_SIZE} y2={(gate.to + 0.5) * CELL_SIZE}
+                  x1={(gate.line + 0.5) * CELL_SIZE} y1={gate.from * CELL_SIZE}
+                  x2={(gate.line + 0.5) * CELL_SIZE} y2={(gate.to + 1) * CELL_SIZE}
                   stroke={color} strokeWidth={2.5} strokeDasharray="4 3"
                   style={{ cursor: "pointer" }}
                   onClick={(e) => { e.stopPropagation(); setSelectedGate(gi); }}
@@ -226,8 +266,8 @@ export default function SlalomEditor({ initialCanon, onComplete, onCancel }: Sla
             } else {
               return (
                 <line key={`gate-${gi}`}
-                  x1={(gate.from + 0.5) * CELL_SIZE} y1={(gate.line + 0.5) * CELL_SIZE}
-                  x2={(gate.to + 0.5) * CELL_SIZE} y2={(gate.line + 0.5) * CELL_SIZE}
+                  x1={gate.from * CELL_SIZE} y1={(gate.line + 0.5) * CELL_SIZE}
+                  x2={(gate.to + 1) * CELL_SIZE} y2={(gate.line + 0.5) * CELL_SIZE}
                   stroke={color} strokeWidth={2.5} strokeDasharray="4 3"
                   style={{ cursor: "pointer" }}
                   onClick={(e) => { e.stopPropagation(); setSelectedGate(gi); }}
@@ -236,23 +276,49 @@ export default function SlalomEditor({ initialCanon, onComplete, onCancel }: Sla
             }
           })}
 
-          {/* Gate numbers */}
-          {gates.map((gate, gi) => {
-            if (gate.number === null) return null;
-            let tx: number, ty: number;
-            if (gate.orientation === "v") {
-              tx = (gate.line + 0.5) * CELL_SIZE - CELL_SIZE * 0.55;
-              ty = ((gate.from + gate.to) / 2 + 0.5) * CELL_SIZE;
+          {/* Gate numbers (directed integer in both adjacent wall cells) */}
+          {gates.flatMap((gate, gi) => {
+            if (gate.number === null) return [];
+            const markers: { r: number; c: number; arrow: string }[] = [];
+            if (gate.orientation === "h") {
+              if (gate.from > 0 && cells[gate.line]?.[gate.from - 1] === 1) {
+                markers.push({ r: gate.line, c: gate.from - 1, arrow: "→" });
+              }
+              if (gate.to < cols - 1 && cells[gate.line]?.[gate.to + 1] === 1) {
+                markers.push({ r: gate.line, c: gate.to + 1, arrow: "←" });
+              }
             } else {
-              tx = ((gate.from + gate.to) / 2 + 0.5) * CELL_SIZE;
-              ty = (gate.line + 0.5) * CELL_SIZE - CELL_SIZE * 0.55;
+              if (gate.from > 0 && cells[gate.from - 1]?.[gate.line] === 1) {
+                markers.push({ r: gate.from - 1, c: gate.line, arrow: "↓" });
+              }
+              if (gate.to < rows - 1 && cells[gate.to + 1]?.[gate.line] === 1) {
+                markers.push({ r: gate.to + 1, c: gate.line, arrow: "↑" });
+              }
             }
-            return (
-              <text key={`gn-${gi}`} x={tx} y={ty} textAnchor="middle" dominantBaseline="central"
-                fontSize={CELL_SIZE * 0.35} fontWeight="bold" fill="#c44" pointerEvents="none">
-                {gate.number}
-              </text>
-            );
+            const fs = CELL_SIZE * 0.3;
+            return markers.map((m, mi) => {
+              const cx = (m.c + 0.5) * CELL_SIZE;
+              const cy = (m.r + 0.5) * CELL_SIZE;
+              if (gate.orientation === "h") {
+                return (
+                  <g key={`gn-${gi}-${mi}`} pointerEvents="none">
+                    <text x={cx} y={cy - fs * 0.45} textAnchor="middle" dominantBaseline="central"
+                      fontSize={fs} fill="#fff">{m.arrow}</text>
+                    <text x={cx} y={cy + fs * 0.55} textAnchor="middle" dominantBaseline="central"
+                      fontSize={fs} fontWeight="bold" fill="#fff">{gate.number}</text>
+                  </g>
+                );
+              } else {
+                return (
+                  <g key={`gn-${gi}-${mi}`} pointerEvents="none">
+                    <text x={cx - fs * 0.45} y={cy} textAnchor="middle" dominantBaseline="central"
+                      fontSize={fs} fontWeight="bold" fill="#fff">{gate.number}</text>
+                    <text x={cx + fs * 0.45} y={cy} textAnchor="middle" dominantBaseline="central"
+                      fontSize={fs} fill="#fff">{m.arrow}</text>
+                  </g>
+                );
+              }
+            });
           })}
 
           {/* Start cell */}
