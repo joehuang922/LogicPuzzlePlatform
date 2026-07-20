@@ -76,12 +76,18 @@ class PencilHead:
 
 
 @dataclass(frozen=True)
+class DashedGate:
+    """Cell has a dashed line segment along one of its edges (a gate crossing)."""
+    side: str  # "top" | "bottom" | "left" | "right" — which edge the dashed line is on
+
+
+@dataclass(frozen=True)
 class Symbol:
     """Cell contains a named symbol (circle, triangle, S, G, etc.)."""
     code: int
 
 
-CellClassification = Empty | Integer | CircledInteger | DirectedInteger | DualInteger | PencilHead | Symbol
+CellClassification = Empty | Integer | CircledInteger | DirectedInteger | DualInteger | PencilHead | DashedGate | Symbol
 
 
 # ─── Target specs ───
@@ -194,6 +200,24 @@ class PencilHeadTarget(TargetSpec[PencilHead]):
 
     def parse(self, raw: dict) -> PencilHead:
         return PencilHead(direction=raw["direction"])
+
+
+class DashedGateTarget(TargetSpec[DashedGate]):
+    @property
+    def name(self) -> str:
+        return "dashed_gate"
+
+    @property
+    def prompt_fragment(self) -> str:
+        return (
+            "A dashed line segment running along one edge of the cell (top, bottom, left, or right). "
+            "The dashes are short black strokes separated by gaps, forming a line along the cell boundary. "
+            "Do NOT report solid grid lines — only clearly dashed/dotted segments. "
+            'Report as {"type":"dashed_gate","side":"top"|"bottom"|"left"|"right"}.'
+        )
+
+    def parse(self, raw: dict) -> DashedGate:
+        return DashedGate(side=raw["side"])
 
 
 class SymbolTarget(TargetSpec[Symbol]):
@@ -423,11 +447,14 @@ def classify_cells(
     # Call LLM
     raw_results = _call_recognizer(recognizer, montage_bytes, prompt)
 
-    if not isinstance(raw_results, list) or len(raw_results) != len(non_empty):
+    if not isinstance(raw_results, list):
         raise ValueError(
-            f"Expected {len(non_empty)} results, "
-            f"got {len(raw_results) if isinstance(raw_results, list) else type(raw_results)}"
+            f"Expected list of results, got {type(raw_results)}"
         )
+
+    # Tolerate slight count mismatch from LLM (truncate excess, pad missing)
+    if len(raw_results) < len(non_empty):
+        raw_results.extend([{"type": "empty"}] * (len(non_empty) - len(raw_results)))
 
     # Map back to grid
     for idx, (r, c, _) in enumerate(non_empty):
