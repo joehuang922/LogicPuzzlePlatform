@@ -1,6 +1,6 @@
 {
   "title": "Slalom Canonical Representation",
-  "description": "Grid with walls, gates (dashed segments along grid lines), and a start cell. Player draws a closed loop crossing all gates in order.",
+  "description": "Grid with walls, gates (dashed segments through cell centers), and a start cell. Player draws a closed loop crossing all gates in order.",
   "type": "object",
   "required": ["cells", "start", "gateCount", "gates"],
   "additionalProperties": false,
@@ -44,17 +44,17 @@
             "enum": ["h", "v"]
           },
           "line": {
-            "description": "Grid line index. For v: column grid-line (0=left border, cols=right border). For h: row grid-line (0=top border, rows=bottom border).",
+            "description": "Cell index the gate passes through. For v: column index (0-based). For h: row index (0-based).",
             "type": "integer",
             "minimum": 0
           },
           "from": {
-            "description": "Start of gate span (inclusive). For v: row index. For h: col index.",
+            "description": "Start of gate span (inclusive cell index). For v: row index. For h: col index.",
             "type": "integer",
             "minimum": 0
           },
           "to": {
-            "description": "End of gate span (inclusive). For v: row index. For h: col index.",
+            "description": "End of gate span (inclusive cell index). For v: row index. For h: col index.",
             "type": "integer",
             "minimum": 0
           },

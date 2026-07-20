@@ -1,14 +1,12 @@
 """Slalom puzzle parser.
 
-Hybrid gate detection strategy:
+Strategy:
 1. Detect grid, classify walls (black cells) via pixel intensity.
-2. Use classify_cells with CircledIntegerTarget + DirectedIntegerTarget to find
-   the start cell and numbered gate annotations.
-3. Infer numbered gates by extending from directed integer arrows along grid lines
-   to wall/border boundaries.
-4. Scan grid-line strips for unnumbered gates via intensity thresholding (dashed
-   line detection).
-5. Manual editor as fallback for anything the parser misses.
+2. Binarize cell crops (Otsu), invert annotated walls (white-on-black text).
+3. Use classify_cells with CircledIntegerTarget + DirectedIntegerTarget +
+   DashedGateTarget to find start cell, gate annotations, and gate cells.
+4. Build gates from DashedGate cells (merge contiguous cells on same line).
+5. Assign numbers from DirectedInteger arrows pointing to adjacent gate cells.
 """
 from __future__ import annotations
 
@@ -214,15 +212,15 @@ class SlalomParser(PuzzleParser):
                 if not isinstance(cls, DashedGate):
                     continue
 
+                # In cell-center convention, a dashed line through a cell means
+                # the gate passes through that cell. "left"/"right" = vertical gate
+                # through this cell's column. "top"/"bottom" = horizontal gate
+                # through this cell's row.
                 side = cls.side
-                if side == "top":
+                if side in ("top", "bottom"):
                     raw_gates.append(("h", r, c))
-                elif side == "bottom":
-                    raw_gates.append(("h", r + 1, c))
-                elif side == "left":
+                elif side in ("left", "right"):
                     raw_gates.append(("v", c, r))
-                elif side == "right":
-                    raw_gates.append(("v", c + 1, r))
 
         # Merge contiguous positions on the same (orientation, line)
         from collections import defaultdict
@@ -290,28 +288,24 @@ class SlalomParser(PuzzleParser):
                 if tr < 0 or tr >= rows or tc < 0 or tc >= cols:
                     continue
 
-                # Find the gate that touches cell (tr, tc)
-                best = self._find_gate_touching_cell(gates, tr, tc)
+                # Find the gate at cell (tr, tc)
+                best = self._find_gate_at_cell(gates, tr, tc)
                 if best is not None and best.number is None:
                     best.number = number
 
     @staticmethod
-    def _find_gate_touching_cell(
+    def _find_gate_at_cell(
         gates: list[SlalomGate], row: int, col: int
     ) -> SlalomGate | None:
-        """Find a gate that touches cell (row, col) on any of its 4 edges."""
+        """Find a gate that occupies cell (row, col)."""
         for gate in gates:
             if gate.orientation == "v":
-                # Vertical gate at grid-line `line` spans rows from_ to to_
-                # It touches cell (r, c) if line == c or line == c+1
-                # and from_ <= r <= to_
-                if (gate.line == col or gate.line == col + 1) and gate.from_ <= row <= gate.to:
+                # v-gate at column `line`, rows from_ to to_
+                if gate.line == col and gate.from_ <= row <= gate.to:
                     return gate
             else:
-                # Horizontal gate at grid-line `line` spans cols from_ to to_
-                # It touches cell (r, c) if line == r or line == r+1
-                # and from_ <= c <= to_
-                if (gate.line == row or gate.line == row + 1) and gate.from_ <= col <= gate.to:
+                # h-gate at row `line`, cols from_ to to_
+                if gate.line == row and gate.from_ <= col <= gate.to:
                     return gate
         return None
 

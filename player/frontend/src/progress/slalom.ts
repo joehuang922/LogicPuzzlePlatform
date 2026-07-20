@@ -4,14 +4,18 @@ import { ProgressCalculator } from "./index";
 
 function isCrossed(gate: SlalomGate, hTrail: number[][], vTrail: number[][]): boolean {
   if (gate.orientation === "v") {
+    // v-gate at column `line`, rows from..to — crossed by horizontal trail through gate cells
     const col = gate.line;
     for (let r = gate.from; r <= gate.to; r++) {
-      if (col > 0 && col <= (hTrail[0]?.length ?? 0) && hTrail[r]?.[col - 1] === 1) return true;
+      if (hTrail[r]?.[col] === 1) return true;
+      if (col > 0 && hTrail[r]?.[col - 1] === 1) return true;
     }
   } else {
+    // h-gate at row `line`, cols from..to — crossed by vertical trail through gate cells
     const row = gate.line;
     for (let c = gate.from; c <= gate.to; c++) {
-      if (row > 0 && row <= (vTrail?.length ?? 0) && vTrail[row - 1]?.[c] === 1) return true;
+      if (vTrail[row]?.[c] === 1) return true;
+      if (row > 0 && vTrail[row - 1]?.[c] === 1) return true;
     }
   }
   return false;

@@ -24,12 +24,14 @@ function isCrossed(gate: SlalomGate, hTrail: number[][], vTrail: number[][]): bo
   if (gate.orientation === "v") {
     const col = gate.line;
     for (let r = gate.from; r <= gate.to; r++) {
-      if (col > 0 && col <= (hTrail[0]?.length ?? 0) && hTrail[r]?.[col - 1] === 1) return true;
+      if (hTrail[r]?.[col] === 1) return true;
+      if (col > 0 && hTrail[r]?.[col - 1] === 1) return true;
     }
   } else {
     const row = gate.line;
     for (let c = gate.from; c <= gate.to; c++) {
-      if (row > 0 && row <= (vTrail?.length ?? 0) && vTrail[row - 1]?.[c] === 1) return true;
+      if (vTrail[row]?.[c] === 1) return true;
+      if (row > 0 && vTrail[row - 1]?.[c] === 1) return true;
     }
   }
   return false;
@@ -99,13 +101,13 @@ function getGateCrossingOrder(
     for (let gi = 0; gi < gates.length; gi++) {
       const gate = gates[gi];
       if (gate.orientation === "v" && dc !== 0) {
-        const crossCol = dc === 1 ? curr.c + 1 : curr.c;
-        if (crossCol === gate.line && curr.r >= gate.from && curr.r <= gate.to) {
+        // Trail moves horizontally — check if next cell is a v-gate cell
+        if (next.c === gate.line && next.r >= gate.from && next.r <= gate.to) {
           if (!order.includes(gi)) order.push(gi);
         }
       } else if (gate.orientation === "h" && dr !== 0) {
-        const crossRow = dr === 1 ? curr.r + 1 : curr.r;
-        if (crossRow === gate.line && curr.c >= gate.from && curr.c <= gate.to) {
+        // Trail moves vertically — check if next cell is an h-gate cell
+        if (next.r === gate.line && next.c >= gate.from && next.c <= gate.to) {
           if (!order.includes(gi)) order.push(gi);
         }
       }
@@ -304,20 +306,20 @@ export default function SlalomBoard({
             )
           )}
 
-          {/* Gates (dashed lines along grid edges) */}
+          {/* Gates (dashed lines through cell centers) */}
           {gates.map((gate, gi) => {
             const gateColor = gate.number !== null ? "#c44" : "#666";
             if (gate.orientation === "v") {
-              const x = gate.line * CELL_SIZE;
-              const y1 = gate.from * CELL_SIZE;
-              const y2 = (gate.to + 1) * CELL_SIZE;
+              const x = (gate.line + 0.5) * CELL_SIZE;
+              const y1 = (gate.from + 0.5) * CELL_SIZE;
+              const y2 = (gate.to + 0.5) * CELL_SIZE;
               return (
                 <line key={`gate-${gi}`} x1={x} y1={y1} x2={x} y2={y2} stroke={gateColor} strokeWidth={2} strokeDasharray="4 3" />
               );
             } else {
-              const y = gate.line * CELL_SIZE;
-              const x1 = gate.from * CELL_SIZE;
-              const x2 = (gate.to + 1) * CELL_SIZE;
+              const y = (gate.line + 0.5) * CELL_SIZE;
+              const x1 = (gate.from + 0.5) * CELL_SIZE;
+              const x2 = (gate.to + 0.5) * CELL_SIZE;
               return (
                 <line key={`gate-${gi}`} x1={x1} y1={y} x2={x2} y2={y} stroke={gateColor} strokeWidth={2} strokeDasharray="4 3" />
               );
@@ -329,13 +331,11 @@ export default function SlalomBoard({
             if (gate.number === null) return null;
             let tx: number, ty: number;
             if (gate.orientation === "v") {
-              const midY = ((gate.from + gate.to + 1) / 2) * CELL_SIZE;
-              tx = gate.line * CELL_SIZE - CELL_SIZE * 0.5;
-              ty = midY;
+              tx = (gate.line + 0.5) * CELL_SIZE - CELL_SIZE * 0.55;
+              ty = ((gate.from + gate.to) / 2 + 0.5) * CELL_SIZE;
             } else {
-              const midX = ((gate.from + gate.to + 1) / 2) * CELL_SIZE;
-              tx = midX;
-              ty = gate.line * CELL_SIZE - CELL_SIZE * 0.5;
+              tx = ((gate.from + gate.to) / 2 + 0.5) * CELL_SIZE;
+              ty = (gate.line + 0.5) * CELL_SIZE - CELL_SIZE * 0.55;
             }
             return (
               <text

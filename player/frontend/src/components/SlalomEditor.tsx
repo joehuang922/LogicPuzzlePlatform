@@ -90,20 +90,19 @@ export default function SlalomEditor({ initialCanon, onComplete, onCancel }: Sla
       const x = (clientX - rect.left) * scaleX - PAD;
       const y = (clientY - rect.top) * scaleX - PAD;
 
-      const nearestVLine = Math.round(x / CELL_SIZE);
-      const nearestHLine = Math.round(y / CELL_SIZE);
-      const distV = Math.abs(x - nearestVLine * CELL_SIZE);
-      const distH = Math.abs(y - nearestHLine * CELL_SIZE);
+      // Snap to cell centers (not edges)
+      const col = Math.floor(x / CELL_SIZE);
+      const row = Math.floor(y / CELL_SIZE);
+      const distV = Math.abs(x - (col + 0.5) * CELL_SIZE);
+      const distH = Math.abs(y - (row + 0.5) * CELL_SIZE);
 
-      const threshold = CELL_SIZE * 0.3;
+      const threshold = CELL_SIZE * 0.4;
 
-      if (distV < threshold && distV < distH && nearestVLine >= 0 && nearestVLine <= cols) {
-        const pos = Math.floor(y / CELL_SIZE);
-        if (pos >= 0 && pos < rows) return { orientation: "v", line: nearestVLine, pos };
+      if (distV < threshold && distV < distH && col >= 0 && col < cols) {
+        if (row >= 0 && row < rows) return { orientation: "v", line: col, pos: row };
       }
-      if (distH < threshold && nearestHLine >= 0 && nearestHLine <= rows) {
-        const pos = Math.floor(x / CELL_SIZE);
-        if (pos >= 0 && pos < cols) return { orientation: "h", line: nearestHLine, pos };
+      if (distH < threshold && row >= 0 && row < rows) {
+        if (col >= 0 && col < cols) return { orientation: "h", line: row, pos: col };
       }
       return null;
     },
@@ -217,8 +216,8 @@ export default function SlalomEditor({ initialCanon, onComplete, onCancel }: Sla
             if (gate.orientation === "v") {
               return (
                 <line key={`gate-${gi}`}
-                  x1={gate.line * CELL_SIZE} y1={gate.from * CELL_SIZE}
-                  x2={gate.line * CELL_SIZE} y2={(gate.to + 1) * CELL_SIZE}
+                  x1={(gate.line + 0.5) * CELL_SIZE} y1={(gate.from + 0.5) * CELL_SIZE}
+                  x2={(gate.line + 0.5) * CELL_SIZE} y2={(gate.to + 0.5) * CELL_SIZE}
                   stroke={color} strokeWidth={2.5} strokeDasharray="4 3"
                   style={{ cursor: "pointer" }}
                   onClick={(e) => { e.stopPropagation(); setSelectedGate(gi); }}
@@ -227,8 +226,8 @@ export default function SlalomEditor({ initialCanon, onComplete, onCancel }: Sla
             } else {
               return (
                 <line key={`gate-${gi}`}
-                  x1={gate.from * CELL_SIZE} y1={gate.line * CELL_SIZE}
-                  x2={(gate.to + 1) * CELL_SIZE} y2={gate.line * CELL_SIZE}
+                  x1={(gate.from + 0.5) * CELL_SIZE} y1={(gate.line + 0.5) * CELL_SIZE}
+                  x2={(gate.to + 0.5) * CELL_SIZE} y2={(gate.line + 0.5) * CELL_SIZE}
                   stroke={color} strokeWidth={2.5} strokeDasharray="4 3"
                   style={{ cursor: "pointer" }}
                   onClick={(e) => { e.stopPropagation(); setSelectedGate(gi); }}
@@ -242,11 +241,11 @@ export default function SlalomEditor({ initialCanon, onComplete, onCancel }: Sla
             if (gate.number === null) return null;
             let tx: number, ty: number;
             if (gate.orientation === "v") {
-              tx = gate.line * CELL_SIZE - CELL_SIZE * 0.4;
-              ty = ((gate.from + gate.to + 1) / 2) * CELL_SIZE;
+              tx = (gate.line + 0.5) * CELL_SIZE - CELL_SIZE * 0.55;
+              ty = ((gate.from + gate.to) / 2 + 0.5) * CELL_SIZE;
             } else {
-              tx = ((gate.from + gate.to + 1) / 2) * CELL_SIZE;
-              ty = gate.line * CELL_SIZE - CELL_SIZE * 0.4;
+              tx = ((gate.from + gate.to) / 2 + 0.5) * CELL_SIZE;
+              ty = (gate.line + 0.5) * CELL_SIZE - CELL_SIZE * 0.55;
             }
             return (
               <text key={`gn-${gi}`} x={tx} y={ty} textAnchor="middle" dominantBaseline="central"

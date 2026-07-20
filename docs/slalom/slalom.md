@@ -4,7 +4,7 @@
 
 ## Question structure description
 
-A rectangular grid of cells. Some cells are black walls. Dashed segments ("gates") run along grid lines between two walls or borders. One cell contains a circled number (the start/end point of the trail), which equals the total gate count. Some gates have numbered annotations indicating the required crossing order.
+A rectangular grid of cells. Some cells are black walls. Dashed segments ("gates") run through cell centers. One cell contains a circled number (the start/end point of the trail), which equals the total gate count. Some gates have numbered annotations indicating the required crossing order.
 
 ### Canonical JSON structure
 
@@ -38,10 +38,10 @@ A rectangular grid of cells. Some cells are black walls. Dashed segments ("gates
 - `cells`: rows x cols array. `0` = empty white cell, `1` = black wall.
 - `start`: `{row, col}` of the circled number cell (start/end point of the trail).
 - `gateCount`: total number of gates (equals the circled number).
-- `gates`: array of gate objects:
-  - `orientation`: `"h"` for horizontal gate (runs left-right along a horizontal grid line; trail crosses vertically) or `"v"` for vertical gate (runs top-bottom along a vertical grid line; trail crosses horizontally).
-  - `line`: which grid line the gate sits on. For vertical gates: column index 0 = left border, cols = right border. For horizontal gates: row index 0 = top border, rows = bottom border.
-  - `from`, `to`: range of cell positions the gate spans (inclusive). For vertical gates: row indices. For horizontal gates: column indices. Both endpoints must be walls or borders.
+- `gates`: array of gate objects. Gates are rendered through cell centers (not on grid edges).
+  - `orientation`: `"h"` for horizontal gate (runs left-right through cell centers; trail crosses vertically) or `"v"` for vertical gate (runs top-bottom through cell centers; trail crosses horizontally).
+  - `line`: which cell row/column the gate passes through. For vertical gates: the column index (0-based). For horizontal gates: the row index (0-based).
+  - `from`, `to`: range of cells the gate occupies (inclusive). For vertical gates: row indices of cells. For horizontal gates: column indices of cells. A gate from cell 2 to cell 4 passes through 3 consecutive cells.
   - `number`: required crossing order (1-indexed), or `null` if unnumbered (order irrelevant).
 
 ### Sample images
@@ -96,7 +96,7 @@ The trail forms a valid closed loop through the start cell AND crosses every gat
 - Click/tap an existing trail segment to erase it.
 - Black wall cells cannot be entered.
 - The start cell is highlighted (circled number displayed).
-- Gates are rendered as dashed lines along grid edges.
+- Gates are rendered as dashed lines through cell centers.
 - Numbered gates show their number adjacent to the gate with an arrow indicating which gate it labels.
 
 ### Progress calculation
