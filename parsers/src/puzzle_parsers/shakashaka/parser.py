@@ -16,14 +16,7 @@ from puzzle_parsers.shakashaka.grid_detector import (
 )
 from puzzle_parsers.shakashaka.models import ShakashakaBoard
 from puzzle_parsers.recognition import CellRecognizer, GeminiRecognizer
-
-
-CELL_NUMBER_PROMPT = (
-    "This cell is from a Shakashaka puzzle. It is a BLACK cell. "
-    "If it contains a white number (0, 1, 2, 3, or 4), return that integer. "
-    "If it is a solid black cell with no number, return -1. "
-    "Respond with only the integer."
-)
+from puzzle_parsers.recognition_schemas import INT_CELL_PROMPT
 
 BLACK_THRESHOLD = 100
 
@@ -98,12 +91,29 @@ class ShakashakaParser(PuzzleParser):
 
         # Use LLM to classify black cells (numbered vs plain)
         if black_cell_crops:
-            # Organize as a grid for the recognizer
-            crop_grid = [[crop] for crop in black_cell_crops]
-            raw = self._recognizer.recognize(crop_grid, CELL_NUMBER_PROMPT)
+            # Invert crops so white numbers appear as dark on light background
+            inverted_crops = [cv2.bitwise_not(crop) for crop in black_cell_crops]
+            # Arrange into a grid with ~10 columns for better LLM interpretation
+            cols_per_row = min(10, len(inverted_crops))
+            crop_grid: list[list[NDArray]] = []
+            for i in range(0, len(inverted_crops), cols_per_row):
+                row = inverted_crops[i:i + cols_per_row]
+                # Pad last row if needed
+                while len(row) < cols_per_row:
+                    row.append(np.ones_like(inverted_crops[0]) * 255)
+                crop_grid.append(row)
+
+            raw = self._recognizer.recognize(crop_grid, INT_CELL_PROMPT)
+            # Flatten the results back
+            flat_results: list[int] = []
+            for row in raw:
+                flat_results.extend(row)
+
             for i, (r, c) in enumerate(black_cell_coords):
-                val = raw[i][0]
-                if val >= 0 and val <= 4:
+                if i >= len(flat_results):
+                    break
+                val = flat_results[i]
+                if 0 <= val <= 4:
                     cells[r][c] = val
                 else:
                     cells[r][c] = 5  # black with no number
