@@ -8,7 +8,8 @@ import MasyuBoard from "./MasyuBoard";
 import PencilsBoard from "./PencilsBoard";
 import NuritwinBoard from "./NuritwinBoard";
 import SlalomBoard from "./SlalomBoard";
-import { NurimazeCanon, DoubleChocoCanon, SlitherlinkCanon, NonogramCanon, MasyuCanon, PencilsCanon, NuritwinCanon, SlalomCanon } from "../types/canon";
+import ShakashakaBoard from "./ShakashakaBoard";
+import { NurimazeCanon, DoubleChocoCanon, SlitherlinkCanon, NonogramCanon, MasyuCanon, PencilsCanon, NuritwinCanon, SlalomCanon, ShakashakaCanon } from "../types/canon";
 
 export default function CanonPreview({ puzzleType, canonRepr }: { puzzleType: number; canonRepr: string }) {
   let parsed: Record<string, unknown>;
@@ -47,6 +48,9 @@ export default function CanonPreview({ puzzleType, canonRepr }: { puzzleType: nu
   }
   if (puzzleType === 10 && parsed.cells && parsed.gates) {
     return <SlalomBoard canon={parsed as unknown as SlalomCanon} readonly />;
+  }
+  if (puzzleType === 11 && parsed.cells) {
+    return <ShakashakaBoard canon={parsed as unknown as ShakashakaCanon} readonly />;
   }
   return <p style={{ color: "#666", fontSize: "0.85rem" }}>No preview available for this puzzle type.</p>;
 }

@@ -64,6 +64,9 @@ def _init_parsers():
     from puzzle_parsers.slalom.parser import SlalomParser
     print("  - SlalomParser imported")
 
+    from puzzle_parsers.shakashaka.parser import ShakashakaParser
+    print("  - ShakashakaParser imported")
+
     _parsers = {
         1: SudokuParser(ocr_backend=_ocr),
         2: ComboSudokuParser(ocr_backend=_ocr),
@@ -75,6 +78,7 @@ def _init_parsers():
         8: PencilsParser(ocr_backend=_ocr),
         9: NuritwinParser(),
         10: SlalomParser(),
+        11: ShakashakaParser(),
     }
     print("=== Parsers ready ===")
 

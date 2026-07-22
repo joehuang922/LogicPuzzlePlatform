@@ -22,6 +22,7 @@ import MasyuEditor from "../components/MasyuEditor";
 import PencilsEditor from "../components/PencilsEditor";
 import NuritwinEditor from "../components/NuritwinEditor";
 import SlalomEditor from "../components/SlalomEditor";
+import ShakashakaEditor from "../components/ShakashakaEditor";
 import CanonPreview from "../components/CanonPreview";
 import BatchUploadForm from "../components/BatchUploadForm";
 import { extractBase64 } from "../utils/image";
@@ -138,7 +139,8 @@ function QuestionForm({
   const isPencils = selectedTypeName === "pencils";
   const isNuritwin = selectedTypeName === "nuritwin";
   const isSlalom = selectedTypeName === "slalom";
-  const hasEditor = isNurimaze || isSudoku || isComboSudoku || isDoubleChoco || isSlitherlink || isNonogram || isMasyu || isPencils || isNuritwin || isSlalom;
+  const isShakashaka = selectedTypeName === "shakashaka";
+  const hasEditor = isNurimaze || isSudoku || isComboSudoku || isDoubleChoco || isSlitherlink || isNonogram || isMasyu || isPencils || isNuritwin || isSlalom || isShakashaka;
 
   function validate(): boolean {
     const errs: Record<string, string> = {};
@@ -196,6 +198,9 @@ function QuestionForm({
         h = canon.cells.length;
         w = canon.cells[0].length;
       } else if (typeId === 10 && canon.cells) {
+        h = canon.cells.length;
+        w = canon.cells[0].length;
+      } else if (typeId === 11 && canon.cells) {
         h = canon.cells.length;
         w = canon.cells[0].length;
       }
@@ -405,6 +410,12 @@ function QuestionForm({
                 onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
                 onCancel={() => setEditorOpen(false)}
               />
+            ) : isShakashaka ? (
+              <ShakashakaEditor
+                initialJson={canonRepr}
+                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
+                onCancel={() => setEditorOpen(false)}
+              />
             ) : (
               <ComboSudokuEditor
                 initialJson={canonRepr}
@@ -476,7 +487,8 @@ function PuzzleEditRow({
   const isPencils = typeName === "pencils";
   const isNuritwin = typeName === "nuritwin";
   const isSlalom = typeName === "slalom";
-  const hasEditor = isNurimaze || isSudoku || isComboSudoku || isDoubleChoco || isSlitherlink || isNonogram || isMasyu || isPencils || isNuritwin || isSlalom;
+  const isShakashaka = typeName === "shakashaka";
+  const hasEditor = isNurimaze || isSudoku || isComboSudoku || isDoubleChoco || isSlitherlink || isNonogram || isMasyu || isPencils || isNuritwin || isSlalom || isShakashaka;
 
   async function handleConfirm() {
     let parsedCanon: Record<string, unknown>;
@@ -606,6 +618,12 @@ function PuzzleEditRow({
               ) : isSlalom ? (
                 <SlalomEditor
                   initialCanon={canonRepr}
+                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
+                  onCancel={() => setEditorOpen(false)}
+                />
+              ) : isShakashaka ? (
+                <ShakashakaEditor
+                  initialJson={canonRepr}
                   onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
                   onCancel={() => setEditorOpen(false)}
                 />

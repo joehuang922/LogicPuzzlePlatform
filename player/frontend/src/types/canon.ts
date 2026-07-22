@@ -113,3 +113,11 @@ export interface SlalomAnswer {
     v: number[][];
   };
 }
+
+export interface ShakashakaCanon {
+  cells: number[][];
+}
+
+export interface ShakashakaAnswer {
+  states: number[][];
+}

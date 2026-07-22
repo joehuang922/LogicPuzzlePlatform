@@ -1,0 +1,18 @@
+{
+  "title": "Shakashaka Canonical Representation",
+  "description": "Rectangle grid with black cells (some numbered 0-4) and white cells to be filled with triangles",
+  "type": "object",
+  "required": ["cells"],
+  "additionalProperties": false,
+  "properties": {
+    "cells": {
+      "description": "m x n grid: -1=white/empty, 0-4=black cell with number, 5=black cell no number",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": { "type": "integer", "minimum": -1, "maximum": 5 }
+      },
+      "minItems": 1
+    }
+  }
+}

@@ -77,7 +77,8 @@ INSERT INTO puzzle_types (id, name, rule) VALUES
   (7, 'masyu', 'Draw a single closed loop through cell centers. The loop passes through all circles. At white circles the line goes straight but a neighbor must turn. At black circles the line turns but both neighbors must go straight.'),
   (8, 'pencils', 'Draw pencils (head, body, trail) to fill every cell. Each pencil body is a 1xn rectangle behind its head. The trail extends n segments from the head. Trails cannot overlap or cross. Body length must match the number clue.'),
   (9, 'nuritwin', 'Blacken cells so each room has exactly two connected black components of equal size. If a room has number N, each component is N cells. All black cells globally connected. No 2x2 all-black.'),
-  (10, 'slalom', 'Draw a closed loop through cell centers starting from the circled number. The loop must cross every gate exactly once perpendicularly. Numbered gates must be crossed in the specified order (either direction). The loop cannot pass through walls or touch itself.');
+  (10, 'slalom', 'Draw a closed loop through cell centers starting from the circled number. The loop must cross every gate exactly once perpendicularly. Numbered gates must be crossed in the specified order (either direction). The loop cannot pass through walls or touch itself.'),
+  (11, 'shakashaka', 'Place black right-angled triangles in white cells so that all remaining white regions form rectangles (axis-aligned or 45-degree rotated). Numbers on black cells indicate how many adjacent cells contain a triangle.');
 
 -- Seed sample puzzle: sudoku (difficulty 4 = hard)
 INSERT INTO puzzle_questions (id, puzzle_type, title, difficulty, width, height, canon_repr) VALUES (

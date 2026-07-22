@@ -9,6 +9,7 @@ import masyuSchema from "../../../../schemas/canon/masyu.json";
 import pencilsSchema from "../../../../schemas/canon/pencils.json";
 import nuritwinSchema from "../../../../schemas/canon/nuritwin.json";
 import slalomSchema from "../../../../schemas/canon/slalom.json";
+import shakashakaSchema from "../../../../schemas/canon/shakashaka.json";
 
 const ajv = new Ajv();
 
@@ -23,6 +24,7 @@ const validators: Record<number, ValidateFunction> = {
   8: ajv.compile(pencilsSchema),
   9: ajv.compile(nuritwinSchema),
   10: ajv.compile(slalomSchema),
+  11: ajv.compile(shakashakaSchema),
 };
 
 export function validateCanon(puzzleType: number, data: unknown): void {

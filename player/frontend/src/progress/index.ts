@@ -8,6 +8,7 @@ import { computeNonogramProgress } from "./nonogram";
 import { computePencilsProgress } from "./pencils";
 import { computeNuritwinProgress } from "./nuritwin";
 import { computeSlalomProgress } from "./slalom";
+import { computeShakashakaProgress } from "./shakashaka";
 
 export interface ProgressCalculator {
   puzzleType: number;
@@ -29,6 +30,7 @@ register(computeNonogramProgress);
 register(computePencilsProgress);
 register(computeNuritwinProgress);
 register(computeSlalomProgress);
+register(computeShakashakaProgress);
 
 export function computeProgress(
   puzzle: PuzzleDefinition,

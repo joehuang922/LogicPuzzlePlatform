@@ -13,6 +13,7 @@ import { masyuRenderer } from "./renderers/masyu";
 import { pencilsRenderer } from "./renderers/pencils";
 import { nuritwinRenderer } from "./renderers/nuritwin";
 import { slalomRenderer } from "./renderers/slalom";
+import { shakashakaRenderer } from "./renderers/shakashaka";
 
 registerRenderer(comboSudokuRenderer);
 registerRenderer(sudokuRenderer);
@@ -24,6 +25,7 @@ registerRenderer(masyuRenderer);
 registerRenderer(pencilsRenderer);
 registerRenderer(nuritwinRenderer);
 registerRenderer(slalomRenderer);
+registerRenderer(shakashakaRenderer);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

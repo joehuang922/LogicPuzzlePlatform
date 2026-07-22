@@ -9,6 +9,7 @@ import { masyuExtractor } from "./masyu";
 import { pencilsExtractor } from "./pencils";
 import { nuritwinExtractor } from "./nuritwin";
 import { slalomExtractor } from "./slalom";
+import { shakashakaExtractor } from "./shakashaka";
 
 const extractorRegistry = new Map<number, AnswerExtractor>();
 
@@ -26,6 +27,7 @@ registerExtractor(masyuExtractor);
 registerExtractor(pencilsExtractor);
 registerExtractor(nuritwinExtractor);
 registerExtractor(slalomExtractor);
+registerExtractor(shakashakaExtractor);
 
 export function getExtractor(puzzleType: number): AnswerExtractor | undefined {
   return extractorRegistry.get(puzzleType);
