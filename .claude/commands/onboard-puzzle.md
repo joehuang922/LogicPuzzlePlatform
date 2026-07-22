@@ -18,6 +18,7 @@ If any of these are missing, ask before proceeding.
    - **Player appearance** — grid styling, colors, line types (solid/dashed), layering, sizing
    - **Editor interaction** — how the editor creates/edits puzzles (click to cycle, resize controls, etc.)
    - **Editor appearance** — any differences from the player view (dots for empty cells, extra controls, etc.)
+   - **Grid line style** — are the grid lines in the sample images solid or dashed/dotted? This determines whether the parser uses `detect_grid_lines` (solid) or `auto_detect_grid_lines` (dashed — auto-sweeps erode sizes for optimal detection).
 4. Draft the full documentation file following the template in existing docs (e.g., `docs/nurimaze/nurimaze.md`). Must include all sections:
    - Puzzle Type ID
    - Question structure description + Canonical JSON structure + Sample images

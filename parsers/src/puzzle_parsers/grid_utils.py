@@ -131,6 +131,89 @@ def preprocess_dashed_lines(
     return cv2.bitwise_or(h_closed, v_closed)
 
 
+def auto_detect_grid_lines(
+    warped_gray: NDArray,
+    warp_w: int,
+    warp_h: int,
+    *,
+    erode_range: range = range(4, 10),
+    close_gap_size: int = 40,
+) -> tuple[list[int], list[int]]:
+    """Auto-detect grid lines by sweeping erode sizes and picking the most uniform.
+
+    For boards with dashed/dotted grid lines, the optimal erode size depends on
+    image resolution. This function tries multiple erode sizes, scores each by
+    the coefficient of variation (CV) of cell spacings, and returns the result
+    with the lowest CV (most uniform grid).
+
+    Args:
+        warped_gray: Grayscale warped puzzle image.
+        warp_w: Width of the warped image.
+        warp_h: Height of the warped image.
+        erode_range: Range of erode kernel sizes to try (default 4–9).
+        close_gap_size: Size of the closing kernel to bridge dash gaps.
+
+    Returns:
+        (h_lines, v_lines) from the best-scoring erode size.
+    """
+    binary = cv2.adaptiveThreshold(
+        cv2.GaussianBlur(warped_gray, (3, 3), 0),
+        255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 3,
+    )
+
+    best_score = float("inf")
+    best_h: list[int] = []
+    best_v: list[int] = []
+
+    for erode_size in erode_range:
+        h_erode_k = cv2.getStructuringElement(cv2.MORPH_RECT, (erode_size, 1))
+        v_erode_k = cv2.getStructuringElement(cv2.MORPH_RECT, (1, erode_size))
+        h_cleaned = cv2.erode(binary, h_erode_k)
+        v_cleaned = cv2.erode(binary, v_erode_k)
+
+        h_close_k = cv2.getStructuringElement(cv2.MORPH_RECT, (close_gap_size, 1))
+        v_close_k = cv2.getStructuringElement(cv2.MORPH_RECT, (1, close_gap_size))
+        h_closed = cv2.morphologyEx(h_cleaned, cv2.MORPH_CLOSE, h_close_k)
+        v_closed = cv2.morphologyEx(v_cleaned, cv2.MORPH_CLOSE, v_close_k)
+
+        mask = cv2.bitwise_or(h_closed, v_closed)
+        h_lines, v_lines = detect_grid_lines(
+            warped_gray, warp_w, warp_h, preprocessed_mask=mask
+        )
+
+        rows = len(h_lines) - 1
+        cols = len(v_lines) - 1
+        if rows < 3 or cols < 3:
+            continue
+
+        score = _grid_uniformity_score(h_lines, v_lines)
+        if score < best_score:
+            best_score = score
+            best_h = h_lines
+            best_v = v_lines
+
+    if not best_h:
+        return detect_grid_lines(warped_gray, warp_w, warp_h)
+
+    return best_h, best_v
+
+
+def _grid_uniformity_score(h_lines: list[int], v_lines: list[int]) -> float:
+    """Score grid uniformity as the CV of all gaps pooled across both axes.
+
+    Pooling exploits the assumption that cells are roughly square: if one axis
+    has much larger gaps than the other (e.g. a degenerate 2×5 detection), the
+    combined distribution will have high variance and score poorly.
+    """
+    h_gaps = [h_lines[i + 1] - h_lines[i] for i in range(len(h_lines) - 1)]
+    v_gaps = [v_lines[i + 1] - v_lines[i] for i in range(len(v_lines) - 1)]
+    all_gaps = h_gaps + v_gaps
+    mean = float(np.mean(all_gaps))
+    if mean == 0:
+        return float("inf")
+    return float(np.std(all_gaps)) / mean
+
+
 def detect_grid_lines(
     warped_gray: NDArray, warp_w: int, warp_h: int,
     *,

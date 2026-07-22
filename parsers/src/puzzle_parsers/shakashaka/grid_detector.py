@@ -8,9 +8,8 @@ import numpy as np
 from numpy.typing import NDArray
 
 from puzzle_parsers.grid_utils import (
-    detect_grid_lines,
+    auto_detect_grid_lines,
     find_quadrilateral_border,
-    preprocess_dashed_lines,
     warp_to_rectangle,
 )
 
@@ -34,9 +33,7 @@ def detect_shakashaka_grid(
     warped, warp_w, warp_h = warp_to_rectangle(img, quad)
     warped_gray = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
 
-    # Shakashaka uses dashed grid lines — preprocess to bridge gaps
-    mask = preprocess_dashed_lines(warped_gray)
-    h_lines, v_lines = detect_grid_lines(warped_gray, warp_w, warp_h, preprocessed_mask=mask)
+    h_lines, v_lines = auto_detect_grid_lines(warped_gray, warp_w, warp_h)
 
     rows = len(h_lines) - 1
     cols = len(v_lines) - 1
