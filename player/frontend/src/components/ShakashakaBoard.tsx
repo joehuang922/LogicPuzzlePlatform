@@ -56,6 +56,32 @@ function getQuadrant(
   return 4; // bottom-right
 }
 
+function isWhite(
+  r: number,
+  c: number,
+  canon: ShakashakaCanon,
+  stateGrid: CellValue[][]
+): boolean {
+  if (r < 0 || r >= canon.cells.length || c < 0 || c >= canon.cells[0].length)
+    return false;
+  if (canon.cells[r][c] !== -1) return false;
+  const s = stateGrid[r][c];
+  return s === 0 || s === 5;
+}
+
+function isTriangle(
+  r: number,
+  c: number,
+  canon: ShakashakaCanon,
+  stateGrid: CellValue[][],
+  expected: CellValue
+): boolean {
+  if (r < 0 || r >= canon.cells.length || c < 0 || c >= canon.cells[0].length)
+    return false;
+  if (canon.cells[r][c] !== -1) return false;
+  return stateGrid[r][c] === expected;
+}
+
 function validateSolution(
   canon: ShakashakaCanon,
   stateGrid: CellValue[][]
@@ -68,7 +94,6 @@ function validateSolution(
     for (let c = 0; c < cols; c++) {
       const cell = canon.cells[r][c];
       if (cell >= 0 && cell <= 4) {
-        // Black cell with number: count adjacent triangles
         let count = 0;
         const neighbors: [number, number][] = [
           [r - 1, c],
@@ -87,131 +112,188 @@ function validateSolution(
     }
   }
 
-  // Check that all white regions form rectangles (axis-aligned or 45° rotated).
-  // Each white cell is divided into 4 sub-triangles. We model each cell as 4 sub-regions:
-  // For a cell with triangle orientation T, the triangle half is "black" and the other half is "white".
-  // We check connectivity of white sub-regions and verify they form rectangles.
-
-  // Model: each cell has 4 "half-edges" (top, right, bottom, left).
-  // A white cell (state=0 or 5) has all 4 halves white.
-  // A triangle cell has 2 halves white and 2 halves black.
-  // We use a half-cell grid: each cell becomes 2x2 sub-cells.
-  const subRows = rows * 2;
-  const subCols = cols * 2;
-  // 0 = white sub-cell, 1 = black sub-cell
-  const subGrid: number[][] = Array.from({ length: subRows }, () =>
-    Array(subCols).fill(1)
+  // Validate white regions form rectangles (type A or type B).
+  // visited tracks cells already accounted for by a validated rectangle.
+  const visited: boolean[][] = Array.from({ length: rows }, () =>
+    Array(cols).fill(false)
   );
 
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      const cellVal = canon.cells[r][c];
-      const sr = r * 2;
-      const sc = c * 2;
-      if (cellVal !== -1) {
-        // Black cell: all sub-cells are black (already set to 1)
-        continue;
-      }
+      if (visited[r][c]) continue;
+      if (canon.cells[r][c] !== -1) continue;
       const state = stateGrid[r][c];
-      if (state === 0) {
-        // Unset — should not happen in a completed puzzle
-        return false;
-      }
-      if (state === 5) {
-        // Dot mark: entirely white
-        subGrid[sr][sc] = 0;
-        subGrid[sr][sc + 1] = 0;
-        subGrid[sr + 1][sc] = 0;
-        subGrid[sr + 1][sc + 1] = 0;
-      } else {
-        // Triangle: 2 sub-cells white, 2 black
-        // ◤ (1): right angle top-left → black covers TL, white covers TR+BL+BR? No.
-        // Actually: ◤ fills the top-left triangle → the BLACK triangle occupies:
-        //   TL sub-cell = black, the diagonal. We approximate:
-        //   ◤: TL=black, TR=white, BL=white, BR=white? That's wrong for half-cell model.
-        //
-        // Better model: ◤ means the triangle with vertices at TL, TR, BL corners.
-        // The hypotenuse goes from TR to BL. Black half = upper-left triangle.
-        // Sub-cell approximation:
-        //   ◤: TL=black, TR=half, BL=half, BR=white → doesn't work cleanly.
-        //
-        // Use a finer 2x2 model where we treat each sub-cell as:
-        //   For ◤ (black triangle upper-left): TL=black, others=white
-        //   For ◥ (black triangle upper-right): TR=black, others=white
-        //   For ◣ (black triangle lower-left): BL=black, others=white
-        //   For ◢ (black triangle lower-right): BR=black, others=white
-        // This is an approximation but works for rectangle validation
-        // because the diagonal edge between two adjacent triangles forms
-        // a consistent boundary in the sub-grid.
-        subGrid[sr][sc] = 0;
-        subGrid[sr][sc + 1] = 0;
-        subGrid[sr + 1][sc] = 0;
-        subGrid[sr + 1][sc + 1] = 0;
-        switch (state) {
-          case 1: // ◤ black at top-left
-            subGrid[sr][sc] = 1;
-            break;
-          case 2: // ◥ black at top-right
-            subGrid[sr][sc + 1] = 1;
-            break;
-          case 3: // ◣ black at bottom-left
-            subGrid[sr + 1][sc] = 1;
-            break;
-          case 4: // ◢ black at bottom-right
-            subGrid[sr + 1][sc + 1] = 1;
-            break;
-        }
-      }
-    }
-  }
 
-  // Find connected white regions in subGrid and check each is a rectangle
-  const visited: boolean[][] = Array.from({ length: subRows }, () =>
-    Array(subCols).fill(false)
-  );
-
-  for (let sr = 0; sr < subRows; sr++) {
-    for (let sc = 0; sc < subCols; sc++) {
-      if (subGrid[sr][sc] !== 0 || visited[sr][sc]) continue;
-      // BFS to find the connected white region
-      const queue: [number, number][] = [[sr, sc]];
-      visited[sr][sc] = true;
-      let minR = sr,
-        maxR = sr,
-        minC = sc,
-        maxC = sc;
-      let count = 0;
-      while (queue.length > 0) {
-        const [cr, cc] = queue.pop()!;
-        count++;
-        minR = Math.min(minR, cr);
-        maxR = Math.max(maxR, cr);
-        minC = Math.min(minC, cc);
-        maxC = Math.max(maxC, cc);
-        for (const [dr, dc] of [
-          [-1, 0],
-          [1, 0],
-          [0, -1],
-          [0, 1],
-        ] as [number, number][]) {
-          const nr = cr + dr;
-          const nc = cc + dc;
-          if (
-            nr >= 0 &&
-            nr < subRows &&
-            nc >= 0 &&
-            nc < subCols &&
-            !visited[nr][nc] &&
-            subGrid[nr][nc] === 0
-          ) {
-            visited[nr][nc] = true;
-            queue.push([nr, nc]);
+      if (state === 0 || state === 5) {
+        // Type A: axis-aligned rectangle of white/marked cells
+        // Flood-fill adjacent white/marked cells, verify rectangle shape
+        const queue: [number, number][] = [[r, c]];
+        visited[r][c] = true;
+        let minR = r, maxR = r, minC = c, maxC = c;
+        let count = 0;
+        while (queue.length > 0) {
+          const [cr, cc] = queue.pop()!;
+          count++;
+          minR = Math.min(minR, cr);
+          maxR = Math.max(maxR, cr);
+          minC = Math.min(minC, cc);
+          maxC = Math.max(maxC, cc);
+          for (const [dr, dc] of [[-1,0],[1,0],[0,-1],[0,1]] as [number,number][]) {
+            const nr = cr + dr;
+            const nc = cc + dc;
+            if (nr >= 0 && nr < rows && nc >= 0 && nc < cols &&
+                !visited[nr][nc] && isWhite(nr, nc, canon, stateGrid)) {
+              visited[nr][nc] = true;
+              queue.push([nr, nc]);
+            }
           }
         }
+        const expectedArea = (maxR - minR + 1) * (maxC - minC + 1);
+        if (count !== expectedArea) return false;
+        // Verify no triangle cells inside the bounding box
+        for (let rr = minR; rr <= maxR; rr++) {
+          for (let cc = minC; cc <= maxC; cc++) {
+            if (!isWhite(rr, cc, canon, stateGrid)) return false;
+          }
+        }
+      } else if (state === 1) {
+        // Type B: diagonal rectangle starting from ◤
+        // Trace the contour: UL edge → UR edge → LR edge → LL edge → close
+        const contour: [number, number][] = [[r, c]];
+        visited[r][c] = true;
+
+        let cr = r, cc = c;
+        type Phase = "UL" | "UR" | "LR" | "LL" | "UL_CLOSE";
+        let phase: Phase = "UL";
+
+        // Trace UL edge (going up-right diagonally)
+        while (phase === "UL") {
+          if (isTriangle(cr, cc + 1, canon, stateGrid, 2)) {
+            // Corner: switch to UR edge
+            cr = cr; cc = cc + 1;
+            contour.push([cr, cc]);
+            visited[cr][cc] = true;
+            phase = "UR";
+          } else if (isWhite(cr, cc + 1, canon, stateGrid) &&
+                     isTriangle(cr - 1, cc + 1, canon, stateGrid, 1)) {
+            cr = cr - 1; cc = cc + 1;
+            contour.push([cr, cc]);
+            visited[cr][cc] = true;
+          } else {
+            return false;
+          }
+        }
+
+        // Trace UR edge (going down-right diagonally)
+        while (phase === "UR") {
+          if (isTriangle(cr + 1, cc, canon, stateGrid, 4)) {
+            // Corner: switch to LR edge
+            cr = cr + 1; cc = cc;
+            contour.push([cr, cc]);
+            visited[cr][cc] = true;
+            phase = "LR";
+          } else if (isWhite(cr + 1, cc, canon, stateGrid) &&
+                     isTriangle(cr + 1, cc + 1, canon, stateGrid, 2)) {
+            cr = cr + 1; cc = cc + 1;
+            contour.push([cr, cc]);
+            visited[cr][cc] = true;
+          } else {
+            return false;
+          }
+        }
+
+        // Trace LR edge (going down-left diagonally)
+        while (phase === "LR") {
+          if (isTriangle(cr, cc - 1, canon, stateGrid, 3)) {
+            // Corner: switch to LL edge
+            cr = cr; cc = cc - 1;
+            contour.push([cr, cc]);
+            visited[cr][cc] = true;
+            phase = "LL";
+          } else if (isWhite(cr, cc - 1, canon, stateGrid) &&
+                     isTriangle(cr + 1, cc - 1, canon, stateGrid, 4)) {
+            cr = cr + 1; cc = cc - 1;
+            contour.push([cr, cc]);
+            visited[cr][cc] = true;
+          } else {
+            return false;
+          }
+        }
+
+        // Trace LL edge (going up-left diagonally)
+        while (phase === "LL") {
+          if (isTriangle(cr - 1, cc, canon, stateGrid, 1)) {
+            // Corner: switch to UL close
+            cr = cr - 1; cc = cc;
+            if (cr === r && cc === c) {
+              phase = "UL_CLOSE";
+              break;
+            }
+            contour.push([cr, cc]);
+            visited[cr][cc] = true;
+            phase = "UL_CLOSE";
+          } else if (isWhite(cr - 1, cc, canon, stateGrid) &&
+                     isTriangle(cr - 1, cc - 1, canon, stateGrid, 3)) {
+            cr = cr - 1; cc = cc - 1;
+            contour.push([cr, cc]);
+            visited[cr][cc] = true;
+          } else {
+            return false;
+          }
+        }
+
+        // Close back to origin along UL edge
+        while (phase === "UL_CLOSE") {
+          if (cr === r && cc === c) {
+            break;
+          }
+          if (isWhite(cr, cc + 1, canon, stateGrid) &&
+              isTriangle(cr - 1, cc + 1, canon, stateGrid, 1)) {
+            cr = cr - 1; cc = cc + 1;
+            if (cr === r && cc === c) break;
+            contour.push([cr, cc]);
+            visited[cr][cc] = true;
+          } else {
+            return false;
+          }
+        }
+
+        // Mark interior white cells as visited and verify they are all white
+        // Interior = cells adjacent to contour cells that are white and not on contour
+        // For a diagonal rectangle, interior cells are those "inside" the parallelogram.
+        // We collect all white cells reachable from contour neighbors that aren't on contour.
+        const contourSet = new Set(contour.map(([rr, cc]) => `${rr},${cc}`));
+        for (const [cr, cc] of contour) {
+          // Check the white cell that sits between diagonal contour steps
+          for (const [dr, dc] of [[-1,0],[1,0],[0,-1],[0,1]] as [number,number][]) {
+            const nr = cr + dr;
+            const nc = cc + dc;
+            if (nr >= 0 && nr < rows && nc >= 0 && nc < cols &&
+                !visited[nr][nc] && isWhite(nr, nc, canon, stateGrid) &&
+                !contourSet.has(`${nr},${nc}`)) {
+              // BFS to find connected interior white region
+              const intQueue: [number, number][] = [[nr, nc]];
+              visited[nr][nc] = true;
+              while (intQueue.length > 0) {
+                const [ir, ic] = intQueue.pop()!;
+                for (const [dr2, dc2] of [[-1,0],[1,0],[0,-1],[0,1]] as [number,number][]) {
+                  const ir2 = ir + dr2;
+                  const ic2 = ic + dc2;
+                  if (ir2 >= 0 && ir2 < rows && ic2 >= 0 && ic2 < cols &&
+                      !visited[ir2][ic2] && isWhite(ir2, ic2, canon, stateGrid)) {
+                    visited[ir2][ic2] = true;
+                    intQueue.push([ir2, ic2]);
+                  }
+                }
+              }
+            }
+          }
+        }
+      } else {
+        // Triangle cells 2,3,4 encountered before being part of a traced contour = invalid
+        // (scanning left-to-right, top-to-bottom, ◤ is always the first triangle of a diagonal rect)
+        return false;
       }
-      // A rectangle in sub-grid has area = (maxR - minR + 1) * (maxC - minC + 1)
-      const expectedArea = (maxR - minR + 1) * (maxC - minC + 1);
-      if (count !== expectedArea) return false;
     }
   }
 
@@ -267,12 +349,6 @@ export default function ShakashakaBoard({
 
   useEffect(() => {
     if (completedRef.current) return;
-    // Check all white cells are assigned
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        if (cells[r][c] === -1 && stateGrid[r][c] === 0) return;
-      }
-    }
     if (validateSolution(canon, stateGrid)) {
       completedRef.current = true;
       onComplete?.();
