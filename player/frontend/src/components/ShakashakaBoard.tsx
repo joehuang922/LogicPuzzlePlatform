@@ -349,9 +349,16 @@ export default function ShakashakaBoard({
 
   useEffect(() => {
     if (completedRef.current) return;
-    if (validateSolution(canon, stateGrid)) {
-      completedRef.current = true;
-      onComplete?.();
+    console.log("[shaka] validateSolution running, stateGrid:", JSON.stringify(stateGrid));
+    try {
+      const result = validateSolution(canon, stateGrid);
+      console.log("[shaka] validateSolution result:", result);
+      if (result) {
+        completedRef.current = true;
+        onComplete?.();
+      }
+    } catch (e) {
+      console.error("[shaka] validateSolution threw:", e);
     }
   }, [stateGrid, canon, cells, rows, cols, onComplete]);
 
