@@ -1,0 +1,40 @@
+{
+  "title": "Kakuro Canonical Representation",
+  "description": "Grid where each cell is either a clue (with optional right/down sums) or an empty cell to be filled with digits 1-9.",
+  "type": "object",
+  "required": ["cells"],
+  "additionalProperties": false,
+  "properties": {
+    "cells": {
+      "description": "m x n grid of cell objects. Each cell is either a clue or empty.",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["type"],
+              "additionalProperties": false,
+              "properties": {
+                "type": { "type": "string", "const": "clue" },
+                "right": { "type": ["integer", "null"], "minimum": 1, "maximum": 45 },
+                "down": { "type": ["integer", "null"], "minimum": 1, "maximum": 45 }
+              }
+            },
+            {
+              "type": "object",
+              "required": ["type"],
+              "additionalProperties": false,
+              "properties": {
+                "type": { "type": "string", "const": "empty" }
+              }
+            }
+          ]
+        },
+        "minItems": 1
+      },
+      "minItems": 1
+    }
+  }
+}

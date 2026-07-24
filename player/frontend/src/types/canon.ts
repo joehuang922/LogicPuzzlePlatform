@@ -121,3 +121,15 @@ export interface ShakashakaCanon {
 export interface ShakashakaAnswer {
   states: number[][];
 }
+
+export type KakuroCell =
+  | { type: "clue"; right?: number | null; down?: number | null }
+  | { type: "empty" };
+
+export interface KakuroCanon {
+  cells: KakuroCell[][];
+}
+
+export interface KakuroAnswer {
+  values: number[][];
+}
