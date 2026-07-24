@@ -18,7 +18,7 @@ from puzzle_parsers.kakuro.models import KakuroBoard, KakuroClueCell, KakuroEmpt
 from puzzle_parsers.recognition import CellRecognizer, GeminiRecognizer
 from puzzle_parsers.recognition_schemas import DUAL_INT_CELL_PROMPT
 
-BLACK_THRESHOLD = 100
+BLACK_THRESHOLD = 200
 
 
 class KakuroParser(PuzzleParser):
@@ -92,7 +92,10 @@ class KakuroParser(PuzzleParser):
 
         # Use LLM to read numbers in clue cells
         if clue_cell_crops:
-            inverted_crops = [cv2.bitwise_not(crop) for crop in clue_cell_crops]
+            inverted_crops = []
+            for crop in clue_cell_crops:
+                _, binary = cv2.threshold(crop, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                inverted_crops.append(cv2.bitwise_not(binary))
             cols_per_row = min(10, len(inverted_crops))
             crop_grid: list[list[NDArray]] = []
             for i in range(0, len(inverted_crops), cols_per_row):
@@ -116,6 +119,26 @@ class KakuroParser(PuzzleParser):
                     right_val = top_right if isinstance(top_right, int) and top_right > 0 else None
                     down_val = bottom_left if isinstance(bottom_left, int) and bottom_left > 0 else None
                     cells[r][c] = KakuroClueCell(right=right_val, down=down_val)
+
+        # Post-process: fix single-number clue cells using structural constraints.
+        # A cell can only have right if there's an empty cell to its right,
+        # and can only have down if there's an empty cell below it.
+        for r in range(rows):
+            for c in range(cols):
+                cell = cells[r][c]
+                if cell.type != "clue":
+                    continue
+                has_empty_right = (c + 1 < cols and cells[r][c + 1].type == "empty")
+                has_empty_below = (r + 1 < rows and cells[r + 1][c].type == "empty")
+
+                if cell.right is not None and cell.down is None:
+                    # Single number claimed as right — verify
+                    if not has_empty_right and has_empty_below:
+                        cells[r][c] = KakuroClueCell(right=None, down=cell.right)
+                elif cell.right is None and cell.down is not None:
+                    # Single number claimed as down — verify
+                    if not has_empty_below and has_empty_right:
+                        cells[r][c] = KakuroClueCell(right=cell.down, down=None)
 
         return cells
 

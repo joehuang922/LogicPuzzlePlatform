@@ -20,39 +20,192 @@ def find_quadrilateral_border(gray: NDArray) -> NDArray:
 
     Returns a (4,2) float32 array ordered as: TL, TR, BR, BL.
     Falls back to full image bounds if no clear border is found.
+
+    Two-pass approach:
+    1. Canny edge contour detection — works when the border is a distinct
+       closed contour with clear whitespace margins around the puzzle.
+    2. Gradient-based fallback — finds the border via steepest brightness
+       transitions in row/column mean profiles.
     """
     h, w = gray.shape
+    fallback = np.float32([[0, 0], [w, 0], [w, h], [0, h]])
 
-    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-    binary = cv2.adaptiveThreshold(
-        blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY_INV, 11, 3,
-    )
+    quad = _find_border_via_contours(gray)
+    if quad is not None:
+        return quad
 
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-    binary = cv2.dilate(binary, kernel, iterations=1)
+    quad = _find_border_via_gradient(gray)
+    if quad is not None:
+        return quad
 
-    contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    if not contours:
-        return np.float32([[0, 0], [w, 0], [w, h], [0, h]])
+    return fallback
 
-    largest = max(contours, key=cv2.contourArea)
-    area = cv2.contourArea(largest)
+
+def _find_border_via_contours(gray: NDArray) -> NDArray | None:
+    """Try to find the border as a closed quadrilateral contour."""
+    h, w = gray.shape
     img_area = h * w
 
-    if area < img_area * 0.1:
-        return np.float32([[0, 0], [w, 0], [w, h], [0, h]])
+    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+    edges = cv2.Canny(blurred, 50, 150)
 
-    peri = cv2.arcLength(largest, True)
-    approx = cv2.approxPolyDP(largest, 0.02 * peri, True)
+    contours, _ = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    if not contours:
+        return None
 
-    if len(approx) == 4:
-        pts = approx.reshape(4, 2).astype(np.float32)
-        return order_points(pts)
+    candidates = sorted(contours, key=cv2.contourArea, reverse=True)
+    for contour in candidates[:10]:
+        area = cv2.contourArea(contour)
+        if area < img_area * 0.2:
+            break
+        if area > img_area * 0.9:
+            continue
+        peri = cv2.arcLength(contour, True)
+        approx = cv2.approxPolyDP(contour, 0.02 * peri, True)
+        if len(approx) == 4:
+            pts = approx.reshape(4, 2).astype(np.float32)
+            return order_points(pts)
 
-    rect = cv2.minAreaRect(largest)
-    box = cv2.boxPoints(rect)
-    return order_points(np.float32(box))
+    return None
+
+
+
+def _cluster_positions(positions: list[float], min_gap: float = 10) -> list[float]:
+    """Cluster nearby positions and return the median of each cluster."""
+    if not positions:
+        return []
+    positions = sorted(positions)
+    result: list[float] = []
+    group = [positions[0]]
+    for p in positions[1:]:
+        if p - group[-1] < min_gap:
+            group.append(p)
+        else:
+            result.append(float(np.median(group)))
+            group = [p]
+    result.append(float(np.median(group)))
+    return result
+
+
+def _median_single_spacing(positions: list[float]) -> float:
+    """Estimate cell size as the median of single-cell spacings."""
+    spacings = np.diff(positions)
+    if len(spacings) < 2:
+        return 0
+    med = float(np.median(spacings))
+    single = spacings[spacings < med * 1.5]
+    return float(np.median(single)) if len(single) >= 3 else med
+
+
+def _find_grid_chain(positions: list[float], cell_size: float, tol_ratio: float = 0.08) -> list[float]:
+    """Find the longest chain of positions with locally consistent grid spacing.
+
+    Uses dynamic programming: each position can chain from the nearest earlier
+    position whose spacing is an integer multiple of cell_size within tolerance.
+    """
+    if len(positions) < 5:
+        return positions
+    tol = cell_size * tol_ratio
+    n = len(positions)
+    dp = [1] * n
+    parent = [-1] * n
+
+    for i in range(1, n):
+        for j in range(i - 1, max(-1, i - 5), -1):
+            sp = positions[i] - positions[j]
+            k = round(sp / cell_size)
+            if k >= 1 and abs(sp - k * cell_size) < tol:
+                if dp[j] + 1 > dp[i]:
+                    dp[i] = dp[j] + 1
+                    parent[i] = j
+                break
+
+    best_end = int(np.argmax(dp))
+    chain: list[float] = []
+    idx = best_end
+    while idx != -1:
+        chain.append(positions[idx])
+        idx = parent[idx]
+    chain.reverse()
+    return chain
+
+
+def _extend_border(
+    gray: NDArray,
+    top: float, bot: float, left: float, right: float,
+    cell_size: float,
+) -> tuple[float, float, float, float]:
+    """Extend border outward where dark content continues beyond detected lines.
+
+    Iteratively checks a one-cell-wide strip beyond each edge. If its mean
+    brightness is below 200 (indicating puzzle content, not background),
+    extends by one cell. Repeats until no further extension is possible.
+    """
+    h, w = gray.shape
+    cs = int(cell_size)
+
+    while True:
+        extended = False
+
+        probe_left = int(left) - cs
+        if probe_left >= 0:
+            strip = gray[int(top):int(bot), probe_left:int(left)]
+            if strip.size > 0 and strip.mean() < 200:
+                left = float(probe_left)
+                extended = True
+
+        probe_right = int(right) + cs
+        if probe_right <= w:
+            strip = gray[int(top):int(bot), int(right):probe_right]
+            if strip.size > 0 and strip.mean() < 200:
+                right = float(probe_right)
+                extended = True
+
+        probe_top = int(top) - cs
+        if probe_top >= 0:
+            strip = gray[probe_top:int(top), int(left):int(right)]
+            if strip.size > 0 and strip.mean() < 200:
+                top = float(probe_top)
+                extended = True
+
+        probe_bot = int(bot) + cs
+        if probe_bot <= h:
+            strip = gray[int(bot):probe_bot, int(left):int(right)]
+            if strip.size > 0 and strip.mean() < 200:
+                bot = float(probe_bot)
+                extended = True
+
+        if not extended:
+            break
+
+    return top, bot, left, right
+
+
+def _find_border_via_gradient(gray: NDArray) -> NDArray | None:
+    """Find the border by locating steepest brightness transitions on each edge.
+
+    For each side, scans the outer 15% of the image for the position where
+    the row/column mean brightness drops most sharply (top/left) or rises
+    most sharply (bottom/right), indicating the outer edge of the border.
+    """
+    h, w = gray.shape
+    row_means = gray.mean(axis=1)
+    col_means = gray.mean(axis=0)
+    row_grad = np.gradient(row_means)
+    col_grad = np.gradient(col_means)
+
+    scan_y = max(10, int(h * 0.15))
+    scan_x = max(10, int(w * 0.15))
+
+    top = int(np.argmin(row_grad[:scan_y]))
+    bot = int(h - 1 - scan_y + np.argmax(row_grad[h - scan_y:]))
+    left = int(np.argmin(col_grad[:scan_x]))
+    right = int(w - 1 - scan_x + np.argmax(col_grad[w - scan_x:]))
+
+    if (right - left) < w * 0.5 or (bot - top) < h * 0.5:
+        return None
+
+    return np.float32([[left, top], [right, top], [right, bot], [left, bot]])
 
 
 def order_points(pts: NDArray) -> NDArray:
