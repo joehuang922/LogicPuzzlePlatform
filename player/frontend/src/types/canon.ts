@@ -133,3 +133,20 @@ export interface KakuroCanon {
 export interface KakuroAnswer {
   values: number[][];
 }
+
+export type YajilinClue = {
+  dir: "up" | "down" | "left" | "right";
+  num: number;
+};
+
+export interface YajilinCanon {
+  cells: (YajilinClue | null)[][];
+}
+
+export interface YajilinAnswer {
+  blacks: number[][];
+  edges: {
+    h: number[][];
+    v: number[][];
+  };
+}

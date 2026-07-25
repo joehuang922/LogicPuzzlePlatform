@@ -1,0 +1,38 @@
+{
+  "title": "Yajilin Canonical Representation",
+  "description": "Rectangle grid where some cells contain a directional number clue. Players blacken cells and draw a single closed loop through the remaining empty cells.",
+  "type": "object",
+  "required": ["cells"],
+  "additionalProperties": false,
+  "properties": {
+    "cells": {
+      "description": "m x n grid. null = empty cell, object = clue cell with direction and number.",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["dir", "num"],
+              "additionalProperties": false,
+              "properties": {
+                "dir": {
+                  "type": "string",
+                  "enum": ["up", "down", "left", "right"]
+                },
+                "num": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          ]
+        },
+        "minItems": 1
+      },
+      "minItems": 1
+    }
+  }
+}

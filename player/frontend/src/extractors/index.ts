@@ -11,6 +11,7 @@ import { nuritwinExtractor } from "./nuritwin";
 import { slalomExtractor } from "./slalom";
 import { shakashakaExtractor } from "./shakashaka";
 import { kakuroExtractor } from "./kakuro";
+import { yajilinExtractor } from "./yajilin";
 
 const extractorRegistry = new Map<number, AnswerExtractor>();
 
@@ -30,6 +31,7 @@ registerExtractor(nuritwinExtractor);
 registerExtractor(slalomExtractor);
 registerExtractor(shakashakaExtractor);
 registerExtractor(kakuroExtractor);
+registerExtractor(yajilinExtractor);
 
 export function getExtractor(puzzleType: number): AnswerExtractor | undefined {
   return extractorRegistry.get(puzzleType);

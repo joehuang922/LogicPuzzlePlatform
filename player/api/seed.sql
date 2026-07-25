@@ -79,7 +79,8 @@ INSERT INTO puzzle_types (id, name, rule) VALUES
   (9, 'nuritwin', 'Blacken cells so each room has exactly two connected black components of equal size. If a room has number N, each component is N cells. All black cells globally connected. No 2x2 all-black.'),
   (10, 'slalom', 'Draw a closed loop through cell centers starting from the circled number. The loop must cross every gate exactly once perpendicularly. Numbered gates must be crossed in the specified order (either direction). The loop cannot pass through walls or touch itself.'),
   (11, 'shakashaka', 'Place black right-angled triangles in white cells so that all remaining white regions form rectangles (axis-aligned or 45-degree rotated). Numbers on black cells indicate how many adjacent cells contain a triangle.'),
-  (12, 'kakuro', 'Fill empty cells with digits 1-9. Each horizontal or vertical run of empty cells must sum to the clue number. No digit may repeat within a single run.');
+  (12, 'kakuro', 'Fill empty cells with digits 1-9. Each horizontal or vertical run of empty cells must sum to the clue number. No digit may repeat within a single run.'),
+  (13, 'yajilin', 'Blacken some cells and draw a single closed loop through the rest. No two black cells may be adjacent. Each arrow-number clue indicates exactly how many black cells lie in that direction from the clue.');
 
 -- Seed sample puzzle: sudoku (difficulty 4 = hard)
 INSERT INTO puzzle_questions (id, puzzle_type, title, difficulty, width, height, canon_repr) VALUES (
