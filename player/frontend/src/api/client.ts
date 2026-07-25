@@ -149,7 +149,7 @@ export function listAttempts(player: number, question: string, opts?: { finished
 
 export function getSolvedQuestions(player: number, questionIds: string[]) {
   const url = `/attempts?player=${player}&questions=${questionIds.map(encodeURIComponent).join(",")}`;
-  return request<{ solvedQuestions: string[] }>(url);
+  return request<{ solvedQuestions: string[]; attemptedQuestions: string[] }>(url);
 }
 
 export function getAttemptSnapshot(attemptId: string) {

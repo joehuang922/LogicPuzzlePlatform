@@ -78,20 +78,28 @@ async function listAttempts(
 
   if (questions) {
     const ids = questions.split(",").filter(Boolean);
-    if (ids.length === 0) return response(200, { solvedQuestions: [] });
+    if (ids.length === 0) return response(200, { solvedQuestions: [], attemptedQuestions: [] });
     const placeholders = ids.map((_, i) => `:q${i}`).join(",");
     const params = [
       { name: "player", value: { longValue: Number(player) } },
       ...ids.map((id, i) => ({ name: `q${i}`, value: { stringValue: id } })),
     ];
-    const result = await executeStatement(
+    const solvedResult = await executeStatement(
       `SELECT DISTINCT question FROM player_attempt
        WHERE player = :player AND finished_at IS NOT NULL
          AND question IN (${placeholders})`,
       params
     );
-    const solvedQuestions = result.records.map((r) => r.question as string);
-    return response(200, { solvedQuestions });
+    const solvedQuestions = solvedResult.records.map((r) => r.question as string);
+    const attemptedResult = await executeStatement(
+      `SELECT DISTINCT question FROM player_attempt
+       WHERE player = :player AND finished_at IS NULL
+         AND question IN (${placeholders})`,
+      params
+    );
+    const attemptedQuestions = attemptedResult.records.map((r) => r.question as string)
+      .filter((q) => !solvedQuestions.includes(q));
+    return response(200, { solvedQuestions, attemptedQuestions });
   }
 
   if (!question) {

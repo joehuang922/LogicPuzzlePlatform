@@ -55,14 +55,28 @@ function SortableHeader({ label, sortKey, currentKey, currentDir, onSort, style 
   );
 }
 
+function ProgressBar({ solved, total, style }: { solved: number; total: number; style?: React.CSSProperties }) {
+  const pct = total === 0 ? 0 : Math.round((solved / total) * 100);
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", ...style }}>
+      <span style={{ display: "inline-block", width: 60, height: 8, background: "#e0e0e0", borderRadius: 4, overflow: "hidden" }}>
+        <span style={{ display: "block", height: "100%", width: `${pct}%`, background: pct === 100 ? "#4caf50" : "#1976d2", borderRadius: 4 }} />
+      </span>
+      <span style={{ fontSize: "0.75rem", color: "#555" }}>{pct}%</span>
+    </span>
+  );
+}
+
 function CollectionPuzzleList({
   puzzles,
   puzzleTypes,
+  solvedIds,
   attemptedIds,
   onPuzzleClick,
 }: {
   puzzles: Puzzle[];
   puzzleTypes: PuzzleType[];
+  solvedIds: Set<string>;
   attemptedIds: Set<string>;
   onPuzzleClick: (puzzle: Puzzle) => void;
 }) {
@@ -91,10 +105,13 @@ function CollectionPuzzleList({
 
   return (
     <div>
-      {Object.entries(groupedByType).map(([typeId, items]) => (
+      {Object.entries(groupedByType).map(([typeId, items]) => {
+        const typeSolved = items.filter((p) => solvedIds.has(p.id)).length;
+        return (
         <div key={typeId} style={{ marginBottom: "0.75rem" }}>
-          <div style={{ fontWeight: "bold", fontSize: "0.85rem", padding: "0.3rem 0.5rem", background: "#e8e8e8", borderRadius: 4, marginBottom: "0.25rem" }}>
-            {puzzleTypeMap[Number(typeId)] || `Type ${typeId}`} ({items.length})
+          <div style={{ fontWeight: "bold", fontSize: "0.85rem", padding: "0.3rem 0.5rem", background: "#e8e8e8", borderRadius: 4, marginBottom: "0.25rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span>{puzzleTypeMap[Number(typeId)] || `Type ${typeId}`} ({items.length})</span>
+            <ProgressBar solved={typeSolved} total={items.length} />
           </div>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.8rem" }}>
             <thead>
@@ -117,15 +134,16 @@ function CollectionPuzzleList({
                   <td style={{ padding: "0.3rem" }}>{DIFFICULTY_LABELS[p.difficulty] || String(p.difficulty)}</td>
                   <td style={{ padding: "0.3rem" }}>{p.author || "N/A"}</td>
                   <td style={{ padding: "0.3rem" }}>{p.width && p.height ? `${p.width} x ${p.height}` : "—"}</td>
-                  <td style={{ padding: "0.3rem", textAlign: "center", color: "green" }}>
-                    {attemptedIds.has(p.id) && "✓"}
+                  <td style={{ padding: "0.3rem", textAlign: "center" }}>
+                    {solvedIds.has(p.id) ? <span style={{ color: "green" }}>✓</span> : attemptedIds.has(p.id) ? <span style={{ color: "#f59e0b" }}>◐</span> : null}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -149,6 +167,7 @@ export default function Home() {
   const [expandedCollectionId, setExpandedCollectionId] = useState<number | null>(null);
   const [collectionPuzzles, setCollectionPuzzles] = useState<Puzzle[]>([]);
   const [loadingCollectionPuzzles, setLoadingCollectionPuzzles] = useState(false);
+  const [solvedPuzzleIds, setSolvedPuzzleIds] = useState<Set<string>>(new Set());
   const [attemptedPuzzleIds, setAttemptedPuzzleIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -194,7 +213,8 @@ export default function Home() {
       setCollectionPuzzles(res.puzzles);
       const ids = res.puzzles.map((p) => p.id);
       const solvedRes = await getSolvedQuestions(HARDCODED_PLAYER_ID, ids);
-      setAttemptedPuzzleIds(new Set(solvedRes.solvedQuestions));
+      setSolvedPuzzleIds(new Set(solvedRes.solvedQuestions));
+      setAttemptedPuzzleIds(new Set(solvedRes.attemptedQuestions ?? []));
     } finally {
       setLoadingCollectionPuzzles(false);
     }
@@ -277,6 +297,7 @@ export default function Home() {
                 <th style={{ textAlign: "left", borderBottom: "2px solid #ddd", padding: "0.5rem" }}>Publisher</th>
                 <th style={{ textAlign: "left", borderBottom: "2px solid #ddd", padding: "0.5rem" }}>Publish Date</th>
                 <th style={{ textAlign: "right", borderBottom: "2px solid #ddd", padding: "0.5rem" }}>Puzzles</th>
+                <th style={{ textAlign: "right", borderBottom: "2px solid #ddd", padding: "0.5rem" }}>Progress</th>
               </tr>
             </thead>
             <tbody>
@@ -296,10 +317,15 @@ export default function Home() {
                     <td style={{ padding: "0.5rem" }}>{c.publisher ?? "—"}</td>
                     <td style={{ padding: "0.5rem" }}>{c.publishAt ?? "—"}</td>
                     <td style={{ textAlign: "right", padding: "0.5rem" }}>{c.puzzleCount}</td>
+                    <td style={{ textAlign: "right", padding: "0.5rem" }}>
+                      {expandedCollectionId === c.id && !loadingCollectionPuzzles && collectionPuzzles.length > 0
+                        ? <ProgressBar solved={solvedPuzzleIds.size} total={collectionPuzzles.length} />
+                        : "—"}
+                    </td>
                   </tr>
                   {expandedCollectionId === c.id && (
                     <tr key={`${c.id}-detail`}>
-                      <td colSpan={4} style={{ padding: "0.75rem 0.5rem", background: "#fafafa" }}>
+                      <td colSpan={5} style={{ padding: "0.75rem 0.5rem", background: "#fafafa" }}>
                         {loadingCollectionPuzzles ? (
                           <p style={{ margin: 0, fontSize: "0.85rem" }}>Loading questions...</p>
                         ) : collectionPuzzles.length === 0 ? (
@@ -308,6 +334,7 @@ export default function Home() {
                           <CollectionPuzzleList
                             puzzles={collectionPuzzles}
                             puzzleTypes={puzzleTypes}
+                            solvedIds={solvedPuzzleIds}
                             attemptedIds={attemptedPuzzleIds}
                             onPuzzleClick={handleCollectionPuzzleClick}
                           />
