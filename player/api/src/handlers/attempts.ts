@@ -102,6 +102,33 @@ async function listAttempts(
     return response(200, { solvedQuestions, attemptedQuestions });
   }
 
+  const collectionProgress = event.queryStringParameters?.collectionProgress;
+  if (collectionProgress) {
+    const collectionIds = collectionProgress.split(",").map(Number).filter((n) => !isNaN(n));
+    if (collectionIds.length === 0) return response(200, { collectionProgress: [] });
+    const placeholders = collectionIds.map((_, i) => `:c${i}`).join(",");
+    const params = [
+      { name: "player", value: { longValue: Number(player) } },
+      ...collectionIds.map((id, i) => ({ name: `c${i}`, value: { longValue: id } })),
+    ];
+    const result = await executeStatement(
+      `SELECT pq.src_collection AS collection_id,
+              COUNT(DISTINCT pq.id) AS total,
+              COUNT(DISTINCT CASE WHEN pa.finished_at IS NOT NULL THEN pq.id END) AS solved
+       FROM puzzle_questions pq
+       LEFT JOIN player_attempt pa ON pa.question = pq.id AND pa.player = :player
+       WHERE pq.src_collection IN (${placeholders})
+       GROUP BY pq.src_collection`,
+      params
+    );
+    const progress = result.records.map((r) => ({
+      collectionId: r.collection_id as number,
+      total: r.total as number,
+      solved: r.solved as number,
+    }));
+    return response(200, { collectionProgress: progress });
+  }
+
   if (!question) {
     return response(400, { error: "question or questions query param required" });
   }

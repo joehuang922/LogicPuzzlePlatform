@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { listPuzzles, listCollections, listPuzzleTypes, listAttempts, getSolvedQuestions, createAttempt, getAttemptSnapshot, Collection, Attempt, PuzzleType, Puzzle } from "../api/client";
+import { listPuzzles, listCollections, listPuzzleTypes, listAttempts, getSolvedQuestions, getCollectionProgress, createAttempt, getAttemptSnapshot, Collection, CollectionProgress, Attempt, PuzzleType, Puzzle } from "../api/client";
 import { PuzzleDefinition } from "../types/puzzle";
 import { DIFFICULTY_LABELS } from "../constants";
 import { extractAnswer } from "../extractors";
@@ -169,6 +169,7 @@ export default function Home() {
   const [loadingCollectionPuzzles, setLoadingCollectionPuzzles] = useState(false);
   const [solvedPuzzleIds, setSolvedPuzzleIds] = useState<Set<string>>(new Set());
   const [attemptedPuzzleIds, setAttemptedPuzzleIds] = useState<Set<string>>(new Set());
+  const [collectionProgressMap, setCollectionProgressMap] = useState<Map<number, CollectionProgress>>(new Map());
 
   useEffect(() => {
     Promise.all([listPuzzles({ limit: 10 }), listCollections(), listPuzzleTypes()])
@@ -176,6 +177,12 @@ export default function Home() {
         setPuzzles(puzzleRes.puzzles as PuzzleDefinition[]);
         setCollections(collectionRes.collections);
         setPuzzleTypes(ptRes.puzzleTypes);
+        if (collectionRes.collections.length > 0) {
+          const ids = collectionRes.collections.map((c) => c.id);
+          getCollectionProgress(HARDCODED_PLAYER_ID, ids).then((res) => {
+            setCollectionProgressMap(new Map(res.collectionProgress.map((p) => [p.collectionId, p])));
+          });
+        }
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -215,6 +222,11 @@ export default function Home() {
       const solvedRes = await getSolvedQuestions(HARDCODED_PLAYER_ID, ids);
       setSolvedPuzzleIds(new Set(solvedRes.solvedQuestions));
       setAttemptedPuzzleIds(new Set(solvedRes.attemptedQuestions ?? []));
+      setCollectionProgressMap((prev) => {
+        const next = new Map(prev);
+        next.set(collectionId, { collectionId, total: res.puzzles.length, solved: solvedRes.solvedQuestions.length });
+        return next;
+      });
     } finally {
       setLoadingCollectionPuzzles(false);
     }
@@ -318,8 +330,8 @@ export default function Home() {
                     <td style={{ padding: "0.5rem" }}>{c.publishAt ?? "—"}</td>
                     <td style={{ textAlign: "right", padding: "0.5rem" }}>{c.puzzleCount}</td>
                     <td style={{ textAlign: "right", padding: "0.5rem" }}>
-                      {expandedCollectionId === c.id && !loadingCollectionPuzzles && collectionPuzzles.length > 0
-                        ? <ProgressBar solved={solvedPuzzleIds.size} total={collectionPuzzles.length} />
+                      {collectionProgressMap.has(c.id)
+                        ? <ProgressBar solved={collectionProgressMap.get(c.id)!.solved} total={collectionProgressMap.get(c.id)!.total} />
                         : "—"}
                     </td>
                   </tr>

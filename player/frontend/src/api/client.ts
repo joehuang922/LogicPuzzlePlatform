@@ -152,6 +152,17 @@ export function getSolvedQuestions(player: number, questionIds: string[]) {
   return request<{ solvedQuestions: string[]; attemptedQuestions: string[] }>(url);
 }
 
+export interface CollectionProgress {
+  collectionId: number;
+  total: number;
+  solved: number;
+}
+
+export function getCollectionProgress(player: number, collectionIds: number[]) {
+  const url = `/attempts?player=${player}&collectionProgress=${collectionIds.join(",")}`;
+  return request<{ collectionProgress: CollectionProgress[] }>(url);
+}
+
 export function getAttemptSnapshot(attemptId: string) {
   return request<{ snapshot: Snapshot }>(`/attempts/${attemptId}/snapshot`);
 }
