@@ -225,6 +225,20 @@ export default function KakuroEditor({ initialCanon, onComplete, onCancel }: Kak
                 style={{ width: 50 }}
               />
             </label>
+            <button
+              onClick={() => {
+                const { r, c } = editingClue;
+                setCells((prev) => {
+                  const next = prev.map((row) => [...row]);
+                  const cell = next[r][c];
+                  if (cell.type === "clue") {
+                    next[r][c] = { ...cell, right: cell.down, down: cell.right };
+                  }
+                  return next;
+                });
+              }}
+              style={{ marginTop: 8, marginRight: 8 }}
+            >Swap ↓/→</button>
             <button onClick={() => setEditingClue(null)} style={{ marginTop: 8 }}>Close</button>
           </div>
         )}
