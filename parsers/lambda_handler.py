@@ -73,6 +73,9 @@ def _init_parsers():
     from puzzle_parsers.yajilin.parser import YajilinParser
     print("  - YajilinParser imported")
 
+    from puzzle_parsers.fillomino.parser import FillominoParser
+    print("  - FillominoParser imported")
+
     _parsers = {
         1: SudokuParser(ocr_backend=_ocr),
         2: ComboSudokuParser(ocr_backend=_ocr),
@@ -87,6 +90,7 @@ def _init_parsers():
         11: ShakashakaParser(),
         12: KakuroParser(),
         13: YajilinParser(),
+        14: FillominoParser(ocr_backend=_ocr),
     }
     print("=== Parsers ready ===")
 

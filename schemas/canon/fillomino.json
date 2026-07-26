@@ -1,0 +1,19 @@
+{
+  "title": "Fillomino Canonical Representation",
+  "description": "Rectangle grid where some cells carry positive integer clues. Players fill all cells with numbers and draw internal borders to divide the grid into rooms, each of size N containing only the digit N.",
+  "type": "object",
+  "required": ["cells"],
+  "additionalProperties": false,
+  "properties": {
+    "cells": {
+      "description": "m x n grid of integers. 0 = empty (no clue), positive integer = number clue.",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": { "type": "integer", "minimum": 0 },
+        "minItems": 1
+      },
+      "minItems": 1
+    }
+  }
+}

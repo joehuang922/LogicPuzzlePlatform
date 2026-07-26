@@ -16,6 +16,7 @@ import { slalomRenderer } from "./renderers/slalom";
 import { shakashakaRenderer } from "./renderers/shakashaka";
 import { kakuroRenderer } from "./renderers/kakuro";
 import { yajilinRenderer } from "./renderers/yajilin";
+import { fillominoRenderer } from "./renderers/fillomino";
 
 registerRenderer(comboSudokuRenderer);
 registerRenderer(sudokuRenderer);
@@ -30,6 +31,7 @@ registerRenderer(slalomRenderer);
 registerRenderer(shakashakaRenderer);
 registerRenderer(kakuroRenderer);
 registerRenderer(yajilinRenderer);
+registerRenderer(fillominoRenderer);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

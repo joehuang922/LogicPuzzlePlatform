@@ -18,6 +18,7 @@ import SlalomEditor from "./SlalomEditor";
 import ShakashakaEditor from "./ShakashakaEditor";
 import KakuroEditor from "./KakuroEditor";
 import YajilinEditor from "./YajilinEditor";
+import FillominoEditor from "./FillominoEditor";
 
 const MAX_IMAGES = 50;
 const PARSE_CONCURRENCY = 3;
@@ -47,7 +48,7 @@ function computeDimensions(typeId: number, canon: Record<string, unknown>): { w?
       h: Math.max(...subs.map((b) => b.y)) + 9,
     };
   }
-  if ((typeId === 3 || typeId === 4 || typeId === 5 || typeId === 7 || typeId === 8 || typeId === 9 || typeId === 10 || typeId === 11 || typeId === 12 || typeId === 13) && canon.cells) {
+  if ((typeId === 3 || typeId === 4 || typeId === 5 || typeId === 7 || typeId === 8 || typeId === 9 || typeId === 10 || typeId === 11 || typeId === 12 || typeId === 13 || typeId === 14) && canon.cells) {
     const cells = canon.cells as unknown[][];
     return { h: cells.length, w: (cells[0] as unknown[]).length };
   }
@@ -113,6 +114,9 @@ function InlineEditor({
   if (typeName === "yajilin") {
     return <YajilinEditor initialCanon={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
   }
+  if (typeName === "fillomino") {
+    return <FillominoEditor initialJson={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
+  }
   return null;
 }
 
@@ -140,7 +144,7 @@ function BatchItemRow({
   onToggleEditor: () => void;
 }) {
   const typeName = puzzleTypes.find((pt) => pt.id === puzzleType)?.name;
-  const hasEditor = ["nurimaze", "sudoku", "combo-sudoku", "double-choco", "slitherlink", "nonogram", "masyu", "pencils", "nuritwin", "slalom", "shakashaka", "kakuro", "yajilin"].includes(typeName || "");
+  const hasEditor = ["nurimaze", "sudoku", "combo-sudoku", "double-choco", "slitherlink", "nonogram", "masyu", "pencils", "nuritwin", "slalom", "shakashaka", "kakuro", "yajilin", "fillomino"].includes(typeName || "");
 
   return (
     <div style={{ border: "1px solid #eee", borderRadius: 6, padding: "0.75rem", background: item.editorOpen ? "#fffbe6" : "#fff" }}>

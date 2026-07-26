@@ -12,6 +12,7 @@ import slalomSchema from "../../../../schemas/canon/slalom.json";
 import shakashakaSchema from "../../../../schemas/canon/shakashaka.json";
 import kakuroSchema from "../../../../schemas/canon/kakuro.json";
 import yajilinSchema from "../../../../schemas/canon/yajilin.json";
+import fillominoSchema from "../../../../schemas/canon/fillomino.json";
 
 const ajv = new Ajv();
 
@@ -29,6 +30,7 @@ const validators: Record<number, ValidateFunction> = {
   11: ajv.compile(shakashakaSchema),
   12: ajv.compile(kakuroSchema),
   13: ajv.compile(yajilinSchema),
+  14: ajv.compile(fillominoSchema),
 };
 
 export function validateCanon(puzzleType: number, data: unknown): void {

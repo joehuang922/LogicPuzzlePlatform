@@ -150,3 +150,15 @@ export interface YajilinAnswer {
     v: number[][];
   };
 }
+
+export interface FillominoCanon {
+  cells: number[][];
+}
+
+export interface FillominoAnswer {
+  numbers: number[][];
+  edges: {
+    h: number[][];
+    v: number[][];
+  };
+}
