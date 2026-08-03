@@ -81,7 +81,8 @@ INSERT INTO puzzle_types (id, name, rule) VALUES
   (11, 'shakashaka', 'Place black right-angled triangles in white cells so that all remaining white regions form rectangles (axis-aligned or 45-degree rotated). Numbers on black cells indicate how many adjacent cells contain a triangle.'),
   (12, 'kakuro', 'Fill empty cells with digits 1-9. Each horizontal or vertical run of empty cells must sum to the clue number. No digit may repeat within a single run.'),
   (13, 'yajilin', 'Blacken some cells and draw a single closed loop through the rest. No two black cells may be adjacent. Each arrow-number clue indicates exactly how many black cells lie in that direction from the clue.'),
-  (14, 'fillomino', 'Fill every cell with a positive integer and draw borders to divide the grid into rooms. Each room of size N must contain only the digit N. No two adjacent rooms may contain the same number.');
+  (14, 'fillomino', 'Fill every cell with a positive integer and draw borders to divide the grid into rooms. Each room of size N must contain only the digit N. No two adjacent rooms may contain the same number.'),
+  (15, 'lits', 'Shade one L, I, T, or S tetromino in every region. All shaded cells form a single connected group. No 2x2 area is fully shaded. Two tetrominoes of the same shape may not be orthogonally adjacent.');
 
 -- Seed sample puzzle: sudoku (difficulty 4 = hard)
 INSERT INTO puzzle_questions (id, puzzle_type, title, difficulty, width, height, canon_repr) VALUES (

@@ -1,0 +1,32 @@
+{
+  "title": "LITS Canonical Representation",
+  "description": "Rectangle grid pre-divided into regions by thick borders; player shades one L/I/T/S tetromino per region",
+  "type": "object",
+  "required": ["grids"],
+  "additionalProperties": false,
+  "properties": {
+    "grids": {
+      "type": "object",
+      "required": ["h", "v"],
+      "additionalProperties": false,
+      "properties": {
+        "h": {
+          "description": "(m-1) x n array: h[r][c] = thick border below cell[r][c]. 0=thin, 1=thick",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "type": "integer", "minimum": 0, "maximum": 1 }
+          }
+        },
+        "v": {
+          "description": "m x (n-1) array: v[r][c] = thick border right of cell[r][c]. 0=thin, 1=thick",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "type": "integer", "minimum": 0, "maximum": 1 }
+          }
+        }
+      }
+    }
+  }
+}

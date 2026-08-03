@@ -162,3 +162,14 @@ export interface FillominoAnswer {
     v: number[][];
   };
 }
+
+export interface LitsCanon {
+  grids: {
+    h: number[][];
+    v: number[][];
+  };
+}
+
+export interface LitsAnswer {
+  shaded: number[][];
+}

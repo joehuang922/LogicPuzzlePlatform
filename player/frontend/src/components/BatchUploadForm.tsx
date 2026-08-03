@@ -19,6 +19,7 @@ import ShakashakaEditor from "./ShakashakaEditor";
 import KakuroEditor from "./KakuroEditor";
 import YajilinEditor from "./YajilinEditor";
 import FillominoEditor from "./FillominoEditor";
+import LitsEditor from "./LitsEditor";
 
 const MAX_IMAGES = 50;
 const PARSE_CONCURRENCY = 3;
@@ -56,6 +57,10 @@ function computeDimensions(typeId: number, canon: Record<string, unknown>): { w?
     const rowClues = canon.rowClues as unknown[];
     const colClues = canon.colClues as unknown[];
     return { h: rowClues.length, w: colClues.length };
+  }
+  if (typeId === 15 && canon.grids) {
+    const grids = canon.grids as { h: unknown[][]; v: unknown[][] };
+    return { h: grids.h.length + 1, w: (grids.v[0] as unknown[]).length + 1 };
   }
   return {};
 }
@@ -117,6 +122,9 @@ function InlineEditor({
   if (typeName === "fillomino") {
     return <FillominoEditor initialJson={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
   }
+  if (typeName === "lits") {
+    return <LitsEditor initialJson={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
+  }
   return null;
 }
 
@@ -144,7 +152,7 @@ function BatchItemRow({
   onToggleEditor: () => void;
 }) {
   const typeName = puzzleTypes.find((pt) => pt.id === puzzleType)?.name;
-  const hasEditor = ["nurimaze", "sudoku", "combo-sudoku", "double-choco", "slitherlink", "nonogram", "masyu", "pencils", "nuritwin", "slalom", "shakashaka", "kakuro", "yajilin", "fillomino"].includes(typeName || "");
+  const hasEditor = ["nurimaze", "sudoku", "combo-sudoku", "double-choco", "slitherlink", "nonogram", "masyu", "pencils", "nuritwin", "slalom", "shakashaka", "kakuro", "yajilin", "fillomino", "lits"].includes(typeName || "");
 
   return (
     <div style={{ border: "1px solid #eee", borderRadius: 6, padding: "0.75rem", background: item.editorOpen ? "#fffbe6" : "#fff" }}>
