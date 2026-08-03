@@ -245,32 +245,43 @@ export default function LitsBoard({
     [rows, cols, hEdges, vEdges]
   );
 
-  // Parse initial shaded cells from user values ("c:col,row" -> 1).
-  const initialShaded = useMemo(() => {
-    const set = new Set<string>();
+  // Cell states from user values ("c:col,row" -> 1=black, 2=marked).
+  // "marked" (a centered dot) is a solver aid and counts as NOT shaded.
+  const initialStates = useMemo(() => {
+    const map = new Map<string, number>();
     if (initialUserValues) {
       for (const [key, val] of Object.entries(initialUserValues)) {
-        if (key.startsWith("c:") && val === 1) {
+        if (key.startsWith("c:") && (val === 1 || val === 2)) {
           const [c, r] = key.slice(2).split(",").map(Number);
-          if (r >= 0 && r < rows && c >= 0 && c < cols) set.add(`${r},${c}`);
+          if (r >= 0 && r < rows && c >= 0 && c < cols) map.set(`${r},${c}`, val);
         }
       }
     }
-    return set;
+    return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const [shaded, setShaded] = useState<Set<string>>(initialShaded);
+  const [cellStates, setCellStates] = useState<Map<string, number>>(initialStates);
   const completedRef = useRef(false);
+
+  // The set of shaded (black) cells — the only state that matters for rules.
+  const shaded = useMemo(() => {
+    const set = new Set<string>();
+    for (const [key, state] of cellStates) {
+      if (state === 1) set.add(key);
+    }
+    return set;
+  }, [cellStates]);
 
   const serializeValues = useCallback((): Record<string, number> => {
     const result: Record<string, number> = {};
-    for (const key of shaded) {
+    for (const [key, state] of cellStates) {
+      if (state !== 1 && state !== 2) continue;
       const [r, c] = key.split(",").map(Number);
-      result[`c:${c},${r}`] = 1;
+      result[`c:${c},${r}`] = state;
     }
     return result;
-  }, [shaded]);
+  }, [cellStates]);
 
   useEffect(() => {
     onValuesChange?.(serializeValues());
@@ -284,25 +295,30 @@ export default function LitsBoard({
     }
   }, [shaded, rows, cols, regionIds, onComplete]);
 
-  const handleCellClick = useCallback(
-    (r: number, c: number) => {
+  // Left click cycles forward: empty -> black -> marked -> empty.
+  // Right click cycles backward: empty -> marked -> black -> empty.
+  const cycleCell = useCallback(
+    (r: number, c: number, dir: 1 | -1) => {
       if (readonly) return;
       const key = `${r},${c}`;
-      setShaded((prev) => {
-        const next = new Set(prev);
-        if (next.has(key)) next.delete(key);
-        else next.add(key);
+      setCellStates((prev) => {
+        const next = new Map(prev);
+        const cur = next.get(key) ?? 0;
+        const state = (cur + dir + 3) % 3;
+        if (state === 0) next.delete(key);
+        else next.set(key, state);
         return next;
       });
     },
     [readonly]
   );
 
-  // Cell fills
+  // Cell fills and marked-cell dots
   const fills: JSX.Element[] = [];
+  const marks: JSX.Element[] = [];
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      const isShaded = shaded.has(`${r},${c}`);
+      const state = cellStates.get(`${r},${c}`) ?? 0;
       fills.push(
         <rect
           key={`fill-${r}-${c}`}
@@ -310,9 +326,21 @@ export default function LitsBoard({
           y={r * CELL_SIZE}
           width={CELL_SIZE}
           height={CELL_SIZE}
-          fill={isShaded ? "#333" : "white"}
+          fill={state === 1 ? "#333" : "white"}
         />
       );
+      if (state === 2) {
+        marks.push(
+          <circle
+            key={`mark-${r}-${c}`}
+            cx={c * CELL_SIZE + CELL_SIZE / 2}
+            cy={r * CELL_SIZE + CELL_SIZE / 2}
+            r={4}
+            fill="black"
+            pointerEvents="none"
+          />
+        );
+      }
     }
   }
 
@@ -367,7 +395,11 @@ export default function LitsBoard({
             height={CELL_SIZE}
             fill="transparent"
             style={{ cursor: "pointer" }}
-            onClick={() => handleCellClick(r, c)}
+            onClick={() => cycleCell(r, c, 1)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              cycleCell(r, c, -1);
+            }}
           />
         );
       }
@@ -384,6 +416,7 @@ export default function LitsBoard({
         <g transform={`translate(${PAD},${PAD})`}>
           {fills}
           {gridLines}
+          {marks}
           {targets}
         </g>
       </svg>
