@@ -20,7 +20,7 @@ export class DatabaseStack extends cdk.Stack {
         version: rds.AuroraMysqlEngineVersion.VER_3_08_1,
       }),
       defaultDatabaseName: this.databaseName,
-      serverlessV2MinCapacity: 0.5,
+      serverlessV2MinCapacity: 0,
       serverlessV2MaxCapacity: 2,
       writer: rds.ClusterInstance.serverlessV2("writer"),
       vpc,
