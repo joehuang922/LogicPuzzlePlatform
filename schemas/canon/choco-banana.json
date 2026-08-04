@@ -1,0 +1,19 @@
+{
+  "title": "Choco Banana Canonical Representation",
+  "description": "Rectangle grid where some cells carry positive integer clues. Players shade cells so every shaded (chocolate) group forms a rectangle and every unshaded (banana) group does not. A clue gives the size of the group (shaded or unshaded) its cell belongs to.",
+  "type": "object",
+  "required": ["cells"],
+  "additionalProperties": false,
+  "properties": {
+    "cells": {
+      "description": "m x n grid of integers. 0 = empty (no clue), positive integer = group-size clue.",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": { "type": "integer", "minimum": 0 },
+        "minItems": 1
+      },
+      "minItems": 1
+    }
+  }
+}

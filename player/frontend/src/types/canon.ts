@@ -173,3 +173,12 @@ export interface LitsCanon {
 export interface LitsAnswer {
   shaded: number[][];
 }
+
+export interface ChocoBananaCanon {
+  cells: number[][];
+}
+
+export interface ChocoBananaAnswer {
+  // rows x cols tri-state: 0 = unknown, 1 = shaded (chocolate), 2 = white-mark (banana)
+  states: number[][];
+}

@@ -82,7 +82,8 @@ INSERT INTO puzzle_types (id, name, rule) VALUES
   (12, 'kakuro', 'Fill empty cells with digits 1-9. Each horizontal or vertical run of empty cells must sum to the clue number. No digit may repeat within a single run.'),
   (13, 'yajilin', 'Blacken some cells and draw a single closed loop through the rest. No two black cells may be adjacent. Each arrow-number clue indicates exactly how many black cells lie in that direction from the clue.'),
   (14, 'fillomino', 'Fill every cell with a positive integer and draw borders to divide the grid into rooms. Each room of size N must contain only the digit N. No two adjacent rooms may contain the same number.'),
-  (15, 'lits', 'Shade one L, I, T, or S tetromino in every region. All shaded cells form a single connected group. No 2x2 area is fully shaded. Two tetrominoes of the same shape may not be orthogonally adjacent.');
+  (15, 'lits', 'Shade one L, I, T, or S tetromino in every region. All shaded cells form a single connected group. No 2x2 area is fully shaded. Two tetrominoes of the same shape may not be orthogonally adjacent.'),
+  (16, 'choco-banana', 'Shade some cells. Every group of connected shaded cells must form a rectangle; every group of connected unshaded cells must not form a rectangle. A number indicates the size of the group (shaded or unshaded) that its cell belongs to.');
 
 -- Seed sample puzzle: sudoku (difficulty 4 = hard)
 INSERT INTO puzzle_questions (id, puzzle_type, title, difficulty, width, height, canon_repr) VALUES (

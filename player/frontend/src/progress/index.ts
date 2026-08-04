@@ -13,6 +13,7 @@ import { computeKakuroProgress } from "./kakuro";
 import { computeYajilinProgress } from "./yajilin";
 import { computeFillominoProgress } from "./fillomino";
 import { computeLitsProgress } from "./lits";
+import { computeChocoBananaProgress } from "./chocoBanana";
 
 export interface ProgressCalculator {
   puzzleType: number;
@@ -39,6 +40,7 @@ register(computeKakuroProgress);
 register(computeYajilinProgress);
 register(computeFillominoProgress);
 register(computeLitsProgress);
+register(computeChocoBananaProgress);
 
 export function computeProgress(
   puzzle: PuzzleDefinition,
