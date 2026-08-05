@@ -15,7 +15,8 @@ import FillominoBoard from "./FillominoBoard";
 import LitsBoard from "./LitsBoard";
 import ChocoBananaBoard from "./ChocoBananaBoard";
 import NumberLinkBoard from "./NumberLinkBoard";
-import { NurimazeCanon, DoubleChocoCanon, SlitherlinkCanon, NonogramCanon, MasyuCanon, PencilsCanon, NuritwinCanon, SlalomCanon, ShakashakaCanon, KakuroCanon, YajilinCanon, FillominoCanon, LitsCanon, ChocoBananaCanon, NumberLinkCanon } from "../types/canon";
+import AkariBoard from "./AkariBoard";
+import { NurimazeCanon, DoubleChocoCanon, SlitherlinkCanon, NonogramCanon, MasyuCanon, PencilsCanon, NuritwinCanon, SlalomCanon, ShakashakaCanon, KakuroCanon, YajilinCanon, FillominoCanon, LitsCanon, ChocoBananaCanon, NumberLinkCanon, AkariCanon } from "../types/canon";
 
 export default function CanonPreview({ puzzleType, canonRepr }: { puzzleType: number; canonRepr: string }) {
   let parsed: Record<string, unknown>;
@@ -75,6 +76,9 @@ export default function CanonPreview({ puzzleType, canonRepr }: { puzzleType: nu
   }
   if (puzzleType === 17 && parsed.cells) {
     return <NumberLinkBoard canon={parsed as unknown as NumberLinkCanon} readonly />;
+  }
+  if (puzzleType === 18 && parsed.cells) {
+    return <AkariBoard canon={parsed as unknown as AkariCanon} readonly />;
   }
   return <p style={{ color: "#666", fontSize: "0.85rem" }}>No preview available for this puzzle type.</p>;
 }

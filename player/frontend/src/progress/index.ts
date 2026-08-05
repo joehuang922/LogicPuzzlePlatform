@@ -15,6 +15,7 @@ import { computeFillominoProgress } from "./fillomino";
 import { computeLitsProgress } from "./lits";
 import { computeChocoBananaProgress } from "./chocoBanana";
 import { computeNumberLinkProgress } from "./numberLink";
+import { computeAkariProgress } from "./akari";
 
 export interface ProgressCalculator {
   puzzleType: number;
@@ -43,6 +44,7 @@ register(computeFillominoProgress);
 register(computeLitsProgress);
 register(computeChocoBananaProgress);
 register(computeNumberLinkProgress);
+register(computeAkariProgress);
 
 export function computeProgress(
   puzzle: PuzzleDefinition,

@@ -84,7 +84,8 @@ INSERT INTO puzzle_types (id, name, rule) VALUES
   (14, 'fillomino', 'Fill every cell with a positive integer and draw borders to divide the grid into rooms. Each room of size N must contain only the digit N. No two adjacent rooms may contain the same number.'),
   (15, 'lits', 'Shade one L, I, T, or S tetromino in every region. All shaded cells form a single connected group. No 2x2 area is fully shaded. Two tetrominoes of the same shape may not be orthogonally adjacent.'),
   (16, 'choco-banana', 'Shade some cells. Every group of connected shaded cells must form a rectangle; every group of connected unshaded cells must not form a rectangle. A number indicates the size of the group (shaded or unshaded) that its cell belongs to.'),
-  (17, 'number-link', 'Connect each pair of matching numbers with a single continuous path running horizontally or vertically between cells. Paths may not cross or overlap, and every cell must be used by exactly one path.');
+  (17, 'number-link', 'Connect each pair of matching numbers with a single continuous path running horizontally or vertically between cells. Paths may not cross or overlap, and every cell must be used by exactly one path.'),
+  (18, 'akari', 'Place light bulbs in white cells. Each bulb lights its row and column until blocked by a black wall. Every white cell must be lit, and no bulb may light another. A numbered wall must have exactly that many bulbs orthogonally adjacent.');
 
 -- Seed sample puzzle: sudoku (difficulty 4 = hard)
 INSERT INTO puzzle_questions (id, puzzle_type, title, difficulty, width, height, canon_repr) VALUES (

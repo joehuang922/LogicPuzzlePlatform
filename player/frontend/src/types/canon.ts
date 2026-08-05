@@ -196,3 +196,13 @@ export interface NumberLinkAnswer {
     v: number[][];
   };
 }
+
+export interface AkariCanon {
+  // rows x cols: -1 = white/empty, 0-4 = black wall with number, 5 = black wall no number
+  cells: number[][];
+}
+
+export interface AkariAnswer {
+  // rows x cols (only white cells): 0 = empty, 1 = bulb, 2 = dot/no-bulb mark
+  states: number[][];
+}

@@ -22,6 +22,7 @@ import FillominoEditor from "./FillominoEditor";
 import LitsEditor from "./LitsEditor";
 import ChocoBananaEditor from "./ChocoBananaEditor";
 import NumberLinkEditor from "./NumberLinkEditor";
+import AkariEditor from "./AkariEditor";
 
 const MAX_IMAGES = 50;
 const PARSE_CONCURRENCY = 3;
@@ -51,7 +52,7 @@ function computeDimensions(typeId: number, canon: Record<string, unknown>): { w?
       h: Math.max(...subs.map((b) => b.y)) + 9,
     };
   }
-  if ((typeId === 3 || typeId === 4 || typeId === 5 || typeId === 7 || typeId === 8 || typeId === 9 || typeId === 10 || typeId === 11 || typeId === 12 || typeId === 13 || typeId === 14 || typeId === 16 || typeId === 17) && canon.cells) {
+  if ((typeId === 3 || typeId === 4 || typeId === 5 || typeId === 7 || typeId === 8 || typeId === 9 || typeId === 10 || typeId === 11 || typeId === 12 || typeId === 13 || typeId === 14 || typeId === 16 || typeId === 17 || typeId === 18) && canon.cells) {
     const cells = canon.cells as unknown[][];
     return { h: cells.length, w: (cells[0] as unknown[]).length };
   }
@@ -133,6 +134,9 @@ function InlineEditor({
   if (typeName === "number-link") {
     return <NumberLinkEditor initialCanon={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
   }
+  if (typeName === "akari") {
+    return <AkariEditor initialJson={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
+  }
   return null;
 }
 
@@ -160,7 +164,7 @@ function BatchItemRow({
   onToggleEditor: () => void;
 }) {
   const typeName = puzzleTypes.find((pt) => pt.id === puzzleType)?.name;
-  const hasEditor = ["nurimaze", "sudoku", "combo-sudoku", "double-choco", "slitherlink", "nonogram", "masyu", "pencils", "nuritwin", "slalom", "shakashaka", "kakuro", "yajilin", "fillomino", "lits", "choco-banana", "number-link"].includes(typeName || "");
+  const hasEditor = ["nurimaze", "sudoku", "combo-sudoku", "double-choco", "slitherlink", "nonogram", "masyu", "pencils", "nuritwin", "slalom", "shakashaka", "kakuro", "yajilin", "fillomino", "lits", "choco-banana", "number-link", "akari"].includes(typeName || "");
 
   return (
     <div style={{ border: "1px solid #eee", borderRadius: 6, padding: "0.75rem", background: item.editorOpen ? "#fffbe6" : "#fff" }}>

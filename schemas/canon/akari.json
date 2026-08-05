@@ -1,0 +1,19 @@
+{
+  "title": "Akari (Light Up) Canonical Representation",
+  "description": "Rectangle grid with black cells (walls; some numbered 0-4) and white cells where light bulbs are placed",
+  "type": "object",
+  "required": ["cells"],
+  "additionalProperties": false,
+  "properties": {
+    "cells": {
+      "description": "m x n grid: -1=white/empty, 0-4=black wall with number, 5=black wall no number",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": { "type": "integer", "minimum": -1, "maximum": 5 },
+        "minItems": 1
+      },
+      "minItems": 1
+    }
+  }
+}
