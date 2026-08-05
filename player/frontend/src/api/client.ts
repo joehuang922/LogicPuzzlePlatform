@@ -1,20 +1,44 @@
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
-    ...options,
-  });
-  if (!res.ok) {
-    let detail = res.statusText;
+// Statuses returned when Aurora is still resuming from a paused state or the
+// gateway timed out waiting for it. These are transient and worth retrying.
+const RETRYABLE_STATUS = new Set([502, 503, 504]);
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function request<T>(
+  path: string,
+  options?: RequestInit,
+  retries = 3
+): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    let res: Response;
     try {
-      const body = await res.json();
-      if (body.error) detail = body.error;
-    } catch {}
-    throw new Error(`API error ${res.status}: ${detail}`);
+      res = await fetch(`${API_BASE}${path}`, {
+        headers: { "Content-Type": "application/json" },
+        ...options,
+      });
+    } catch (networkErr) {
+      // Network-level failure (DB waking, connection dropped). Retry.
+      if (attempt >= retries) throw networkErr;
+      await sleep(Math.min(1000 * 2 ** attempt, 6000));
+      continue;
+    }
+
+    if (!res.ok) {
+      if (RETRYABLE_STATUS.has(res.status) && attempt < retries) {
+        await sleep(Math.min(1000 * 2 ** attempt, 6000));
+        continue;
+      }
+      let detail = res.statusText;
+      try {
+        const body = await res.json();
+        if (body.error) detail = body.error;
+      } catch {}
+      throw new Error(`API error ${res.status}: ${detail}`);
+    }
+    if (res.status === 204) return null as T;
+    return res.json();
   }
-  if (res.status === 204) return null as T;
-  return res.json();
 }
 
 export interface Puzzle {

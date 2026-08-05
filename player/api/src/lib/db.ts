@@ -4,7 +4,47 @@ import {
   Field,
 } from "@aws-sdk/client-rds-data";
 
-const client = new RDSDataClient({});
+// Aurora Serverless v2 with min capacity 0 pauses when idle. The first request
+// after a pause fails while the cluster resumes (~10-25s). Give the SDK a few
+// built-in retries with adaptive backoff on top of our explicit resume retry.
+const client = new RDSDataClient({
+  maxAttempts: 5,
+  retryMode: "adaptive",
+});
+
+// Errors the Data API raises while the cluster is waking from a paused state.
+const RESUMING_ERROR_NAMES = new Set([
+  "DatabaseResumingException",
+  "StatementTimeoutException",
+]);
+
+function isResumingError(err: unknown): boolean {
+  const e = err as { name?: string; message?: string } | undefined;
+  if (e?.name && RESUMING_ERROR_NAMES.has(e.name)) return true;
+  return /resuming|is paused|starting up|not currently available/i.test(
+    e?.message ?? ""
+  );
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Retry only on resume-related errors. The total budget stays under the Lambda
+// timeout (29s): 6 attempts of 1s,2s,4s,8s,8s backoff (+jitter) ≈ 23s worst case.
+async function withResumeRetry<T>(
+  fn: () => Promise<T>,
+  maxAttempts = 6
+): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (attempt >= maxAttempts - 1 || !isResumingError(err)) throw err;
+      const base = Math.min(1000 * 2 ** attempt, 8000);
+      const jitter = Math.floor(Math.random() * 250);
+      await sleep(base + jitter);
+    }
+  }
+}
 
 const CLUSTER_ARN = process.env.CLUSTER_ARN!;
 const SECRET_ARN = process.env.SECRET_ARN!;
@@ -42,7 +82,7 @@ export async function executeStatement(
     includeResultMetadata: true,
   });
 
-  const result = await client.send(command);
+  const result = await withResumeRetry(() => client.send(command));
 
   const columns =
     result.columnMetadata?.map((col) => col.label || col.name || "") ?? [];

@@ -83,6 +83,8 @@ export default function Play() {
   const [showCongratsDialog, setShowCongratsDialog] = useState(false);
   const [finalTime, setFinalTime] = useState(0);
   const [newAchievements, setNewAchievements] = useState<AchievementUnlock[]>([]);
+  const [completionError, setCompletionError] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [debugOpen, setDebugOpen] = useState(false);
   const [debugJson, setDebugJson] = useState("");
@@ -98,28 +100,51 @@ export default function Play() {
     }
   }, [puzzle]);
 
+  // Persist the finished snapshot. saveSnapshot retries transient failures
+  // (e.g. Aurora resuming from a paused state); if it still fails we record the
+  // error so the solve isn't silently lost and the user can retry.
+  const persistCompletion = useCallback(
+    async (elapsedSeconds: number): Promise<boolean> => {
+      if (!puzzle || !attemptId) return false;
+      try {
+        const answer = extractAnswer(puzzle, userValuesRef.current);
+        const currentProgress = computeProgress(puzzle, userValuesRef.current) / 100;
+        const result = await saveSnapshot(attemptId, {
+          currentAnswer: answer,
+          progress: currentProgress,
+          elapsedSeconds,
+          finished: true,
+        });
+        if (result.newAchievements?.length) {
+          setNewAchievements(result.newAchievements);
+        }
+        setCompletionError(null);
+        return true;
+      } catch (err: unknown) {
+        setCompletionError(err instanceof Error ? err.message : "Save failed");
+        return false;
+      }
+    },
+    [puzzle, attemptId]
+  );
+
   const handleComplete = useCallback(async () => {
     if (!puzzle || !attemptId) return;
     const elapsedSeconds = timerRef.current?.getElapsed() ?? 0;
     timerRef.current?.stop();
     setFinalTime(elapsedSeconds);
-
-    try {
-      const answer = extractAnswer(puzzle, userValuesRef.current);
-      const currentProgress = computeProgress(puzzle, userValuesRef.current) / 100;
-      const result = await saveSnapshot(attemptId, {
-        currentAnswer: answer,
-        progress: currentProgress,
-        elapsedSeconds,
-        finished: true,
-      });
-      if (result.newAchievements?.length) {
-        setNewAchievements(result.newAchievements);
-      }
-    } catch {}
-
+    await persistCompletion(elapsedSeconds);
     setShowCongratsDialog(true);
-  }, [puzzle, attemptId]);
+  }, [puzzle, attemptId, persistCompletion]);
+
+  const handleRetryCompletion = useCallback(async () => {
+    setRetrying(true);
+    try {
+      await persistCompletion(finalTime);
+    } finally {
+      setRetrying(false);
+    }
+  }, [persistCompletion, finalTime]);
 
   useEffect(() => {
     if (!id) return;
@@ -294,6 +319,19 @@ export default function Play() {
           <div style={dialogStyle}>
             <h3>Congratulations!</h3>
             <p>You solved the puzzle in <strong>{formatElapsed(finalTime)}</strong>!</p>
+            {completionError && (
+              <div style={{ marginTop: "0.75rem", padding: "0.75rem", backgroundColor: "#fdecea", border: "1px solid #f5c6cb", borderRadius: 6, textAlign: "left" }}>
+                <div style={{ color: "#b71c1c", fontWeight: "bold", marginBottom: "0.25rem" }}>
+                  Your solve couldn't be saved.
+                </div>
+                <div style={{ fontSize: "0.85rem", color: "#555", marginBottom: "0.5rem" }}>
+                  {completionError}
+                </div>
+                <button onClick={handleRetryCompletion} disabled={retrying} style={btnPrimary}>
+                  {retrying ? "Retrying…" : "Retry save"}
+                </button>
+              </div>
+            )}
             {newAchievements.length > 0 && (
               <div style={{ marginTop: "1rem", textAlign: "left" }}>
                 <p style={{ fontWeight: "bold", marginBottom: "0.5rem" }}>Achievements Unlocked!</p>

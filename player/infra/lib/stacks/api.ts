@@ -23,7 +23,9 @@ export class ApiStack extends cdk.Stack {
         SECRET_ARN: props.cluster.secret!.secretArn,
         DATABASE_NAME: props.databaseName,
       },
-      timeout: cdk.Duration.seconds(10),
+      // 29s = API Gateway's max integration timeout. Gives the DB layer's
+      // resume-retry loop room to outlast an Aurora cold start (~10-25s).
+      timeout: cdk.Duration.seconds(29),
     });
 
     props.cluster.secret!.grantRead(puzzlesHandler);
@@ -38,7 +40,9 @@ export class ApiStack extends cdk.Stack {
         SECRET_ARN: props.cluster.secret!.secretArn,
         DATABASE_NAME: props.databaseName,
       },
-      timeout: cdk.Duration.seconds(10),
+      // 29s = API Gateway's max integration timeout. Gives the DB layer's
+      // resume-retry loop room to outlast an Aurora cold start (~10-25s).
+      timeout: cdk.Duration.seconds(29),
     });
 
     props.cluster.secret!.grantRead(collectionsHandler);
@@ -90,7 +94,9 @@ export class ApiStack extends cdk.Stack {
         SECRET_ARN: props.cluster.secret!.secretArn,
         DATABASE_NAME: props.databaseName,
       },
-      timeout: cdk.Duration.seconds(10),
+      // 29s = API Gateway's max integration timeout. Gives the DB layer's
+      // resume-retry loop room to outlast an Aurora cold start (~10-25s).
+      timeout: cdk.Duration.seconds(29),
     });
 
     props.cluster.secret!.grantRead(puzzleTypesHandler);
@@ -108,7 +114,9 @@ export class ApiStack extends cdk.Stack {
         SECRET_ARN: props.cluster.secret!.secretArn,
         DATABASE_NAME: props.databaseName,
       },
-      timeout: cdk.Duration.seconds(10),
+      // 29s = API Gateway's max integration timeout. Gives the DB layer's
+      // resume-retry loop room to outlast an Aurora cold start (~10-25s).
+      timeout: cdk.Duration.seconds(29),
     });
 
     props.cluster.secret!.grantRead(attemptsHandler);
@@ -123,7 +131,9 @@ export class ApiStack extends cdk.Stack {
         SECRET_ARN: props.cluster.secret!.secretArn,
         DATABASE_NAME: props.databaseName,
       },
-      timeout: cdk.Duration.seconds(10),
+      // 29s = API Gateway's max integration timeout. Gives the DB layer's
+      // resume-retry loop room to outlast an Aurora cold start (~10-25s).
+      timeout: cdk.Duration.seconds(29),
     });
 
     props.cluster.secret!.grantRead(profileHandler);
