@@ -182,3 +182,17 @@ export interface ChocoBananaAnswer {
   // rows x cols tri-state: 0 = unknown, 1 = shaded (chocolate), 2 = white-mark (banana)
   states: number[][];
 }
+
+export interface NumberLinkCanon {
+  // rows x cols: 0 = empty, positive integer = numbered endpoint (each value appears twice)
+  cells: number[][];
+}
+
+export interface NumberLinkAnswer {
+  edges: {
+    // h: rows x (cols-1) — segment between (r,c) and (r,c+1); 1 = drawn, 0 = none
+    h: number[][];
+    // v: (rows-1) x cols — segment between (r,c) and (r+1,c); 1 = drawn, 0 = none
+    v: number[][];
+  };
+}

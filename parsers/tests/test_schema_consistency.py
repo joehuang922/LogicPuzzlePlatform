@@ -10,6 +10,7 @@ import pytest
 from puzzle_parsers.sudoku.models import SudokuBoard
 from puzzle_parsers.combo_sudoku.models import ComboSudokuBoard
 from puzzle_parsers.nurimaze.models import NurimazeBoard
+from puzzle_parsers.number_link.models import NumberLinkBoard
 from puzzle_parsers.validate import validate_canon
 
 SCHEMA_DIR = Path(__file__).parents[2] / "schemas" / "canon"
@@ -18,6 +19,7 @@ MODELS = {
     "sudoku": SudokuBoard,
     "combo-sudoku": ComboSudokuBoard,
     "nurimaze": NurimazeBoard,
+    "number-link": NumberLinkBoard,
 }
 
 
@@ -91,3 +93,14 @@ def test_invalid_nurimaze_fails():
     }
     with pytest.raises(Exception):
         validate_canon("nurimaze", data)
+
+
+def test_valid_number_link_passes():
+    data = {"cells": [[1, 0], [0, 1]]}
+    validate_canon("number-link", data)
+
+
+def test_invalid_number_link_fails():
+    data = {"cells": [[1, 0], [0, -1]]}  # negative value out of range
+    with pytest.raises(Exception):
+        validate_canon("number-link", data)

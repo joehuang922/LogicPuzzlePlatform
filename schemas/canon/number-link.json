@@ -1,0 +1,19 @@
+{
+  "title": "Number Link Canonical Representation",
+  "description": "Rectangle grid where some cells contain positive integer endpoints. Each distinct value appears in exactly two cells. Players draw non-crossing paths connecting each pair, filling every cell.",
+  "type": "object",
+  "required": ["cells"],
+  "additionalProperties": false,
+  "properties": {
+    "cells": {
+      "description": "m x n grid of integers. 0 = empty cell, any positive integer = a numbered endpoint (each distinct value appears exactly twice, no upper limit).",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": { "type": "integer", "minimum": 0 },
+        "minItems": 1
+      },
+      "minItems": 1
+    }
+  }
+}

@@ -19,6 +19,7 @@ import { yajilinRenderer } from "./renderers/yajilin";
 import { fillominoRenderer } from "./renderers/fillomino";
 import { litsRenderer } from "./renderers/lits";
 import { chocoBananaRenderer } from "./renderers/chocoBanana";
+import { numberLinkRenderer } from "./renderers/numberLink";
 
 registerRenderer(comboSudokuRenderer);
 registerRenderer(sudokuRenderer);
@@ -36,6 +37,7 @@ registerRenderer(yajilinRenderer);
 registerRenderer(fillominoRenderer);
 registerRenderer(litsRenderer);
 registerRenderer(chocoBananaRenderer);
+registerRenderer(numberLinkRenderer);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

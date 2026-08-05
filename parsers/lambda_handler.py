@@ -82,6 +82,9 @@ def _init_parsers():
     from puzzle_parsers.choco_banana.parser import ChocoBananaParser
     print("  - ChocoBananaParser imported")
 
+    from puzzle_parsers.number_link.parser import NumberLinkParser
+    print("  - NumberLinkParser imported")
+
     _parsers = {
         1: SudokuParser(ocr_backend=_ocr),
         2: ComboSudokuParser(ocr_backend=_ocr),
@@ -99,6 +102,7 @@ def _init_parsers():
         14: FillominoParser(ocr_backend=_ocr),
         15: LitsParser(),
         16: ChocoBananaParser(ocr_backend=_ocr),
+        17: NumberLinkParser(ocr_backend=_ocr),
     }
     print("=== Parsers ready ===")
 

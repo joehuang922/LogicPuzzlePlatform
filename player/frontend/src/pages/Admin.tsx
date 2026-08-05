@@ -28,6 +28,7 @@ import YajilinEditor from "../components/YajilinEditor";
 import FillominoEditor from "../components/FillominoEditor";
 import LitsEditor from "../components/LitsEditor";
 import ChocoBananaEditor from "../components/ChocoBananaEditor";
+import NumberLinkEditor from "../components/NumberLinkEditor";
 import CanonPreview from "../components/CanonPreview";
 import BatchUploadForm from "../components/BatchUploadForm";
 import { extractBase64 } from "../utils/image";
@@ -150,7 +151,8 @@ function QuestionForm({
   const isFillomino = selectedTypeName === "fillomino";
   const isLits = selectedTypeName === "lits";
   const isChocoBanana = selectedTypeName === "choco-banana";
-  const hasEditor = isNurimaze || isSudoku || isComboSudoku || isDoubleChoco || isSlitherlink || isNonogram || isMasyu || isPencils || isNuritwin || isSlalom || isShakashaka || isKakuro || isYajilin || isFillomino || isLits || isChocoBanana;
+  const isNumberLink = selectedTypeName === "number-link";
+  const hasEditor = isNurimaze || isSudoku || isComboSudoku || isDoubleChoco || isSlitherlink || isNonogram || isMasyu || isPencils || isNuritwin || isSlalom || isShakashaka || isKakuro || isYajilin || isFillomino || isLits || isChocoBanana || isNumberLink;
 
   function validate(): boolean {
     const errs: Record<string, string> = {};
@@ -226,6 +228,9 @@ function QuestionForm({
         h = canon.grids.h.length + 1;
         w = canon.grids.v[0].length + 1;
       } else if (typeId === 16 && canon.cells) {
+        h = canon.cells.length;
+        w = canon.cells[0].length;
+      } else if (typeId === 17 && canon.cells) {
         h = canon.cells.length;
         w = canon.cells[0].length;
       }
@@ -471,6 +476,12 @@ function QuestionForm({
                 onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
                 onCancel={() => setEditorOpen(false)}
               />
+            ) : isNumberLink ? (
+              <NumberLinkEditor
+                initialCanon={canonRepr}
+                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
+                onCancel={() => setEditorOpen(false)}
+              />
             ) : (
               <ComboSudokuEditor
                 initialJson={canonRepr}
@@ -548,7 +559,8 @@ function PuzzleEditRow({
   const isFillomino = typeName === "fillomino";
   const isLits = typeName === "lits";
   const isChocoBanana = typeName === "choco-banana";
-  const hasEditor = isNurimaze || isSudoku || isComboSudoku || isDoubleChoco || isSlitherlink || isNonogram || isMasyu || isPencils || isNuritwin || isSlalom || isShakashaka || isKakuro || isYajilin || isFillomino || isLits || isChocoBanana;
+  const isNumberLink = typeName === "number-link";
+  const hasEditor = isNurimaze || isSudoku || isComboSudoku || isDoubleChoco || isSlitherlink || isNonogram || isMasyu || isPencils || isNuritwin || isSlalom || isShakashaka || isKakuro || isYajilin || isFillomino || isLits || isChocoBanana || isNumberLink;
 
   async function handleConfirm() {
     let parsedCanon: Record<string, unknown>;
@@ -714,6 +726,12 @@ function PuzzleEditRow({
               ) : isChocoBanana ? (
                 <ChocoBananaEditor
                   initialJson={canonRepr}
+                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
+                  onCancel={() => setEditorOpen(false)}
+                />
+              ) : isNumberLink ? (
+                <NumberLinkEditor
+                  initialCanon={canonRepr}
                   onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
                   onCancel={() => setEditorOpen(false)}
                 />
