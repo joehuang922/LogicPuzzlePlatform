@@ -1,0 +1,43 @@
+{
+  "title": "Hell Golf Canonical Representation",
+  "description": "Rectangle grid with lakes (thick-bordered gray cells), balls (circled numbers), and goals (H marks). Board dimensions derive from the lakes grid. Ball count equals goal count. Player moves each ball onto a distinct goal.",
+  "type": "object",
+  "required": ["lakes", "balls", "goals"],
+  "additionalProperties": false,
+  "properties": {
+    "lakes": {
+      "description": "height x width grid. 1 = lake cell (may not be stopped on), 0 = normal cell. Board dimensions derive from this array.",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": { "type": "integer", "minimum": 0, "maximum": 1 },
+        "minItems": 1
+      },
+      "minItems": 1
+    },
+    "balls": {
+      "description": "List of balls. Each has 0-indexed position (r, c) and starting number n (>= 1).",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["r", "c", "n"],
+        "additionalProperties": false,
+        "properties": {
+          "r": { "type": "integer", "minimum": 0 },
+          "c": { "type": "integer", "minimum": 0 },
+          "n": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "goals": {
+      "description": "List of goal positions [r, c] (H marks). Must have the same length as balls.",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": { "type": "integer", "minimum": 0 },
+        "minItems": 2,
+        "maxItems": 2
+      }
+    }
+  }
+}

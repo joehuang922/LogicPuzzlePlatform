@@ -11,6 +11,7 @@ from puzzle_parsers.sudoku.models import SudokuBoard
 from puzzle_parsers.combo_sudoku.models import ComboSudokuBoard
 from puzzle_parsers.nurimaze.models import NurimazeBoard
 from puzzle_parsers.number_link.models import NumberLinkBoard
+from puzzle_parsers.hell_golf.models import HellGolfBoard
 from puzzle_parsers.validate import validate_canon
 
 SCHEMA_DIR = Path(__file__).parents[2] / "schemas" / "canon"
@@ -20,6 +21,7 @@ MODELS = {
     "combo-sudoku": ComboSudokuBoard,
     "nurimaze": NurimazeBoard,
     "number-link": NumberLinkBoard,
+    "hell-golf": HellGolfBoard,
 }
 
 
@@ -104,3 +106,22 @@ def test_invalid_number_link_fails():
     data = {"cells": [[1, 0], [0, -1]]}  # negative value out of range
     with pytest.raises(Exception):
         validate_canon("number-link", data)
+
+
+def test_valid_hell_golf_passes():
+    data = {
+        "lakes": [[0, 1], [0, 0]],
+        "balls": [{"r": 0, "c": 0, "n": 1}],
+        "goals": [[1, 1]],
+    }
+    validate_canon("hell-golf", data)
+
+
+def test_invalid_hell_golf_fails():
+    data = {
+        "lakes": [[0, 2], [0, 0]],  # 2 is out of range (only 0/1 allowed)
+        "balls": [{"r": 0, "c": 0, "n": 1}],
+        "goals": [[1, 1]],
+    }
+    with pytest.raises(Exception):
+        validate_canon("hell-golf", data)

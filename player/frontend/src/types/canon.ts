@@ -206,3 +206,24 @@ export interface AkariAnswer {
   // rows x cols (only white cells): 0 = empty, 1 = bulb, 2 = dot/no-bulb mark
   states: number[][];
 }
+
+export interface HellGolfBall {
+  r: number;
+  c: number;
+  n: number;
+}
+
+export interface HellGolfCanon {
+  // height x width: 1 = lake cell (may not be stopped on), 0 = normal cell
+  lakes: number[][];
+  // balls with position (r, c) and starting number n; count equals goals.length
+  balls: HellGolfBall[];
+  // goal positions [r, c] (H marks); count equals balls.length
+  goals: number[][];
+}
+
+export interface HellGolfAnswer {
+  // aligned by index with canon.balls; each trail is an ordered list of stop cells
+  // starting at the ball origin and ending on a goal
+  trails: { path: number[][] }[];
+}

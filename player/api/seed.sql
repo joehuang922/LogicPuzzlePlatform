@@ -85,7 +85,8 @@ INSERT INTO puzzle_types (id, name, rule) VALUES
   (15, 'lits', 'Shade one L, I, T, or S tetromino in every region. All shaded cells form a single connected group. No 2x2 area is fully shaded. Two tetrominoes of the same shape may not be orthogonally adjacent.'),
   (16, 'choco-banana', 'Shade some cells. Every group of connected shaded cells must form a rectangle; every group of connected unshaded cells must not form a rectangle. A number indicates the size of the group (shaded or unshaded) that its cell belongs to.'),
   (17, 'number-link', 'Connect each pair of matching numbers with a single continuous path running horizontally or vertically between cells. Paths may not cross or overlap, and every cell must be used by exactly one path.'),
-  (18, 'akari', 'Place light bulbs in white cells. Each bulb lights its row and column until blocked by a black wall. Every white cell must be lit, and no bulb may light another. A numbered wall must have exactly that many bulbs orthogonally adjacent.');
+  (18, 'akari', 'Place light bulbs in white cells. Each bulb lights its row and column until blocked by a black wall. Every white cell must be lit, and no bulb may light another. A numbered wall must have exactly that many bulbs orthogonally adjacent.'),
+  (19, 'hell-golf', 'Move every ball onto a goal (H). A ball with number k slides k cells in a straight line, then its number drops by 1; a ball at 0 cannot move. Moves may not stop on a lake (gray region) but may slide across one. Trails may not cross each other or themselves, or pass over other balls and goals. Each ball ends on its own distinct goal.');
 
 -- Seed sample puzzle: sudoku (difficulty 4 = hard)
 INSERT INTO puzzle_questions (id, puzzle_type, title, difficulty, width, height, canon_repr) VALUES (

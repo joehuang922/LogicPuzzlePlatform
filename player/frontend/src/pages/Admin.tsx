@@ -30,6 +30,7 @@ import LitsEditor from "../components/LitsEditor";
 import ChocoBananaEditor from "../components/ChocoBananaEditor";
 import NumberLinkEditor from "../components/NumberLinkEditor";
 import AkariEditor from "../components/AkariEditor";
+import HellGolfEditor from "../components/HellGolfEditor";
 import CanonPreview from "../components/CanonPreview";
 import BatchUploadForm from "../components/BatchUploadForm";
 import { extractBase64 } from "../utils/image";
@@ -154,7 +155,8 @@ function QuestionForm({
   const isChocoBanana = selectedTypeName === "choco-banana";
   const isNumberLink = selectedTypeName === "number-link";
   const isAkari = selectedTypeName === "akari";
-  const hasEditor = isNurimaze || isSudoku || isComboSudoku || isDoubleChoco || isSlitherlink || isNonogram || isMasyu || isPencils || isNuritwin || isSlalom || isShakashaka || isKakuro || isYajilin || isFillomino || isLits || isChocoBanana || isNumberLink || isAkari;
+  const isHellGolf = selectedTypeName === "hell-golf";
+  const hasEditor = isNurimaze || isSudoku || isComboSudoku || isDoubleChoco || isSlitherlink || isNonogram || isMasyu || isPencils || isNuritwin || isSlalom || isShakashaka || isKakuro || isYajilin || isFillomino || isLits || isChocoBanana || isNumberLink || isAkari || isHellGolf;
 
   function validate(): boolean {
     const errs: Record<string, string> = {};
@@ -238,6 +240,9 @@ function QuestionForm({
       } else if (typeId === 18 && canon.cells) {
         h = canon.cells.length;
         w = canon.cells[0].length;
+      } else if (typeId === 19 && canon.lakes) {
+        h = canon.lakes.length;
+        w = canon.lakes[0].length;
       }
       const res = await createPuzzle({
         puzzleType: typeId,
@@ -493,6 +498,12 @@ function QuestionForm({
                 onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
                 onCancel={() => setEditorOpen(false)}
               />
+            ) : isHellGolf ? (
+              <HellGolfEditor
+                initialCanon={canonRepr}
+                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
+                onCancel={() => setEditorOpen(false)}
+              />
             ) : (
               <ComboSudokuEditor
                 initialJson={canonRepr}
@@ -572,7 +583,8 @@ function PuzzleEditRow({
   const isChocoBanana = typeName === "choco-banana";
   const isNumberLink = typeName === "number-link";
   const isAkari = typeName === "akari";
-  const hasEditor = isNurimaze || isSudoku || isComboSudoku || isDoubleChoco || isSlitherlink || isNonogram || isMasyu || isPencils || isNuritwin || isSlalom || isShakashaka || isKakuro || isYajilin || isFillomino || isLits || isChocoBanana || isNumberLink || isAkari;
+  const isHellGolf = typeName === "hell-golf";
+  const hasEditor = isNurimaze || isSudoku || isComboSudoku || isDoubleChoco || isSlitherlink || isNonogram || isMasyu || isPencils || isNuritwin || isSlalom || isShakashaka || isKakuro || isYajilin || isFillomino || isLits || isChocoBanana || isNumberLink || isAkari || isHellGolf;
 
   async function handleConfirm() {
     let parsedCanon: Record<string, unknown>;
@@ -750,6 +762,12 @@ function PuzzleEditRow({
               ) : isAkari ? (
                 <AkariEditor
                   initialJson={canonRepr}
+                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
+                  onCancel={() => setEditorOpen(false)}
+                />
+              ) : isHellGolf ? (
+                <HellGolfEditor
+                  initialCanon={canonRepr}
                   onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
                   onCancel={() => setEditorOpen(false)}
                 />

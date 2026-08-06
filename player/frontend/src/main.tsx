@@ -21,6 +21,7 @@ import { litsRenderer } from "./renderers/lits";
 import { chocoBananaRenderer } from "./renderers/chocoBanana";
 import { numberLinkRenderer } from "./renderers/numberLink";
 import { akariRenderer } from "./renderers/akari";
+import { hellGolfRenderer } from "./renderers/hellGolf";
 
 registerRenderer(comboSudokuRenderer);
 registerRenderer(sudokuRenderer);
@@ -40,6 +41,7 @@ registerRenderer(litsRenderer);
 registerRenderer(chocoBananaRenderer);
 registerRenderer(numberLinkRenderer);
 registerRenderer(akariRenderer);
+registerRenderer(hellGolfRenderer);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
