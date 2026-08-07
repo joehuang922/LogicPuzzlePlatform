@@ -18,7 +18,17 @@ from puzzle_parsers.akari.models import AkariBoard
 from puzzle_parsers.recognition import CellRecognizer, GeminiRecognizer
 from puzzle_parsers.recognition_schemas import INT_CELL_PROMPT
 
-BLACK_THRESHOLD = 100
+# A wall cell is mostly dark. We classify by the *fraction* of dark pixels
+# rather than the mean intensity: numbered walls print the digit white-on-black,
+# so their mean brightness is pulled up past a mean-based threshold and they
+# would be misread as empty. The dark fraction stays high for both plain walls
+# (~1.0) and numbered walls (~0.5), while empty cells are ~0.0.
+DARK_PIXEL_VALUE = 100
+WALL_DARK_FRACTION = 0.35
+# A numbered wall's white digit keeps its dark fraction around 0.72-0.77, while
+# a plain wall is near-solid (~1.0). Above this cutoff there is no real digit,
+# so any LLM-reported number is vetoed as a hallucination.
+DIGIT_MAX_DARK_FRACTION = 0.9
 
 
 class AkariParser(PuzzleParser):
@@ -63,6 +73,7 @@ class AkariParser(PuzzleParser):
         cells: list[list[int]] = []
         black_cell_coords: list[tuple[int, int]] = []
         black_cell_crops: list[NDArray] = []
+        black_cell_dark_fractions: list[float] = []
 
         for r in range(rows):
             row: list[int] = []
@@ -78,13 +89,14 @@ class AkariParser(PuzzleParser):
                 mx = int(cell_w * margin_ratio)
 
                 roi = warped_gray[y1 + my: y2 - my, x1 + mx: x2 - mx]
-                mean_val = np.mean(roi)
+                dark_fraction = float(np.mean(roi < DARK_PIXEL_VALUE))
 
-                if mean_val < BLACK_THRESHOLD:
+                if dark_fraction > WALL_DARK_FRACTION:
                     # Black cell (wall) — need to determine if numbered
                     row.append(5)  # placeholder, will be updated
                     black_cell_coords.append((r, c))
                     black_cell_crops.append(roi)
+                    black_cell_dark_fractions.append(dark_fraction)
                 else:
                     row.append(-1)  # white/empty
             cells.append(row)
@@ -114,7 +126,11 @@ class AkariParser(PuzzleParser):
                 if i >= len(flat_results):
                     break
                 val = flat_results[i]
-                if 0 <= val <= 4:
+                # A genuine white-on-black digit occupies a meaningful chunk of
+                # the cell, so a numbered wall's dark fraction sits well below a
+                # solid wall's (~0.75 vs ~1.0). If the LLM reports a digit but the
+                # crop is near-solid black, it's a hallucination — treat as plain.
+                if 0 <= val <= 4 and black_cell_dark_fractions[i] < DIGIT_MAX_DARK_FRACTION:
                     cells[r][c] = val
                 else:
                     cells[r][c] = 5  # black with no number
