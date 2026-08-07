@@ -12,6 +12,7 @@ from puzzle_parsers.combo_sudoku.models import ComboSudokuBoard
 from puzzle_parsers.nurimaze.models import NurimazeBoard
 from puzzle_parsers.number_link.models import NumberLinkBoard
 from puzzle_parsers.hell_golf.models import HellGolfBoard
+from puzzle_parsers.tentaishow.models import TentaishowBoard
 from puzzle_parsers.validate import validate_canon
 
 SCHEMA_DIR = Path(__file__).parents[2] / "schemas" / "canon"
@@ -22,6 +23,7 @@ MODELS = {
     "nurimaze": NurimazeBoard,
     "number-link": NumberLinkBoard,
     "hell-golf": HellGolfBoard,
+    "tentaishow": TentaishowBoard,
 }
 
 
@@ -125,3 +127,22 @@ def test_invalid_hell_golf_fails():
     }
     with pytest.raises(Exception):
         validate_canon("hell-golf", data)
+
+
+def test_valid_tentaishow_passes():
+    data = {
+        "width": 10,
+        "height": 10,
+        "dots": [{"dr": 1, "dc": 5, "color": 0}, {"dr": 4, "dc": 4, "color": 1}],
+    }
+    validate_canon("tentaishow", data)
+
+
+def test_invalid_tentaishow_fails():
+    data = {
+        "width": 10,
+        "height": 10,
+        "dots": [{"dr": 1, "dc": 5, "color": 2}],  # color out of range (0/1 only)
+    }
+    with pytest.raises(Exception):
+        validate_canon("tentaishow", data)

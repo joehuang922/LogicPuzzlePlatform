@@ -24,6 +24,7 @@ import ChocoBananaEditor from "./ChocoBananaEditor";
 import NumberLinkEditor from "./NumberLinkEditor";
 import AkariEditor from "./AkariEditor";
 import HellGolfEditor from "./HellGolfEditor";
+import TentaishowEditor from "./TentaishowEditor";
 
 const MAX_IMAGES = 50;
 const PARSE_CONCURRENCY = 3;
@@ -69,6 +70,9 @@ function computeDimensions(typeId: number, canon: Record<string, unknown>): { w?
   if (typeId === 19 && canon.lakes) {
     const lakes = canon.lakes as unknown[][];
     return { h: lakes.length, w: (lakes[0] as unknown[]).length };
+  }
+  if (typeId === 20 && typeof canon.width === "number" && typeof canon.height === "number") {
+    return { w: canon.width as number, h: canon.height as number };
   }
   return {};
 }
@@ -145,6 +149,9 @@ function InlineEditor({
   if (typeName === "hell-golf") {
     return <HellGolfEditor initialCanon={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
   }
+  if (typeName === "tentaishow") {
+    return <TentaishowEditor initialJson={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
+  }
   return null;
 }
 
@@ -172,7 +179,7 @@ function BatchItemRow({
   onToggleEditor: () => void;
 }) {
   const typeName = puzzleTypes.find((pt) => pt.id === puzzleType)?.name;
-  const hasEditor = ["nurimaze", "sudoku", "combo-sudoku", "double-choco", "slitherlink", "nonogram", "masyu", "pencils", "nuritwin", "slalom", "shakashaka", "kakuro", "yajilin", "fillomino", "lits", "choco-banana", "number-link", "akari", "hell-golf"].includes(typeName || "");
+  const hasEditor = ["nurimaze", "sudoku", "combo-sudoku", "double-choco", "slitherlink", "nonogram", "masyu", "pencils", "nuritwin", "slalom", "shakashaka", "kakuro", "yajilin", "fillomino", "lits", "choco-banana", "number-link", "akari", "hell-golf", "tentaishow"].includes(typeName || "");
 
   return (
     <div style={{ border: "1px solid #eee", borderRadius: 6, padding: "0.75rem", background: item.editorOpen ? "#fffbe6" : "#fff" }}>

@@ -1,0 +1,47 @@
+{
+  "title": "Tentai Show (Spiral Galaxies) Canonical Representation",
+  "description": "A width x height grid with dashed interior lines and a solid outer border. Dots (galaxy centers) sit at cell centers, edge midpoints, or grid corners, encoded in doubled coordinates where cell (r, c) center is (2r+1, 2c+1). Each dot is an open (white) or filled (black) circle; color is cosmetic. The solver divides the grid into connected regions, one dot each, with 180-degree rotational symmetry about the dot.",
+  "type": "object",
+  "required": ["width", "height", "dots"],
+  "additionalProperties": false,
+  "properties": {
+    "width": {
+      "description": "Number of columns.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "height": {
+      "description": "Number of rows.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "dots": {
+      "description": "List of galaxy centers.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["dr", "dc", "color"],
+        "additionalProperties": false,
+        "properties": {
+          "dr": {
+            "description": "Doubled row coordinate. Interior: 1 <= dr <= 2*height - 1.",
+            "type": "integer",
+            "minimum": 1
+          },
+          "dc": {
+            "description": "Doubled column coordinate. Interior: 1 <= dc <= 2*width - 1.",
+            "type": "integer",
+            "minimum": 1
+          },
+          "color": {
+            "description": "0 = open/white circle, 1 = filled/black circle. Cosmetic only.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    }
+  }
+}

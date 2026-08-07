@@ -18,6 +18,7 @@ import chocoBananaSchema from "../../../../schemas/canon/choco-banana.json";
 import numberLinkSchema from "../../../../schemas/canon/number-link.json";
 import akariSchema from "../../../../schemas/canon/akari.json";
 import hellGolfSchema from "../../../../schemas/canon/hell-golf.json";
+import tentaishowSchema from "../../../../schemas/canon/tentaishow.json";
 
 const ajv = new Ajv();
 
@@ -41,6 +42,7 @@ const validators: Record<number, ValidateFunction> = {
   17: ajv.compile(numberLinkSchema),
   18: ajv.compile(akariSchema),
   19: ajv.compile(hellGolfSchema),
+  20: ajv.compile(tentaishowSchema),
 };
 
 export function validateCanon(puzzleType: number, data: unknown): void {

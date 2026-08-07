@@ -227,3 +227,28 @@ export interface HellGolfAnswer {
   // starting at the ball origin and ending on a goal
   trails: { path: number[][] }[];
 }
+
+export interface TentaishowDot {
+  // doubled coordinates: cell (r, c) center is (2r+1, 2c+1).
+  // parity of (dr, dc): odd/odd = cell center, odd/even = vertical edge,
+  // even/odd = horizontal edge, even/even = grid corner.
+  dr: number;
+  dc: number;
+  // 0 = open/white circle, 1 = filled/black circle (cosmetic only)
+  color: number;
+}
+
+export interface TentaishowCanon {
+  width: number;
+  height: number;
+  dots: TentaishowDot[];
+}
+
+export interface TentaishowAnswer {
+  edges: {
+    // h: (height-1) x width — wall between row r and row r+1 at col c; 1 = wall, 0 = none
+    h: number[][];
+    // v: height x (width-1) — wall between col c and col c+1 at row r; 1 = wall, 0 = none
+    v: number[][];
+  };
+}
