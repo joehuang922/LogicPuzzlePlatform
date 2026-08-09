@@ -14,6 +14,7 @@ from puzzle_parsers.number_link.models import NumberLinkBoard
 from puzzle_parsers.hell_golf.models import HellGolfBoard
 from puzzle_parsers.tentaishow.models import TentaishowBoard
 from puzzle_parsers.heyawake.models import HeyawakeBoard
+from puzzle_parsers.shikaku.models import ShikakuBoard
 from puzzle_parsers.validate import validate_canon
 
 SCHEMA_DIR = Path(__file__).parents[2] / "schemas" / "canon"
@@ -26,6 +27,7 @@ MODELS = {
     "hell-golf": HellGolfBoard,
     "tentaishow": TentaishowBoard,
     "heyawake": HeyawakeBoard,
+    "shikaku": ShikakuBoard,
 }
 
 
@@ -171,3 +173,14 @@ def test_invalid_heyawake_fails():
     }
     with pytest.raises(Exception):
         validate_canon("heyawake", data)
+
+
+def test_valid_shikaku_passes():
+    data = {"cells": [[6, 0, 4], [0, 0, 0], [2, 0, 0]]}
+    validate_canon("shikaku", data)
+
+
+def test_invalid_shikaku_fails():
+    data = {"cells": [[6, 0, 4], [0, -1, 0]]}  # negative value out of range
+    with pytest.raises(Exception):
+        validate_canon("shikaku", data)

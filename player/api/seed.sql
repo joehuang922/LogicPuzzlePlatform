@@ -88,7 +88,8 @@ INSERT INTO puzzle_types (id, name, rule) VALUES
   (18, 'akari', 'Place light bulbs in white cells. Each bulb lights its row and column until blocked by a black wall. Every white cell must be lit, and no bulb may light another. A numbered wall must have exactly that many bulbs orthogonally adjacent.'),
   (19, 'hell-golf', 'Move every ball onto a goal (H). A ball with number k slides k cells in a straight line, then its number drops by 1; a ball at 0 cannot move. Moves may not stop on a lake (gray region) but may slide across one. Trails may not cross each other or themselves, or pass over other balls and goals. Each ball ends on its own distinct goal.'),
   (20, 'tentaishow', 'Divide the grid into regions by drawing walls along cell edges. Each region contains exactly one dot and has 180-degree rotational symmetry about that dot. Every cell belongs to exactly one connected region.'),
-  (21, 'heyawake', 'Paint cells black. A number in a room gives exactly how many of its cells are black. No two black cells may be orthogonally adjacent. All white cells must stay connected. No straight horizontal or vertical run of white cells may span three or more rooms.');
+  (21, 'heyawake', 'Paint cells black. A number in a room gives exactly how many of its cells are black. No two black cells may be orthogonally adjacent. All white cells must stay connected. No straight horizontal or vertical run of white cells may span three or more rooms.'),
+  (22, 'shikaku', 'Divide the grid into rectangles. Each rectangle contains exactly one number, and that number equals the rectangle''s area (its width times height in cells). Rectangles may not overlap, and every cell must belong to exactly one rectangle.');
 
 -- Seed sample puzzle: sudoku (difficulty 4 = hard)
 INSERT INTO puzzle_questions (id, puzzle_type, title, difficulty, width, height, canon_repr) VALUES (

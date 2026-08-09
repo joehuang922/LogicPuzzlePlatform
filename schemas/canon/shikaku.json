@@ -1,0 +1,19 @@
+{
+  "title": "Shikaku Canonical Representation",
+  "description": "Rectangle grid where some cells carry positive integer clues. Players divide the whole grid into rectangles, each containing exactly one clue whose value equals the rectangle's area.",
+  "type": "object",
+  "required": ["cells"],
+  "additionalProperties": false,
+  "properties": {
+    "cells": {
+      "description": "m x n grid of integers. 0 = empty (no clue), positive integer = area clue.",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": { "type": "integer", "minimum": 0 },
+        "minItems": 1
+      },
+      "minItems": 1
+    }
+  }
+}

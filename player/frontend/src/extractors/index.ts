@@ -20,6 +20,7 @@ import { akariExtractor } from "./akari";
 import { hellGolfExtractor } from "./hellGolf";
 import { tentaishowExtractor } from "./tentaishow";
 import { heyawakeExtractor } from "./heyawake";
+import { shikakuExtractor } from "./shikaku";
 
 const extractorRegistry = new Map<number, AnswerExtractor>();
 
@@ -48,6 +49,7 @@ registerExtractor(akariExtractor);
 registerExtractor(hellGolfExtractor);
 registerExtractor(tentaishowExtractor);
 registerExtractor(heyawakeExtractor);
+registerExtractor(shikakuExtractor);
 
 export function getExtractor(puzzleType: number): AnswerExtractor | undefined {
   return extractorRegistry.get(puzzleType);

@@ -100,6 +100,11 @@ If any of these are missing, ask before proceeding.
 ## Phase 11: Database
 
 1. Add an `INSERT INTO puzzle_types` entry in `player/api/seed.sql` with the new ID, name, and rule text.
+2. Apply just the new row to the live DB (do NOT run the whole `seed.sql` via `--file` — it is a destructive reset + sample seed). Use the idempotent MySQL upsert with `player/api/db.sh`:
+   ```
+   ./player/api/db.sh "INSERT INTO puzzle_types (id, name, rule) VALUES (<id>, '<name>', '<rule>') ON DUPLICATE KEY UPDATE name = VALUES(name), rule = VALUES(rule)"
+   ```
+   Notes: escape single quotes in the rule text by doubling them (`''`). The DB is MySQL (RDS Data API), so use `ON DUPLICATE KEY UPDATE`, not Postgres `ON CONFLICT`. Aurora Serverless auto-pauses — if the first call returns `DatabaseResumingException`, wait ~12s and retry. Verify with `./player/api/db.sh "SELECT id, name FROM puzzle_types WHERE id = <id>"`.
 
 ## Phase 12: Verify
 

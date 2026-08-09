@@ -42,6 +42,24 @@ HEYAWAKE_CLUE_PROMPT = (
 )
 
 
+# Shikaku clue montage: every tile shown contains a printed clue number
+# (blank cells are filtered out before the montage is built), so the model must
+# never answer -1. Clues are the rectangle area and are frequently multi-digit
+# (e.g. 10, 12, 18), so we tell the model to read the full number rather than a
+# single digit. The crops have already been inverted to dark-on-light before
+# the montage is assembled.
+SHIKAKU_CLUE_PROMPT = (
+    "This image shows a grid of cells cropped from a shikaku puzzle. "
+    "Each cell is labeled with its row,col position and contains exactly one "
+    "printed clue number. Every cell shown has a number — none are blank. "
+    "Each number is a positive integer that may have one or two digits "
+    "(for example 2, 4, 9, 10, 12, 18). Read the entire number in each cell, "
+    "not just the first digit. "
+    "Respond with ONLY a JSON array of arrays (rows of integers), one entry per "
+    "cell. Example for a 1x3: [[6,12,4]]. No explanation, just the JSON."
+)
+
+
 # Case B: symbol enum (nurimaze)
 # Represented as plain int: 0=empty, 1=circle, 2=triangle, 3=S, 4=G
 SymbolCell = int

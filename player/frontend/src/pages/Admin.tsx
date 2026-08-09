@@ -33,6 +33,7 @@ import AkariEditor from "../components/AkariEditor";
 import HellGolfEditor from "../components/HellGolfEditor";
 import TentaishowEditor from "../components/TentaishowEditor";
 import HeyawakeEditor from "../components/HeyawakeEditor";
+import ShikakuEditor from "../components/ShikakuEditor";
 import CanonPreview from "../components/CanonPreview";
 import BatchUploadForm from "../components/BatchUploadForm";
 import { extractBase64 } from "../utils/image";
@@ -160,7 +161,8 @@ function QuestionForm({
   const isHellGolf = selectedTypeName === "hell-golf";
   const isTentaishow = selectedTypeName === "tentaishow";
   const isHeyawake = selectedTypeName === "heyawake";
-  const hasEditor = isNurimaze || isSudoku || isComboSudoku || isDoubleChoco || isSlitherlink || isNonogram || isMasyu || isPencils || isNuritwin || isSlalom || isShakashaka || isKakuro || isYajilin || isFillomino || isLits || isChocoBanana || isNumberLink || isAkari || isHellGolf || isTentaishow || isHeyawake;
+  const isShikaku = selectedTypeName === "shikaku";
+  const hasEditor = isNurimaze || isSudoku || isComboSudoku || isDoubleChoco || isSlitherlink || isNonogram || isMasyu || isPencils || isNuritwin || isSlalom || isShakashaka || isKakuro || isYajilin || isFillomino || isLits || isChocoBanana || isNumberLink || isAkari || isHellGolf || isTentaishow || isHeyawake || isShikaku;
 
   function validate(): boolean {
     const errs: Record<string, string> = {};
@@ -253,6 +255,9 @@ function QuestionForm({
       } else if (typeId === 21 && canon.width && canon.height) {
         w = canon.width;
         h = canon.height;
+      } else if (typeId === 22 && canon.cells) {
+        h = canon.cells.length;
+        w = canon.cells[0].length;
       }
       const res = await createPuzzle({
         puzzleType: typeId,
@@ -526,6 +531,12 @@ function QuestionForm({
                 onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
                 onCancel={() => setEditorOpen(false)}
               />
+            ) : isShikaku ? (
+              <ShikakuEditor
+                initialJson={canonRepr}
+                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
+                onCancel={() => setEditorOpen(false)}
+              />
             ) : (
               <ComboSudokuEditor
                 initialJson={canonRepr}
@@ -608,7 +619,8 @@ function PuzzleEditRow({
   const isHellGolf = typeName === "hell-golf";
   const isTentaishow = typeName === "tentaishow";
   const isHeyawake = typeName === "heyawake";
-  const hasEditor = isNurimaze || isSudoku || isComboSudoku || isDoubleChoco || isSlitherlink || isNonogram || isMasyu || isPencils || isNuritwin || isSlalom || isShakashaka || isKakuro || isYajilin || isFillomino || isLits || isChocoBanana || isNumberLink || isAkari || isHellGolf || isTentaishow || isHeyawake;
+  const isShikaku = typeName === "shikaku";
+  const hasEditor = isNurimaze || isSudoku || isComboSudoku || isDoubleChoco || isSlitherlink || isNonogram || isMasyu || isPencils || isNuritwin || isSlalom || isShakashaka || isKakuro || isYajilin || isFillomino || isLits || isChocoBanana || isNumberLink || isAkari || isHellGolf || isTentaishow || isHeyawake || isShikaku;
 
   async function handleConfirm() {
     let parsedCanon: Record<string, unknown>;
@@ -803,6 +815,12 @@ function PuzzleEditRow({
                 />
               ) : isHeyawake ? (
                 <HeyawakeEditor
+                  initialJson={canonRepr}
+                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
+                  onCancel={() => setEditorOpen(false)}
+                />
+              ) : isShikaku ? (
+                <ShikakuEditor
                   initialJson={canonRepr}
                   onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
                   onCancel={() => setEditorOpen(false)}

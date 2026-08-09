@@ -19,7 +19,8 @@ import AkariBoard from "./AkariBoard";
 import HellGolfBoard from "./HellGolfBoard";
 import TentaishowBoard from "./TentaishowBoard";
 import HeyawakeBoard from "./HeyawakeBoard";
-import { NurimazeCanon, DoubleChocoCanon, SlitherlinkCanon, NonogramCanon, MasyuCanon, PencilsCanon, NuritwinCanon, SlalomCanon, ShakashakaCanon, KakuroCanon, YajilinCanon, FillominoCanon, LitsCanon, ChocoBananaCanon, NumberLinkCanon, AkariCanon, HellGolfCanon, TentaishowCanon, HeyawakeCanon } from "../types/canon";
+import ShikakuBoard from "./ShikakuBoard";
+import { NurimazeCanon, DoubleChocoCanon, SlitherlinkCanon, NonogramCanon, MasyuCanon, PencilsCanon, NuritwinCanon, SlalomCanon, ShakashakaCanon, KakuroCanon, YajilinCanon, FillominoCanon, LitsCanon, ChocoBananaCanon, NumberLinkCanon, AkariCanon, HellGolfCanon, TentaishowCanon, HeyawakeCanon, ShikakuCanon } from "../types/canon";
 
 export default function CanonPreview({ puzzleType, canonRepr }: { puzzleType: number; canonRepr: string }) {
   let parsed: Record<string, unknown>;
@@ -91,6 +92,9 @@ export default function CanonPreview({ puzzleType, canonRepr }: { puzzleType: nu
   }
   if (puzzleType === 21 && parsed.rooms) {
     return <HeyawakeBoard canon={parsed as unknown as HeyawakeCanon} readonly />;
+  }
+  if (puzzleType === 22 && parsed.cells) {
+    return <ShikakuBoard canon={parsed as unknown as ShikakuCanon} readonly />;
   }
   return <p style={{ color: "#666", fontSize: "0.85rem" }}>No preview available for this puzzle type.</p>;
 }

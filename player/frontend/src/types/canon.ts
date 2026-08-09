@@ -274,3 +274,19 @@ export interface HeyawakeAnswer {
   // height x width; 0 = unset, 1 = black, 2 = white-marked
   states: number[][];
 }
+
+export interface ShikakuCanon {
+  // rows x cols; 0 = empty (no clue), positive integer = area clue
+  cells: number[][];
+}
+
+export interface ShikakuRect {
+  r: number; // top row (0-based)
+  c: number; // left column (0-based)
+  w: number; // width in columns (>= 1)
+  h: number; // height in rows (>= 1)
+}
+
+export interface ShikakuAnswer {
+  rects: ShikakuRect[];
+}
