@@ -194,13 +194,18 @@ class HeyawakeParser(PuzzleParser):
         if not clue_crops:
             return clues
 
-        # Pack candidate crops into a compact grid montage (~10 columns).
+        # Pack candidate crops into a compact grid montage (~10 columns). The
+        # last row is padded to a full rectangle by repeating a real clue crop
+        # (never a blank tile): HEYAWAKE_CLUE_PROMPT tells the model every cell
+        # contains a digit, so padding with blanks would make the model return a
+        # short final row and fail recognize()'s rectangularity check. The extra
+        # recognized values map past clue_coords and are simply ignored below.
         cols_per_row = min(10, len(clue_crops))
         crop_grid: list[list[NDArray]] = []
         for i in range(0, len(clue_crops), cols_per_row):
             row_crops = clue_crops[i : i + cols_per_row]
             while len(row_crops) < cols_per_row:
-                row_crops.append(np.full_like(clue_crops[0], 255))
+                row_crops.append(clue_crops[0])
             crop_grid.append(row_crops)
 
         raw = self._recognizer.recognize(crop_grid, HEYAWAKE_CLUE_PROMPT)
