@@ -247,6 +247,33 @@ export default function TentaishowBoard({
     return { regionIds, regionColor };
   }, [canon, rows, cols, hEdges, vEdges]);
 
+  // Thumbnail preview: reveal only enclosed single-dot regions, painted in
+  // their dot's color, so the user can glimpse the emerging picture.
+  const THUMB_MAX = 160;
+  const thumbCell = Math.max(
+    3,
+    Math.min(8, Math.floor(THUMB_MAX / cols), Math.floor(THUMB_MAX / rows))
+  );
+  const thumbWidth = thumbCell * cols;
+  const thumbHeight = thumbCell * rows;
+  const thumbCells: JSX.Element[] = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const regionColor = shading.regionColor.get(shading.regionIds[r][c]);
+      if (regionColor === undefined) continue;
+      thumbCells.push(
+        <rect
+          key={`tc-${r}-${c}`}
+          x={c * thumbCell}
+          y={r * thumbCell}
+          width={thumbCell}
+          height={thumbCell}
+          fill={regionColor === 1 ? REGION_BLACK : REGION_WHITE}
+        />
+      );
+    }
+  }
+
   const elements: JSX.Element[] = [];
 
   // Cell backgrounds (region shading).
@@ -369,6 +396,14 @@ export default function TentaishowBoard({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+      <svg
+        width={thumbWidth}
+        height={thumbHeight}
+        viewBox={`0 0 ${thumbWidth} ${thumbHeight}`}
+        style={{ border: "1px solid #ccc", background: BOARD_BG, display: "block" }}
+      >
+        {thumbCells}
+      </svg>
       <div style={{ maxWidth: svgWidth, width: "100%" }}>
         <svg
           width="100%"
