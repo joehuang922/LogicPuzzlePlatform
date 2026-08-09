@@ -118,7 +118,7 @@ def _init_parsers():
         18: AkariParser(),
         19: HellGolfParser(ocr_backend=_ocr),
         20: TentaishowParser(ocr_backend=_ocr),
-        21: HeyawakeParser(ocr_backend=_ocr),
+        21: HeyawakeParser(),
     }
     print("=== Parsers ready ===")
 

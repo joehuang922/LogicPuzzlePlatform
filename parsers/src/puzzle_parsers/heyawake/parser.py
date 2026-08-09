@@ -17,9 +17,17 @@ from puzzle_parsers.heyawake.grid_detector import (
 )
 from puzzle_parsers.heyawake.models import HeyawakeBoard, HeyawakeRoom
 from puzzle_parsers.models import PuzzleData
+from puzzle_parsers.recognition_schemas import HEYAWAKE_CLUE_PROMPT
 
 if TYPE_CHECKING:
-    from puzzle_parsers.recognition import OcrBackend
+    from puzzle_parsers.recognition import CellRecognizer
+
+# A clue cell prints a single dark digit on a light background. We treat a cell
+# as clued only when a meaningful fraction of its interior is ink; blank cells
+# fall well below this and are never sent to the recognizer (so they cannot be
+# hallucinated into spurious clues).
+DARK_PIXEL_VALUE = 128
+CLUE_MIN_INK_FRACTION = 0.02
 
 
 def _flood_components(
@@ -67,8 +75,12 @@ def _flood_components(
 class HeyawakeParser(PuzzleParser):
     puzzle_type = "heyawake"
 
-    def __init__(self, ocr_backend: OcrBackend | None = None) -> None:
-        self._ocr = ocr_backend
+    def __init__(self, recognizer: CellRecognizer | None = None) -> None:
+        if recognizer is None:
+            from puzzle_parsers.recognition import GeminiRecognizer
+
+            recognizer = GeminiRecognizer()
+        self._recognizer = recognizer
 
     def _parse(self, image: Image.Image) -> PuzzleData:
         img_array = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
@@ -148,14 +160,22 @@ class HeyawakeParser(PuzzleParser):
     def _read_clues(
         self, warped_gray: NDArray, geom: HeyawakeGeometry
     ) -> list[list[int]]:
-        """OCR each cell for a printed clue digit (-1 / 0 when blank)."""
-        rows, cols = geom.rows, geom.cols
-        if self._ocr is None:
-            return [[-1] * cols for _ in range(rows)]
+        """Read printed clue digits, one per cell (-1 where blank).
 
-        cell_rois: list[list[np.ndarray]] = []
+        Blank cells are filtered out *before* recognition by their ink fraction,
+        so only cells that actually contain a printed digit reach the model.
+        This keeps unclued rooms unclued instead of picking up hallucinated
+        digits. The surviving crops are packed into a single labeled montage and
+        recognized in one call (mirroring the akari parser).
+        """
+        rows, cols = geom.rows, geom.cols
+        clues = [[-1] * cols for _ in range(rows)]
+        if self._recognizer is None:
+            return clues
+
+        clue_coords: list[tuple[int, int]] = []
+        clue_crops: list[NDArray] = []
         for r in range(rows):
-            row_rois: list[np.ndarray] = []
             for c in range(cols):
                 y1 = geom.h_lines[r]
                 y2 = geom.h_lines[r + 1]
@@ -163,10 +183,39 @@ class HeyawakeParser(PuzzleParser):
                 x2 = geom.v_lines[c + 1]
                 my = int((y2 - y1) * 0.2)
                 mx = int((x2 - x1) * 0.2)
-                row_rois.append(warped_gray[y1 + my : y2 - my, x1 + mx : x2 - mx])
-            cell_rois.append(row_rois)
+                roi = warped_gray[y1 + my : y2 - my, x1 + mx : x2 - mx]
+                if roi.size == 0:
+                    continue
+                ink_fraction = float(np.mean(roi < DARK_PIXEL_VALUE))
+                if ink_fraction >= CLUE_MIN_INK_FRACTION:
+                    clue_coords.append((r, c))
+                    clue_crops.append(roi)
 
-        return self._ocr.recognize_cells(cell_rois)
+        if not clue_crops:
+            return clues
+
+        # Pack candidate crops into a compact grid montage (~10 columns).
+        cols_per_row = min(10, len(clue_crops))
+        crop_grid: list[list[NDArray]] = []
+        for i in range(0, len(clue_crops), cols_per_row):
+            row_crops = clue_crops[i : i + cols_per_row]
+            while len(row_crops) < cols_per_row:
+                row_crops.append(np.full_like(clue_crops[0], 255))
+            crop_grid.append(row_crops)
+
+        raw = self._recognizer.recognize(crop_grid, HEYAWAKE_CLUE_PROMPT)
+        flat: list[int] = []
+        for row in raw:
+            flat.extend(row)
+
+        for i, (r, c) in enumerate(clue_coords):
+            if i >= len(flat):
+                break
+            val = flat[i]
+            if isinstance(val, int) and 0 <= val <= 9:
+                clues[r][c] = val
+
+        return clues
 
     def _attach_clues(
         self, rooms: list[HeyawakeRoom], clues: list[list[int]]

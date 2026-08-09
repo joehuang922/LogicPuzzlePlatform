@@ -67,20 +67,90 @@ class CellRecognizer(ABC):
 
 
 class GeminiRecognizer(CellRecognizer):
-    """Cell recognizer using Google Gemini Vision API."""
+    """Cell recognizer using Google Gemini Vision API.
 
-    def __init__(self, client=None, model: str = "gemini-2.5-flash") -> None:
+    Each request is bounded by ``timeout`` seconds. If the primary model is slow
+    (times out) or errors, the request is retried against ``fallback_model`` so a
+    single sluggish call can't stall the whole parse. When an explicit ``client``
+    is supplied (e.g. in tests) no fallback is attempted.
+    """
+
+    def __init__(
+        self,
+        client=None,
+        model: str = "gemini-2.5-flash",
+        *,
+        fallback_model: str = "gemini-2.0-flash",
+        timeout: float = 60.0,
+    ) -> None:
         import os
 
         import google.generativeai as genai
 
+        self._timeout = timeout
+
         if client is not None:
             self._model = client
+            self._fallback_model = None
         else:
             api_key = os.environ.get("GEMINI_API_KEY")
             if api_key:
                 genai.configure(api_key=api_key)
             self._model = genai.GenerativeModel(model)
+            self._fallback_model = (
+                genai.GenerativeModel(fallback_model) if fallback_model else None
+            )
+
+    def _call_with_timeout(self, model, content: list) -> object:
+        """Run one generate_content call under a hard wall-clock timeout.
+
+        The SDK's own ``request_options`` timeout does not reliably interrupt a
+        stalled connection (e.g. a proxy that holds the socket open), so we run
+        the call on a daemon worker thread and abandon it if it overruns. Using a
+        daemon thread (rather than a thread pool) ensures a wedged call cannot
+        block process exit.
+        """
+        import threading
+
+        request_options = {"timeout": self._timeout}
+        result: dict[str, object] = {}
+
+        def _run() -> None:
+            try:
+                result["value"] = model.generate_content(
+                    content, request_options=request_options
+                )
+            except Exception as exc:  # noqa: BLE001 - propagated to caller below
+                result["error"] = exc
+
+        worker = threading.Thread(target=_run, daemon=True)
+        worker.start()
+        worker.join(self._timeout)
+        if worker.is_alive():
+            raise TimeoutError(
+                f"generate_content exceeded {self._timeout}s wall-clock timeout"
+            )
+        if "error" in result:
+            raise result["error"]  # type: ignore[misc]
+        return result["value"]
+
+    def _generate(self, content: list) -> object:
+        """Call the primary model with a timeout, falling back on slow/error.
+
+        When the primary model is slow (exceeds the wall-clock timeout) or errors,
+        we retry once against the fallback model before giving up.
+        """
+        try:
+            return self._call_with_timeout(self._model, content)
+        except Exception as primary_error:
+            if self._fallback_model is None:
+                raise
+            print(
+                f"  [GeminiRecognizer] primary model failed/slow "
+                f"({type(primary_error).__name__}: {primary_error}); "
+                f"retrying with fallback model"
+            )
+            return self._call_with_timeout(self._fallback_model, content)
 
     @property
     def supports_full_image(self) -> bool:
@@ -118,7 +188,7 @@ class GeminiRecognizer(CellRecognizer):
                     f"(rows {start_row} to {end_row - 1} of the full grid)."
                 )
 
-            response = self._model.generate_content([montage_image, batch_prompt])
+            response = self._generate([montage_image, batch_prompt])
             batch_result = parse_json_response(response.text)
 
             if not isinstance(batch_result, list) or len(batch_result) != batch_rows:
@@ -142,7 +212,7 @@ class GeminiRecognizer(CellRecognizer):
         prompt: str,
     ) -> object:
         pil_image = Image.open(image_path)
-        response = self._model.generate_content([pil_image, prompt])
+        response = self._generate([pil_image, prompt])
         return parse_json_response(response.text)
 
 

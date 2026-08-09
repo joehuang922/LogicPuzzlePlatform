@@ -21,6 +21,27 @@ INT_CELL_PROMPT = (
     "Example for a 3x3: [[0,-1,3],[-1,5,-1],[7,-1,-1]]. No explanation, just the JSON."
 )
 
+# Heyawake clue montage: every tile shown already contains a printed digit
+# (blank cells are filtered out before the montage is built), so the model must
+# never answer -1. The clues are single digits, commonly small (0-9). We spell
+# out the 1-vs-7 and 0-vs-6 confusions explicitly because those are the
+# dominant OCR error modes on these boards.
+HEYAWAKE_CLUE_PROMPT = (
+    "This image shows a grid of cells cropped from a heyawake puzzle. "
+    "Each cell is labeled with its row,col position and contains exactly one "
+    "printed clue digit (0-9). Every cell shown has a digit — none are blank. "
+    "Read the single digit in each cell carefully:\n"
+    "- A '1' is a single vertical stroke (sometimes with a small top flag and a "
+    "base serif). A '7' has a full horizontal bar across the top with a stroke "
+    "slanting down-left. If there is no horizontal top bar, it is a '1', not a '7'.\n"
+    "- A '0' is a fully closed oval/loop. A '6' has an open top with a curl into "
+    "a lower loop. If the shape is a closed loop with no open tail, it is a '0', "
+    "not a '6'.\n"
+    "Respond with ONLY a JSON array of arrays (rows of integers), one entry per "
+    "cell. Example for a 1x3: [[1,0,7]]. No explanation, just the JSON."
+)
+
+
 # Case B: symbol enum (nurimaze)
 # Represented as plain int: 0=empty, 1=circle, 2=triangle, 3=S, 4=G
 SymbolCell = int
