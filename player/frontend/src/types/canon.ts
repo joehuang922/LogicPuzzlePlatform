@@ -252,3 +252,25 @@ export interface TentaishowAnswer {
     v: number[][];
   };
 }
+
+export interface HeyawakeRoom {
+  // zero-based top-left cell of the rectangular room
+  r: number;
+  c: number;
+  // room size in cells
+  w: number;
+  h: number;
+  // number of black cells required in this room; null/undefined = unclued
+  clue?: number | null;
+}
+
+export interface HeyawakeCanon {
+  width: number;
+  height: number;
+  rooms: HeyawakeRoom[];
+}
+
+export interface HeyawakeAnswer {
+  // height x width; 0 = unset, 1 = black, 2 = white-marked
+  states: number[][];
+}

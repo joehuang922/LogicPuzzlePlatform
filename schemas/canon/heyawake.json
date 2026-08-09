@@ -1,0 +1,55 @@
+{
+  "title": "Heyawake Canonical Representation",
+  "description": "Rectangular grid tiled by rectangular rooms; some rooms carry a clue for how many of their cells are black",
+  "type": "object",
+  "required": ["width", "height", "rooms"],
+  "additionalProperties": false,
+  "properties": {
+    "width": {
+      "description": "Grid width in cells (number of columns)",
+      "type": "integer",
+      "minimum": 1
+    },
+    "height": {
+      "description": "Grid height in cells (number of rows)",
+      "type": "integer",
+      "minimum": 1
+    },
+    "rooms": {
+      "description": "Rectangular rooms tiling the grid exactly",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["r", "c", "w", "h"],
+        "additionalProperties": false,
+        "properties": {
+          "r": {
+            "description": "Zero-based row of the room's top-left cell",
+            "type": "integer",
+            "minimum": 0
+          },
+          "c": {
+            "description": "Zero-based column of the room's top-left cell",
+            "type": "integer",
+            "minimum": 0
+          },
+          "w": {
+            "description": "Room width in cells",
+            "type": "integer",
+            "minimum": 1
+          },
+          "h": {
+            "description": "Room height in cells",
+            "type": "integer",
+            "minimum": 1
+          },
+          "clue": {
+            "description": "Number of black cells required in this room, or null if unclued",
+            "type": ["integer", "null"],
+            "minimum": 0
+          }
+        }
+      }
+    }
+  }
+}

@@ -19,6 +19,7 @@ import { numberLinkExtractor } from "./numberLink";
 import { akariExtractor } from "./akari";
 import { hellGolfExtractor } from "./hellGolf";
 import { tentaishowExtractor } from "./tentaishow";
+import { heyawakeExtractor } from "./heyawake";
 
 const extractorRegistry = new Map<number, AnswerExtractor>();
 
@@ -46,6 +47,7 @@ registerExtractor(numberLinkExtractor);
 registerExtractor(akariExtractor);
 registerExtractor(hellGolfExtractor);
 registerExtractor(tentaishowExtractor);
+registerExtractor(heyawakeExtractor);
 
 export function getExtractor(puzzleType: number): AnswerExtractor | undefined {
   return extractorRegistry.get(puzzleType);

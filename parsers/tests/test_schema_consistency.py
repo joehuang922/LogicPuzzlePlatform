@@ -13,6 +13,7 @@ from puzzle_parsers.nurimaze.models import NurimazeBoard
 from puzzle_parsers.number_link.models import NumberLinkBoard
 from puzzle_parsers.hell_golf.models import HellGolfBoard
 from puzzle_parsers.tentaishow.models import TentaishowBoard
+from puzzle_parsers.heyawake.models import HeyawakeBoard
 from puzzle_parsers.validate import validate_canon
 
 SCHEMA_DIR = Path(__file__).parents[2] / "schemas" / "canon"
@@ -24,6 +25,7 @@ MODELS = {
     "number-link": NumberLinkBoard,
     "hell-golf": HellGolfBoard,
     "tentaishow": TentaishowBoard,
+    "heyawake": HeyawakeBoard,
 }
 
 
@@ -146,3 +148,26 @@ def test_invalid_tentaishow_fails():
     }
     with pytest.raises(Exception):
         validate_canon("tentaishow", data)
+
+
+def test_valid_heyawake_passes():
+    data = {
+        "width": 4,
+        "height": 4,
+        "rooms": [
+            {"r": 0, "c": 0, "w": 2, "h": 2, "clue": 1},
+            {"r": 0, "c": 2, "w": 2, "h": 2, "clue": None},
+            {"r": 2, "c": 0, "w": 4, "h": 2},
+        ],
+    }
+    validate_canon("heyawake", data)
+
+
+def test_invalid_heyawake_fails():
+    data = {
+        "width": 4,
+        "height": 4,
+        "rooms": [{"r": 0, "c": 0, "w": 2}],  # missing required "h"
+    }
+    with pytest.raises(Exception):
+        validate_canon("heyawake", data)

@@ -94,6 +94,9 @@ def _init_parsers():
     from puzzle_parsers.tentaishow.parser import TentaishowParser
     print("  - TentaishowParser imported")
 
+    from puzzle_parsers.heyawake.parser import HeyawakeParser
+    print("  - HeyawakeParser imported")
+
     _parsers = {
         1: SudokuParser(ocr_backend=_ocr),
         2: ComboSudokuParser(ocr_backend=_ocr),
@@ -115,6 +118,7 @@ def _init_parsers():
         18: AkariParser(),
         19: HellGolfParser(ocr_backend=_ocr),
         20: TentaishowParser(ocr_backend=_ocr),
+        21: HeyawakeParser(ocr_backend=_ocr),
     }
     print("=== Parsers ready ===")
 
