@@ -15,9 +15,12 @@ const THIN = 1;
 const THICK = 3;
 const EDGE_HIT_WIDTH = 10;
 
-// Two-tone checkerboard shades for enclosed single-dot regions.
-const SHADE_A = "#dbeafe";
-const SHADE_B = "#fde68a";
+// Base board color for unmarked cells (light grey so white-dot regions,
+// filled pure white, stand out against it).
+const BOARD_BG = "#eee";
+// Fills for enclosed single-dot regions, matching the dot's color.
+const REGION_WHITE = "#fff";
+const REGION_BLACK = "#111";
 
 // Flood-fill cells into region ids across edges that have no wall.
 function computeRegions(
@@ -133,57 +136,6 @@ function validateSolution(
   return true;
 }
 
-// Greedy 2-coloring of the adjacency graph of single-dot regions, so adjacent
-// regions get contrasting shades. Falls back gracefully when a proper
-// 2-coloring is impossible (just reuses a color).
-function twoColorRegions(
-  rows: number,
-  cols: number,
-  regionIds: number[][],
-  hEdges: number[][],
-  vEdges: number[][],
-  shaded: Set<number>
-): Map<number, number> {
-  const adj = new Map<number, Set<number>>();
-  const add = (a: number, b: number) => {
-    if (a === b || !shaded.has(a) || !shaded.has(b)) return;
-    if (!adj.has(a)) adj.set(a, new Set());
-    adj.get(a)!.add(b);
-  };
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const id = regionIds[r][c];
-      if (r < rows - 1 && hEdges[r][c] === 1) {
-        add(id, regionIds[r + 1][c]);
-        add(regionIds[r + 1][c], id);
-      }
-      if (c < cols - 1 && vEdges[r][c] === 1) {
-        add(id, regionIds[r][c + 1]);
-        add(regionIds[r][c + 1], id);
-      }
-    }
-  }
-  const color = new Map<number, number>();
-  const ordered = Array.from(shaded).sort((a, b) => a - b);
-  for (const id of ordered) {
-    if (color.has(id)) continue;
-    // BFS coloring from this region.
-    const queue = [id];
-    color.set(id, 0);
-    while (queue.length > 0) {
-      const cur = queue.shift()!;
-      const cc = color.get(cur)!;
-      for (const nb of adj.get(cur) ?? []) {
-        if (!color.has(nb)) {
-          color.set(nb, cc ^ 1);
-          queue.push(nb);
-        }
-      }
-    }
-  }
-  return color;
-}
-
 export default function TentaishowBoard({
   canon,
   initialUserValues,
@@ -276,21 +228,23 @@ export default function TentaishowBoard({
     [readonly]
   );
 
-  // Region shading: shade every region that contains exactly one dot, using a
-  // two-tone checkerboard so adjacent regions contrast.
+  // Region shading: shade every region that contains exactly one dot with that
+  // dot's color (white or black).
   const shading = useMemo(() => {
     const regionIds = computeRegions(rows, cols, hEdges, vEdges);
     const dotRegion = assignDotsToRegions(canon, regionIds);
     const dotCount = new Map<number, number>();
-    for (const id of dotRegion) {
+    for (let i = 0; i < dotRegion.length; i++) {
+      const id = dotRegion[i];
       if (id >= 0) dotCount.set(id, (dotCount.get(id) ?? 0) + 1);
     }
-    const shaded = new Set<number>();
-    for (const [id, count] of dotCount) {
-      if (count === 1) shaded.add(id);
-    }
-    const color = twoColorRegions(rows, cols, regionIds, hEdges, vEdges, shaded);
-    return { regionIds, shaded, color };
+    // Region id -> the color of its single dot (1 = black, 0 = white).
+    const regionColor = new Map<number, number>();
+    canon.dots.forEach((dot, i) => {
+      const id = dotRegion[i];
+      if (id >= 0 && dotCount.get(id) === 1) regionColor.set(id, dot.color);
+    });
+    return { regionIds, regionColor };
   }, [canon, rows, cols, hEdges, vEdges]);
 
   const elements: JSX.Element[] = [];
@@ -299,9 +253,10 @@ export default function TentaishowBoard({
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const id = shading.regionIds[r][c];
-      let fill = "white";
-      if (shading.shaded.has(id)) {
-        fill = shading.color.get(id) === 1 ? SHADE_B : SHADE_A;
+      let fill = BOARD_BG;
+      const regionColor = shading.regionColor.get(id);
+      if (regionColor !== undefined) {
+        fill = regionColor === 1 ? REGION_BLACK : REGION_WHITE;
       }
       elements.push(
         <rect
@@ -368,7 +323,7 @@ export default function TentaishowBoard({
         cy={cy}
         r={rad}
         fill={dot.color === 1 ? "#111" : "white"}
-        stroke="#111"
+        stroke={dot.color === 1 ? "#fff" : "#111"}
         strokeWidth={2}
         pointerEvents="none"
       />
