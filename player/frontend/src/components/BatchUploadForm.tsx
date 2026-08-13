@@ -27,6 +27,7 @@ import HellGolfEditor from "./HellGolfEditor";
 import TentaishowEditor from "./TentaishowEditor";
 import HeyawakeEditor from "./HeyawakeEditor";
 import ShikakuEditor from "./ShikakuEditor";
+import NorinoriEditor from "./NorinoriEditor";
 
 const MAX_IMAGES = 50;
 const PARSE_CONCURRENCY = 3;
@@ -65,7 +66,7 @@ function computeDimensions(typeId: number, canon: Record<string, unknown>): { w?
     const colClues = canon.colClues as unknown[];
     return { h: rowClues.length, w: colClues.length };
   }
-  if (typeId === 15 && canon.grids) {
+  if ((typeId === 15 || typeId === 23) && canon.grids) {
     const grids = canon.grids as { h: unknown[][]; v: unknown[][] };
     return { h: grids.h.length + 1, w: (grids.v[0] as unknown[]).length + 1 };
   }
@@ -163,6 +164,9 @@ function InlineEditor({
   if (typeName === "shikaku") {
     return <ShikakuEditor initialJson={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
   }
+  if (typeName === "norinori") {
+    return <NorinoriEditor initialJson={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
+  }
   return null;
 }
 
@@ -190,7 +194,7 @@ function BatchItemRow({
   onToggleEditor: () => void;
 }) {
   const typeName = puzzleTypes.find((pt) => pt.id === puzzleType)?.name;
-  const hasEditor = ["nurimaze", "sudoku", "combo-sudoku", "double-choco", "slitherlink", "nonogram", "masyu", "pencils", "nuritwin", "slalom", "shakashaka", "kakuro", "yajilin", "fillomino", "lits", "choco-banana", "number-link", "akari", "hell-golf", "tentaishow", "heyawake", "shikaku"].includes(typeName || "");
+  const hasEditor = ["nurimaze", "sudoku", "combo-sudoku", "double-choco", "slitherlink", "nonogram", "masyu", "pencils", "nuritwin", "slalom", "shakashaka", "kakuro", "yajilin", "fillomino", "lits", "choco-banana", "number-link", "akari", "hell-golf", "tentaishow", "heyawake", "shikaku", "norinori"].includes(typeName || "");
 
   return (
     <div style={{ border: "1px solid #eee", borderRadius: 6, padding: "0.75rem", background: item.editorOpen ? "#fffbe6" : "#fff" }}>

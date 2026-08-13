@@ -25,6 +25,7 @@ import { hellGolfRenderer } from "./renderers/hellGolf";
 import { tentaishowRenderer } from "./renderers/tentaishow";
 import { heyawakeRenderer } from "./renderers/heyawake";
 import { shikakuRenderer } from "./renderers/shikaku";
+import { norinoriRenderer } from "./renderers/norinori";
 
 registerRenderer(comboSudokuRenderer);
 registerRenderer(sudokuRenderer);
@@ -48,6 +49,7 @@ registerRenderer(hellGolfRenderer);
 registerRenderer(tentaishowRenderer);
 registerRenderer(heyawakeRenderer);
 registerRenderer(shikakuRenderer);
+registerRenderer(norinoriRenderer);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

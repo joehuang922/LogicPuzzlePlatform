@@ -100,6 +100,9 @@ def _init_parsers():
     from puzzle_parsers.shikaku.parser import ShikakuParser
     print("  - ShikakuParser imported")
 
+    from puzzle_parsers.norinori.parser import NorinoriParser
+    print("  - NorinoriParser imported")
+
     _parsers = {
         1: SudokuParser(ocr_backend=_ocr),
         2: ComboSudokuParser(ocr_backend=_ocr),
@@ -123,6 +126,7 @@ def _init_parsers():
         20: TentaishowParser(ocr_backend=_ocr),
         21: HeyawakeParser(),
         22: ShikakuParser(),
+        23: NorinoriParser(ocr_backend=_ocr),
     }
     print("=== Parsers ready ===")
 

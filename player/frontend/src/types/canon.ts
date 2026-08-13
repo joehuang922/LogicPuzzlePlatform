@@ -290,3 +290,14 @@ export interface ShikakuRect {
 export interface ShikakuAnswer {
   rects: ShikakuRect[];
 }
+
+export interface NorinoriCanon {
+  grids: {
+    h: number[][];
+    v: number[][];
+  };
+}
+
+export interface NorinoriAnswer {
+  shaded: number[][];
+}
