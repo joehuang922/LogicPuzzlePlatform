@@ -1,0 +1,19 @@
+{
+  "title": "Nurikabe Canonical Representation",
+  "description": "Rectangular grid where some cells contain a positive integer clue. Each clue seeds a white island of that size; the remaining cells form a single connected black sea with no 2x2 pools.",
+  "type": "object",
+  "required": ["cells"],
+  "additionalProperties": false,
+  "properties": {
+    "cells": {
+      "description": "m x n grid of integers. 0 = empty cell, any positive integer = an island clue placed in that cell (the island containing this cell must have exactly that many white cells).",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": { "type": "integer", "minimum": 0 },
+        "minItems": 1
+      },
+      "minItems": 1
+    }
+  }
+}

@@ -301,3 +301,13 @@ export interface NorinoriCanon {
 export interface NorinoriAnswer {
   shaded: number[][];
 }
+
+export interface NurikabeCanon {
+  // rows x cols; 0 = empty, positive integer = island clue (island size)
+  cells: number[][];
+}
+
+export interface NurikabeAnswer {
+  // rows x cols; 0 = unset, 1 = black (sea), 2 = white-marked (solver aid)
+  states: number[][];
+}

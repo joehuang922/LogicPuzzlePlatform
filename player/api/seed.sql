@@ -90,7 +90,8 @@ INSERT INTO puzzle_types (id, name, rule) VALUES
   (20, 'tentaishow', 'Divide the grid into regions by drawing walls along cell edges. Each region contains exactly one dot and has 180-degree rotational symmetry about that dot. Every cell belongs to exactly one connected region.'),
   (21, 'heyawake', 'Paint cells black. A number in a room gives exactly how many of its cells are black. No two black cells may be orthogonally adjacent. All white cells must stay connected. No straight horizontal or vertical run of white cells may span three or more rooms.'),
   (22, 'shikaku', 'Divide the grid into rectangles. Each rectangle contains exactly one number, and that number equals the rectangle''s area (its width times height in cells). Rectangles may not overlap, and every cell must belong to exactly one rectangle.'),
-  (23, 'norinori', 'Shade cells so every region contains exactly two shaded cells. All shaded cells must form dominoes: each shaded cell is orthogonally adjacent to exactly one other shaded cell. Dominoes may cross region boundaries.');
+  (23, 'norinori', 'Shade cells so every region contains exactly two shaded cells. All shaded cells must form dominoes: each shaded cell is orthogonally adjacent to exactly one other shaded cell. Dominoes may cross region boundaries.'),
+  (24, 'nurikabe', 'Each number is an island of that many white cells, with exactly one number per island. Islands may not touch orthogonally. All remaining black cells form one connected sea, and no 2x2 area is entirely black.');
 
 -- Seed sample puzzle: sudoku (difficulty 4 = hard)
 INSERT INTO puzzle_questions (id, puzzle_type, title, difficulty, width, height, canon_repr) VALUES (

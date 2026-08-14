@@ -21,6 +21,7 @@ import { computeTentaishowProgress } from "./tentaishow";
 import { computeHeyawakeProgress } from "./heyawake";
 import { computeShikakuProgress } from "./shikaku";
 import { computeNorinoriProgress } from "./norinori";
+import { computeNurikabeProgress } from "./nurikabe";
 
 export interface ProgressCalculator {
   puzzleType: number;
@@ -55,6 +56,7 @@ register(computeTentaishowProgress);
 register(computeHeyawakeProgress);
 register(computeShikakuProgress);
 register(computeNorinoriProgress);
+register(computeNurikabeProgress);
 
 export function computeProgress(
   puzzle: PuzzleDefinition,
