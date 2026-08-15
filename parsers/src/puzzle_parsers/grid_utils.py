@@ -15,39 +15,92 @@ from numpy.typing import NDArray
 from scipy.signal import find_peaks
 
 
+# Minimum fraction of a quad's weakest edge that must run along dark ink for
+# the quad to be trusted. Title strips and page-gutter seams produce an edge
+# floating over whitespace, which scores far below this; a true border scores ~1.
+_BORDER_SUPPORT_MIN = 0.5
+
+
 def find_quadrilateral_border(gray: NDArray) -> NDArray:
     """Find the 4 corners of the puzzle's outer border.
 
     Returns a (4,2) float32 array ordered as: TL, TR, BR, BL.
     Falls back to full image bounds if no clear border is found.
 
-    Two-pass approach:
-    1. Canny edge contour detection — works when the border is a distinct
-       closed contour with clear whitespace margins around the puzzle.
-    2. Gradient-based fallback — finds the border via steepest brightness
-       transitions in row/column mean profiles.
+    Strategy (each candidate is scored by *edge support* — the fraction of its
+    weakest edge that runs along dark ink — and the best-supported one wins):
+    1. Multi-scale contour detection. Canny edges are morphologically closed at
+       several kernel sizes to reconnect scan-degraded ("ink-saving") borders,
+       small/scattered components (title text) are dropped by bounding-box
+       extent, and each surviving contour is reduced to 4 corners via convex
+       hull + collinear-vertex removal. A larger close kernel recovers a badly
+       broken border but risks fusing a nearby title into it; edge-support
+       scoring rejects the fused result, so we can safely try several.
+    2. Dark-pixel projection box — immune to titles (relative threshold) and to
+       a single page-gutter seam. Used when no contour candidate is well
+       supported, e.g. a title sits close above a dashed board.
+    3. Gradient-based fallback — steepest row/column brightness transitions.
     """
     h, w = gray.shape
     fallback = np.float32([[0, 0], [w, 0], [w, h], [0, h]])
 
-    quad = _find_border_via_contours(gray)
-    if quad is not None:
-        return quad
+    best: NDArray | None = None
+    best_support = -1.0
+    for close_k in (1, 3, 5, 7):
+        quad = _find_border_via_contours(gray, close_k)
+        if quad is None:
+            continue
+        support = _edge_support(gray, quad)
+        if support > best_support:
+            best_support = support
+            best = quad
+
+    if best is not None and best_support >= _BORDER_SUPPORT_MIN:
+        return best
+
+    # No well-supported contour: try the projection box and keep whichever of
+    # the two has stronger edge support.
+    box = _projection_box_quad(gray)
+    box_support = _edge_support(gray, box)
+    if best is None or box_support > best_support:
+        if box_support >= _BORDER_SUPPORT_MIN:
+            return box
+        best, best_support = box, box_support
 
     quad = _find_border_via_gradient(gray)
-    if quad is not None:
+    if quad is not None and _edge_support(gray, quad) > best_support:
         return quad
 
-    return fallback
+    return best if best is not None else fallback
 
 
-def _find_border_via_contours(gray: NDArray) -> NDArray | None:
-    """Try to find the border as a closed quadrilateral contour."""
+def _find_border_via_contours(gray: NDArray, close_k: int = 1) -> NDArray | None:
+    """Try to find the border as a large quadrilateral contour.
+
+    Args:
+        close_k: Size of the morphological close kernel applied to the Canny
+            edges before contour finding. ``1`` disables closing (clean scans);
+            larger values reconnect a scan-broken border at the cost of possibly
+            fusing nearby text — the caller guards against that via edge support.
+    """
     h, w = gray.shape
     img_area = h * w
 
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
     edges = cv2.Canny(blurred, 50, 150)
+    if close_k > 1:
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (close_k, close_k))
+        edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
+
+    # Drop small/scattered edge components (title text, clue digits, halftone):
+    # only a board border spans most of an axis, so keep components whose
+    # bounding box covers > 50% of the width or height.
+    n, labels, stats, _ = cv2.connectedComponentsWithStats(edges, 8)
+    keep = np.zeros_like(edges)
+    for i in range(1, n):
+        if stats[i, cv2.CC_STAT_WIDTH] > 0.5 * w or stats[i, cv2.CC_STAT_HEIGHT] > 0.5 * h:
+            keep[labels == i] = 255
+    edges = keep
 
     contours, _ = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
@@ -58,15 +111,125 @@ def _find_border_via_contours(gray: NDArray) -> NDArray | None:
         area = cv2.contourArea(contour)
         if area < img_area * 0.2:
             break
-        if area > img_area * 0.9:
+        if area > img_area * 0.98:
             continue
-        peri = cv2.arcLength(contour, True)
-        approx = cv2.approxPolyDP(contour, 0.02 * peri, True)
-        if len(approx) == 4:
-            pts = approx.reshape(4, 2).astype(np.float32)
-            return order_points(pts)
+        quad = _corners_from_contour(contour)
+        if quad is not None:
+            return quad
 
     return None
+
+
+def _corners_from_contour(
+    contour: NDArray, straight_deg: float = 160.0, rect_tol: float = 35.0
+) -> NDArray | None:
+    """Reduce a contour to its 4 corners via convex hull + collinear removal.
+
+    A scan-degraded or dashed border rarely approximates to exactly 4 vertices —
+    ``approxPolyDP`` leaves mid-edge kinks where the traced contour weaves in and
+    out of dash gaps. Instead of demanding ``len(approx) == 4``, we take the
+    convex hull (removes concave garbage), collapse dense point runs with a low
+    epsilon, then iteratively drop the vertex whose interior angle is closest to
+    180° (a collinear mid-edge point) until 4 remain. Returns ``None`` if the
+    result is not a plausible rectangle.
+    """
+    hull = cv2.convexHull(contour).reshape(-1, 2).astype(np.float32)
+    if len(hull) < 4:
+        return None
+
+    peri = cv2.arcLength(hull.reshape(-1, 1, 2), True)
+    approx = cv2.approxPolyDP(
+        hull.reshape(-1, 1, 2), 0.01 * peri, True
+    ).reshape(-1, 2).astype(np.float32)
+    poly = approx if len(approx) >= 4 else hull
+
+    while len(poly) > 4:
+        angles = _polygon_interior_angles(poly)
+        i = int(np.argmax(angles))
+        if angles[i] < straight_deg:
+            break  # remaining vertices are all real corners
+        poly = np.delete(poly, i, axis=0)
+
+    if len(poly) != 4:
+        return None
+    if np.any(np.abs(_polygon_interior_angles(poly) - 90) > rect_tol):
+        return None
+    return order_points(poly)
+
+
+def _polygon_interior_angles(poly: NDArray) -> NDArray:
+    """Interior angle (degrees) at each vertex of a polygon."""
+    n = len(poly)
+    angles = np.empty(n)
+    for i in range(n):
+        prev = poly[(i - 1) % n]
+        cur = poly[i]
+        nxt = poly[(i + 1) % n]
+        v1 = prev - cur
+        v2 = nxt - cur
+        cos = np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2) + 1e-9)
+        angles[i] = np.degrees(np.arccos(np.clip(cos, -1.0, 1.0)))
+    return angles
+
+
+def _edge_support(gray: NDArray, quad: NDArray, band_ratio: float = 0.006) -> float:
+    """Fraction of the quad's *weakest* edge that runs along dark ink.
+
+    A genuine border tracks a dark line and scores near 1.0; a title-induced top
+    edge or page-gutter seam floats over whitespace on at least one edge and
+    scores low. Returns the minimum over the four edges.
+    """
+    h, w = gray.shape
+    dark = gray < 128
+    band = max(2, int(band_ratio * max(h, w)))
+    scores: list[float] = []
+    for a, b in ((0, 1), (1, 2), (2, 3), (3, 0)):
+        p0 = quad[a]
+        p1 = quad[b]
+        length = int(np.hypot(p1[0] - p0[0], p1[1] - p0[1]))
+        if length < 5:
+            scores.append(0.0)
+            continue
+        n_samples = max(20, length // 3)
+        hits = 0
+        for t in np.linspace(0, 1, n_samples):
+            x = int(p0[0] + t * (p1[0] - p0[0]))
+            y = int(p0[1] + t * (p1[1] - p0[1]))
+            x0 = max(0, x - band)
+            x1 = min(w, x + band + 1)
+            y0 = max(0, y - band)
+            y1 = min(h, y + band + 1)
+            if dark[y0:y1, x0:x1].any():
+                hits += 1
+        scores.append(hits / n_samples)
+    return min(scores) if scores else 0.0
+
+
+def _projection_box_quad(gray: NDArray) -> NDArray:
+    """Axis-aligned board box from dark-pixel projection.
+
+    The board border is the only near-full-width / full-height dark structure,
+    so projecting the dark-pixel fraction onto each axis produces sharp spikes at
+    the four edges. Taking the outermost rows/cols that clear a relative
+    threshold ignores title text and faint interior dividers, and — because the
+    threshold is relative — a single page-gutter seam does not shift the box.
+    Returns a (4,2) float32 quad ordered TL, TR, BR, BL.
+    """
+    h, w = gray.shape
+    dark = (gray < 128).astype(np.float32)
+    row_frac = dark.sum(axis=1) / w
+    col_frac = dark.sum(axis=0) / h
+
+    def _outer(frac: NDArray, full: int) -> tuple[int, int]:
+        thr = max(0.18, 0.55 * float(frac.max()))
+        idx = np.where(frac > thr)[0]
+        if len(idx) == 0:
+            return 0, full - 1
+        return int(idx.min()), int(idx.max())
+
+    y0, y1 = _outer(row_frac, h)
+    x0, x1 = _outer(col_frac, w)
+    return np.float32([[x0, y0], [x1, y0], [x1, y1], [x0, y1]])
 
 
 
