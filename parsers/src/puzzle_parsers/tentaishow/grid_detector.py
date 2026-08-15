@@ -11,11 +11,10 @@ Two phases:
 
 Phase 1 — rectify (find the board, warp to an axis-aligned rectangle):
 1. Find the outer-border quadrilateral and perspective-warp it to a rectangle.
-   We cross-check the generic contour detector against a dark-pixel projection
-   box: on a clean scan the contour quad captures slight skew and is used; when
-   the border is dashed/broken (no closed contour forms) the detector returns a
-   degenerate full-image quad, or grabs the title strip above the board, so we
-   fall back to the projection box. Either way the output is a rectified board.
+   The shared ``find_quadrilateral_border`` captures slight skew on a clean scan
+   and, on a dashed/broken border where no closed contour forms, rejects a
+   title-strip-contaminated quad via edge-support scoring and falls back to a
+   dark-pixel projection box. Either way the output is a rectified board.
 
 Phase 2 — parse the board:
 2. Detect dots (HoughCircles + contour fallback) and classify open/filled.
@@ -70,13 +69,11 @@ def detect_tentaishow_grid(
         debug_path.mkdir(parents=True, exist_ok=True)
 
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    border_pts, border_src = _detect_border(gray)
+    border_pts = find_quadrilateral_border(gray)
 
     if debug_path:
         vis = image.copy()
         cv2.polylines(vis, [border_pts.astype(int)], True, (0, 255, 0), 3)
-        cv2.putText(vis, border_src, (10, 30), cv2.FONT_HERSHEY_SIMPLEX,
-                    1.0, (0, 255, 0), 2)
         cv2.imwrite(str(debug_path / "01_border.png"), vis)
 
     warped, warp_w, warp_h = warp_to_rectangle(image, border_pts)
@@ -124,66 +121,6 @@ def detect_tentaishow_grid(
         cols=cols,
         dots=dots,
     )
-
-
-def _detect_border(gray: NDArray) -> tuple[NDArray, str]:
-    """Find the board's outer-border quadrilateral for phase-1 rectification.
-
-    Returns (quad, source) where quad is a (4,2) float32 array (TL, TR, BR, BL)
-    suitable for ``warp_to_rectangle``, and source names which detector won.
-
-    We reconcile two detectors:
-    - The generic contour detector (``find_quadrilateral_border``) captures a
-      skewed/photographed board precisely, but needs a *closed* border loop. A
-      dashed border yields no such loop, so it either returns a degenerate
-      full-image quad or its gradient fallback grabs the title strip above the
-      board (top edge lands ~80px too high).
-    - A dark-pixel projection box, which is immune to the title and dashed
-      interior lines but assumes an axis-aligned board.
-
-    We trust the contour quad only when it agrees with the projection box
-    (guarding against the title-strip failure); otherwise we use the box.
-    """
-    box_quad, box = _projection_box_quad(gray)
-    x0, y0, x1, y1 = box
-    span = max(x1 - x0, y1 - y0)
-    tol = 0.06 * span
-
-    h, w = gray.shape
-    full = np.float32([[0, 0], [w, 0], [w, h], [0, h]])
-    quad = find_quadrilateral_border(gray)
-
-    degenerate = np.allclose(quad, full, atol=2)
-    if not degenerate and np.all(np.abs(quad - box_quad) <= tol):
-        return quad, "contour"
-    return box_quad, "projection"
-
-
-def _projection_box_quad(gray: NDArray) -> tuple[NDArray, tuple[int, int, int, int]]:
-    """Axis-aligned board box from dark-pixel projection.
-
-    The board border is the only near-full-width / full-height dark line, so
-    projecting the dark-pixel fraction onto each axis produces sharp spikes at
-    the four border edges. We take the outermost rows/cols whose dark fraction
-    clears a relative threshold, so faint interior dashes and title text are
-    ignored. Returns (quad, (x0, y0, x1, y1)).
-    """
-    h, w = gray.shape
-    dark = (gray < 128).astype(np.float32)
-    row_frac = dark.sum(axis=1) / w
-    col_frac = dark.sum(axis=0) / h
-
-    def _outer(frac: NDArray, full: int) -> tuple[int, int]:
-        thr = max(0.30, 0.55 * float(frac.max()))
-        idx = np.where(frac > thr)[0]
-        if len(idx) == 0:
-            return 0, full - 1
-        return int(idx.min()), int(idx.max())
-
-    y0, y1 = _outer(row_frac, h)
-    x0, x1 = _outer(col_frac, w)
-    quad = np.float32([[x0, y0], [x1, y0], [x1, y1], [x0, y1]])
-    return quad, (x0, y0, x1, y1)
 
 
 def _detect_dots(warped_gray: NDArray, approx_pitch: float) -> list[DetectedDot]:
