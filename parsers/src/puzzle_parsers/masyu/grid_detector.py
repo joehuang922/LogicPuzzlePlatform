@@ -3,8 +3,11 @@
 Pipeline:
 1. Find quadrilateral border and warp to rectangle
 2. Preprocess dashed grid lines into solid mask
-3. Detect grid lines via morphological projection
-4. Compute cell centers from detected lines
+3. Fit a uniform grid to the ink projection (``detect_uniform_grid``). Masyu's
+   dense circle-clues sit on the faint dashed lines and corrupt horizontal peak
+   detection, so a uniform-lattice fit (which reads the raw projection and is
+   immune to that clutter) recovers a clean grid where peak-counting jitters.
+4. Compute cell centers from the resulting lines
 """
 from __future__ import annotations
 
@@ -19,7 +22,7 @@ from puzzle_parsers.grid_utils import (
     find_quadrilateral_border,
     warp_to_rectangle,
     preprocess_dashed_lines,
-    detect_grid_lines,
+    detect_uniform_grid,
 )
 
 
@@ -61,8 +64,10 @@ def detect_masyu_grid(
     if debug_path:
         cv2.imwrite(str(debug_path / "02_dashed_mask.png"), dashed_mask)
 
-    # Step 3: Detect grid lines
-    h_lines, v_lines = detect_grid_lines(
+    # Step 3: Detect grid lines. Fit a uniform grid to the ink projection (robust
+    # to the dense circle-clues that corrupt masyu's horizontal peak detection),
+    # falling back to peak detection per axis when no confident fit is found.
+    h_lines, v_lines = detect_uniform_grid(
         warped_gray, warp_w, warp_h, preprocessed_mask=dashed_mask
     )
 

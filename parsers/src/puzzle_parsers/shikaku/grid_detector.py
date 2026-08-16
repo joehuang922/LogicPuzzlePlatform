@@ -1,7 +1,8 @@
 """Grid detection for shikaku puzzles with dashed internal lines.
 
-Reuses the same approach as fillomino/double-choco: preprocess_dashed_lines()
-to bridge dashes, then finds peaks and snaps a uniform grid.
+Bridges the dashes with preprocess_dashed_lines(), then fits a uniform grid to
+the ink projection (detect_uniform_grid) — the square-cell fact makes an exact
+uniform grid more reliable than snapping to jittery detected peaks.
 """
 from __future__ import annotations
 
@@ -9,11 +10,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import cv2
-import numpy as np
 from numpy.typing import NDArray
-from scipy.signal import find_peaks
 
 from puzzle_parsers.grid_utils import (
+    detect_uniform_grid,
     find_quadrilateral_border,
     preprocess_dashed_lines,
     warp_to_rectangle,
@@ -52,7 +52,10 @@ def detect_shikaku_grid(
         cv2.imwrite(str(debug_path / "02_warped.png"), warped)
 
     warped_gray = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
-    h_lines, v_lines = _detect_dashed_grid(warped_gray, warp_w, warp_h)
+    mask = preprocess_dashed_lines(warped_gray)
+    h_lines, v_lines = detect_uniform_grid(
+        warped_gray, warp_w, warp_h, preprocessed_mask=mask
+    )
 
     rows = len(h_lines) - 1
     cols = len(v_lines) - 1
@@ -76,102 +79,3 @@ def detect_shikaku_grid(
         cell_h=cell_h,
         cell_w=cell_w,
     )
-
-
-def _detect_dashed_grid(
-    warped_gray: NDArray, warp_w: int, warp_h: int
-) -> tuple[list[int], list[int]]:
-    """Detect grid lines from dashed-line image using shared preprocessing."""
-    mask = preprocess_dashed_lines(warped_gray)
-
-    h_peaks = _find_line_peaks(mask, "h", warp_w, warp_h)
-    v_peaks = _find_line_peaks(mask, "v", warp_h, warp_w)
-
-    n_rows, n_cols = _reconcile_square_counts(h_peaks, v_peaks, warp_h, warp_w)
-
-    h_lines = _uniform_grid_snapped(h_peaks, warp_h, n_rows)
-    v_lines = _uniform_grid_snapped(v_peaks, warp_w, n_cols)
-
-    return h_lines, v_lines
-
-
-def _reconcile_square_counts(
-    h_peaks: NDArray, v_peaks: NDArray, warp_h: int, warp_w: int
-) -> tuple[int, int]:
-    """Derive row/column counts assuming square cells.
-
-    Shikaku is always drawn on a square-cell grid. Faint or sparse dashed lines
-    on one axis can be under-detected, which only ever *inflates* that axis's
-    estimated cell size (you cannot detect more lines than exist). The smaller
-    of the two per-axis cell-size estimates is therefore the reliable one, so we
-    take it as the true cell size and derive both counts from it. When one axis
-    has too few peaks to estimate, we fall back to the other axis alone.
-    """
-    h_cell = _cell_size_from_peaks(h_peaks)
-    v_cell = _cell_size_from_peaks(v_peaks)
-
-    candidates = [c for c in (h_cell, v_cell) if c is not None]
-    if not candidates:
-        return 10, 10
-
-    cell = min(candidates)
-    n_rows = max(2, round(warp_h / cell))
-    n_cols = max(2, round(warp_w / cell))
-    return n_rows, n_cols
-
-
-def _cell_size_from_peaks(peaks: NDArray) -> float | None:
-    """Estimate the cell size (in px) from the median of detected peak spacings.
-
-    Returns None when there are too few peaks to estimate reliably.
-    """
-    if len(peaks) < 3:
-        return None
-
-    spacings = np.diff(peaks)
-    med = float(np.median(spacings))
-    good = spacings[spacings > med * 0.5]
-    if len(good) == 0:
-        return None
-
-    return float(np.median(good))
-
-
-def _find_line_peaks(
-    mask: NDArray, axis: str, line_len: int, span: int
-) -> NDArray:
-    """Find grid line positions along one axis via morphological opening + projection."""
-    if axis == "h":
-        open_k = cv2.getStructuringElement(cv2.MORPH_RECT, (line_len // 8, 1))
-        lines_mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, open_k)
-        proj = lines_mask.sum(axis=1).astype(float) / 255
-    else:
-        open_k = cv2.getStructuringElement(cv2.MORPH_RECT, (1, line_len // 8))
-        lines_mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, open_k)
-        proj = lines_mask.sum(axis=0).astype(float) / 255
-
-    peaks, _ = find_peaks(proj, height=line_len * 0.15, distance=span // 20)
-    return peaks
-
-
-def _uniform_grid_snapped(
-    peaks: NDArray, total_span: int, n_cells: int
-) -> list[int]:
-    """Generate a uniform grid and snap each position to the nearest peak."""
-    cell_size = total_span / n_cells
-    tolerance = int(cell_size * 0.25)
-
-    result: list[int] = []
-    for i in range(n_cells + 1):
-        expected = int(i * cell_size)
-        if len(peaks) > 0:
-            dists = np.abs(peaks - expected)
-            min_dist = int(np.min(dists))
-            if min_dist < tolerance:
-                result.append(int(peaks[np.argmin(dists)]))
-            else:
-                result.append(expected)
-        else:
-            result.append(expected)
-
-    return result

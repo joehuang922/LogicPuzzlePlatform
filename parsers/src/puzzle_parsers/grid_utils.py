@@ -530,6 +530,149 @@ def _grid_uniformity_score(h_lines: list[int], v_lines: list[int]) -> float:
     return float(np.std(all_gaps)) / mean
 
 
+def detect_uniform_grid(
+    warped_gray: NDArray,
+    warp_w: int,
+    warp_h: int,
+    *,
+    preprocessed_mask: NDArray | None = None,
+) -> tuple[list[int], list[int]]:
+    """Unified step-4 grid detector: lattice-fit count, then emit a uniform grid.
+
+    This is the shared procedure for both solid- and dashed-line boards. Per axis:
+
+    1. Fit the cell count with :func:`detect_grid_dimensions` (uniform-lattice fit
+       on the raw ink projection — robust to clue clutter and octave errors).
+    2. If exactly one axis fits, recover the other from the square-cell fact
+       (both axes share a pitch, so count = round(span / pitch)).
+    3. If a count is known for both axes, synthesise perfectly uniform grids via
+       :func:`uniform_grid` (the square-cell fact makes jittery peak positions
+       redundant, so we discard them).
+    4. If both axes refuse (e.g. a bowed/curved scan whose ink no longer lands at a
+       single uniform phase), fall back to peak-based :func:`detect_grid_lines`.
+
+    Args:
+        warped_gray: Grayscale warped (rectified) puzzle image.
+        warp_w, warp_h: Warped image dimensions.
+        preprocessed_mask: Optional pre-binarised ink mask (e.g. from
+            :func:`preprocess_dashed_lines`); binarised internally when omitted.
+    """
+    if preprocessed_mask is not None:
+        binary = preprocessed_mask
+    else:
+        binary = cv2.adaptiveThreshold(
+            cv2.GaussianBlur(warped_gray, (3, 3), 0),
+            255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 3,
+        )
+
+    rows, cols = detect_grid_dimensions(binary)
+
+    # When exactly one axis fits confidently, the square-cell fact recovers the
+    # other: both axes share the same pitch, so count = round(span / pitch). This
+    # rescues large/clue-heavy boards (e.g. fillomino-big, whose 37 rows refuse the
+    # lattice fit under clue-inflated background but whose 23 cols fit cleanly)
+    # without inventing an octave-prone count heuristic.
+    if rows is not None and cols is None:
+        cols = max(2, round(warp_w / (warp_h / rows)))
+    elif cols is not None and rows is None:
+        rows = max(2, round(warp_h / (warp_w / cols)))
+
+    if rows is not None and cols is not None:
+        return uniform_grid(warp_h, rows), uniform_grid(warp_w, cols)
+
+    # Both axes refused (e.g. a bowed/curved scan): fall back to peak detection.
+    return detect_grid_lines(
+        warped_gray, warp_w, warp_h, preprocessed_mask=preprocessed_mask
+    )
+
+
+def _lattice_count_1d(
+    proj: NDArray,
+    span: int,
+    *,
+    n_min: int = 4,
+    n_max: int = 64,
+    band: int = 2,
+    weak_pct: int = 15,
+    ratio: float = 2.0,
+    floor: float = 0.02,
+) -> int | None:
+    """Count cells along one axis by fitting a uniform grid to the ink projection.
+
+    Because step-2 gives a reliable axis-aligned border, the ``count-1`` interior
+    grid lines sit at fixed phase ``i*span/count``. For each candidate count we lay
+    that uniform "comb" and require the *weakest* tooth (the ``weak_pct``-percentile
+    of per-tooth peak ink) to clearly beat the off-tooth background. Among all
+    counts that pass, we keep the **largest** — which is what makes this immune to
+    the octave traps that defeat peak-counting and plain contrast scoring:
+
+    - An overtone (2N) drops half its teeth into empty cell interiors, so its weak
+      tooth is near-zero and it fails the test.
+    - A sub-harmonic (N/2) passes the test, but so does the true N, and N > N/2, so
+      "largest passing" discards it.
+
+    Unlike peak detection, this reads the *raw* projection, so clue clutter (which
+    does not sit on a consistent pitch) cannot inject spurious lines. Returns
+    ``None`` when no count qualifies (e.g. a bowed/curved scan where the ink no
+    longer lands at a single uniform phase); callers fall back to peak detection.
+    """
+    m = float(proj.max())
+    if m <= 0:
+        return None
+    proj = proj / m
+
+    best: int | None = None
+    for n in range(n_min, n_max + 1):
+        pitch = span / n
+        on = np.zeros(span, dtype=bool)
+        teeth: list[float] = []
+        for i in range(1, n):
+            c = int(round(i * pitch))
+            lo = max(0, c - band)
+            hi = min(span, c + band + 1)
+            on[lo:hi] = True
+            teeth.append(float(proj[lo:hi].max()))
+        if on.all() or not on.any() or not teeth:
+            continue
+        off = float(proj[~on].mean())
+        if np.percentile(teeth, weak_pct) > off * ratio + floor:
+            best = n
+    return best
+
+
+def detect_grid_dimensions(
+    binary: NDArray,
+) -> tuple[int | None, int | None]:
+    """Detect (rows, cols) via uniform-lattice fitting on the ink projection.
+
+    Reads a binary ink mask (255 = ink), projects onto each axis, and fits the
+    best uniform grid count per axis with :func:`_lattice_count_1d`. Returns
+    ``(rows, cols)`` where either may be ``None`` if that axis does not admit a
+    confident uniform fit — the caller should then fall back to peak-based line
+    detection for that axis. This is the shared count detector for the uniform
+    step-4 pipeline; it does not locate individual lines (use :func:`uniform_grid`
+    to synthesise them once the count is known).
+    """
+    ink = (binary > 0).astype(np.float32)
+    h, w = ink.shape
+    col_proj = ink.sum(axis=0)   # vertical lines -> column count
+    row_proj = ink.sum(axis=1)   # horizontal lines -> row count
+    cols = _lattice_count_1d(col_proj, w)
+    rows = _lattice_count_1d(row_proj, h)
+    return rows, cols
+
+
+def uniform_grid(span: int, count: int) -> list[int]:
+    """Synthesise ``count+1`` perfectly uniform line positions across ``span``.
+
+    Once the count is known and the border is rectified, the square-cell fact makes
+    the individual detected peak positions redundant (and, on degraded scans,
+    actively harmful — they jitter off the true grid). Emitting an exactly uniform
+    grid ``line[i] = round(i*span/count)`` discards that jitter entirely.
+    """
+    return [int(round(i * span / count)) for i in range(count + 1)]
+
+
 def detect_grid_lines(
     warped_gray: NDArray, warp_w: int, warp_h: int,
     *,
