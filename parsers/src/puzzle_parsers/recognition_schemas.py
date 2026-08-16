@@ -60,6 +60,29 @@ SHIKAKU_CLUE_PROMPT = (
 )
 
 
+# Pencils clue montage: every tile shown is a non-empty cell (blank cells are
+# filtered out before the montage is built), so the model must never answer 0.
+# Each cell holds either a positive integer clue or a pencil-head arrowhead,
+# encoded as a negative int by direction. The head belongs to the cell where the
+# flat base of the triangle sits, not the cell the tip points toward.
+PENCILS_CLUE_PROMPT = (
+    "This image shows a grid of cells cropped from a Pencils puzzle. "
+    "Each cell is labeled with its row,col position. Every cell shown has "
+    "content — none are blank. "
+    "Ignore any faint dashed lines or partial ink at cell edges — those are grid "
+    "artifacts, not content. Focus only on the main content of each cell. "
+    "Each cell contains one of:\n"
+    "- A positive integer (1, 2, 3, ... possibly two digits like 10, 13, 20, 24) "
+    "representing a number clue. Read the entire number, not just the first digit.\n"
+    "- A pencil head icon: a small filled triangular arrowhead pointing in one "
+    "direction. The head BELONGS TO the cell where the FLAT BASE of the triangle "
+    "sits, NOT the cell the tip points toward. Output -1 if the tip points UP, "
+    "-2 if DOWN, -3 if LEFT, -4 if RIGHT.\n"
+    "Respond with ONLY a JSON array of arrays (rows of integers), one entry per "
+    "cell. Example for a 1x3: [[3,-2,10]]. No explanation, just the JSON."
+)
+
+
 # Case B: symbol enum (nurimaze)
 # Represented as plain int: 0=empty, 1=circle, 2=triangle, 3=S, 4=G
 SymbolCell = int
