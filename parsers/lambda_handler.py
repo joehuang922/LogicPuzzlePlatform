@@ -106,6 +106,9 @@ def _init_parsers():
     from puzzle_parsers.nurikabe.parser import NurikabeParser
     print("  - NurikabeParser imported")
 
+    from puzzle_parsers.ripple_effect.parser import RippleEffectParser
+    print("  - RippleEffectParser imported")
+
     _parsers = {
         1: SudokuParser(ocr_backend=_ocr),
         2: ComboSudokuParser(ocr_backend=_ocr),
@@ -131,6 +134,7 @@ def _init_parsers():
         22: ShikakuParser(),
         23: NorinoriParser(ocr_backend=_ocr),
         24: NurikabeParser(ocr_backend=_ocr),
+        25: RippleEffectParser(ocr_backend=_ocr),
     }
     print("=== Parsers ready ===")
 

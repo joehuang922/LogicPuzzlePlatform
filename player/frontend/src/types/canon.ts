@@ -311,3 +311,18 @@ export interface NurikabeAnswer {
   // rows x cols; 0 = unset, 1 = black (sea), 2 = white-marked (solver aid)
   states: number[][];
 }
+
+export interface RippleEffectCanon {
+  // rows x cols; 0 = empty, positive integer = pre-filled clue
+  cells: number[][];
+  // thick room borders; board perimeter is implicit
+  edges: {
+    h: number[][]; // (rows-1) x cols: h[r][c] = border between cell[r][c] and cell[r+1][c]
+    v: number[][]; // rows x (cols-1): v[r][c] = border between cell[r][c] and cell[r][c+1]
+  };
+}
+
+export interface RippleEffectAnswer {
+  // rows x cols; every cell filled with a positive integer
+  numbers: number[][];
+}

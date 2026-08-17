@@ -15,6 +15,7 @@ from puzzle_parsers.hell_golf.models import HellGolfBoard
 from puzzle_parsers.tentaishow.models import TentaishowBoard
 from puzzle_parsers.heyawake.models import HeyawakeBoard
 from puzzle_parsers.shikaku.models import ShikakuBoard
+from puzzle_parsers.ripple_effect.models import RippleEffectBoard
 from puzzle_parsers.validate import validate_canon
 
 SCHEMA_DIR = Path(__file__).parents[2] / "schemas" / "canon"
@@ -28,6 +29,7 @@ MODELS = {
     "tentaishow": TentaishowBoard,
     "heyawake": HeyawakeBoard,
     "shikaku": ShikakuBoard,
+    "ripple-effect": RippleEffectBoard,
 }
 
 
@@ -184,3 +186,20 @@ def test_invalid_shikaku_fails():
     data = {"cells": [[6, 0, 4], [0, -1, 0]]}  # negative value out of range
     with pytest.raises(Exception):
         validate_canon("shikaku", data)
+
+
+def test_valid_ripple_effect_passes():
+    data = {
+        "cells": [[0, 2], [1, 0]],
+        "edges": {"h": [[0, 0]], "v": [[1], [1]]},
+    }
+    validate_canon("ripple-effect", data)
+
+
+def test_invalid_ripple_effect_fails():
+    data = {
+        "cells": [[0, 2], [1, 0]],
+        "edges": {"h": [[0, 2]], "v": [[1], [1]]},  # 2 out of range (0/1 only)
+    }
+    with pytest.raises(Exception):
+        validate_canon("ripple-effect", data)

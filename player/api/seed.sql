@@ -91,7 +91,8 @@ INSERT INTO puzzle_types (id, name, rule) VALUES
   (21, 'heyawake', 'Paint cells black. A number in a room gives exactly how many of its cells are black. No two black cells may be orthogonally adjacent. All white cells must stay connected. No straight horizontal or vertical run of white cells may span three or more rooms.'),
   (22, 'shikaku', 'Divide the grid into rectangles. Each rectangle contains exactly one number, and that number equals the rectangle''s area (its width times height in cells). Rectangles may not overlap, and every cell must belong to exactly one rectangle.'),
   (23, 'norinori', 'Shade cells so every region contains exactly two shaded cells. All shaded cells must form dominoes: each shaded cell is orthogonally adjacent to exactly one other shaded cell. Dominoes may cross region boundaries.'),
-  (24, 'nurikabe', 'Each number is an island of that many white cells, with exactly one number per island. Islands may not touch orthogonally. All remaining black cells form one connected sea, and no 2x2 area is entirely black.');
+  (24, 'nurikabe', 'Each number is an island of that many white cells, with exactly one number per island. Islands may not touch orthogonally. All remaining black cells form one connected sea, and no 2x2 area is entirely black.'),
+  (25, 'ripple-effect', 'The grid is divided into rooms. Fill every cell so each room of size N contains the numbers 1 to N exactly once. If the same number K appears more than once in a row or column, those equal numbers must be at least K cells apart.');
 
 -- Seed sample puzzle: sudoku (difficulty 4 = hard)
 INSERT INTO puzzle_questions (id, puzzle_type, title, difficulty, width, height, canon_repr) VALUES (

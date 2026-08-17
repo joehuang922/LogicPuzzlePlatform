@@ -23,6 +23,7 @@ import heyawakeSchema from "../../../../schemas/canon/heyawake.json";
 import shikakuSchema from "../../../../schemas/canon/shikaku.json";
 import norinoriSchema from "../../../../schemas/canon/norinori.json";
 import nurikabeSchema from "../../../../schemas/canon/nurikabe.json";
+import rippleEffectSchema from "../../../../schemas/canon/ripple-effect.json";
 
 const ajv = new Ajv();
 
@@ -51,6 +52,7 @@ const validators: Record<number, ValidateFunction> = {
   22: ajv.compile(shikakuSchema),
   23: ajv.compile(norinoriSchema),
   24: ajv.compile(nurikabeSchema),
+  25: ajv.compile(rippleEffectSchema),
 };
 
 export function validateCanon(puzzleType: number, data: unknown): void {

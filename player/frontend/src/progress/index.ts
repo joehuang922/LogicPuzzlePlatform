@@ -22,6 +22,7 @@ import { computeHeyawakeProgress } from "./heyawake";
 import { computeShikakuProgress } from "./shikaku";
 import { computeNorinoriProgress } from "./norinori";
 import { computeNurikabeProgress } from "./nurikabe";
+import { computeRippleEffectProgress } from "./rippleEffect";
 
 export interface ProgressCalculator {
   puzzleType: number;
@@ -57,6 +58,7 @@ register(computeHeyawakeProgress);
 register(computeShikakuProgress);
 register(computeNorinoriProgress);
 register(computeNurikabeProgress);
+register(computeRippleEffectProgress);
 
 export function computeProgress(
   puzzle: PuzzleDefinition,

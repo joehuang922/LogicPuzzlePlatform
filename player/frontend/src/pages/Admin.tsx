@@ -36,6 +36,7 @@ import HeyawakeEditor from "../components/HeyawakeEditor";
 import ShikakuEditor from "../components/ShikakuEditor";
 import NorinoriEditor from "../components/NorinoriEditor";
 import NurikabeEditor from "../components/NurikabeEditor";
+import RippleEffectEditor from "../components/RippleEffectEditor";
 import CanonPreview from "../components/CanonPreview";
 import BatchUploadForm from "../components/BatchUploadForm";
 import { extractBase64 } from "../utils/image";
@@ -166,7 +167,8 @@ function QuestionForm({
   const isShikaku = selectedTypeName === "shikaku";
   const isNorinori = selectedTypeName === "norinori";
   const isNurikabe = selectedTypeName === "nurikabe";
-  const hasEditor = isNurimaze || isSudoku || isComboSudoku || isDoubleChoco || isSlitherlink || isNonogram || isMasyu || isPencils || isNuritwin || isSlalom || isShakashaka || isKakuro || isYajilin || isFillomino || isLits || isChocoBanana || isNumberLink || isAkari || isHellGolf || isTentaishow || isHeyawake || isShikaku || isNorinori || isNurikabe;
+  const isRippleEffect = selectedTypeName === "ripple-effect";
+  const hasEditor = isNurimaze || isSudoku || isComboSudoku || isDoubleChoco || isSlitherlink || isNonogram || isMasyu || isPencils || isNuritwin || isSlalom || isShakashaka || isKakuro || isYajilin || isFillomino || isLits || isChocoBanana || isNumberLink || isAkari || isHellGolf || isTentaishow || isHeyawake || isShikaku || isNorinori || isNurikabe || isRippleEffect;
 
   function validate(): boolean {
     const errs: Record<string, string> = {};
@@ -266,6 +268,9 @@ function QuestionForm({
         h = canon.grids.h.length + 1;
         w = canon.grids.v[0].length + 1;
       } else if (typeId === 24 && canon.cells) {
+        h = canon.cells.length;
+        w = canon.cells[0].length;
+      } else if (typeId === 25 && canon.cells) {
         h = canon.cells.length;
         w = canon.cells[0].length;
       }
@@ -559,6 +564,12 @@ function QuestionForm({
                 onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
                 onCancel={() => setEditorOpen(false)}
               />
+            ) : isRippleEffect ? (
+              <RippleEffectEditor
+                initialJson={canonRepr}
+                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
+                onCancel={() => setEditorOpen(false)}
+              />
             ) : (
               <ComboSudokuEditor
                 initialJson={canonRepr}
@@ -644,7 +655,8 @@ function PuzzleEditRow({
   const isShikaku = typeName === "shikaku";
   const isNorinori = typeName === "norinori";
   const isNurikabe = typeName === "nurikabe";
-  const hasEditor = isNurimaze || isSudoku || isComboSudoku || isDoubleChoco || isSlitherlink || isNonogram || isMasyu || isPencils || isNuritwin || isSlalom || isShakashaka || isKakuro || isYajilin || isFillomino || isLits || isChocoBanana || isNumberLink || isAkari || isHellGolf || isTentaishow || isHeyawake || isShikaku || isNorinori || isNurikabe;
+  const isRippleEffect = typeName === "ripple-effect";
+  const hasEditor = isNurimaze || isSudoku || isComboSudoku || isDoubleChoco || isSlitherlink || isNonogram || isMasyu || isPencils || isNuritwin || isSlalom || isShakashaka || isKakuro || isYajilin || isFillomino || isLits || isChocoBanana || isNumberLink || isAkari || isHellGolf || isTentaishow || isHeyawake || isShikaku || isNorinori || isNurikabe || isRippleEffect;
 
   async function handleConfirm() {
     let parsedCanon: Record<string, unknown>;
@@ -857,6 +869,12 @@ function PuzzleEditRow({
                 />
               ) : isNurikabe ? (
                 <NurikabeEditor
+                  initialJson={canonRepr}
+                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
+                  onCancel={() => setEditorOpen(false)}
+                />
+              ) : isRippleEffect ? (
+                <RippleEffectEditor
                   initialJson={canonRepr}
                   onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
                   onCancel={() => setEditorOpen(false)}

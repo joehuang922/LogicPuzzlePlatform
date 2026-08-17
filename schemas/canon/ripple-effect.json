@@ -1,0 +1,43 @@
+{
+  "title": "Ripple Effect Canonical Representation",
+  "description": "Rectangular grid pre-divided into rooms (polyominoes) by thick borders. Some cells carry positive integer clues. Players fill every cell so each room of size N contains 1..N, and equal values K in a row/column are at least K+1 cells apart.",
+  "type": "object",
+  "required": ["cells", "edges"],
+  "additionalProperties": false,
+  "properties": {
+    "cells": {
+      "description": "rows x cols grid of integers. 0 = empty cell, positive integer = a pre-filled clue in that cell.",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": { "type": "integer", "minimum": 0 },
+        "minItems": 1
+      },
+      "minItems": 1
+    },
+    "edges": {
+      "description": "Thick room borders defining the partition. Board perimeter is an implicit border.",
+      "type": "object",
+      "required": ["h", "v"],
+      "additionalProperties": false,
+      "properties": {
+        "h": {
+          "description": "(rows-1) x cols array: h[r][c] = thick border between cell[r][c] and cell[r+1][c]. 0 = same room, 1 = room boundary.",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "type": "integer", "minimum": 0, "maximum": 1 }
+          }
+        },
+        "v": {
+          "description": "rows x (cols-1) array: v[r][c] = thick border between cell[r][c] and cell[r][c+1]. 0 = same room, 1 = room boundary.",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "type": "integer", "minimum": 0, "maximum": 1 }
+          }
+        }
+      }
+    }
+  }
+}

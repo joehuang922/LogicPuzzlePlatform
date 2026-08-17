@@ -23,6 +23,7 @@ import { heyawakeExtractor } from "./heyawake";
 import { shikakuExtractor } from "./shikaku";
 import { norinoriExtractor } from "./norinori";
 import { nurikabeExtractor } from "./nurikabe";
+import { rippleEffectExtractor } from "./rippleEffect";
 
 const extractorRegistry = new Map<number, AnswerExtractor>();
 
@@ -54,6 +55,7 @@ registerExtractor(heyawakeExtractor);
 registerExtractor(shikakuExtractor);
 registerExtractor(norinoriExtractor);
 registerExtractor(nurikabeExtractor);
+registerExtractor(rippleEffectExtractor);
 
 export function getExtractor(puzzleType: number): AnswerExtractor | undefined {
   return extractorRegistry.get(puzzleType);
