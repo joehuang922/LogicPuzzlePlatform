@@ -82,21 +82,19 @@ def detect_tentaishow_grid(
     if debug_path:
         cv2.imwrite(str(debug_path / "02_warped.png"), warped)
 
-    # Rough pitch estimate for dot-size bounds: assume a squarish board of
-    # roughly 10 cells until we refine the count.
-    approx_pitch = min(warp_w, warp_h) / 10.0
-
-    dots = _detect_dots(warped_gray, approx_pitch)
-
-    # Mask dots to background so they don't perturb line detection.
-    cleaned = warped_gray.copy()
-    for d in dots:
-        cv2.circle(cleaned, (int(d.cx), int(d.cy)), int(approx_pitch * 0.5), 255, -1)
+    # Count cells FIRST, from the dashed grid alone. The dot lattice can only
+    # confirm a count once the dots are known, but the dots can only be sized
+    # reliably once the pitch is known — so we break the cycle by reading the
+    # cell count straight off the rectified grid lines. This also fixes large
+    # boards: a fixed "~10 cells" pitch guess mis-sized dot radii on a 25x25.
+    rows, cols = _count_cells(warped_gray, warp_w, warp_h)
+    pitch = min(warp_w / cols, warp_h / rows)
 
     if debug_path:
-        cv2.imwrite(str(debug_path / "03_dots_masked.png"), cleaned)
+        mask = preprocess_dashed_lines(warped_gray)
+        cv2.imwrite(str(debug_path / "03_dashed_mask.png"), mask)
 
-    rows, cols = _count_cells(cleaned, warp_w, warp_h, dots)
+    dots = _detect_dots(warped_gray, pitch)
 
     if debug_path:
         vis = warped.copy()
@@ -123,16 +121,21 @@ def detect_tentaishow_grid(
     )
 
 
-def _detect_dots(warped_gray: NDArray, approx_pitch: float) -> list[DetectedDot]:
+def _detect_dots(warped_gray: NDArray, pitch: float) -> list[DetectedDot]:
     """Detect dot centers via HoughCircles, with a contour-based fallback.
 
-    Classifies each dot as open (0) or filled (1) by comparing the mean
-    intensity of a small disk at the center against the annulus around it.
+    HoughCircles is deliberately permissive, so on a dashed/halftone board it
+    hallucinates large circles floating over empty cells. Every candidate is
+    therefore gated by :func:`_verify_dot`, which keeps it only if dark ink
+    actually runs along the detected perimeter (a filled disk's body or an open
+    dot's printed ring). This is the same edge-support idea the shared border
+    detector uses, and it is what removes the false-positive "open dots" that
+    previously littered empty cells.
     """
     blurred = cv2.medianBlur(warped_gray, 5)
-    min_r = max(4, int(approx_pitch * 0.12))
-    max_r = int(approx_pitch * 0.42)
-    min_dist = max(6, int(approx_pitch * 0.5))
+    min_r = max(4, int(pitch * 0.14))
+    max_r = int(pitch * 0.45)
+    min_dist = max(6, int(pitch * 0.5))
 
     detected: list[DetectedDot] = []
     seen: list[tuple[float, float]] = []
@@ -141,8 +144,11 @@ def _detect_dots(warped_gray: NDArray, approx_pitch: float) -> list[DetectedDot]
         for sx, sy in seen:
             if (sx - cx) ** 2 + (sy - cy) ** 2 < (min_dist * 0.8) ** 2:
                 return
+        color = _verify_dot(warped_gray, cx, cy, r)
+        if color is None:
+            return
         seen.append((cx, cy))
-        detected.append(DetectedDot(cx=cx, cy=cy, color=_classify_dot(warped_gray, cx, cy, r)))
+        detected.append(DetectedDot(cx=cx, cy=cy, color=color))
 
     circles = cv2.HoughCircles(
         blurred,
@@ -150,7 +156,7 @@ def _detect_dots(warped_gray: NDArray, approx_pitch: float) -> list[DetectedDot]
         dp=1.2,
         minDist=min_dist,
         param1=100,
-        param2=18,
+        param2=20,
         minRadius=min_r,
         maxRadius=max_r,
     )
@@ -182,85 +188,104 @@ def _detect_dots(warped_gray: NDArray, approx_pitch: float) -> list[DetectedDot]
     return detected
 
 
-def _classify_dot(gray: NDArray, cx: float, cy: float, r: float) -> int:
-    """0 = open (light center), 1 = filled (dark center).
+def _verify_dot(
+    gray: NDArray, cx: float, cy: float, r: float
+) -> int | None:
+    """Confirm a Hough/contour candidate is a real dot and classify it.
 
-    Compares a small central disk to the mid annulus; robust to anti-aliasing.
+    Returns ``1`` (filled), ``0`` (open), or ``None`` if the candidate is not a
+    dot at all. A real dot is distinguished from a phantom circle over an empty
+    cell by *perimeter ink support*: sampling ``gray`` around the candidate
+    circle, most samples must be clearly darker than the local background (a
+    filled disk is dark all the way out; an open dot has a dark printed ring at
+    exactly this radius). An empty cell — or a circle that happens to straddle
+    faint dashed lines — has too few dark perimeter samples and is rejected.
+
+    Filled vs open is then decided by whether the small central disk is itself
+    inked (filled) or bright (open ring around white paper).
     """
     h, w = gray.shape
     ci, cj = int(round(cy)), int(round(cx))
-    rr = max(2, int(r))
+    rr = int(r * 1.5) + 2
     y0, y1 = max(0, ci - rr), min(h, ci + rr + 1)
     x0, x1 = max(0, cj - rr), min(w, cj + rr + 1)
-    patch = gray[y0:y1, x0:x1].astype(np.float32)
+    patch = gray[y0:y1, x0:x1]
     if patch.size == 0:
-        return 0
+        return None
+
+    # Local background from the bright majority of the surrounding box; a dot
+    # only covers a fraction of it, so the 85th percentile is paper-white.
+    bg = float(np.percentile(patch, 85))
+    dark_thr = bg - 45.0
+
+    # Perimeter support: fraction of points on the candidate circle over ink.
+    n_samples = max(16, int(2 * np.pi * r / 3))
+    hits = 0
+    total = 0
+    for k in range(n_samples):
+        a = 2 * np.pi * k / n_samples
+        x = int(round(cx + r * np.cos(a)))
+        y = int(round(cy + r * np.sin(a)))
+        if 0 <= x < w and 0 <= y < h:
+            total += 1
+            if gray[y, x] < dark_thr:
+                hits += 1
+    if total == 0 or hits / total < 0.6:
+        return None
+
     ys, xs = np.mgrid[y0:y1, x0:x1]
     dist = np.sqrt((ys - ci) ** 2 + (xs - cj) ** 2)
     center_mask = dist <= r * 0.4
     if not center_mask.any():
-        return 0
-    center_mean = float(patch[center_mask].mean())
-    return 1 if center_mean < 128 else 0
+        return None
+    center_dark = float((patch[center_mask] < dark_thr).mean())
+    return 1 if center_dark > 0.55 else 0
 
 
 def _count_cells(
-    cleaned: NDArray,
+    warped_gray: NDArray,
     warp_w: int,
     warp_h: int,
-    dots: list[DetectedDot],
 ) -> tuple[int, int]:
-    """Determine row/col counts.
+    """Determine row/col counts straight from the dashed grid lines.
 
-    Primary signal is the dot lattice: every dot sits at a half-pitch multiple
-    k*span/(2N), so the true N minimizes each dot's residual to that lattice.
-    This is far more robust than dashed-line detection on faint/halftone
-    boards. We fall back to the dashed-line count per axis when the lattice is
-    not confident (too few dots, or no clear residual minimum).
+    This runs *before* dot detection, so it cannot lean on the dot lattice — but
+    the dashed grid alone is a strong signal once the board is rectified. We
+    detect the grid-line pitch on each axis and, because Tentai Show cells are
+    square, pool both axes into one pitch estimate. The counts then follow as
+    ``round(span / pitch)``. Pooling is what rescues a board whose dashes are
+    faint on one axis: the stronger axis fixes the shared pitch.
+
+    The per-axis pitch is the median grid-line spacing found by
+    :func:`_axis_line_pitch`; if neither axis yields one (extremely degraded
+    scan) we fall back to a 10x10 guess, matching the historical default.
     """
-    mask = preprocess_dashed_lines(cleaned)
-    dash_cols = _cell_count_axis(mask, "v", warp_w, warp_h)
-    dash_rows = _cell_count_axis(mask, "h", warp_h, warp_w)
+    mask = preprocess_dashed_lines(warped_gray)
+    pitch_x = _axis_line_pitch(mask, "v", warp_h, warp_w)
+    pitch_y = _axis_line_pitch(mask, "h", warp_w, warp_h)
 
-    xs = np.array([d.cx for d in dots], dtype=float)
-    ys = np.array([d.cy for d in dots], dtype=float)
-    n_cols = _lattice_count_axis(xs, warp_w) or dash_cols
-    n_rows = _lattice_count_axis(ys, warp_h) or dash_rows
-    return n_rows, n_cols
+    pitches = [p for p in (pitch_x, pitch_y) if p is not None]
+    if not pitches:
+        return 10, 10
+
+    pooled = float(np.median(pitches))
+    cols = max(2, round(warp_w / pooled))
+    rows = max(2, round(warp_h / pooled))
+    return rows, cols
 
 
-def _lattice_count_axis(
-    coords: NDArray, span: int, n_min: int = 4, n_max: int = 40
-) -> int | None:
-    """Return the cell count N whose half-pitch lattice best fits the dots.
+def _axis_line_pitch(
+    mask: NDArray, axis: str, line_len: int, span: int
+) -> float | None:
+    """Median spacing between grid lines along one axis, in pixels.
 
-    A dot at pixel p sits at some k*span/(2N); its residual is the distance of
-    2N*p/span from the nearest integer (0..0.5). The best N minimizes the mean
-    residual. We only trust the result when it is a clear minimum: at least 4
-    dots, error well below the ~0.25 expected for a random (wrong) N, and a
-    margin over the runner-up.
+    ``axis="v"`` finds vertical lines (spacing gives the column pitch); ``"h"``
+    finds horizontal lines. Lines are isolated by morphological opening with a
+    long directional kernel, then located as projection peaks. The peak
+    ``distance`` is deliberately a small fraction of the span (``span/40``): the
+    previous ``span/20`` exceeded the true pitch on a 25x25 board and merged
+    adjacent lines, collapsing the count to ~10.
     """
-    if len(coords) < 4:
-        return None
-
-    scores: list[tuple[float, int]] = []
-    for n in range(n_min, n_max + 1):
-        half_pitch = span / (2 * n)
-        res = coords / half_pitch
-        err = float(np.mean(np.abs(res - np.round(res))))
-        scores.append((err, n))
-
-    scores.sort(key=lambda t: t[0])
-    best_err, best_n = scores[0]
-    runner_err = scores[1][0]
-    # A genuine fit sits well under the ~0.25 mean residual of a wrong N and is
-    # clearly separated from the next candidate.
-    if best_err < 0.16 and best_err < runner_err * 0.75:
-        return best_n
-    return None
-
-
-def _cell_count_axis(mask: NDArray, axis: str, line_len: int, span: int) -> int:
     if axis == "h":
         open_k = cv2.getStructuringElement(cv2.MORPH_RECT, (max(1, line_len // 8), 1))
         lines_mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, open_k)
@@ -270,15 +295,13 @@ def _cell_count_axis(mask: NDArray, axis: str, line_len: int, span: int) -> int:
         lines_mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, open_k)
         proj = lines_mask.sum(axis=0).astype(float) / 255
 
-    peaks, _ = find_peaks(proj, height=line_len * 0.15, distance=max(1, span // 20))
+    peaks, _ = find_peaks(proj, height=line_len * 0.15, distance=max(1, span // 40))
     if len(peaks) < 3:
-        return 10
+        return None
 
     spacings = np.diff(peaks)
     med = float(np.median(spacings))
     good = spacings[spacings > med * 0.5]
     if len(good) == 0:
-        return 10
-    cell_size = float(np.median(good))
-    count = round(span / cell_size)
-    return max(2, count)
+        return None
+    return float(np.median(good))
