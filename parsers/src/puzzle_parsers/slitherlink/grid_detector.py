@@ -3,8 +3,16 @@
 Pipeline:
 1. Threshold to binary, find small circular blobs (the intersection dots)
 2. Filter by area and circularity to keep only dots
-3. Cluster dot centers into rows and columns
-4. Infer grid dimensions from the (rows+1) x (cols+1) dot array
+3. Estimate the (isotropic) lattice pitch from nearest-neighbour spacing
+4. RANSAC over sub-pitch phase offsets to snap dots onto an integer lattice
+5. Slide an (rows+1) x (cols+1) window over the lattice to isolate the puzzle
+   from surrounding page clutter (titles, QR codes, neighbouring puzzles)
+6. Emit the dot_grid, snapping each node to a real dot where one exists
+
+The magazine source images are full-page photos that contain multiple puzzles,
+headers and QR codes. Because the intersection dots form an extremely regular
+square lattice, fitting that lattice and windowing it is far more robust than
+clustering the raw dot cloud (which would span the whole page).
 """
 from __future__ import annotations
 
@@ -44,15 +52,17 @@ def detect_slitherlink_grid(
             cv2.circle(vis, (int(cx), int(cy)), 5, (0, 0, 255), 2)
         cv2.imwrite(str(debug_path / "01_dots_raw.png"), vis)
 
+    pitch = _estimate_pitch(dots)
+
     if expected_rows is None or expected_cols is None:
-        det_rows, det_cols = _auto_detect_dimensions(dots)
+        det_rows, det_cols = _auto_detect_dimensions(dots, pitch)
         if expected_rows is None:
             expected_rows = det_rows
         if expected_cols is None:
             expected_cols = det_cols
 
-    dot_grid = _cluster_dots_to_grid(
-        dots, expected_rows + 1, expected_cols + 1, gray.shape
+    dot_grid = _fit_lattice_grid(
+        dots, pitch, expected_rows + 1, expected_cols + 1, gray.shape
     )
 
     if debug_path:
@@ -83,64 +93,151 @@ def detect_slitherlink_grid(
     )
 
 
-def _auto_detect_dimensions(dots: NDArray) -> tuple[int, int]:
-    """Infer grid cell dimensions (rows, cols) from detected dots.
+def _estimate_pitch(dots: NDArray) -> float:
+    """Estimate the isotropic lattice pitch from nearest-neighbour spacing.
 
-    Uses autocorrelation on X positions to find the cell spacing, then
-    derives cols from the X span and rows from the filtered Y span.
+    The intersection dots form a square lattice, so the median nearest-neighbour
+    distance is a robust estimate of the cell pitch even when many dots are
+    missing (obscured by digits) or spurious (from titles/QR codes).
     """
     if len(dots) < 4:
+        return 0.0
+    from scipy.spatial import cKDTree
+
+    tree = cKDTree(dots)
+    dist, _ = tree.query(dots, k=2)
+    nn = dist[:, 1]
+    nn = nn[nn > 1.0]
+    if len(nn) == 0:
+        return 0.0
+    return float(np.median(nn))
+
+
+def _auto_detect_dimensions(dots: NDArray, pitch: float) -> tuple[int, int]:
+    """Infer grid cell dimensions (rows, cols) from detected dots and pitch."""
+    if len(dots) < 4 or pitch <= 0:
         return 10, 10
-
-    xs = dots[:, 0]
-    x_min, x_max = float(xs.min()), float(xs.max())
-    x_span = x_max - x_min
-    if x_span < 10:
-        return 10, 10
-
-    spacing = _estimate_spacing_autocorrelation(xs)
-    if spacing is None:
-        return 10, 10
-
-    est_cols = max(2, round(x_span / spacing))
-
-    filtered = _filter_dots_by_row_density(dots, est_cols + 1)
-    ys_filt = filtered[:, 1]
-    y_span = float(ys_filt.max() - ys_filt.min())
-    est_rows = max(2, round(y_span / spacing))
-
+    xs, ys = dots[:, 0], dots[:, 1]
+    est_cols = max(2, round((xs.max() - xs.min()) / pitch))
+    est_rows = max(2, round((ys.max() - ys.min()) / pitch))
     return est_rows, est_cols
 
 
-def _estimate_spacing_autocorrelation(values: NDArray) -> float | None:
-    """Estimate regular grid spacing via autocorrelation of a 1D histogram."""
-    from numpy.fft import fft, ifft
+def _fit_lattice_grid(
+    dots: NDArray, pitch: float,
+    n_dot_rows: int, n_dot_cols: int,
+    img_shape: tuple[int, ...],
+) -> NDArray:
+    """Fit an affine lattice to the dot cloud and window out the puzzle.
 
-    sorted_vals = np.sort(values)
-    v_min, v_max = float(sorted_vals[0]), float(sorted_vals[-1])
-    span = v_max - v_min
-    if span < 10:
-        return None
+    1. RANSAC over sub-pitch phase offsets (ox, oy) to seed an integer lattice.
+    2. Iteratively refine an affine map (col, row) -> (x, y): reassign each dot
+       to its nearest integer node under the current map, then least-squares
+       refit. Affine (unlike a rigid translation) absorbs the shear/scale of a
+       photographed page, so wide boards don't drift off the dots near their
+       far edge.
+    3. Slide an (n_dot_rows x n_dot_cols) window over the occupied nodes and
+       pick the position covering the most dots — this isolates the target
+       puzzle from other page content.
+    4. Build the dot_grid, snapping each node to its real dot when present and
+       falling back to the affine-predicted position otherwise.
+    """
+    if len(dots) == 0 or pitch <= 0:
+        h, w = img_shape[:2]
+        return _synthetic_grid(w, h, n_dot_rows, n_dot_cols)
 
-    bins = np.arange(v_min, v_max + 1, 1)
-    density, _ = np.histogram(sorted_vals, bins=bins)
-    n = len(density)
-    if n < 100:
-        return None
+    xs, ys = dots[:, 0], dots[:, 1]
+    tol = pitch * 0.30
 
-    f = fft(density - density.mean())
-    acf = np.real(ifft(f * np.conj(f)))
-    acf = acf[: n // 2]
-    if acf[0] == 0:
-        return None
-    acf = acf / acf[0]
+    # --- 1. Seed integer lattice via phase-offset RANSAC ---
+    best = None  # (inlier_count, ox, oy)
+    steps = 24
+    for ox in np.linspace(0, pitch, steps, endpoint=False):
+        jx = np.round((xs - ox) / pitch)
+        inl_x = np.abs(xs - (ox + jx * pitch)) < tol
+        for oy in np.linspace(0, pitch, steps, endpoint=False):
+            jy = np.round((ys - oy) / pitch)
+            inl = inl_x & (np.abs(ys - (oy + jy * pitch)) < tol)
+            cnt = int(inl.sum())
+            if best is None or cnt > best[0]:
+                best = (cnt, float(ox), float(oy))
+    _, ox, oy = best
 
-    min_lag = max(50, int(span * 0.02))
-    for i in range(min_lag, len(acf) - 1):
-        if acf[i] > acf[i - 1] and acf[i] > acf[i + 1] and acf[i] > 0.3:
-            return float(i)
+    # --- 2. Iterative affine refinement ---
+    # cx maps (col, row, 1) -> x, cy maps (col, row, 1) -> y
+    cx = np.array([pitch, 0.0, ox])
+    cy = np.array([0.0, pitch, oy])
+    jr = np.zeros((len(dots), 2))
+    inl = np.ones(len(dots), dtype=bool)
+    for _ in range(8):
+        det = cx[0] * cy[1] - cx[1] * cy[0]
+        if abs(det) < 1e-6:
+            break
+        # invert the linear part to recover fractional (col, row) per dot
+        inv = np.array([[cy[1], -cx[1]], [-cy[0], cx[0]]]) / det
+        b = np.c_[xs - cx[2], ys - cy[2]]
+        frac = b @ inv.T
+        jr = np.round(frac)
+        A = np.c_[jr[:, 0], jr[:, 1], np.ones(len(dots))]
+        res = np.hypot(A @ cx - xs, A @ cy - ys)
+        inl = res < tol
+        if int(inl.sum()) < 6:
+            break
+        cx, *_ = np.linalg.lstsq(A[inl], xs[inl], rcond=None)
+        cy, *_ = np.linalg.lstsq(A[inl], ys[inl], rcond=None)
 
-    return None
+    A = np.c_[jr[:, 0], jr[:, 1], np.ones(len(dots))]
+    res = np.hypot(A @ cx - xs, A @ cy - ys)
+    inl = res < tol
+
+    if int(inl.sum()) < n_dot_rows * n_dot_cols * 0.3:
+        h, w = img_shape[:2]
+        return _synthetic_grid(w, h, n_dot_rows, n_dot_cols)
+
+    jci = jr[inl, 0].astype(int)  # column indices
+    jri = jr[inl, 1].astype(int)  # row indices
+    dxi = dots[inl]
+
+    # Map (node_row, node_col) -> real dot coordinate
+    node_to_dot: dict[tuple[int, int], NDArray] = {}
+    for k in range(len(jci)):
+        node_to_dot[(int(jri[k]), int(jci[k]))] = dxi[k]
+
+    # --- 3. Slide an (n_dot_rows x n_dot_cols) window to cover the most dots ---
+    r_lo, r_hi = int(jri.min()), int(jri.max())
+    c_lo, c_hi = int(jci.min()), int(jci.max())
+    node_set = set(node_to_dot.keys())
+
+    r0_range = range(r_lo, max(r_lo, r_hi - n_dot_rows + 1) + 1)
+    c0_range = range(c_lo, max(c_lo, c_hi - n_dot_cols + 1) + 1)
+
+    best_win = None  # (count, r0, c0)
+    for r0 in r0_range:
+        for c0 in c0_range:
+            count = sum(
+                1 for (ny, nx) in node_set
+                if r0 <= ny < r0 + n_dot_rows and c0 <= nx < c0 + n_dot_cols
+            )
+            if best_win is None or count > best_win[0]:
+                best_win = (count, r0, c0)
+
+    _, r0, c0 = best_win
+
+    # --- 4. Build the dot grid, snapping to real dots where present ---
+    grid = np.zeros((n_dot_rows, n_dot_cols, 2), dtype=np.float64)
+    for r in range(n_dot_rows):
+        for c in range(n_dot_cols):
+            node = (r0 + r, c0 + c)
+            if node in node_to_dot:
+                grid[r, c] = node_to_dot[node]
+            else:
+                col, row = c0 + c, r0 + r
+                grid[r, c] = [
+                    cx[0] * col + cx[1] * row + cx[2],
+                    cy[0] * col + cy[1] * row + cy[2],
+                ]
+
+    return grid
 
 
 def _detect_dots(gray: NDArray) -> NDArray:
@@ -188,255 +285,6 @@ def _detect_dots(gray: NDArray) -> NDArray:
             centers.append((cx, cy))
 
     return np.array(centers, dtype=np.float64) if centers else np.empty((0, 2), dtype=np.float64)
-
-
-def _cluster_dots_to_grid(
-    dots: NDArray, expected_rows: int, expected_cols: int,
-    img_shape: tuple[int, ...],
-) -> NDArray:
-    """Cluster detected dots into a regular grid.
-
-    Groups dots into rows (by Y proximity) and columns (by X proximity)
-    using the estimated spacing as a merge threshold. Uses actual cluster
-    medians as grid line positions to avoid drift from non-uniform spacing.
-    """
-    if len(dots) == 0:
-        h, w = img_shape[:2]
-        return _synthetic_grid(w, h, expected_rows, expected_cols)
-
-    dots = _filter_dots_by_row_density(dots, expected_cols)
-    if len(dots) < expected_rows * expected_cols * 0.3:
-        h, w = img_shape[:2]
-        return _synthetic_grid(w, h, expected_rows, expected_cols)
-
-    xs = dots[:, 0]
-    ys = dots[:, 1]
-
-    row_positions = _cluster_positions_1d(ys, expected_rows)
-    col_positions = _cluster_positions_1d(xs, expected_cols)
-
-    if row_positions is None or col_positions is None:
-        h, w = img_shape[:2]
-        return _synthetic_grid(w, h, expected_rows, expected_cols)
-
-    grid = np.zeros((expected_rows, expected_cols, 2), dtype=np.float64)
-    assigned = np.zeros((expected_rows, expected_cols), dtype=bool)
-
-    r_spacing = (row_positions[-1] - row_positions[0]) / max(1, expected_rows - 1)
-    c_spacing = (col_positions[-1] - col_positions[0]) / max(1, expected_cols - 1)
-
-    for (cx, cy) in dots:
-        r_idx = int(np.argmin(np.abs(row_positions - cy)))
-        c_idx = int(np.argmin(np.abs(col_positions - cx)))
-
-        r_dist = abs(cy - row_positions[r_idx])
-        c_dist = abs(cx - col_positions[c_idx])
-
-        if r_dist < r_spacing * 0.4 and c_dist < c_spacing * 0.4:
-            if not assigned[r_idx, c_idx]:
-                grid[r_idx, c_idx] = [cx, cy]
-                assigned[r_idx, c_idx] = True
-
-    _fill_missing(grid, assigned, row_positions, col_positions)
-    return grid
-
-
-def _cluster_positions_1d(values: NDArray, expected_count: int) -> NDArray | None:
-    """Cluster 1D values into expected_count groups and return their medians.
-
-    Uses a merge-threshold approach: sort values, split into groups where
-    consecutive gaps exceed half the estimated spacing. If the cluster count
-    doesn't match expected_count, fall back to uniform grid fitting.
-    """
-    if len(values) < expected_count:
-        return None
-
-    sorted_vals = np.sort(values)
-    v_min = float(sorted_vals[0])
-    v_max = float(sorted_vals[-1])
-    span = v_max - v_min
-    if span < 10:
-        return None
-
-    est_spacing = span / (expected_count - 1)
-    merge_threshold = est_spacing * 0.4
-
-    # Group values by proximity
-    groups: list[list[float]] = [[float(sorted_vals[0])]]
-    for i in range(1, len(sorted_vals)):
-        if sorted_vals[i] - sorted_vals[i - 1] < merge_threshold:
-            groups[-1].append(float(sorted_vals[i]))
-        else:
-            groups.append([float(sorted_vals[i])])
-
-    if len(groups) == expected_count:
-        positions = np.array([np.median(g) for g in groups])
-        return positions
-
-    # If we got more groups than expected, merge the closest pairs
-    while len(groups) > expected_count:
-        min_gap = float("inf")
-        min_idx = 0
-        for i in range(len(groups) - 1):
-            gap = np.median(groups[i + 1]) - np.median(groups[i])
-            if gap < min_gap:
-                min_gap = gap
-                min_idx = i
-        groups[min_idx].extend(groups[min_idx + 1])
-        del groups[min_idx + 1]
-
-    if len(groups) == expected_count:
-        positions = np.array([np.median(g) for g in groups])
-        return positions
-
-    # Fallback to uniform fit
-    return _fit_uniform_grid_1d(values, expected_count)
-
-
-def _filter_dots_by_row_density(
-    dots: NDArray, expected_cols: int
-) -> NDArray:
-    """Remove dots that aren't part of a dense horizontal row.
-
-    Groups dots by Y proximity, keeps only those in groups with at least
-    expected_cols/2 members. This filters out stray dots from title areas
-    or digit internals.
-    """
-    if len(dots) == 0:
-        return dots
-
-    ys = dots[:, 1]
-    sorted_indices = np.argsort(ys)
-    sorted_dots = dots[sorted_indices]
-
-    # Estimate row spacing from the span and expected count
-    y_span = float(ys.max() - ys.min())
-    est_spacing = y_span / max(1, expected_cols)  # rough estimate
-    merge_threshold = est_spacing * 0.3
-
-    # Group dots into rows by Y proximity
-    groups: list[list[int]] = []
-    current_group: list[int] = [0]
-    for i in range(1, len(sorted_dots)):
-        if sorted_dots[i, 1] - sorted_dots[current_group[-1], 1] < merge_threshold:
-            current_group.append(i)
-        else:
-            groups.append(current_group)
-            current_group = [i]
-    groups.append(current_group)
-
-    # Keep only dots from groups with sufficient density
-    min_count = max(3, expected_cols // 2)
-    keep_indices = []
-    for group in groups:
-        if len(group) >= min_count:
-            keep_indices.extend(group)
-
-    if not keep_indices:
-        return dots  # fallback: keep all
-
-    return sorted_dots[keep_indices]
-
-
-def _fit_uniform_grid_1d(values: NDArray, expected_count: int) -> NDArray | None:
-    """Fit a uniform grid (origin + spacing) to 1D dot positions.
-
-    Uses a two-phase approach:
-    1. Estimate spacing from the most common pairwise difference
-    2. Score candidate grids by how many dots have MULTIPLE matches on the
-       perpendicular axis (true dots appear in rows/cols of ~expected_count,
-       stray dots from headers/digits don't)
-
-    Since we only have 1D values here, we use a simpler scoring: for each
-    candidate grid line, count how many actual dots fall near it. We then
-    prefer grids where ALL lines have at least one dot (complete coverage).
-    """
-    if len(values) < expected_count:
-        return None
-
-    sorted_vals = np.sort(values)
-    v_min = float(sorted_vals[0])
-    v_max = float(sorted_vals[-1])
-    span = v_max - v_min
-    if span < 10:
-        return None
-
-    # The true spacing should be close to span / (expected_count - 1)
-    expected_spacing = span / (expected_count - 1)
-    tolerance = expected_spacing * 0.2
-
-    # Generate candidate spacings from pairwise differences
-    diffs = []
-    for i in range(len(sorted_vals)):
-        for j in range(i + 1, min(i + expected_count, len(sorted_vals))):
-            d = sorted_vals[j] - sorted_vals[i]
-            for k in range(1, expected_count):
-                candidate = d / k
-                if abs(candidate - expected_spacing) < expected_spacing * 0.15:
-                    diffs.append(candidate)
-
-    if not diffs:
-        return np.linspace(v_min, v_max, expected_count)
-
-    # Find mode spacing via histogram
-    diffs_arr = np.array(diffs)
-    n_bins = max(20, len(diffs) // 5)
-    hist, bin_edges = np.histogram(diffs_arr, bins=n_bins)
-    best_bin = np.argmax(hist)
-    mask = (diffs_arr >= bin_edges[best_bin]) & (diffs_arr < bin_edges[best_bin + 1])
-    best_spacing = float(np.median(diffs_arr[mask]))
-
-    # Score candidate origins: prefer grids where every line has a dot nearby
-    # Weight by total inlier count with a heavy penalty for missing lines
-    best_score = -1.0
-    best_origin = v_min
-    for val in sorted_vals:
-        for grid_idx in range(expected_count):
-            origin = val - grid_idx * best_spacing
-            # Skip if grid extends far outside the data range
-            grid_end = origin + (expected_count - 1) * best_spacing
-            if origin < v_min - tolerance * 2 or grid_end > v_max + tolerance * 2:
-                continue
-
-            inliers = 0
-            min_dots_per_line = float("inf")
-            for k in range(expected_count):
-                target = origin + k * best_spacing
-                dots_on_line = int(np.sum(np.abs(sorted_vals - target) < tolerance))
-                if dots_on_line > 0:
-                    inliers += 1
-                min_dots_per_line = min(min_dots_per_line, dots_on_line)
-
-            # Score: number of covered lines + bonus for no empty lines
-            score = inliers + (0.5 if min_dots_per_line > 0 else 0)
-            if score > best_score:
-                best_score = score
-                best_origin = origin
-
-    # Build the grid positions, snapping to actual dots
-    positions = np.zeros(expected_count)
-    for k in range(expected_count):
-        target = best_origin + k * best_spacing
-        dists = np.abs(sorted_vals - target)
-        min_idx = np.argmin(dists)
-        if dists[min_idx] < tolerance:
-            positions[k] = sorted_vals[min_idx]
-        else:
-            positions[k] = target
-
-    return positions
-
-
-def _fill_missing(
-    grid: NDArray, assigned: NDArray,
-    row_positions: NDArray, col_positions: NDArray,
-) -> None:
-    """Fill unassigned grid positions using the expected row/col positions."""
-    rows, cols = assigned.shape
-    for r in range(rows):
-        for c in range(cols):
-            if not assigned[r, c]:
-                grid[r, c] = [col_positions[c], row_positions[r]]
 
 
 def _synthetic_grid(
