@@ -37,8 +37,6 @@ class PencilsGeometry:
 
 def detect_pencils_grid(
     image: NDArray,
-    expected_rows: int | None = None,
-    expected_cols: int | None = None,
     debug_dir: str | None = None,
 ) -> PencilsGeometry:
     debug_path = Path(debug_dir) if debug_dir else None
@@ -73,11 +71,6 @@ def detect_pencils_grid(
 
     rows = len(h_lines) - 1
     cols = len(v_lines) - 1
-
-    if expected_rows and rows != expected_rows:
-        rows = expected_rows
-    if expected_cols and cols != expected_cols:
-        cols = expected_cols
 
     # Always use uniform spacing — the grid cells are evenly distributed
     h_lines = _uniform_lines(h_lines[0], h_lines[-1], rows + 1)

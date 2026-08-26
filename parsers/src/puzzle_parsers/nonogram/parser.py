@@ -61,15 +61,13 @@ class NonogramParser(PuzzleParser):
 
     def _parse(self, image: Image.Image) -> PuzzleData:
         img_array = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-        board = self._parse_image(img_array, expected_rows=None, expected_cols=None)
+        board = self._parse_image(img_array)
         grid = board.model_dump()
         return PuzzleData(puzzle_type=self.puzzle_type, grid=grid)
 
     def parse_file(
         self,
         image_path: str | Path,
-        expected_rows: int = 10,
-        expected_cols: int = 10,
         debug_dir: str | None = None,
         ocr: str = "gemini",
     ) -> NonogramBoard:
@@ -79,8 +77,6 @@ class NonogramParser(PuzzleParser):
             raise ValueError(f"Could not read image: {image_path}")
         return self._parse_image(
             img_array,
-            expected_rows=expected_rows,
-            expected_cols=expected_cols,
             debug_dir=debug_dir,
             ocr=ocr,
         )
@@ -88,17 +84,10 @@ class NonogramParser(PuzzleParser):
     def _parse_image(
         self,
         img_array: np.ndarray,
-        expected_rows: int | None = None,
-        expected_cols: int | None = None,
         debug_dir: str | None = None,
         ocr: str = "gemini",
     ) -> NonogramBoard:
-        geom = detect_nonogram_grid(
-            img_array,
-            expected_rows=expected_rows,
-            expected_cols=expected_cols,
-            debug_dir=debug_dir,
-        )
+        geom = detect_nonogram_grid(img_array, debug_dir=debug_dir)
 
         debug_path = Path(debug_dir) if debug_dir else None
 

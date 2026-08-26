@@ -35,34 +35,20 @@ class MasyuParser(PuzzleParser):
     def parse_file(
         self,
         image_path: str | Path,
-        expected_rows: int | None = None,
-        expected_cols: int | None = None,
         debug_dir: str | None = None,
     ) -> MasyuBoard:
         image_path = Path(image_path)
         img_array = cv2.imread(str(image_path))
         if img_array is None:
             raise ValueError(f"Could not read image: {image_path}")
-        return self._parse_image(
-            img_array,
-            expected_rows=expected_rows,
-            expected_cols=expected_cols,
-            debug_dir=debug_dir,
-        )
+        return self._parse_image(img_array, debug_dir=debug_dir)
 
     def _parse_image(
         self,
         img_array: np.ndarray,
-        expected_rows: int | None = None,
-        expected_cols: int | None = None,
         debug_dir: str | None = None,
     ) -> MasyuBoard:
-        geom = detect_masyu_grid(
-            img_array,
-            expected_rows=expected_rows,
-            expected_cols=expected_cols,
-            debug_dir=debug_dir,
-        )
+        geom = detect_masyu_grid(img_array, debug_dir=debug_dir)
 
         debug_path = Path(debug_dir) if debug_dir else None
         rows = geom.rows
@@ -110,56 +96,49 @@ def _detect_circles(
     cols: int,
     cell_size: float,
 ) -> list[list[int]]:
-    """Detect circles using HoughCircles on the full warped image.
+    """Classify each grid cell as empty (0), white circle (1) or black (2).
 
-    Runs circle detection globally (more robust than per-cell), then assigns
-    each detected circle to its grid cell and classifies by center intensity.
+    Per-cell classification against a normalised intensity, which is far more
+    robust than global HoughCircles on these faint phone-scanned boards. The
+    intensity is divided by the 90th-percentile "paper white" so faded/brownish
+    prints still normalise to ~1.0 on blank paper. A black circle is a solid
+    dark disk (dark cell centre); a white circle is a light centre ringed by a
+    dark stroke; anything else is empty.
     """
     cells = [[0] * cols for _ in range(rows)]
 
-    blurred = cv2.medianBlur(gray, 5)
-    min_r = int(cell_size * 0.15)
-    max_r = int(cell_size * 0.4)
-    min_dist = int(cell_size * 0.5)
-
-    circles = cv2.HoughCircles(
-        blurred,
-        cv2.HOUGH_GRADIENT,
-        dp=1.2,
-        minDist=min_dist,
-        param1=100,
-        param2=20,
-        minRadius=min_r,
-        maxRadius=max_r,
-    )
-
-    if circles is None:
+    g = gray.astype(float)
+    white = float(np.percentile(g, 90))
+    if white <= 0:
         return cells
 
-    for cx, cy, _ in circles[0]:
-        # Determine which cell this circle belongs to
-        col = -1
-        row = -1
-        for c_idx in range(cols):
-            if v_lines[c_idx] <= cx < v_lines[c_idx + 1]:
-                col = c_idx
-                break
-        for r_idx in range(rows):
-            if h_lines[r_idx] <= cy < h_lines[r_idx + 1]:
-                row = r_idx
-                break
+    for r in range(rows):
+        y0, y1 = h_lines[r], h_lines[r + 1]
+        for c in range(cols):
+            x0, x1 = v_lines[c], v_lines[c + 1]
+            ch = y1 - y0
+            cw = x1 - x0
+            if ch <= 2 or cw <= 2:
+                continue
+            cy = (y0 + y1) / 2
+            cx = (x0 + x1) / 2
+            rad = min(ch, cw) * 0.5
 
-        if row < 0 or col < 0:
-            continue
+            yy, xx = np.mgrid[y0:y1, x0:x1]
+            dist = np.sqrt((yy - cy) ** 2 + (xx - cx) ** 2)
+            patch = g[y0:y1, x0:x1] / white
 
-        # Classify by center intensity
-        ci, cj = int(cy), int(cx)
-        patch = gray[max(0, ci - 2) : ci + 3, max(0, cj - 2) : cj + 3]
-        mean_center = float(patch.mean())
+            inner = dist < rad * 0.30
+            ring = (dist >= rad * 0.55) & (dist <= rad * 0.92)
+            if not inner.any() or not ring.any():
+                continue
 
-        if mean_center < 128:
-            cells[row][col] = 2  # Black circle
-        else:
-            cells[row][col] = 1  # White circle
+            center_mean = float(patch[inner].mean())
+            ring_dark_frac = float((patch[ring] < 0.5).mean())
+
+            if center_mean < 0.45:
+                cells[r][c] = 2  # solid dark disk -> black circle
+            elif ring_dark_frac > 0.25:
+                cells[r][c] = 1  # light centre, dark stroke -> white circle
 
     return cells

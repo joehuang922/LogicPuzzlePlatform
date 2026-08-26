@@ -148,4 +148,59 @@ def _find_border_via_hough_grid(gray: NDArray) -> NDArray | None:
         gray, top, bot, left, right, cell_size
     )
 
+    # Trim any adjacent puzzle the grid chain bridged across. Distinct puzzles
+    # on a page are separated by a blank band of page; the detected border can
+    # jump this gap (a 2-cell spacing reads as an integer multiple of the cell
+    # size). Cut the border back to the blank band that borders the puzzle.
+    top, bot = _clip_to_blank_bands(
+        (gray < 110).mean(axis=1), top, bot, cell_size
+    )
+    left, right = _clip_to_blank_bands(
+        (gray < 110).mean(axis=0), left, right, cell_size
+    )
+
     return np.float32([[left, top], [right, top], [right, bot], [left, bot]])
+
+
+def _clip_to_blank_bands(
+    ink_profile: NDArray, lo: float, hi: float, cell_size: float
+) -> tuple[float, float]:
+    """Shrink [lo, hi] to exclude neighbouring puzzles across blank page bands.
+
+    ``ink_profile`` is the per-row (or per-column) fraction of dark pixels. A
+    band of consecutive near-empty lines that is at least ~half a cell tall is a
+    page gap separating puzzles. Bands near either end trim the border to the
+    band edge; a band strictly inside [lo, hi] means the border spans two
+    puzzles, so we keep whichever sub-segment holds the larger share.
+    """
+    min_h = max(10, int(cell_size * 0.4))
+    smoothed = np.convolve(ink_profile, np.ones(15) / 15, mode="same")
+    blank = smoothed < 0.02
+
+    bands: list[tuple[int, int]] = []
+    n = len(blank)
+    i = 0
+    while i < n:
+        if blank[i]:
+            j = i
+            while j < n and blank[j]:
+                j += 1
+            if j - i >= min_h:
+                bands.append((i, j))
+            i = j
+        else:
+            i += 1
+
+    new_lo, new_hi = 0.0, float(n)
+    for a, b in bands:
+        center = (a + b) / 2
+        if center <= lo + cell_size * 0.5:
+            new_lo = max(new_lo, float(b))          # band before the puzzle
+        elif center >= hi - cell_size * 0.5:
+            new_hi = min(new_hi, float(a))          # band after the puzzle
+        elif center - lo >= hi - center:
+            new_hi = min(new_hi, float(a))          # separator; keep upper part
+        else:
+            new_lo = max(new_lo, float(b))          # separator; keep lower part
+
+    return max(lo, new_lo), min(hi, new_hi)

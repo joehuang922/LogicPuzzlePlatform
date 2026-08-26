@@ -35,8 +35,6 @@ class YajilinGeometry:
 
 def detect_yajilin_grid(
     image: NDArray,
-    expected_rows: int | None = None,
-    expected_cols: int | None = None,
     debug_dir: str | None = None,
 ) -> YajilinGeometry:
     debug_path = Path(debug_dir) if debug_dir else None
@@ -68,13 +66,6 @@ def detect_yajilin_grid(
     rows = len(h_lines) - 1
     cols = len(v_lines) - 1
 
-    if expected_rows and rows != expected_rows:
-        rows = expected_rows
-        h_lines = _uniform_lines(h_lines[0], h_lines[-1], rows + 1)
-    if expected_cols and cols != expected_cols:
-        cols = expected_cols
-        v_lines = _uniform_lines(v_lines[0], v_lines[-1], cols + 1)
-
     cell_h = (h_lines[-1] - h_lines[0]) / rows if rows > 0 else 50.0
     cell_w = (v_lines[-1] - v_lines[0]) / cols if cols > 0 else 50.0
 
@@ -88,8 +79,3 @@ def detect_yajilin_grid(
         cell_h=cell_h,
         cell_w=cell_w,
     )
-
-
-def _uniform_lines(start: int, end: int, count: int) -> list[int]:
-    """Generate uniformly spaced lines between start and end."""
-    return [int(start + i * (end - start) / (count - 1)) for i in range(count)]

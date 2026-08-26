@@ -35,8 +35,6 @@ class SlalomGeometry:
 
 def detect_slalom_grid(
     image: NDArray,
-    expected_rows: int | None = None,
-    expected_cols: int | None = None,
     debug_dir: str | None = None,
 ) -> SlalomGeometry:
     debug_path = Path(debug_dir) if debug_dir else None
@@ -64,11 +62,6 @@ def detect_slalom_grid(
 
     rows = len(h_lines) - 1
     cols = len(v_lines) - 1
-
-    if expected_rows and rows != expected_rows:
-        rows = expected_rows
-    if expected_cols and cols != expected_cols:
-        cols = expected_cols
 
     h_lines = _uniform_lines(h_lines[0], h_lines[-1], rows + 1)
     v_lines = _uniform_lines(v_lines[0], v_lines[-1], cols + 1)

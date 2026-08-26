@@ -44,34 +44,20 @@ class PencilsParser(PuzzleParser):
     def parse_file(
         self,
         image_path: str | Path,
-        expected_rows: int | None = None,
-        expected_cols: int | None = None,
         debug_dir: str | None = None,
     ) -> PencilsBoard:
         image_path = Path(image_path)
         img_array = cv2.imread(str(image_path))
         if img_array is None:
             raise ValueError(f"Could not read image: {image_path}")
-        return self._parse_image(
-            img_array,
-            expected_rows=expected_rows,
-            expected_cols=expected_cols,
-            debug_dir=debug_dir,
-        )
+        return self._parse_image(img_array, debug_dir=debug_dir)
 
     def _parse_image(
         self,
         img_array: np.ndarray,
-        expected_rows: int | None = None,
-        expected_cols: int | None = None,
         debug_dir: str | None = None,
     ) -> PencilsBoard:
-        geom = detect_pencils_grid(
-            img_array,
-            expected_rows=expected_rows,
-            expected_cols=expected_cols,
-            debug_dir=debug_dir,
-        )
+        geom = detect_pencils_grid(img_array, debug_dir=debug_dir)
 
         debug_path = Path(debug_dir) if debug_dir else None
         rows = geom.rows

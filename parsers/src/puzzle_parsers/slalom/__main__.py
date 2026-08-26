@@ -21,18 +21,6 @@ def main() -> None:
         default=None,
     )
     parser.add_argument(
-        "--rows",
-        type=int,
-        default=None,
-        help="Expected number of rows",
-    )
-    parser.add_argument(
-        "--cols",
-        type=int,
-        default=None,
-        help="Expected number of columns",
-    )
-    parser.add_argument(
         "--debug",
         help="Directory to save intermediate debug images",
         default=None,
@@ -58,8 +46,6 @@ def main() -> None:
     slalom_parser = SlalomParser(ocr_backend=ocr_backend)
     board = slalom_parser.parse_file(
         image_path,
-        expected_rows=args.rows,
-        expected_cols=args.cols,
         debug_dir=args.debug,
     )
 

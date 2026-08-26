@@ -21,18 +21,6 @@ def main() -> None:
         default=None,
     )
     parser.add_argument(
-        "--rows",
-        type=int,
-        default=10,
-        help="Expected number of rows (default: 10)",
-    )
-    parser.add_argument(
-        "--cols",
-        type=int,
-        default=10,
-        help="Expected number of columns (default: 10)",
-    )
-    parser.add_argument(
         "--debug",
         help="Directory to save intermediate debug images",
         default=None,
@@ -58,8 +46,6 @@ def main() -> None:
     masyu_parser = MasyuParser(ocr_backend=ocr_backend)
     board = masyu_parser.parse_file(
         image_path,
-        expected_rows=args.rows,
-        expected_cols=args.cols,
         debug_dir=args.debug,
     )
 

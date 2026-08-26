@@ -31,8 +31,6 @@ class NonogramGeometry:
 
 def detect_nonogram_grid(
     image: NDArray,
-    expected_rows: int | None = None,
-    expected_cols: int | None = None,
     debug_dir: str | None = None,
 ) -> NonogramGeometry:
     debug_path = Path(debug_dir) if debug_dir else None
@@ -90,18 +88,12 @@ def detect_nonogram_grid(
     interior_h = [y for y in h_positions if margin < y < outer_h - margin]
 
     if not interior_v or not interior_h:
-        # Fallback: estimate from expected dimensions
-        if expected_rows and expected_cols:
-            # Assume clue area is proportional
-            grid_x_start = int(outer_w * 0.3)
-            grid_y_start = int(outer_h * 0.2)
-        else:
-            raise ValueError("Could not detect grid separation lines and no expected dimensions provided")
-    else:
-        # The first interior vertical line from left = start of playable grid
-        grid_x_start = interior_v[0]
-        # The first interior horizontal line from top = start of playable grid
-        grid_y_start = interior_h[0]
+        raise ValueError("Could not detect grid separation lines")
+
+    # The first interior vertical line from left = start of playable grid
+    grid_x_start = interior_v[0]
+    # The first interior horizontal line from top = start of playable grid
+    grid_y_start = interior_h[0]
 
     # Playable grid rectangle (in image coordinates)
     grid_x = outer_x + grid_x_start
@@ -110,12 +102,9 @@ def detect_nonogram_grid(
     grid_h = outer_h - grid_y_start
 
     # Determine rows/cols from grid lines within the playable area
-    if expected_rows and expected_cols:
-        rows, cols = expected_rows, expected_cols
-    else:
-        playable_roi = thresh[grid_y : grid_y + grid_h, grid_x : grid_x + grid_w]
-        rows = _count_cells_in_axis(playable_roi, axis="horizontal", debug_path=debug_path)
-        cols = _count_cells_in_axis(playable_roi, axis="vertical", debug_path=debug_path)
+    playable_roi = thresh[grid_y : grid_y + grid_h, grid_x : grid_x + grid_w]
+    rows = _count_cells_in_axis(playable_roi, axis="horizontal", debug_path=debug_path)
+    cols = _count_cells_in_axis(playable_roi, axis="vertical", debug_path=debug_path)
 
     cell_w = grid_w / cols
     cell_h = grid_h / rows
