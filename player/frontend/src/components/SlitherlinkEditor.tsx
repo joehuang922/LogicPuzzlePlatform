@@ -63,7 +63,7 @@ export default function SlitherlinkEditor({ initialCanon, onComplete, onCancel }
           <input
             type="number"
             min={1}
-            max={20}
+            max={100}
             value={rows}
             onChange={(e) => resizeGrid(Number(e.target.value) || 1, cols)}
             style={{ width: 50 }}
@@ -74,7 +74,7 @@ export default function SlitherlinkEditor({ initialCanon, onComplete, onCancel }
           <input
             type="number"
             min={1}
-            max={20}
+            max={100}
             value={cols}
             onChange={(e) => resizeGrid(rows, Number(e.target.value) || 1)}
             style={{ width: 50 }}
