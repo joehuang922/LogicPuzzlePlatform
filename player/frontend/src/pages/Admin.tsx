@@ -8,6 +8,7 @@ import {
   updatePuzzle,
   deletePuzzle,
   parseImage,
+  uploadImage,
   PuzzleType,
   Collection,
   Puzzle,
@@ -48,9 +49,26 @@ function CollectionForm({ onCreated }: { onCreated: () => void }) {
   const [publisher, setPublisher] = useState("");
   const [publishAt, setPublishAt] = useState("");
   const [coverSrc, setCoverSrc] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
+
+  async function handleCoverUpload(e: FormEvent<HTMLInputElement> | React.ChangeEvent<HTMLInputElement>) {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    setUploadError(null);
+    setUploading(true);
+    try {
+      const url = await uploadImage(file);
+      setCoverSrc(url);
+    } catch (err: unknown) {
+      setUploadError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   function validate(): boolean {
     const errs: Record<string, string> = {};
@@ -104,8 +122,25 @@ function CollectionForm({ onCreated }: { onCreated: () => void }) {
           <input style={inputStyle} type="date" value={publishAt} onChange={(e) => setPublishAt(e.target.value)} />
         </div>
         <div style={fieldStyle}>
-          <label>Cover image URL</label>
-          <input style={inputStyle} value={coverSrc} onChange={(e) => setCoverSrc(e.target.value)} />
+          <label>Cover image</label>
+          <input
+            style={inputStyle}
+            placeholder="Paste a URL or upload a file below"
+            value={coverSrc}
+            onChange={(e) => setCoverSrc(e.target.value)}
+          />
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.35rem" }}>
+            <input type="file" accept="image/*" onChange={handleCoverUpload} disabled={uploading} />
+            {uploading && <span style={{ fontSize: "0.8rem", color: "#666" }}>Uploading…</span>}
+          </div>
+          {uploadError && <span style={errorStyle}>{uploadError}</span>}
+          {coverSrc && !uploading && (
+            <img
+              src={coverSrc}
+              alt="Cover preview"
+              style={{ marginTop: "0.5rem", maxWidth: 120, maxHeight: 160, border: "1px solid #ddd", borderRadius: 4 }}
+            />
+          )}
         </div>
         {errors.form && <span style={errorStyle}>{errors.form}</span>}
         {success && <span style={{ color: "green", fontSize: "0.85rem" }}>{success}</span>}

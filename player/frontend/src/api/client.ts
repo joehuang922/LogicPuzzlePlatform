@@ -127,6 +127,32 @@ export function createCollection(data: {
   });
 }
 
+/**
+ * Uploads an image to the assets namespace and returns its stable public
+ * (CloudFront) URL. Asks the API for a presigned PUT URL, then uploads the
+ * file straight to S3 so large binaries never pass through API Gateway.
+ */
+export async function uploadImage(file: File): Promise<string> {
+  const { uploadUrl, publicUrl } = await request<{
+    uploadUrl: string;
+    publicUrl: string;
+  }>("/assets/upload-url", {
+    method: "POST",
+    body: JSON.stringify({ contentType: file.type }),
+  });
+
+  const putRes = await fetch(uploadUrl, {
+    method: "PUT",
+    headers: { "Content-Type": file.type },
+    body: file,
+  });
+  if (!putRes.ok) {
+    throw new Error(`Upload failed (${putRes.status})`);
+  }
+
+  return publicUrl;
+}
+
 export interface PuzzleType {
   id: number;
   name: string;

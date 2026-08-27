@@ -2,12 +2,16 @@ import * as cdk from "aws-cdk-lib";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as apigw from "aws-cdk-lib/aws-apigateway";
 import * as rds from "aws-cdk-lib/aws-rds";
+import * as s3 from "aws-cdk-lib/aws-s3";
+import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as path from "path";
 import { Construct } from "constructs";
 
 interface ApiStackProps extends cdk.StackProps {
   cluster: rds.DatabaseCluster;
   databaseName: string;
+  assetsBucket: s3.Bucket;
+  assetsDistribution: cloudfront.Distribution;
 }
 
 export class ApiStack extends cdk.Stack {
@@ -84,6 +88,26 @@ export class ApiStack extends cdk.Stack {
     const collectionIntegration = new apigw.LambdaIntegration(collectionsHandler);
     collections.addMethod("GET", collectionIntegration);
     collections.addMethod("POST", collectionIntegration);
+
+    // Assets: mints presigned S3 PUT URLs so the browser can upload binaries
+    // (e.g. cover images) directly to the assets bucket, then serves them back
+    // through the CloudFront distribution at a stable public URL.
+    const assetsHandler = new lambda.Function(this, "AssetsHandler", {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: "handlers/assets.handler",
+      code: lambda.Code.fromAsset(path.join(__dirname, "../../../api/dist")),
+      environment: {
+        ASSETS_BUCKET: props.assetsBucket.bucketName,
+        ASSETS_CDN_URL: `https://${props.assetsDistribution.distributionDomainName}`,
+      },
+      timeout: cdk.Duration.seconds(29),
+    });
+
+    props.assetsBucket.grantPut(assetsHandler);
+
+    const assets = api.root.addResource("assets");
+    const uploadUrl = assets.addResource("upload-url");
+    uploadUrl.addMethod("POST", new apigw.LambdaIntegration(assetsHandler));
 
     const puzzleTypesHandler = new lambda.Function(this, "PuzzleTypesHandler", {
       runtime: lambda.Runtime.NODEJS_20_X,

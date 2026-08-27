@@ -263,7 +263,7 @@ export default function Play() {
             <img
               src={puzzle.srcCollectionCoverSrc}
               alt={`${puzzle.srcCollectionName} cover`}
-              style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 6 }}
+              style={{ width: "100%", height: "auto", objectFit: "contain", borderRadius: 6, display: "block" }}
             />
           </div>
         )}
@@ -445,10 +445,12 @@ const chipStyle: React.CSSProperties = {
 };
 
 const coverImageStyle: React.CSSProperties = {
-  width: 80,
-  height: 100,
+  width: 96,
+  // Let the image show in full: no fixed height, no clipping. A negative top
+  // margin lets a tall cover extend above the banner's top edge.
+  alignSelf: "flex-start",
+  marginTop: "-1.75rem",
   borderRadius: 6,
-  overflow: "hidden",
   border: "1px solid #e5e7eb",
   flexShrink: 0,
   backgroundColor: "#f3f4f6",
