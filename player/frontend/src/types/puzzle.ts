@@ -4,6 +4,7 @@ export interface PuzzleDefinition {
   id: string;
   puzzleType: number;
   puzzleTypeName: string;
+  puzzleTypeJpLabel: string;
   title: string | null;
   author: string | null;
   difficulty: number;

@@ -223,7 +223,7 @@ export default function Play() {
         <div style={{ flex: 1, minWidth: 0 }}>
           {/* Puzzle type badge */}
           <div style={puzzleTypeBadgeStyle}>
-            {puzzle.puzzleTypeName.toUpperCase()}
+            {puzzle.puzzleTypeJpLabel}
           </div>
 
           {/* Title */}
@@ -426,7 +426,7 @@ const puzzleTypeBadgeStyle: React.CSSProperties = {
   padding: "0.3rem 0.9rem",
   fontSize: "0.95rem",
   fontWeight: 700,
-  letterSpacing: 2,
+  letterSpacing: 1,
   color: "#fff",
   background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
   borderRadius: 6,

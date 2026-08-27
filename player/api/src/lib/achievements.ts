@@ -46,15 +46,15 @@ const STATIC_DEFINITIONS: AchievementDefinition[] = [
 ];
 
 function generateTypeDefinitions(
-  types: { id: number; name: string }[]
+  types: { id: number; name: string; jpLabel: string }[]
 ): AchievementDefinition[] {
   const defs: AchievementDefinition[] = [];
   for (const t of types) {
     for (const n of TYPE_MILESTONES) {
       defs.push({
         id: `type_${t.id}_solved_${n}`,
-        name: `${t.name} x${n}`,
-        description: `Solve ${n} ${t.name} puzzle${n > 1 ? "s" : ""}`,
+        name: `${t.jpLabel} x${n}`,
+        description: `Solve ${n} ${t.jpLabel} puzzle${n > 1 ? "s" : ""}`,
         icon: "🧩",
         category: "type",
         evaluate: (s) => (s.solvedByType[t.id] ?? 0) >= n,
@@ -66,11 +66,12 @@ function generateTypeDefinitions(
 
 export async function getAllDefinitions(): Promise<AchievementDefinition[]> {
   const result = await executeStatement(
-    `SELECT id, name FROM puzzle_types ORDER BY name`
+    `SELECT id, name, jp_label AS jpLabel FROM puzzle_types ORDER BY name`
   );
   const types = result.records.map((r) => ({
     id: r.id as number,
     name: r.name as string,
+    jpLabel: r.jpLabel as string,
   }));
   return [...STATIC_DEFINITIONS, ...generateTypeDefinitions(types)];
 }

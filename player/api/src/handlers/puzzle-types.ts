@@ -14,7 +14,7 @@ function response(statusCode: number, body: unknown): APIGatewayProxyResult {
 
 async function listPuzzleTypes(): Promise<APIGatewayProxyResult> {
   const result = await executeStatement(
-    "SELECT id, name, rule FROM puzzle_types ORDER BY id"
+    "SELECT id, name, jp_label AS jpLabel, rule FROM puzzle_types ORDER BY id"
   );
   return response(200, { puzzleTypes: result.records });
 }

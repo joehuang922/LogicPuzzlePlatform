@@ -9,6 +9,7 @@ export enum Difficulty {
 export interface PuzzleType {
   id: number;
   name: string;
+  jpLabel: string;
   rule: string;
 }
 

@@ -562,7 +562,7 @@ export default function BatchUploadForm({
           <select style={inputStyle} value={puzzleType} onChange={(e) => handlePuzzleTypeChange(e.target.value)}>
             <option value="">— Select —</option>
             {puzzleTypes.map((pt) => (
-              <option key={pt.id} value={pt.id}>{pt.name}</option>
+              <option key={pt.id} value={pt.id}>{pt.jpLabel}</option>
             ))}
           </select>
         </div>

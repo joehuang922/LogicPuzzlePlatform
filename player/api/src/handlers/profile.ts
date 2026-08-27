@@ -48,6 +48,7 @@ async function getProfile(
     `SELECT
        pt.id AS type_id,
        pt.name AS type_name,
+       pt.jp_label AS type_jp_label,
        COUNT(DISTINCT pq.id) AS total,
        COUNT(DISTINCT CASE
          WHEN EXISTS (
@@ -66,7 +67,7 @@ async function getProfile(
        END) AS tried
      FROM puzzle_types pt
      LEFT JOIN puzzle_questions pq ON pq.puzzle_type = pt.id
-     GROUP BY pt.id, pt.name
+     GROUP BY pt.id, pt.name, pt.jp_label
      ORDER BY pt.name`,
     [{ name: "player", value: { longValue: Number(playerId) } }]
   );
@@ -79,13 +80,14 @@ async function getProfile(
        pc.name AS collection_name,
        pt.id AS type_id,
        pt.name AS type_name,
+       pt.jp_label AS type_jp_label,
        COUNT(DISTINCT pq.id) AS total,
        COUNT(DISTINCT CASE WHEN pa.finished_at IS NOT NULL THEN pq.id END) AS solved
      FROM puzzle_collections pc
      JOIN puzzle_questions pq ON pq.src_collection = pc.id
      JOIN puzzle_types pt ON pq.puzzle_type = pt.id
      LEFT JOIN player_attempt pa ON pa.question = pq.id AND pa.player = :player AND pa.finished_at IS NOT NULL
-     GROUP BY pc.id, pc.name, pt.id, pt.name
+     GROUP BY pc.id, pc.name, pt.id, pt.name, pt.jp_label
      ORDER BY pc.name, pt.name`,
     [{ name: "player", value: { longValue: Number(playerId) } }]
   );

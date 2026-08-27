@@ -45,6 +45,7 @@ export interface Puzzle {
   id: string;
   puzzleType: number;
   puzzleTypeName: string;
+  puzzleTypeJpLabel: string;
   title: string | null;
   author: string | null;
   difficulty: number;
@@ -156,6 +157,7 @@ export async function uploadImage(file: File): Promise<string> {
 export interface PuzzleType {
   id: number;
   name: string;
+  jpLabel: string;
   rule: string;
 }
 
@@ -259,6 +261,7 @@ export function getSnapshotById(attemptId: string, snapshotId: string) {
 export interface ProfileQuestionStat {
   typeId: number;
   typeName: string;
+  typeJpLabel: string;
   total: number;
   solved: number;
   tried: number;
@@ -269,6 +272,7 @@ export interface ProfileCollectionRow {
   collectionName: string;
   typeId: number;
   typeName: string;
+  typeJpLabel: string;
   total: number;
   solved: number;
 }

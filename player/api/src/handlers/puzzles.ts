@@ -30,6 +30,7 @@ function response(statusCode: number, body: unknown): APIGatewayProxyResult {
 const PUZZLE_SELECT = `
   SELECT pq.*,
          pt.name AS puzzle_type_name,
+         pt.jp_label AS puzzle_type_jp_label,
          pc.name AS src_collection_name,
          pc.cover_src AS src_collection_cover_src
   FROM puzzle_questions pq

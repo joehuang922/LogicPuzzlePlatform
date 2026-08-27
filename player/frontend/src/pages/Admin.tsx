@@ -381,7 +381,7 @@ function QuestionForm({
           <select style={inputStyle} value={puzzleType} onChange={(e) => setPuzzleType(e.target.value)}>
             <option value="">— Select —</option>
             {puzzleTypes.map((pt) => (
-              <option key={pt.id} value={pt.id}>{pt.name}</option>
+              <option key={pt.id} value={pt.id}>{pt.jpLabel}</option>
             ))}
           </select>
           {errors.puzzleType && <span style={errorStyle}>{errors.puzzleType}</span>}
@@ -1026,7 +1026,7 @@ function CollectionBrowser({
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
-  const puzzleTypeMap = Object.fromEntries(puzzleTypes.map((pt) => [pt.id, pt.name]));
+  const puzzleTypeMap = Object.fromEntries(puzzleTypes.map((pt) => [pt.id, pt.jpLabel]));
 
   function handleSort(key: SortKey) {
     if (sortKey === key) {

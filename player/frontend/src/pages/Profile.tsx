@@ -8,7 +8,7 @@ interface CollectionGroup {
   collectionName: string;
   totalSolved: number;
   totalCount: number;
-  types: { typeName: string; solved: number; total: number }[];
+  types: { typeName: string; typeJpLabel: string; solved: number; total: number }[];
 }
 
 function groupCollectionStats(rows: ProfileCollectionRow[]): CollectionGroup[] {
@@ -27,7 +27,7 @@ function groupCollectionStats(rows: ProfileCollectionRow[]): CollectionGroup[] {
     }
     group.totalSolved += row.solved;
     group.totalCount += row.total;
-    group.types.push({ typeName: row.typeName, solved: row.solved, total: row.total });
+    group.types.push({ typeName: row.typeName, typeJpLabel: row.typeJpLabel, solved: row.solved, total: row.total });
   }
   return Array.from(map.values());
 }
@@ -115,7 +115,7 @@ export default function Profile() {
         <tbody>
           {questionStats.map((s) => (
             <tr key={s.typeId}>
-              <td style={tdStyle}>{s.typeName}</td>
+              <td style={tdStyle}>{s.typeJpLabel}</td>
               <td style={tdStyle}>{s.solved}</td>
               <td style={tdStyle}>{s.tried}</td>
               <td style={tdStyle}>{s.total}</td>
@@ -146,7 +146,7 @@ export default function Profile() {
               <tbody>
                 {cg.types.map((t) => (
                   <tr key={t.typeName}>
-                    <td style={tdStyle}>{t.typeName}</td>
+                    <td style={tdStyle}>{t.typeJpLabel}</td>
                     <td style={tdStyle}>{t.solved} / {t.total}</td>
                   </tr>
                 ))}

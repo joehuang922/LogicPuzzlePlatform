@@ -80,7 +80,7 @@ function CollectionPuzzleList({
   attemptedIds: Set<string>;
   onPuzzleClick: (puzzle: Puzzle) => void;
 }) {
-  const puzzleTypeMap = Object.fromEntries(puzzleTypes.map((pt) => [pt.id, pt.name]));
+  const puzzleTypeMap = Object.fromEntries(puzzleTypes.map((pt) => [pt.id, pt.jpLabel]));
   const groupedByType = puzzles.reduce<Record<number, Puzzle[]>>((acc, p) => {
     (acc[p.puzzleType] ??= []).push(p);
     return acc;
@@ -292,7 +292,7 @@ export default function Home() {
               onClick={(e) => { e.preventDefault(); handlePuzzleClick(p); }}
               style={{ cursor: "pointer" }}
             >
-              {p.title ?? "Untitled"} — {p.puzzleTypeName} ({DIFFICULTY_LABELS[p.difficulty] || `${p.difficulty}/5`})
+              {p.title ?? "Untitled"} — {p.puzzleTypeJpLabel} ({DIFFICULTY_LABELS[p.difficulty] || `${p.difficulty}/5`})
               {p.srcCollectionName && ` — from: ${p.srcCollectionName}`}
             </a>
           </li>
