@@ -5,31 +5,7 @@ import { extractBase64, blobToDataUrl } from "../utils/image";
 import { cardStyle, fieldStyle, inputStyle, errorStyle } from "../styles/admin";
 import { DIFFICULTY_OPTIONS } from "../constants";
 import CanonPreview from "./CanonPreview";
-import NurimazeEditor from "./NurimazeEditor";
-import SudokuEditor from "./SudokuEditor";
-import ComboSudokuEditor from "./ComboSudokuEditor";
-import DoubleChocoEditor from "./DoubleChocoEditor";
-import SlitherlinkEditor from "./SlitherlinkEditor";
-import NonogramEditor from "./NonogramEditor";
-import MasyuEditor from "./MasyuEditor";
-import PencilsEditor from "./PencilsEditor";
-import NuritwinEditor from "./NuritwinEditor";
-import SlalomEditor from "./SlalomEditor";
-import ShakashakaEditor from "./ShakashakaEditor";
-import KakuroEditor from "./KakuroEditor";
-import YajilinEditor from "./YajilinEditor";
-import FillominoEditor from "./FillominoEditor";
-import LitsEditor from "./LitsEditor";
-import ChocoBananaEditor from "./ChocoBananaEditor";
-import NumberLinkEditor from "./NumberLinkEditor";
-import AkariEditor from "./AkariEditor";
-import HellGolfEditor from "./HellGolfEditor";
-import TentaishowEditor from "./TentaishowEditor";
-import HeyawakeEditor from "./HeyawakeEditor";
-import ShikakuEditor from "./ShikakuEditor";
-import NorinoriEditor from "./NorinoriEditor";
-import NurikabeEditor from "./NurikabeEditor";
-import RippleEffectEditor from "./RippleEffectEditor";
+import PuzzleEditorModal, { hasVisualEditor } from "./PuzzleEditorModal";
 
 const MAX_IMAGES = 50;
 const PARSE_CONCURRENCY = 3;
@@ -85,99 +61,6 @@ function computeDimensions(typeId: number, canon: Record<string, unknown>): { w?
   return {};
 }
 
-function InlineEditor({
-  puzzleType,
-  puzzleTypes,
-  canonRepr,
-  onComplete,
-  onCancel,
-}: {
-  puzzleType: number;
-  puzzleTypes: PuzzleType[];
-  canonRepr: string;
-  onComplete: (json: string) => void;
-  onCancel: () => void;
-}) {
-  const typeName = puzzleTypes.find((pt) => pt.id === puzzleType)?.name;
-
-  if (typeName === "nurimaze") {
-    return <NurimazeEditor initialJson={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
-  }
-  if (typeName === "sudoku") {
-    return <SudokuEditor initialJson={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
-  }
-  if (typeName === "combo-sudoku") {
-    return <ComboSudokuEditor initialJson={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
-  }
-  if (typeName === "double-choco") {
-    return <DoubleChocoEditor initialJson={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
-  }
-  if (typeName === "slitherlink") {
-    return <SlitherlinkEditor initialCanon={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
-  }
-  if (typeName === "nonogram") {
-    return <NonogramEditor initialCanon={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
-  }
-  if (typeName === "masyu") {
-    return <MasyuEditor initialCanon={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
-  }
-  if (typeName === "pencils") {
-    return <PencilsEditor initialCanon={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
-  }
-  if (typeName === "nuritwin") {
-    return <NuritwinEditor initialJson={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
-  }
-  if (typeName === "slalom") {
-    return <SlalomEditor initialCanon={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
-  }
-  if (typeName === "shakashaka") {
-    return <ShakashakaEditor initialJson={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
-  }
-  if (typeName === "kakuro") {
-    return <KakuroEditor initialCanon={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
-  }
-  if (typeName === "yajilin") {
-    return <YajilinEditor initialCanon={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
-  }
-  if (typeName === "fillomino") {
-    return <FillominoEditor initialJson={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
-  }
-  if (typeName === "lits") {
-    return <LitsEditor initialJson={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
-  }
-  if (typeName === "choco-banana") {
-    return <ChocoBananaEditor initialJson={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
-  }
-  if (typeName === "number-link") {
-    return <NumberLinkEditor initialCanon={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
-  }
-  if (typeName === "akari") {
-    return <AkariEditor initialJson={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
-  }
-  if (typeName === "hell-golf") {
-    return <HellGolfEditor initialCanon={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
-  }
-  if (typeName === "tentaishow") {
-    return <TentaishowEditor initialJson={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
-  }
-  if (typeName === "heyawake") {
-    return <HeyawakeEditor initialJson={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
-  }
-  if (typeName === "shikaku") {
-    return <ShikakuEditor initialJson={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
-  }
-  if (typeName === "norinori") {
-    return <NorinoriEditor initialJson={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
-  }
-  if (typeName === "nurikabe") {
-    return <NurikabeEditor initialJson={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
-  }
-  if (typeName === "ripple-effect") {
-    return <RippleEffectEditor initialJson={canonRepr} onComplete={onComplete} onCancel={onCancel} />;
-  }
-  return null;
-}
-
 function BatchItemRow({
   item,
   puzzleType,
@@ -202,7 +85,7 @@ function BatchItemRow({
   onToggleEditor: () => void;
 }) {
   const typeName = puzzleTypes.find((pt) => pt.id === puzzleType)?.name;
-  const hasEditor = ["nurimaze", "sudoku", "combo-sudoku", "double-choco", "slitherlink", "nonogram", "masyu", "pencils", "nuritwin", "slalom", "shakashaka", "kakuro", "yajilin", "fillomino", "lits", "choco-banana", "number-link", "akari", "hell-golf", "tentaishow", "heyawake", "shikaku", "norinori", "nurikabe", "ripple-effect"].includes(typeName || "");
+  const hasEditor = hasVisualEditor(typeName);
 
   return (
     <div style={{ border: "1px solid #eee", borderRadius: 6, padding: "0.75rem", background: item.editorOpen ? "#fffbe6" : "#fff" }}>
@@ -293,15 +176,23 @@ function BatchItemRow({
       )}
 
       {item.editorOpen && item.canonRepr && (
-        <div style={{ marginTop: "0.75rem", borderTop: "1px solid #e8c840", paddingTop: "0.75rem" }}>
-          <InlineEditor
-            puzzleType={puzzleType}
-            puzzleTypes={puzzleTypes}
-            canonRepr={item.canonRepr}
-            onComplete={(json) => { onCanonChange(json); onToggleEditor(); }}
-            onCancel={onToggleEditor}
-          />
-        </div>
+        <PuzzleEditorModal
+          puzzleType={puzzleType}
+          puzzleTypes={puzzleTypes}
+          imageUrl={item.dataUrl}
+          initialCanon={item.canonRepr}
+          initialTitle={item.title}
+          initialDifficulty={item.difficulty}
+          showAuthor={false}
+          showCollection={false}
+          onDone={(result) => {
+            onTitleChange(result.title);
+            onDifficultyChange(result.difficulty);
+            onCanonChange(result.canonRepr);
+            onToggleEditor();
+          }}
+          onCancel={onToggleEditor}
+        />
       )}
     </div>
   );

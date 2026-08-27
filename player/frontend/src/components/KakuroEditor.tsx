@@ -3,8 +3,7 @@ import { KakuroCell } from "../types/canon";
 
 interface KakuroEditorProps {
   initialCanon?: string;
-  onComplete: (json: string) => void;
-  onCancel: () => void;
+  onChange: (json: string) => void;
 }
 
 const CELL_SIZE = 40;
@@ -16,7 +15,7 @@ function buildDefaultCells(rows: number, cols: number): KakuroCell[][] {
   );
 }
 
-export default function KakuroEditor({ initialCanon, onComplete, onCancel }: KakuroEditorProps) {
+export default function KakuroEditor({ initialCanon, onChange }: KakuroEditorProps) {
   let initRows = 5, initCols = 5;
   let initCells: KakuroCell[][] | null = null;
   if (initialCanon) {
@@ -41,6 +40,10 @@ export default function KakuroEditor({ initialCanon, onComplete, onCancel }: Kak
     setJsonText(JSON.stringify({ cells }, null, 2));
     setJsonError(null);
   }, [cells]);
+
+  useEffect(() => {
+    onChange(jsonText);
+  }, [jsonText, onChange]);
 
   function handleJsonChange(text: string) {
     setJsonText(text);
@@ -109,10 +112,6 @@ export default function KakuroEditor({ initialCanon, onComplete, onCancel }: Kak
       }
       return next;
     });
-  }
-
-  function handleDone() {
-    onComplete(JSON.stringify({ cells }, null, 2));
   }
 
   const svgWidth = cols * CELL_SIZE + PAD * 2;
@@ -244,21 +243,6 @@ export default function KakuroEditor({ initialCanon, onComplete, onCancel }: Kak
         )}
       </div>
 
-      <div>
-        <label style={{ display: "block", marginBottom: 4, fontWeight: "bold" }}>JSON (source of truth):</label>
-        <textarea
-          value={jsonText}
-          onChange={(e) => handleJsonChange(e.target.value)}
-          rows={12}
-          style={{ width: "100%", fontFamily: "monospace", fontSize: 12 }}
-        />
-        {jsonError && <div style={{ color: "red", fontSize: 12 }}>{jsonError}</div>}
-      </div>
-
-      <div style={{ display: "flex", gap: "0.5rem" }}>
-        <button onClick={handleDone} style={{ padding: "0.5rem 1rem" }}>Done</button>
-        <button onClick={onCancel} style={{ padding: "0.5rem 1rem" }}>Cancel</button>
-      </div>
     </div>
   );
 }

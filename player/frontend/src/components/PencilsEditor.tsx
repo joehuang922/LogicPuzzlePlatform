@@ -1,10 +1,9 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useGridCellInput } from "../hooks/useGridCellInput";
 
 interface PencilsEditorProps {
   initialCanon?: string;
-  onComplete: (json: string) => void;
-  onCancel: () => void;
+  onChange: (json: string) => void;
 }
 
 const CELL_SIZE = 36;
@@ -51,8 +50,7 @@ const DIR_LABELS: { dir: number; label: string; title: string }[] = [
 
 export default function PencilsEditor({
   initialCanon,
-  onComplete,
-  onCancel,
+  onChange,
 }: PencilsEditorProps) {
   let initRows = 7,
     initCols = 7;
@@ -109,11 +107,11 @@ export default function PencilsEditor({
     setCellValue(focused.r, focused.c, dir);
   }
 
-  function handleDone() {
-    onComplete(JSON.stringify({ cells }, null, 2));
-  }
-
   const jsonStr = JSON.stringify({ cells }, null, 2);
+
+  useEffect(() => {
+    onChange(jsonStr);
+  }, [jsonStr, onChange]);
 
   function handleJsonChange(value: string) {
     try {
@@ -295,25 +293,6 @@ export default function PencilsEditor({
           )}
         </div>
 
-        <textarea
-          value={jsonStr}
-          onChange={(e) => handleJsonChange(e.target.value)}
-          style={{
-            fontFamily: "monospace",
-            fontSize: "0.75rem",
-            width: 300,
-            minHeight: 200,
-          }}
-        />
-      </div>
-
-      <div style={{ display: "flex", gap: "0.5rem" }}>
-        <button onClick={handleDone} style={{ padding: "0.5rem 1rem" }}>
-          Done
-        </button>
-        <button onClick={onCancel} style={{ padding: "0.5rem 1rem" }}>
-          Cancel
-        </button>
       </div>
     </div>
   );

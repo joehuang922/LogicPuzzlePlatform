@@ -1,10 +1,9 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect} from "react";
 import { ShakashakaCanon } from "../types/canon";
 
 interface ShakashakaEditorProps {
   initialJson: string;
-  onComplete: (json: string) => void;
-  onCancel: () => void;
+  onChange: (json: string) => void;
 }
 
 const CELL_SIZE = 36;
@@ -28,11 +27,14 @@ function makeEmptyCanon(rows: number, cols: number): ShakashakaCanon {
 
 export default function ShakashakaEditor({
   initialJson,
-  onComplete,
-  onCancel,
+  onChange,
 }: ShakashakaEditorProps) {
   const [jsonText, setJsonText] = useState(initialJson);
   const canon = useMemo(() => parseCanon(jsonText), [jsonText]);
+
+  useEffect(() => {
+    onChange(jsonText);
+  }, [jsonText, onChange]);
 
   const rows = canon ? canon.cells.length : 0;
   const cols = canon ? canon.cells[0].length : 0;
@@ -106,9 +108,6 @@ export default function ShakashakaEditor({
           value={jsonText}
           onChange={(e) => setJsonText(e.target.value)}
         />
-        <div style={{ marginTop: "1rem", display: "flex", gap: "0.5rem" }}>
-          <button onClick={onCancel}>Cancel</button>
-        </div>
       </div>
     );
   }
@@ -302,67 +301,8 @@ export default function ShakashakaEditor({
           </svg>
         </div>
 
-        <div
-          style={{
-            flex: 1,
-            minWidth: 250,
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
-          <label
-            style={{
-              fontSize: "0.85rem",
-              fontWeight: "bold",
-              marginBottom: "0.25rem",
-            }}
-          >
-            Canon JSON (source of truth)
-          </label>
-          <textarea
-            style={{
-              flex: 1,
-              minHeight: 300,
-              fontFamily: "monospace",
-              fontSize: "0.75rem",
-              padding: "0.5rem",
-              border: "1px solid #ccc",
-              borderRadius: 4,
-              resize: "vertical",
-            }}
-            value={jsonText}
-            onChange={(e) => setJsonText(e.target.value)}
-          />
-        </div>
       </div>
 
-      <div style={{ marginTop: "1rem", display: "flex", gap: "0.5rem" }}>
-        <button
-          onClick={() => onComplete(jsonText)}
-          style={{
-            padding: "0.5rem 1.25rem",
-            background: "#4a90d9",
-            color: "white",
-            border: "none",
-            borderRadius: 4,
-            cursor: "pointer",
-            fontWeight: "bold",
-          }}
-        >
-          Complete
-        </button>
-        <button
-          onClick={onCancel}
-          style={{
-            padding: "0.5rem 1rem",
-            border: "1px solid #ccc",
-            borderRadius: 4,
-            cursor: "pointer",
-          }}
-        >
-          Cancel
-        </button>
-      </div>
     </div>
   );
 }

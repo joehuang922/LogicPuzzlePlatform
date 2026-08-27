@@ -3,8 +3,7 @@ import { SudokuCanon } from "../types/canon";
 
 interface SudokuEditorProps {
   initialJson: string;
-  onComplete: (json: string) => void;
-  onCancel: () => void;
+  onChange: (json: string) => void;
 }
 
 const CELL_SIZE = 40;
@@ -27,7 +26,7 @@ function emptyHints(): number[][] {
   return Array.from({ length: 9 }, () => Array(9).fill(0));
 }
 
-export default function SudokuEditor({ initialJson, onComplete, onCancel }: SudokuEditorProps) {
+export default function SudokuEditor({ initialJson, onChange }: SudokuEditorProps) {
   const [jsonText, setJsonText] = useState(() => {
     if (!initialJson.trim()) {
       return JSON.stringify({ hints: emptyHints() }, null, 2);
@@ -35,6 +34,10 @@ export default function SudokuEditor({ initialJson, onComplete, onCancel }: Sudo
     return initialJson;
   });
   const canon = useMemo(() => parseCanon(jsonText), [jsonText]);
+
+  useEffect(() => {
+    onChange(jsonText);
+  }, [jsonText, onChange]);
 
   const [activeCell, setActiveCell] = useState<string | null>(null);
 
@@ -97,9 +100,6 @@ export default function SudokuEditor({ initialJson, onComplete, onCancel }: Sudo
           value={jsonText}
           onChange={(e) => setJsonText(e.target.value)}
         />
-        <div style={{ marginTop: "1rem", display: "flex", gap: "0.5rem" }}>
-          <button onClick={onCancel}>Cancel</button>
-        </div>
       </div>
     );
   }
@@ -210,42 +210,9 @@ export default function SudokuEditor({ initialJson, onComplete, onCancel }: Sudo
           </svg>
         </div>
 
-        {/* JSON textarea */}
-        <div style={{ flex: 1, minWidth: 250, display: "flex", flexDirection: "column" }}>
-          <label style={{ fontSize: "0.85rem", fontWeight: "bold", marginBottom: "0.25rem" }}>
-            Canon JSON (source of truth)
-          </label>
-          <textarea
-            style={{
-              flex: 1,
-              minHeight: 300,
-              fontFamily: "monospace",
-              fontSize: "0.75rem",
-              padding: "0.5rem",
-              border: "1px solid #ccc",
-              borderRadius: 4,
-              resize: "vertical",
-            }}
-            value={jsonText}
-            onChange={(e) => setJsonText(e.target.value)}
-          />
-        </div>
+
       </div>
 
-      <div style={{ marginTop: "1rem", display: "flex", gap: "0.5rem" }}>
-        <button
-          onClick={() => onComplete(jsonText)}
-          style={{ padding: "0.5rem 1.25rem", background: "#4a90d9", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontWeight: "bold" }}
-        >
-          Complete
-        </button>
-        <button
-          onClick={onCancel}
-          style={{ padding: "0.5rem 1rem", border: "1px solid #ccc", borderRadius: 4, cursor: "pointer" }}
-        >
-          Cancel
-        </button>
-      </div>
     </div>
   );
 }

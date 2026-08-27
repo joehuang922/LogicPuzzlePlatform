@@ -1,16 +1,15 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { SlalomGate } from "../types/canon";
 
 interface SlalomEditorProps {
   initialCanon?: string;
-  onComplete: (json: string) => void;
-  onCancel: () => void;
+  onChange: (json: string) => void;
 }
 
 const CELL_SIZE = 32;
 const PAD = 16;
 
-export default function SlalomEditor({ initialCanon, onComplete, onCancel }: SlalomEditorProps) {
+export default function SlalomEditor({ initialCanon, onChange }: SlalomEditorProps) {
   let initRows = 9, initCols = 9;
   let initCells: number[][] | null = null;
   let initStart = { row: 0, col: 0 };
@@ -37,28 +36,19 @@ export default function SlalomEditor({ initialCanon, onComplete, onCancel }: Sla
   const [gates, setGates] = useState<SlalomGate[]>(initGates);
   const [mode, setMode] = useState<"wall" | "start" | "gate">("wall");
   const [selectedGate, setSelectedGate] = useState<number | null>(null);
-  const [jsonText, setJsonText] = useState("");
 
   const svgRef = useRef<SVGSVGElement>(null);
   const gateDragStart = useRef<{ orientation: "h" | "v"; line: number; pos: number } | null>(null);
 
-  function buildJson() {
-    const obj = { cells, start: startCell, gateCount: gates.length, gates };
-    return JSON.stringify(obj, null, 2);
-  }
+  const jsonStr = JSON.stringify(
+    { cells, start: startCell, gateCount: gates.length, gates },
+    null,
+    2
+  );
 
-  function syncFromJson(text: string) {
-    try {
-      const parsed = JSON.parse(text);
-      if (parsed.cells) {
-        setCells(parsed.cells);
-        setRows(parsed.cells.length);
-        setCols(parsed.cells[0].length);
-      }
-      if (parsed.start) setStartCell(parsed.start);
-      if (parsed.gates) setGates(parsed.gates);
-    } catch { /* ignore */ }
-  }
+  useEffect(() => {
+    onChange(jsonStr);
+  }, [jsonStr, onChange]);
 
   function resizeGrid(newRows: number, newCols: number) {
     const newCells = Array.from({ length: newRows }, (_, r) =>
@@ -185,10 +175,6 @@ export default function SlalomEditor({ initialCanon, onComplete, onCancel }: Sla
     if (selectedGate === null) return;
     const n = num === "" ? null : Number(num);
     setGates((prev) => prev.map((g, i) => i === selectedGate ? { ...g, number: n } : g));
-  }
-
-  function handleDone() {
-    onComplete(buildJson());
   }
 
   const svgWidth = cols * CELL_SIZE + PAD * 2;
@@ -347,24 +333,6 @@ export default function SlalomEditor({ initialCanon, onComplete, onCancel }: Sla
           )}
         </g>
       </svg>
-
-      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-        <button onClick={handleDone} style={{ padding: "0.5rem 1rem" }}>Done</button>
-        <button onClick={onCancel} style={{ padding: "0.5rem 1rem" }}>Cancel</button>
-        <button onClick={() => setJsonText(buildJson())} style={{ padding: "0.5rem 1rem", fontSize: "0.8rem" }}>
-          Export JSON
-        </button>
-        <button onClick={() => syncFromJson(jsonText)} style={{ padding: "0.5rem 1rem", fontSize: "0.8rem" }}>
-          Import JSON
-        </button>
-      </div>
-      <textarea
-        value={jsonText}
-        onChange={(e) => setJsonText(e.target.value)}
-        rows={8}
-        style={{ fontFamily: "monospace", fontSize: "0.75rem", width: "100%", maxWidth: 500 }}
-        placeholder="JSON (use Export/Import to sync)"
-      />
     </div>
   );
 }

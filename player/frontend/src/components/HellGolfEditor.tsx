@@ -1,9 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect} from "react";
 
 interface HellGolfEditorProps {
   initialCanon?: string;
-  onComplete: (json: string) => void;
-  onCancel: () => void;
+  onChange: (json: string) => void;
 }
 
 const CELL_SIZE = 40;
@@ -59,8 +58,7 @@ function gridToCanon(grid: Grid) {
 
 export default function HellGolfEditor({
   initialCanon,
-  onComplete,
-  onCancel,
+  onChange,
 }: HellGolfEditorProps) {
   let initRows = 10;
   let initCols = 10;
@@ -120,11 +118,12 @@ export default function HellGolfEditor({
     });
   }
 
-  function handleDone() {
-    onComplete(JSON.stringify(gridToCanon(grid), null, 2));
-  }
 
   const jsonStr = JSON.stringify(gridToCanon(grid), null, 2);
+
+  useEffect(() => {
+    onChange(jsonStr);
+  }, [jsonStr, onChange]);
 
   function handleJsonChange(value: string) {
     try {
@@ -305,17 +304,8 @@ export default function HellGolfEditor({
           </g>
         </svg>
 
-        <textarea
-          value={jsonStr}
-          onChange={(e) => handleJsonChange(e.target.value)}
-          style={{ fontFamily: "monospace", fontSize: "0.75rem", width: 300, minHeight: 200 }}
-        />
       </div>
 
-      <div style={{ display: "flex", gap: "0.5rem" }}>
-        <button onClick={handleDone} style={{ padding: "0.5rem 1rem" }}>Done</button>
-        <button onClick={onCancel} style={{ padding: "0.5rem 1rem" }}>Cancel</button>
-      </div>
     </div>
   );
 }

@@ -1,16 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface SlitherlinkEditorProps {
   initialCanon?: string;
-  onComplete: (json: string) => void;
-  onCancel: () => void;
+  onChange: (json: string) => void;
 }
 
 const CELL_SIZE = 36;
 const PAD = 16;
 const DOT_RADIUS = 3;
 
-export default function SlitherlinkEditor({ initialCanon, onComplete, onCancel }: SlitherlinkEditorProps) {
+export default function SlitherlinkEditor({ initialCanon, onChange }: SlitherlinkEditorProps) {
   let initRows = 5, initCols = 5;
   let initCells: number[][] | null = null;
   if (initialCanon) {
@@ -48,9 +47,11 @@ export default function SlitherlinkEditor({ initialCanon, onComplete, onCancel }
     });
   }
 
-  function handleDone() {
-    onComplete(JSON.stringify({ cells }, null, 2));
-  }
+  const jsonStr = JSON.stringify({ cells }, null, 2);
+
+  useEffect(() => {
+    onChange(jsonStr);
+  }, [jsonStr, onChange]);
 
   const svgWidth = cols * CELL_SIZE + PAD * 2;
   const svgHeight = rows * CELL_SIZE + PAD * 2;
@@ -141,11 +142,6 @@ export default function SlitherlinkEditor({ initialCanon, onComplete, onCancel }
           })}
         </g>
       </svg>
-
-      <div style={{ display: "flex", gap: "0.5rem" }}>
-        <button onClick={handleDone} style={{ padding: "0.5rem 1rem" }}>Done</button>
-        <button onClick={onCancel} style={{ padding: "0.5rem 1rem" }}>Cancel</button>
-      </div>
     </div>
   );
 }

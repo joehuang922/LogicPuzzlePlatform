@@ -2,11 +2,10 @@ import { useState, useCallback, useRef, useEffect } from "react";
 
 interface NonogramEditorProps {
   initialCanon?: string;
-  onComplete: (json: string) => void;
-  onCancel: () => void;
+  onChange: (json: string) => void;
 }
 
-export default function NonogramEditor({ initialCanon, onComplete, onCancel }: NonogramEditorProps) {
+export default function NonogramEditor({ initialCanon, onChange }: NonogramEditorProps) {
   let initRowClues: number[][] = [[1], [1], [1], [1], [1]];
   let initColClues: number[][] = [[1], [1], [1], [1], [1]];
 
@@ -89,9 +88,9 @@ export default function NonogramEditor({ initialCanon, onComplete, onCancel }: N
     syncToJson(rowClues, newColClues);
   }
 
-  function handleDone() {
-    onComplete(JSON.stringify({ rowClues, colClues }, null, 2));
-  }
+  useEffect(() => {
+    onChange(JSON.stringify({ rowClues, colClues }, null, 2));
+  }, [rowClues, colClues, onChange]);
 
   function ClueInput({ value, onCommit }: { value: string; onCommit: (v: string) => void }) {
     const [local, setLocal] = useState(value);
@@ -182,21 +181,6 @@ export default function NonogramEditor({ initialCanon, onComplete, onCancel }: N
         </div>
       </div>
 
-      <div>
-        <h4 style={{ margin: "0 0 0.5rem" }}>JSON (source of truth)</h4>
-        <textarea
-          value={jsonText}
-          onChange={(e) => syncFromJson(e.target.value)}
-          rows={12}
-          style={{ width: "100%", maxWidth: 500, fontFamily: "monospace", fontSize: "0.85rem" }}
-        />
-        {jsonError && <div style={{ color: "red", fontSize: "0.8rem" }}>{jsonError}</div>}
-      </div>
-
-      <div style={{ display: "flex", gap: "0.5rem" }}>
-        <button onClick={handleDone} style={{ padding: "0.5rem 1rem" }}>Done</button>
-        <button onClick={onCancel} style={{ padding: "0.5rem 1rem" }}>Cancel</button>
-      </div>
     </div>
   );
 }

@@ -13,31 +13,7 @@ import {
   Collection,
   Puzzle,
 } from "../api/client";
-import NurimazeEditor from "../components/NurimazeEditor";
-import SudokuEditor from "../components/SudokuEditor";
-import ComboSudokuEditor from "../components/ComboSudokuEditor";
-import DoubleChocoEditor from "../components/DoubleChocoEditor";
-import SlitherlinkEditor from "../components/SlitherlinkEditor";
-import NonogramEditor from "../components/NonogramEditor";
-import MasyuEditor from "../components/MasyuEditor";
-import PencilsEditor from "../components/PencilsEditor";
-import NuritwinEditor from "../components/NuritwinEditor";
-import SlalomEditor from "../components/SlalomEditor";
-import ShakashakaEditor from "../components/ShakashakaEditor";
-import KakuroEditor from "../components/KakuroEditor";
-import YajilinEditor from "../components/YajilinEditor";
-import FillominoEditor from "../components/FillominoEditor";
-import LitsEditor from "../components/LitsEditor";
-import ChocoBananaEditor from "../components/ChocoBananaEditor";
-import NumberLinkEditor from "../components/NumberLinkEditor";
-import AkariEditor from "../components/AkariEditor";
-import HellGolfEditor from "../components/HellGolfEditor";
-import TentaishowEditor from "../components/TentaishowEditor";
-import HeyawakeEditor from "../components/HeyawakeEditor";
-import ShikakuEditor from "../components/ShikakuEditor";
-import NorinoriEditor from "../components/NorinoriEditor";
-import NurikabeEditor from "../components/NurikabeEditor";
-import RippleEffectEditor from "../components/RippleEffectEditor";
+import PuzzleEditorModal, { hasVisualEditor } from "../components/PuzzleEditorModal";
 import CanonPreview from "../components/CanonPreview";
 import BatchUploadForm from "../components/BatchUploadForm";
 import { extractBase64 } from "../utils/image";
@@ -178,32 +154,7 @@ function QuestionForm({
   const [editorOpen, setEditorOpen] = useState(false);
 
   const selectedTypeName = puzzleTypes.find((pt) => String(pt.id) === puzzleType)?.name;
-  const isNurimaze = selectedTypeName === "nurimaze";
-  const isSudoku = selectedTypeName === "sudoku";
-  const isComboSudoku = selectedTypeName === "combo-sudoku";
-  const isDoubleChoco = selectedTypeName === "double-choco";
-  const isSlitherlink = selectedTypeName === "slitherlink";
-  const isNonogram = selectedTypeName === "nonogram";
-  const isMasyu = selectedTypeName === "masyu";
-  const isPencils = selectedTypeName === "pencils";
-  const isNuritwin = selectedTypeName === "nuritwin";
-  const isSlalom = selectedTypeName === "slalom";
-  const isShakashaka = selectedTypeName === "shakashaka";
-  const isKakuro = selectedTypeName === "kakuro";
-  const isYajilin = selectedTypeName === "yajilin";
-  const isFillomino = selectedTypeName === "fillomino";
-  const isLits = selectedTypeName === "lits";
-  const isChocoBanana = selectedTypeName === "choco-banana";
-  const isNumberLink = selectedTypeName === "number-link";
-  const isAkari = selectedTypeName === "akari";
-  const isHellGolf = selectedTypeName === "hell-golf";
-  const isTentaishow = selectedTypeName === "tentaishow";
-  const isHeyawake = selectedTypeName === "heyawake";
-  const isShikaku = selectedTypeName === "shikaku";
-  const isNorinori = selectedTypeName === "norinori";
-  const isNurikabe = selectedTypeName === "nurikabe";
-  const isRippleEffect = selectedTypeName === "ripple-effect";
-  const hasEditor = isNurimaze || isSudoku || isComboSudoku || isDoubleChoco || isSlitherlink || isNonogram || isMasyu || isPencils || isNuritwin || isSlalom || isShakashaka || isKakuro || isYajilin || isFillomino || isLits || isChocoBanana || isNumberLink || isAkari || isHellGolf || isTentaishow || isHeyawake || isShikaku || isNorinori || isNurikabe || isRippleEffect;
+  const hasEditor = hasVisualEditor(selectedTypeName);
 
   function validate(): boolean {
     const errs: Record<string, string> = {};
@@ -460,163 +411,33 @@ function QuestionForm({
               </span>
             )}
           </div>
-          {editorOpen && hasEditor ? (
-            isNurimaze ? (
-              <NurimazeEditor
-                initialJson={canonRepr}
-                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                onCancel={() => setEditorOpen(false)}
-              />
-            ) : isSudoku ? (
-              <SudokuEditor
-                initialJson={canonRepr}
-                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                onCancel={() => setEditorOpen(false)}
-              />
-            ) : isDoubleChoco ? (
-              <DoubleChocoEditor
-                initialJson={canonRepr}
-                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                onCancel={() => setEditorOpen(false)}
-              />
-            ) : isSlitherlink ? (
-              <SlitherlinkEditor
-                initialCanon={canonRepr}
-                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                onCancel={() => setEditorOpen(false)}
-              />
-            ) : isNonogram ? (
-              <NonogramEditor
-                initialCanon={canonRepr}
-                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                onCancel={() => setEditorOpen(false)}
-              />
-            ) : isMasyu ? (
-              <MasyuEditor
-                initialCanon={canonRepr}
-                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                onCancel={() => setEditorOpen(false)}
-              />
-            ) : isPencils ? (
-              <PencilsEditor
-                initialCanon={canonRepr}
-                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                onCancel={() => setEditorOpen(false)}
-              />
-            ) : isNuritwin ? (
-              <NuritwinEditor
-                initialJson={canonRepr}
-                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                onCancel={() => setEditorOpen(false)}
-              />
-            ) : isSlalom ? (
-              <SlalomEditor
-                initialCanon={canonRepr}
-                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                onCancel={() => setEditorOpen(false)}
-              />
-            ) : isShakashaka ? (
-              <ShakashakaEditor
-                initialJson={canonRepr}
-                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                onCancel={() => setEditorOpen(false)}
-              />
-            ) : isKakuro ? (
-              <KakuroEditor
-                initialCanon={canonRepr}
-                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                onCancel={() => setEditorOpen(false)}
-              />
-            ) : isYajilin ? (
-              <YajilinEditor
-                initialCanon={canonRepr}
-                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                onCancel={() => setEditorOpen(false)}
-              />
-            ) : isFillomino ? (
-              <FillominoEditor
-                initialJson={canonRepr}
-                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                onCancel={() => setEditorOpen(false)}
-              />
-            ) : isLits ? (
-              <LitsEditor
-                initialJson={canonRepr}
-                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                onCancel={() => setEditorOpen(false)}
-              />
-            ) : isChocoBanana ? (
-              <ChocoBananaEditor
-                initialJson={canonRepr}
-                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                onCancel={() => setEditorOpen(false)}
-              />
-            ) : isNumberLink ? (
-              <NumberLinkEditor
-                initialCanon={canonRepr}
-                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                onCancel={() => setEditorOpen(false)}
-              />
-            ) : isAkari ? (
-              <AkariEditor
-                initialJson={canonRepr}
-                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                onCancel={() => setEditorOpen(false)}
-              />
-            ) : isHellGolf ? (
-              <HellGolfEditor
-                initialCanon={canonRepr}
-                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                onCancel={() => setEditorOpen(false)}
-              />
-            ) : isTentaishow ? (
-              <TentaishowEditor
-                initialJson={canonRepr}
-                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                onCancel={() => setEditorOpen(false)}
-              />
-            ) : isHeyawake ? (
-              <HeyawakeEditor
-                initialJson={canonRepr}
-                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                onCancel={() => setEditorOpen(false)}
-              />
-            ) : isShikaku ? (
-              <ShikakuEditor
-                initialJson={canonRepr}
-                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                onCancel={() => setEditorOpen(false)}
-              />
-            ) : isNorinori ? (
-              <NorinoriEditor
-                initialJson={canonRepr}
-                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                onCancel={() => setEditorOpen(false)}
-              />
-            ) : isNurikabe ? (
-              <NurikabeEditor
-                initialJson={canonRepr}
-                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                onCancel={() => setEditorOpen(false)}
-              />
-            ) : isRippleEffect ? (
-              <RippleEffectEditor
-                initialJson={canonRepr}
-                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                onCancel={() => setEditorOpen(false)}
-              />
-            ) : (
-              <ComboSudokuEditor
-                initialJson={canonRepr}
-                onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                onCancel={() => setEditorOpen(false)}
-              />
-            )
-          ) : (
+          {!hasEditor && (
             <textarea
               style={{ ...inputStyle, minHeight: 120, fontFamily: "monospace", fontSize: "0.8rem" }}
               value={canonRepr}
               onChange={(e) => setCanonRepr(e.target.value)}
+            />
+          )}
+          {editorOpen && hasEditor && (
+            <PuzzleEditorModal
+              puzzleType={Number(puzzleType)}
+              puzzleTypes={puzzleTypes}
+              imageUrl={imagePreview ?? undefined}
+              initialCanon={canonRepr}
+              initialTitle={title}
+              initialAuthor={author}
+              initialDifficulty={Number(difficulty) || 3}
+              initialSrcCollection={srcCollection ? Number(srcCollection) : null}
+              collections={collections}
+              onDone={(result) => {
+                setCanonRepr(result.canonRepr);
+                setTitle(result.title);
+                setAuthor(result.author);
+                setDifficulty(String(result.difficulty));
+                setSrcCollection(result.srcCollection ? String(result.srcCollection) : "");
+                setEditorOpen(false);
+              }}
+              onCancel={() => setEditorOpen(false)}
             />
           )}
           {errors.canonRepr && <span style={errorStyle}>{errors.canonRepr}</span>}
@@ -666,32 +487,7 @@ function PuzzleEditRow({
   const showCollectionPicker = collections && !puzzle.srcCollection;
 
   const typeName = puzzleTypes.find((pt) => pt.id === puzzle.puzzleType)?.name;
-  const isNurimaze = typeName === "nurimaze";
-  const isSudoku = typeName === "sudoku";
-  const isComboSudoku = typeName === "combo-sudoku";
-  const isDoubleChoco = typeName === "double-choco";
-  const isSlitherlink = typeName === "slitherlink";
-  const isNonogram = typeName === "nonogram";
-  const isMasyu = typeName === "masyu";
-  const isPencils = typeName === "pencils";
-  const isNuritwin = typeName === "nuritwin";
-  const isSlalom = typeName === "slalom";
-  const isShakashaka = typeName === "shakashaka";
-  const isKakuro = typeName === "kakuro";
-  const isYajilin = typeName === "yajilin";
-  const isFillomino = typeName === "fillomino";
-  const isLits = typeName === "lits";
-  const isChocoBanana = typeName === "choco-banana";
-  const isNumberLink = typeName === "number-link";
-  const isAkari = typeName === "akari";
-  const isHellGolf = typeName === "hell-golf";
-  const isTentaishow = typeName === "tentaishow";
-  const isHeyawake = typeName === "heyawake";
-  const isShikaku = typeName === "shikaku";
-  const isNorinori = typeName === "norinori";
-  const isNurikabe = typeName === "nurikabe";
-  const isRippleEffect = typeName === "ripple-effect";
-  const hasEditor = isNurimaze || isSudoku || isComboSudoku || isDoubleChoco || isSlitherlink || isNonogram || isMasyu || isPencils || isNuritwin || isSlalom || isShakashaka || isKakuro || isYajilin || isFillomino || isLits || isChocoBanana || isNumberLink || isAkari || isHellGolf || isTentaishow || isHeyawake || isShikaku || isNorinori || isNurikabe || isRippleEffect;
+  const hasEditor = hasVisualEditor(typeName);
 
   async function handleConfirm() {
     let parsedCanon: Record<string, unknown>;
@@ -769,163 +565,35 @@ function PuzzleEditRow({
                 </button>
               )}
             </div>
-            {editorOpen && hasEditor ? (
-              isNurimaze ? (
-                <NurimazeEditor
-                  initialJson={canonRepr}
-                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                  onCancel={() => setEditorOpen(false)}
-                />
-              ) : isSudoku ? (
-                <SudokuEditor
-                  initialJson={canonRepr}
-                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                  onCancel={() => setEditorOpen(false)}
-                />
-              ) : isDoubleChoco ? (
-                <DoubleChocoEditor
-                  initialJson={canonRepr}
-                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                  onCancel={() => setEditorOpen(false)}
-                />
-              ) : isSlitherlink ? (
-                <SlitherlinkEditor
-                  initialCanon={canonRepr}
-                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                  onCancel={() => setEditorOpen(false)}
-                />
-              ) : isNonogram ? (
-                <NonogramEditor
-                  initialCanon={canonRepr}
-                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                  onCancel={() => setEditorOpen(false)}
-                />
-              ) : isMasyu ? (
-                <MasyuEditor
-                  initialCanon={canonRepr}
-                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                  onCancel={() => setEditorOpen(false)}
-                />
-              ) : isPencils ? (
-                <PencilsEditor
-                  initialCanon={canonRepr}
-                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                  onCancel={() => setEditorOpen(false)}
-                />
-              ) : isNuritwin ? (
-                <NuritwinEditor
-                  initialJson={canonRepr}
-                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                  onCancel={() => setEditorOpen(false)}
-                />
-              ) : isSlalom ? (
-                <SlalomEditor
-                  initialCanon={canonRepr}
-                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                  onCancel={() => setEditorOpen(false)}
-                />
-              ) : isShakashaka ? (
-                <ShakashakaEditor
-                  initialJson={canonRepr}
-                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                  onCancel={() => setEditorOpen(false)}
-                />
-              ) : isKakuro ? (
-                <KakuroEditor
-                  initialCanon={canonRepr}
-                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                  onCancel={() => setEditorOpen(false)}
-                />
-              ) : isYajilin ? (
-                <YajilinEditor
-                  initialCanon={canonRepr}
-                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                  onCancel={() => setEditorOpen(false)}
-                />
-              ) : isFillomino ? (
-                <FillominoEditor
-                  initialJson={canonRepr}
-                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                  onCancel={() => setEditorOpen(false)}
-                />
-              ) : isLits ? (
-                <LitsEditor
-                  initialJson={canonRepr}
-                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                  onCancel={() => setEditorOpen(false)}
-                />
-              ) : isChocoBanana ? (
-                <ChocoBananaEditor
-                  initialJson={canonRepr}
-                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                  onCancel={() => setEditorOpen(false)}
-                />
-              ) : isNumberLink ? (
-                <NumberLinkEditor
-                  initialCanon={canonRepr}
-                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                  onCancel={() => setEditorOpen(false)}
-                />
-              ) : isAkari ? (
-                <AkariEditor
-                  initialJson={canonRepr}
-                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                  onCancel={() => setEditorOpen(false)}
-                />
-              ) : isHellGolf ? (
-                <HellGolfEditor
-                  initialCanon={canonRepr}
-                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                  onCancel={() => setEditorOpen(false)}
-                />
-              ) : isTentaishow ? (
-                <TentaishowEditor
-                  initialJson={canonRepr}
-                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                  onCancel={() => setEditorOpen(false)}
-                />
-              ) : isHeyawake ? (
-                <HeyawakeEditor
-                  initialJson={canonRepr}
-                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                  onCancel={() => setEditorOpen(false)}
-                />
-              ) : isShikaku ? (
-                <ShikakuEditor
-                  initialJson={canonRepr}
-                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                  onCancel={() => setEditorOpen(false)}
-                />
-              ) : isNorinori ? (
-                <NorinoriEditor
-                  initialJson={canonRepr}
-                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                  onCancel={() => setEditorOpen(false)}
-                />
-              ) : isNurikabe ? (
-                <NurikabeEditor
-                  initialJson={canonRepr}
-                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                  onCancel={() => setEditorOpen(false)}
-                />
-              ) : isRippleEffect ? (
-                <RippleEffectEditor
-                  initialJson={canonRepr}
-                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                  onCancel={() => setEditorOpen(false)}
-                />
-              ) : (
-                <ComboSudokuEditor
-                  initialJson={canonRepr}
-                  onComplete={(json) => { setCanonRepr(json); setEditorOpen(false); }}
-                  onCancel={() => setEditorOpen(false)}
-                />
-              )
-            ) : (
+            {!hasEditor && (
               <textarea
                 style={{ ...inputStyle, minHeight: 100, fontFamily: "monospace", fontSize: "0.75rem" }}
                 value={canonRepr}
                 onChange={(e) => setCanonRepr(e.target.value)}
+              />
+            )}
+            {editorOpen && hasEditor && (
+              <PuzzleEditorModal
+                puzzleType={puzzle.puzzleType}
+                puzzleTypes={puzzleTypes}
+                initialCanon={canonRepr}
+                initialTitle={title}
+                initialAuthor={author}
+                initialDifficulty={Number(difficulty) || 3}
+                initialSrcCollection={srcCollection ? Number(srcCollection) : null}
+                collections={showCollectionPicker ? collections : undefined}
+                showCollection={showCollectionPicker}
+                onDone={(result) => {
+                  setCanonRepr(result.canonRepr);
+                  setTitle(result.title);
+                  setAuthor(result.author);
+                  setDifficulty(String(result.difficulty));
+                  if (showCollectionPicker) {
+                    setSrcCollection(result.srcCollection ? String(result.srcCollection) : "");
+                  }
+                  setEditorOpen(false);
+                }}
+                onCancel={() => setEditorOpen(false)}
               />
             )}
           </div>

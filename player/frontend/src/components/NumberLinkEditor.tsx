@@ -1,16 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect} from "react";
 
 interface NumberLinkEditorProps {
   initialCanon?: string;
-  onComplete: (json: string) => void;
-  onCancel: () => void;
+  onChange: (json: string) => void;
 }
 
 const CELL_SIZE = 36;
 const PAD = 16;
 const TOKEN_RADIUS = 13;
 
-export default function NumberLinkEditor({ initialCanon, onComplete, onCancel }: NumberLinkEditorProps) {
+export default function NumberLinkEditor({ initialCanon, onChange }: NumberLinkEditorProps) {
   let initRows = 10, initCols = 10;
   let initCells: number[][] | null = null;
   if (initialCanon) {
@@ -50,11 +49,12 @@ export default function NumberLinkEditor({ initialCanon, onComplete, onCancel }:
     });
   }
 
-  function handleDone() {
-    onComplete(JSON.stringify({ cells }, null, 2));
-  }
 
   const jsonStr = JSON.stringify({ cells }, null, 2);
+
+  useEffect(() => {
+    onChange(jsonStr);
+  }, [jsonStr, onChange]);
 
   function handleJsonChange(value: string) {
     try {
@@ -203,17 +203,8 @@ export default function NumberLinkEditor({ initialCanon, onComplete, onCancel }:
           </g>
         </svg>
 
-        <textarea
-          value={jsonStr}
-          onChange={(e) => handleJsonChange(e.target.value)}
-          style={{ fontFamily: "monospace", fontSize: "0.75rem", width: 300, minHeight: 200 }}
-        />
       </div>
 
-      <div style={{ display: "flex", gap: "0.5rem" }}>
-        <button onClick={handleDone} style={{ padding: "0.5rem 1rem" }}>Done</button>
-        <button onClick={onCancel} style={{ padding: "0.5rem 1rem" }}>Cancel</button>
-      </div>
     </div>
   );
 }
