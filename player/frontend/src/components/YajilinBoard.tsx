@@ -245,6 +245,23 @@ export default function YajilinBoard({
 
       const newVal = eraseModeRef.current ? 0 : 1;
 
+      // When drawing a line, it cannot touch blackened cells, and it clears
+      // the marked (gray dot) state of any cell it is drawn onto.
+      if (newVal === 1) {
+        if (blacks[last.r][last.c] === 1 || blacks[cell.r][cell.c] === 1) {
+          lastCellRef.current = cell;
+          return;
+        }
+        if (blacks[last.r][last.c] === 2 || blacks[cell.r][cell.c] === 2) {
+          setBlacks((prev) => {
+            const n = prev.map((row) => [...row]);
+            if (n[last.r][last.c] === 2) n[last.r][last.c] = 0;
+            if (n[cell.r][cell.c] === 2) n[cell.r][cell.c] = 0;
+            return n;
+          });
+        }
+      }
+
       if (dc === 1) {
         setHEdges((prev) => { const n = prev.map((r) => [...r]); n[last.r][last.c] = newVal; return n; });
       } else if (dc === -1) {
@@ -257,7 +274,7 @@ export default function YajilinBoard({
 
       lastCellRef.current = cell;
     },
-    [getCellFromPoint, hEdges, vEdges]
+    [getCellFromPoint, hEdges, vEdges, blacks]
   );
 
   const handlePointerUp = useCallback(
