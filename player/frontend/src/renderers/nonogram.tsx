@@ -5,7 +5,7 @@ import NonogramBoard from "../components/NonogramBoard";
 export const nonogramRenderer: PuzzleRenderer = {
   puzzleType: 6,
 
-  render(puzzle: PuzzleDefinition, state: PuzzleState, onValuesChange?: (values: Record<string, number>) => void, onComplete?: () => void) {
+  render(puzzle: PuzzleDefinition, state: PuzzleState, onValuesChange?: (values: Record<string, number>) => void, onComplete?: () => void, liveValidate?: boolean) {
     const canonRepr = (typeof puzzle.canonRepr === "string" ? JSON.parse(puzzle.canonRepr) : puzzle.canonRepr) as NonogramCanon;
     const savedAnswer = state.playerGrid as unknown as NonogramAnswer | undefined;
 
@@ -13,6 +13,7 @@ export const nonogramRenderer: PuzzleRenderer = {
       <NonogramBoard
         canon={canonRepr}
         initialAnswer={savedAnswer}
+        liveValidate={liveValidate}
         onAnswerChange={(answer) => {
           if (onValuesChange) {
             const values: Record<string, number> = {};

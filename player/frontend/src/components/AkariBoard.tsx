@@ -7,6 +7,7 @@ interface AkariBoardProps {
   onValuesChange?: (values: Record<string, number>) => void;
   onComplete?: () => void;
   readonly?: boolean;
+  liveValidate?: boolean;
 }
 
 const CELL_SIZE = 36;
@@ -132,6 +133,7 @@ export default function AkariBoard({
   onValuesChange,
   onComplete,
   readonly,
+  liveValidate,
 }: AkariBoardProps) {
   const { cells } = canon;
   const rows = cells.length;
@@ -254,15 +256,16 @@ export default function AkariBoard({
         );
         const state = stateGrid[r][c];
         if (state === 1) {
-          // Bulb (red if it illuminates another bulb)
+          // Bulb (red if it illuminates another bulb, when live validation is on)
+          const showConflict = liveValidate && conflict[r][c];
           elements.push(
             <circle
               key={`bulb-${r}-${c}`}
               cx={x + CELL_SIZE / 2}
               cy={y + CELL_SIZE / 2}
               r={CELL_SIZE * 0.3}
-              fill={conflict[r][c] ? "#e02424" : "#f5b301"}
-              stroke={conflict[r][c] ? "#7a0000" : "#8a6400"}
+              fill={showConflict ? "#e02424" : "#f5b301"}
+              stroke={showConflict ? "#7a0000" : "#8a6400"}
               strokeWidth={1.5}
               pointerEvents="none"
             />

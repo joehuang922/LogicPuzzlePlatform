@@ -7,6 +7,7 @@ interface SudokuBoardProps {
   initialUserValues?: Record<string, number>;
   onValuesChange?: (values: Record<string, number>) => void;
   onComplete?: () => void;
+  liveValidate?: boolean;
 }
 
 const CELL_SIZE = 40;
@@ -17,7 +18,7 @@ const THICK = 3;
 const RADIAL_RADIUS = 44;
 const CIRCLE_RADIUS = 13;
 
-export default function SudokuBoard({ hints, initialUserValues, onValuesChange, onComplete }: SudokuBoardProps) {
+export default function SudokuBoard({ hints, initialUserValues, onValuesChange, onComplete, liveValidate }: SudokuBoardProps) {
   const isMobile = useIsMobile();
   const width = 9 * CELL_SIZE + PAD * 2;
   const height = 9 * CELL_SIZE + PAD * 2;
@@ -275,7 +276,7 @@ export default function SudokuBoard({ hints, initialUserValues, onValuesChange, 
                   dominantBaseline="central"
                   fontSize={20}
                   fontFamily="sans-serif"
-                  fill={conflictCells.has(hintKey) ? "#d32f2f" : "black"}
+                  fill={liveValidate && conflictCells.has(hintKey) ? "#d32f2f" : "black"}
                   pointerEvents="none"
                 >
                   {val}
@@ -319,7 +320,7 @@ export default function SudokuBoard({ hints, initialUserValues, onValuesChange, 
                 dominantBaseline="central"
                 fontSize={20}
                 fontFamily="sans-serif"
-                fill={conflictCells.has(key) ? "#d32f2f" : "#888"}
+                fill={liveValidate && conflictCells.has(key) ? "#d32f2f" : "#888"}
                 pointerEvents="none"
               >
                 {val}

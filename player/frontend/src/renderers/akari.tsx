@@ -22,11 +22,11 @@ function extractUserValues(canon: AkariCanon, savedAnswer: { states?: number[][]
 export const akariRenderer: PuzzleRenderer = {
   puzzleType: 18,
 
-  render(puzzle: PuzzleDefinition, state: PuzzleState, onValuesChange?: (values: Record<string, number>) => void, onComplete?: () => void) {
+  render(puzzle: PuzzleDefinition, state: PuzzleState, onValuesChange?: (values: Record<string, number>) => void, onComplete?: () => void, liveValidate?: boolean) {
     const canonRepr = (typeof puzzle.canonRepr === "string" ? JSON.parse(puzzle.canonRepr) : puzzle.canonRepr) as AkariCanon;
     const savedAnswer = state.playerGrid as { states?: number[][] } | undefined;
     const initialUserValues = extractUserValues(canonRepr, savedAnswer);
-    return <AkariBoard canon={canonRepr} initialUserValues={initialUserValues} onValuesChange={onValuesChange} onComplete={onComplete} />;
+    return <AkariBoard canon={canonRepr} initialUserValues={initialUserValues} onValuesChange={onValuesChange} onComplete={onComplete} liveValidate={liveValidate} />;
   },
 
   handleInput(state: PuzzleState, _action: PlayerAction) {

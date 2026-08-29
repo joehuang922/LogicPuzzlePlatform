@@ -15,9 +15,10 @@ interface PuzzleBoardProps {
   initialAnswer?: Record<string, unknown> | null;
   onValuesChange?: (values: Record<string, number>) => void;
   onComplete?: () => void;
+  liveValidate?: boolean;
 }
 
-export default function PuzzleBoard({ puzzle, initialAnswer, onValuesChange, onComplete }: PuzzleBoardProps) {
+export default function PuzzleBoard({ puzzle, initialAnswer, onValuesChange, onComplete, liveValidate }: PuzzleBoardProps) {
   const renderer = getRenderer(puzzle.puzzleType);
 
   if (!renderer) {
@@ -32,5 +33,5 @@ export default function PuzzleBoard({ puzzle, initialAnswer, onValuesChange, onC
     );
   }
 
-  return <>{renderer.render(puzzle, { puzzleId: puzzle.id, playerGrid: initialAnswer ?? {}, startedAt: "", lastUpdatedAt: "" }, onValuesChange, onComplete)}</>;
+  return <>{renderer.render(puzzle, { puzzleId: puzzle.id, playerGrid: initialAnswer ?? {}, startedAt: "", lastUpdatedAt: "" }, onValuesChange, onComplete, liveValidate)}</>;
 }

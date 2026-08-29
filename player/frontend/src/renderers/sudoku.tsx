@@ -20,11 +20,11 @@ function extractUserValues(hints: number[][], answer: number[][] | undefined): R
 export const sudokuRenderer: PuzzleRenderer = {
   puzzleType: 1,
 
-  render(puzzle: PuzzleDefinition, state: PuzzleState, onValuesChange?: (values: Record<string, number>) => void, onComplete?: () => void) {
+  render(puzzle: PuzzleDefinition, state: PuzzleState, onValuesChange?: (values: Record<string, number>) => void, onComplete?: () => void, liveValidate?: boolean) {
     const canonRepr = (typeof puzzle.canonRepr === "string" ? JSON.parse(puzzle.canonRepr) : puzzle.canonRepr) as SudokuCanon;
     const answerGrid = (state.playerGrid as { hints?: number[][] })?.hints;
     const initialUserValues = extractUserValues(canonRepr.hints, answerGrid);
-    return <SudokuBoard hints={canonRepr.hints} initialUserValues={initialUserValues} onValuesChange={onValuesChange} onComplete={onComplete} />;
+    return <SudokuBoard hints={canonRepr.hints} initialUserValues={initialUserValues} onValuesChange={onValuesChange} onComplete={onComplete} liveValidate={liveValidate} />;
   },
 
   handleInput(state: PuzzleState, _action: PlayerAction) {

@@ -88,6 +88,7 @@ export default function Play() {
   const [progress, setProgress] = useState(0);
   const [debugOpen, setDebugOpen] = useState(false);
   const [debugJson, setDebugJson] = useState("");
+  const [liveValidate, setLiveValidate] = useState(false);
 
   const timerRef = useRef<TimerHandle>(null);
   const userValuesRef = useRef<Record<string, number>>({});
@@ -282,6 +283,13 @@ export default function Play() {
             </button>
           </>
         )}
+        <button
+          onClick={() => setLiveValidate((v) => !v)}
+          style={{ ...btnStyle, backgroundColor: liveValidate ? "#1976d2" : "#9e9e9e", marginLeft: "auto" }}
+          title="Highlight contradictions in your answer as you solve"
+        >
+          Errors: {liveValidate ? "On" : "Off"}
+        </button>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
         <div style={{ flex: 1, height: 8, backgroundColor: "#e0e0e0", borderRadius: 4, overflow: "hidden" }}>
@@ -296,7 +304,7 @@ export default function Play() {
           {toast}
         </div>
       )}
-      <PuzzleBoard key={boardKey} puzzle={puzzle} initialAnswer={currentAnswer} onValuesChange={handleValuesChange} onComplete={handleComplete} />
+      <PuzzleBoard key={boardKey} puzzle={puzzle} initialAnswer={currentAnswer} onValuesChange={handleValuesChange} onComplete={handleComplete} liveValidate={liveValidate} />
 
       <div style={{ marginTop: "1rem" }}>
         <button
