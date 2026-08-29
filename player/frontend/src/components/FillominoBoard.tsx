@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { FillominoCanon } from "../types/canon";
+import BoardViewport from "./BoardViewport";
 
 interface FillominoBoardProps {
   canon: FillominoCanon;
@@ -261,6 +262,29 @@ export default function FillominoBoard({
     [selectedCell, inputBuffer]
   );
 
+  // Move the selection one step in a direction, skipping clue cells.
+  const moveSelection = useCallback(
+    (dr: number, dc: number) => {
+      if (!selectedCell) return;
+      const [, cur] = selectedCell.split(":");
+      const [cStr, rStr] = cur.split(",");
+      let c = parseInt(cStr);
+      let r = parseInt(rStr);
+      // Step until we land on an editable cell or run off the board.
+      while (true) {
+        r += dr;
+        c += dc;
+        if (r < 0 || r >= rows || c < 0 || c >= cols) return;
+        if (cells[r][c] === 0) {
+          setSelectedCell(`c:${c},${r}`);
+          setInputBuffer("");
+          return;
+        }
+      }
+    },
+    [selectedCell, rows, cols, cells]
+  );
+
   // Keyboard support
   useEffect(() => {
     if (readonly || !selectedCell) return;
@@ -276,11 +300,23 @@ export default function FillominoBoard({
       } else if (e.key === "Escape") {
         setSelectedCell(null);
         setInputBuffer("");
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        moveSelection(-1, 0);
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        moveSelection(1, 0);
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        moveSelection(0, -1);
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        moveSelection(0, 1);
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [readonly, selectedCell, handleDigitInput, handleClear]);
+  }, [readonly, selectedCell, handleDigitInput, handleClear, moveSelection]);
 
   // Hidden input for mobile numeric keyboard
   const handleHiddenInput = useCallback(
@@ -495,22 +531,28 @@ export default function FillominoBoard({
     }
   }
 
+  // Keep the selected cell scrolled into view during keyboard navigation.
+  let focusPoint: { x: number; y: number } | null = null;
+  if (selectedCell) {
+    const [cStr, rStr] = selectedCell.slice(2).split(",");
+    const c = parseInt(cStr);
+    const r = parseInt(rStr);
+    focusPoint = {
+      x: PAD + c * CELL_SIZE + CELL_SIZE / 2,
+      y: PAD + r * CELL_SIZE + CELL_SIZE / 2,
+    };
+  }
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-      <div style={{ maxWidth: svgWidth, width: "100%" }}>
-        <svg
-          width="100%"
-          viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-          style={{ border: "1px solid #ccc", userSelect: "none", display: "block" }}
-        >
-          <g transform={`translate(${PAD},${PAD})`}>
-            {elements}
-            {gridLines}
-            {targets}
-            {edgeTargets}
-          </g>
-        </svg>
-      </div>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, width: "100%" }}>
+      <BoardViewport width={svgWidth} height={svgHeight} cellSize={CELL_SIZE} focusPoint={focusPoint}>
+        <g transform={`translate(${PAD},${PAD})`}>
+          {elements}
+          {gridLines}
+          {targets}
+          {edgeTargets}
+        </g>
+      </BoardViewport>
       {!readonly && (
         <input
           ref={hiddenInputRef}
