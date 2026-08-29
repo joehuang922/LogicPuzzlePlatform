@@ -21,6 +21,13 @@ export interface BoardViewportProps {
   focusPoint?: { x: number; y: number } | null;
   children: ReactNode;
   svgStyle?: React.CSSProperties;
+  /**
+   * When true, the viewport does not create its own scroll container: the board
+   * renders at its natural (pan) size and the nearest scrollable ancestor does
+   * the scrolling. Use when embedding in a container that already scrolls (e.g.
+   * the editor modal pane) to avoid nested scrollbars.
+   */
+  fill?: boolean;
 }
 
 const ZOOM_MIN = 0.35;
@@ -35,6 +42,19 @@ function clampZoom(z: number): number {
   return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
 }
 
+/** Walk up from `el` to the nearest ancestor that scrolls (overflow auto/scroll). */
+function getScrollParent(el: Element | null): HTMLElement | null {
+  let node = el?.parentElement ?? null;
+  while (node) {
+    const oy = getComputedStyle(node).overflowY;
+    if ((oy === "auto" || oy === "scroll") && node.scrollHeight > node.clientHeight) {
+      return node;
+    }
+    node = node.parentElement;
+  }
+  return null;
+}
+
 export default function BoardViewport({
   width,
   height,
@@ -42,8 +62,10 @@ export default function BoardViewport({
   focusPoint,
   children,
   svgStyle,
+  fill = false,
 }: BoardViewportProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
   const [mode, setMode] = useState<"fit" | "pan">("fit");
   const [zoom, setZoom] = useState(DEFAULT_PAN_CELL_PX / cellSize);
   const [modeDecided, setModeDecided] = useState(false);
@@ -163,24 +185,32 @@ export default function BoardViewport({
     if (pointers.current.size < 2) pinchStart.current = null;
   };
 
-  // Keep the focused cell scrolled into view (keyboard navigation).
+  // Keep the focused cell scrolled into view (keyboard navigation). Works
+  // whether this component owns the scroll container (pan mode) or an ancestor
+  // does (fill mode) by resolving the nearest scrollable element.
   useEffect(() => {
     if (mode !== "pan" || !focusPoint) return;
-    const el = scrollRef.current;
-    if (!el) return;
-    const px = focusPoint.x * zoom;
-    const py = focusPoint.y * zoom;
-    const margin = 48;
-    let left = el.scrollLeft;
-    let top = el.scrollTop;
-    if (px < el.scrollLeft + margin) left = px - margin;
-    else if (px > el.scrollLeft + el.clientWidth - margin) left = px - el.clientWidth + margin;
-    if (py < el.scrollTop + margin) top = py - margin;
-    else if (py > el.scrollTop + el.clientHeight - margin) top = py - el.clientHeight + margin;
-    if (left !== el.scrollLeft || top !== el.scrollTop) {
-      el.scrollTo({ left, top, behavior: "smooth" });
+    const svg = svgRef.current;
+    if (!svg) return;
+    const scroller = fill ? getScrollParent(svg) : scrollRef.current;
+    if (!scroller) return;
+    // Position of the focus point within the rendered SVG, in scroller-content
+    // coordinates.
+    const svgRect = svg.getBoundingClientRect();
+    const scRect = scroller.getBoundingClientRect();
+    const px = svgRect.left - scRect.left + scroller.scrollLeft + focusPoint.x * zoom;
+    const py = svgRect.top - scRect.top + scroller.scrollTop + focusPoint.y * zoom;
+    const margin = 56;
+    let left = scroller.scrollLeft;
+    let top = scroller.scrollTop;
+    if (px < scroller.scrollLeft + margin) left = px - margin;
+    else if (px > scroller.scrollLeft + scroller.clientWidth - margin) left = px - scroller.clientWidth + margin;
+    if (py < scroller.scrollTop + margin) top = py - margin;
+    else if (py > scroller.scrollTop + scroller.clientHeight - margin) top = py - scroller.clientHeight + margin;
+    if (left !== scroller.scrollLeft || top !== scroller.scrollTop) {
+      scroller.scrollTo({ left, top, behavior: "smooth" });
     }
-  }, [focusPoint, mode, zoom]);
+  }, [focusPoint, mode, zoom, fill]);
 
   const toggleMode = () =>
     setMode((m) => {
@@ -204,7 +234,7 @@ export default function BoardViewport({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", flexShrink: 0 }}>
         <button type="button" style={btnStyle} onClick={toggleMode}>
           {isPan ? "Fit to screen" : "Pan & zoom"}
         </button>
@@ -232,17 +262,20 @@ export default function BoardViewport({
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
         style={{
-          overflow: isPan ? "auto" : "visible",
-          maxHeight: isPan ? "78vh" : undefined,
-          maxWidth: isPan ? "100%" : width,
+          // In fill mode a scrollable ancestor handles overflow, so this stays
+          // visible to avoid a nested scrollbar.
+          overflow: !fill && isPan ? "auto" : "visible",
+          maxHeight: !fill && isPan ? "78vh" : undefined,
+          maxWidth: !fill && !isPan ? width : "100%",
           border: "1px solid #e2e8f0",
           borderRadius: 6,
           background: "#f8fafc",
           touchAction: "pan-x pan-y",
-          margin: isPan ? undefined : "0 auto",
+          margin: !fill && !isPan ? "0 auto" : undefined,
         }}
       >
         <svg
+          ref={svgRef}
           width={svgWidth}
           height={svgHeight}
           viewBox={`0 0 ${width} ${height}`}

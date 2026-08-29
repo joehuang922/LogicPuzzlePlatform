@@ -1,5 +1,6 @@
-import { useState, useMemo, useCallback, useEffect} from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { FillominoCanon } from "../types/canon";
+import BoardViewport from "./BoardViewport";
 
 interface FillominoEditorProps {
   initialJson: string;
@@ -30,6 +31,9 @@ export default function FillominoEditor({ initialJson, onChange }: FillominoEdit
   const [jsonText, setJsonText] = useState(initialJson);
   const [newRows, setNewRows] = useState(10);
   const [newCols, setNewCols] = useState(10);
+  const [selected, setSelected] = useState<{ r: number; c: number } | null>(null);
+  const [inputBuffer, setInputBuffer] = useState("");
+  const bufferTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const canon = useMemo(() => parseCanon(jsonText), [jsonText]);
 
   useEffect(() => {
@@ -54,27 +58,67 @@ export default function FillominoEditor({ initialJson, onChange }: FillominoEdit
     [canon, rows, cols, updateJson]
   );
 
-  const handleCellClick = useCallback(
-    (r: number, c: number) => {
+  const setCellValue = useCallback(
+    (r: number, c: number, value: number) => {
       if (!canon) return;
-      const current = canon.cells[r][c];
-      const input = prompt(
-        `Enter clue for cell (row ${r}, col ${c}). Current: ${current || "empty"}. Enter 0 or empty to clear.`
-      );
-      if (input === null) return;
-      const num = parseInt(input, 10);
       const newCells = canon.cells.map((row) => [...row]);
-      newCells[r][c] = isNaN(num) || num < 0 ? 0 : num;
+      newCells[r][c] = value < 0 ? 0 : value;
       updateJson({ cells: newCells });
     },
     [canon, updateJson]
   );
+
+  const handleCellClick = useCallback((r: number, c: number) => {
+    setSelected((prev) => (prev && prev.r === r && prev.c === c ? null : { r, c }));
+    setInputBuffer("");
+  }, []);
 
   const handleCreateEmpty = () => {
     if (newRows >= 2 && newCols >= 2) {
       updateJson(createEmptyBoard(newRows, newCols));
     }
   };
+
+  // Keyboard editing for the selected cell: digits set the clue (multi-digit
+  // supported via a short buffer), backspace/0 clears, arrows move selection.
+  useEffect(() => {
+    if (!selected || !canon) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      const { r, c } = selected;
+      if (/^[0-9]$/.test(e.key)) {
+        e.preventDefault();
+        if (bufferTimeoutRef.current) clearTimeout(bufferTimeoutRef.current);
+        const next = inputBuffer + e.key;
+        setInputBuffer(next);
+        setCellValue(r, c, parseInt(next, 10));
+        bufferTimeoutRef.current = setTimeout(() => setInputBuffer(""), 1000);
+      } else if (e.key === "Backspace" || e.key === "Delete") {
+        e.preventDefault();
+        setCellValue(r, c, 0);
+        setInputBuffer("");
+        // Note: Escape is intentionally not handled here — the editor modal
+        // owns Escape (to close). Re-click a cell to deselect.
+      } else if (e.key.startsWith("Arrow")) {
+        e.preventDefault();
+        const dr = e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0;
+        const dc = e.key === "ArrowLeft" ? -1 : e.key === "ArrowRight" ? 1 : 0;
+        const nr = r + dr;
+        const nc = c + dc;
+        if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
+          setSelected({ r: nr, c: nc });
+          setInputBuffer("");
+        }
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [selected, canon, inputBuffer, setCellValue, rows, cols]);
+
+  // Clear selection if the board shrinks out from under it.
+  useEffect(() => {
+    if (selected && (selected.r >= rows || selected.c >= cols)) setSelected(null);
+  }, [selected, rows, cols]);
 
   if (!canon) {
     return (
@@ -161,16 +205,25 @@ export default function FillominoEditor({ initialJson, onChange }: FillominoEdit
           />
         </div>
         <div style={{ fontSize: "0.75rem", color: "#666", marginLeft: "auto" }}>
-          Click cell to set clue number (0 = empty)
+          Click a cell, then type a number (0/Backspace clears, arrows move)
         </div>
       </div>
 
       <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
-        <div style={{ flexShrink: 0 }}>
-          <svg
-            width={Math.min(svgWidth, 600)}
-            viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-            style={{ border: "1px solid #ccc", userSelect: "none", display: "block", background: "white" }}
+        <div style={{ flexShrink: 0, width: "100%" }}>
+          <BoardViewport
+            width={svgWidth}
+            height={svgHeight}
+            cellSize={CELL_SIZE}
+            fill
+            focusPoint={
+              selected
+                ? {
+                    x: PAD + selected.c * CELL_SIZE + CELL_SIZE / 2,
+                    y: PAD + selected.r * CELL_SIZE + CELL_SIZE / 2,
+                  }
+                : null
+            }
           >
             <g transform={`translate(${PAD},${PAD})`}>
               {/* Cell backgrounds */}
@@ -178,6 +231,7 @@ export default function FillominoEditor({ initialJson, onChange }: FillominoEdit
                 const r = Math.floor(i / cols);
                 const c = i % cols;
                 const hasClue = canon.cells[r][c] > 0;
+                const isSel = selected && selected.r === r && selected.c === c;
                 return (
                   <rect
                     key={`bg-${r}-${c}`}
@@ -185,7 +239,7 @@ export default function FillominoEditor({ initialJson, onChange }: FillominoEdit
                     y={r * CELL_SIZE}
                     width={CELL_SIZE}
                     height={CELL_SIZE}
-                    fill={hasClue ? "#e8f0fe" : "white"}
+                    fill={isSel ? "#ffe9a8" : hasClue ? "#e8f0fe" : "white"}
                   />
                 );
               })}
@@ -234,7 +288,7 @@ export default function FillominoEditor({ initialJson, onChange }: FillominoEdit
                 );
               })}
             </g>
-          </svg>
+          </BoardViewport>
           <div style={{ marginTop: "0.5rem", fontSize: "0.75rem", color: "#666" }}>
             <strong>Values:</strong> 0 = empty (no clue), positive integer = clue
           </div>
