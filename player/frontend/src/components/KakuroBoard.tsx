@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { KakuroCanon, KakuroCell } from "../types/canon";
+import { KakuroCanon } from "../types/canon";
+import { getRuns, analyzeKakuro } from "../liveValidators/kakuro";
 
 interface KakuroBoardProps {
   canon: KakuroCanon;
@@ -7,54 +8,11 @@ interface KakuroBoardProps {
   onValuesChange?: (values: Record<string, number>) => void;
   onComplete?: () => void;
   readonly?: boolean;
+  liveValidate?: boolean;
 }
 
 const CELL_SIZE = 40;
 const PAD = 12;
-
-function getRuns(cells: KakuroCell[][]): {
-  row: number;
-  col: number;
-  length: number;
-  sum: number;
-  direction: "h" | "v";
-}[] {
-  const rows = cells.length;
-  const cols = cells[0].length;
-  const runs: {
-    row: number;
-    col: number;
-    length: number;
-    sum: number;
-    direction: "h" | "v";
-  }[] = [];
-
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const cell = cells[r][c];
-      if (cell.type !== "clue") continue;
-      if (cell.right != null) {
-        let len = 0;
-        for (let cc = c + 1; cc < cols && cells[r][cc].type === "empty"; cc++) {
-          len++;
-        }
-        if (len > 0) {
-          runs.push({ row: r, col: c + 1, length: len, sum: cell.right, direction: "h" });
-        }
-      }
-      if (cell.down != null) {
-        let len = 0;
-        for (let rr = r + 1; rr < rows && cells[rr][c].type === "empty"; rr++) {
-          len++;
-        }
-        if (len > 0) {
-          runs.push({ row: r + 1, col: c, length: len, sum: cell.down, direction: "v" });
-        }
-      }
-    }
-  }
-  return runs;
-}
 
 function validateSolution(
   canon: KakuroCanon,
@@ -91,55 +49,13 @@ function validateSolution(
   return true;
 }
 
-function getErrors(
-  canon: KakuroCanon,
-  values: Record<string, number>
-): Set<string> {
-  const errors = new Set<string>();
-  const runs = getRuns(canon.cells);
-
-  for (const run of runs) {
-    const digits: { val: number; key: string }[] = [];
-    for (let i = 0; i < run.length; i++) {
-      const r = run.direction === "h" ? run.row : run.row + i;
-      const c = run.direction === "h" ? run.col + i : run.col;
-      const key = `${c},${r}`;
-      const val = values[key];
-      if (val != null) {
-        digits.push({ val, key });
-      }
-    }
-
-    // Check duplicates
-    const seen = new Map<number, string[]>();
-    for (const d of digits) {
-      const arr = seen.get(d.val) || [];
-      arr.push(d.key);
-      seen.set(d.val, arr);
-    }
-    for (const [, keys] of seen) {
-      if (keys.length > 1) {
-        keys.forEach((k) => errors.add(k));
-      }
-    }
-
-    // Check sum if run is fully filled
-    if (digits.length === run.length) {
-      const sum = digits.reduce((a, b) => a + b.val, 0);
-      if (sum !== run.sum) {
-        digits.forEach((d) => errors.add(d.key));
-      }
-    }
-  }
-  return errors;
-}
-
 export default function KakuroBoard({
   canon,
   initialUserValues,
   onValuesChange,
   onComplete,
   readonly,
+  liveValidate,
 }: KakuroBoardProps) {
   const { cells } = canon;
   const rows = cells.length;
@@ -173,7 +89,14 @@ export default function KakuroBoard({
     }
   }, [values, canon, onComplete]);
 
-  const errors = useMemo(() => getErrors(canon, values), [canon, values]);
+  // Live-validation annotations, only computed when the toggle is on:
+  //   cellErrors — empty cells whose value participates in a sum/duplicate violation.
+  //   clueErrors — clue hints ("c,r:right" / "c,r:down") whose sum is violated.
+  const { errors, clueErrors } = useMemo(() => {
+    if (!liveValidate) return { errors: new Set<string>(), clueErrors: new Set<string>() };
+    const a = analyzeKakuro(canon, values);
+    return { errors: a.cellErrors, clueErrors: a.clueErrors };
+  }, [canon, values, liveValidate]);
 
   const handleCellClick = useCallback(
     (r: number, c: number) => {
@@ -264,7 +187,7 @@ export default function KakuroBoard({
               fontSize={CELL_SIZE * 0.3}
               fontFamily="sans-serif"
               fontWeight="bold"
-              fill="white"
+              fill={clueErrors.has(`${key}:right`) ? "#ff6b6b" : "white"}
               pointerEvents="none"
             >
               {cell.right}
@@ -283,7 +206,7 @@ export default function KakuroBoard({
               fontSize={CELL_SIZE * 0.3}
               fontFamily="sans-serif"
               fontWeight="bold"
-              fill="white"
+              fill={clueErrors.has(`${key}:down`) ? "#ff6b6b" : "white"}
               pointerEvents="none"
             >
               {cell.down}
