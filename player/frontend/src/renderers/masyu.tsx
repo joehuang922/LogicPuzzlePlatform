@@ -5,7 +5,7 @@ import MasyuBoard from "../components/MasyuBoard";
 export const masyuRenderer: PuzzleRenderer = {
   puzzleType: 7,
 
-  render(puzzle: PuzzleDefinition, state: PuzzleState, onValuesChange?: (values: Record<string, number>) => void, onComplete?: () => void) {
+  render(puzzle: PuzzleDefinition, state: PuzzleState, onValuesChange?: (values: Record<string, number>) => void, onComplete?: () => void, liveValidate?: boolean) {
     const canonRepr = (typeof puzzle.canonRepr === "string" ? JSON.parse(puzzle.canonRepr) : puzzle.canonRepr) as MasyuCanon;
     const savedAnswer = state.playerGrid as unknown as MasyuAnswer | undefined;
 
@@ -13,6 +13,7 @@ export const masyuRenderer: PuzzleRenderer = {
       <MasyuBoard
         canon={canonRepr}
         initialAnswer={savedAnswer}
+        liveValidate={liveValidate}
         onAnswerChange={(answer) => {
           if (onValuesChange) {
             const values: Record<string, number> = {};

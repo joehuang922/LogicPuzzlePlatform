@@ -1,5 +1,6 @@
 import { PuzzleDefinition } from "../types/puzzle";
 import { nonogramLiveValidator } from "./nonogram";
+import { masyuLiveValidator } from "./masyu";
 
 // A namespaced annotation key. The namespace ("cell", "clue", "edge", "dot", ...)
 // and its encoding are a private contract between a puzzle type's validator and
@@ -25,6 +26,7 @@ function register(validator: LiveValidator) {
 }
 
 register(nonogramLiveValidator);
+register(masyuLiveValidator);
 
 const EMPTY: LiveValidationResult = { errors: new Set() };
 

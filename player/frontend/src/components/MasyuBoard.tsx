@@ -1,5 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { MasyuCanon, MasyuAnswer } from "../types/canon";
+import {
+  getCellConnections,
+  isStraight,
+  isTurn,
+  analyzeMasyu,
+} from "../liveValidators/masyu";
 
 interface MasyuBoardProps {
   canon: MasyuCanon;
@@ -7,42 +13,13 @@ interface MasyuBoardProps {
   onAnswerChange?: (answer: MasyuAnswer) => void;
   onComplete?: () => void;
   readonly?: boolean;
+  liveValidate?: boolean;
 }
 
 const CELL_SIZE = 36;
 const PAD = 20;
 const CIRCLE_RADIUS = 11;
-
-type Direction = "up" | "down" | "left" | "right";
-
-function getCellConnections(
-  r: number,
-  c: number,
-  hEdges: number[][],
-  vEdges: number[][],
-  rows: number,
-  cols: number
-): Direction[] {
-  const dirs: Direction[] = [];
-  if (c > 0 && hEdges[r][c - 1] === 1) dirs.push("left");
-  if (c < cols - 1 && hEdges[r][c] === 1) dirs.push("right");
-  if (r > 0 && vEdges[r - 1][c] === 1) dirs.push("up");
-  if (r < rows - 1 && vEdges[r][c] === 1) dirs.push("down");
-  return dirs;
-}
-
-function isStraight(dirs: Direction[]): boolean {
-  if (dirs.length !== 2) return false;
-  return (
-    (dirs.includes("left") && dirs.includes("right")) ||
-    (dirs.includes("up") && dirs.includes("down"))
-  );
-}
-
-function isTurn(dirs: Direction[]): boolean {
-  if (dirs.length !== 2) return false;
-  return !isStraight(dirs);
-}
+const ERROR_COLOR = "#d33";
 
 function validateSolution(
   cells: number[][],
@@ -172,6 +149,7 @@ export default function MasyuBoard({
   onAnswerChange,
   onComplete,
   readonly,
+  liveValidate,
 }: MasyuBoardProps) {
   const { cells } = canon;
   const rows = cells.length;
@@ -314,6 +292,17 @@ export default function MasyuBoard({
     lastCellRef.current = null;
   }, []);
 
+  // Live-validation annotations, only computed when the toggle is on:
+  //   circleErrors — hint circles whose rule is already violated.
+  //   loopSegments — segments of a closed loop drawn while circles remain
+  //                  uncovered/unsatisfied (a dead-end that must be undone).
+  const analysis = liveValidate
+    ? analyzeMasyu(cells, hEdges, vEdges)
+    : null;
+  const circleErrors = analysis?.circleErrors ?? null;
+  const loopH = analysis?.loopSegments.h ?? null;
+  const loopV = analysis?.loopSegments.v ?? null;
+
   return (
     <div style={{ maxWidth: svgWidth, width: "100%" }}>
       <svg
@@ -373,6 +362,8 @@ export default function MasyuBoard({
               if (val === 0) return null;
               const cx = (c + 0.5) * CELL_SIZE;
               const cy = (r + 0.5) * CELL_SIZE;
+              const bad = circleErrors?.has(`${r},${c}`) ?? false;
+              const stroke = bad ? ERROR_COLOR : "#222";
               if (val === 1) {
                 return (
                   <circle
@@ -381,7 +372,7 @@ export default function MasyuBoard({
                     cy={cy}
                     r={CIRCLE_RADIUS}
                     fill="#fff"
-                    stroke="#222"
+                    stroke={stroke}
                     strokeWidth={2}
                   />
                 );
@@ -392,8 +383,8 @@ export default function MasyuBoard({
                   cx={cx}
                   cy={cy}
                   r={CIRCLE_RADIUS}
-                  fill="#222"
-                  stroke="#222"
+                  fill={bad ? ERROR_COLOR : "#222"}
+                  stroke={stroke}
                   strokeWidth={2}
                 />
               );
@@ -410,7 +401,7 @@ export default function MasyuBoard({
                   y1={(r + 0.5) * CELL_SIZE}
                   x2={(c + 1.5) * CELL_SIZE}
                   y2={(r + 0.5) * CELL_SIZE}
-                  stroke="#888"
+                  stroke={loopH?.has(`${r},${c}`) ? ERROR_COLOR : "#888"}
                   strokeWidth={3}
                   strokeLinecap="round"
                   pointerEvents="none"
@@ -427,7 +418,7 @@ export default function MasyuBoard({
                   y1={(r + 0.5) * CELL_SIZE}
                   x2={(c + 0.5) * CELL_SIZE}
                   y2={(r + 1.5) * CELL_SIZE}
-                  stroke="#888"
+                  stroke={loopV?.has(`${r},${c}`) ? ERROR_COLOR : "#888"}
                   strokeWidth={3}
                   strokeLinecap="round"
                   pointerEvents="none"
