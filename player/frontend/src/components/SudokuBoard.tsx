@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useIsMobile } from "../hooks/useIsMobile";
 import DigitBar from "./DigitBar";
+import RadialInput from "./RadialInput";
 
 interface SudokuBoardProps {
   hints: number[][];
@@ -15,9 +16,6 @@ const PAD = CELL_SIZE;
 const THIN = 1;
 const MEDIUM = 2;
 const THICK = 3;
-const RADIAL_RADIUS = 44;
-const CIRCLE_RADIUS = 13;
-
 export default function SudokuBoard({ hints, initialUserValues, onValuesChange, onComplete, liveValidate }: SudokuBoardProps) {
   const isMobile = useIsMobile();
   const width = 9 * CELL_SIZE + PAD * 2;
@@ -182,11 +180,6 @@ export default function SudokuBoard({ hints, initialUserValues, onValuesChange, 
     setActiveCell((prev) => (prev === key ? null : key));
   }
 
-  const radialPositions = Array.from({ length: 10 }, (_, i) => {
-    const angle = (i * 36 - 90) * (Math.PI / 180);
-    return { x: Math.cos(angle) * RADIAL_RADIUS, y: Math.sin(angle) * RADIAL_RADIUS };
-  });
-
   const gridLines: JSX.Element[] = [];
   for (let i = 0; i <= 9; i++) {
     const isBorder = i === 0 || i === 9;
@@ -328,94 +321,18 @@ export default function SudokuBoard({ hints, initialUserValues, onValuesChange, 
             );
           })}
 
-          {/* Radial input menu (desktop only) */}
+          {/* Radial input menu (desktop only; mobile uses the DigitBar below) */}
           {activeCell && !isMobile && (() => {
             const [col, row] = activeCell.split(",").map(Number);
-            const cx = col * CELL_SIZE + CELL_SIZE / 2;
-            const cy = row * CELL_SIZE + CELL_SIZE / 2;
             return (
-              <g>
-                <rect
-                  x={-PAD}
-                  y={-PAD}
-                  width={width}
-                  height={height}
-                  fill="transparent"
-                  onClick={() => setActiveCell(null)}
-                  onContextMenu={(e) => { e.preventDefault(); setActiveCell(null); }}
-                />
-                <circle
-                  cx={cx}
-                  cy={cy}
-                  r={RADIAL_RADIUS + CIRCLE_RADIUS + 4}
-                  fill="white"
-                  fillOpacity={0.9}
-                  stroke="#ccc"
-                  strokeWidth={1}
-                />
-                {radialPositions.map((pos, i) => {
-                  const isErase = i === 0;
-                  const digit = i;
-                  return (
-                    <g
-                      key={`rad-${i}`}
-                      style={{ cursor: "pointer" }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (isErase) {
-                          clearValue();
-                        } else {
-                          enterValue(digit);
-                        }
-                      }}
-                    >
-                      <circle
-                        cx={cx + pos.x}
-                        cy={cy + pos.y}
-                        r={CIRCLE_RADIUS}
-                        fill="white"
-                        stroke={isErase ? "#c62828" : "#666"}
-                        strokeWidth={1.5}
-                      />
-                      {isErase ? (
-                        <g pointerEvents="none">
-                          <line
-                            x1={cx + pos.x - 5}
-                            y1={cy + pos.y - 5}
-                            x2={cx + pos.x + 5}
-                            y2={cy + pos.y + 5}
-                            stroke="#c62828"
-                            strokeWidth={2}
-                            strokeLinecap="round"
-                          />
-                          <line
-                            x1={cx + pos.x + 5}
-                            y1={cy + pos.y - 5}
-                            x2={cx + pos.x - 5}
-                            y2={cy + pos.y + 5}
-                            stroke="#c62828"
-                            strokeWidth={2}
-                            strokeLinecap="round"
-                          />
-                        </g>
-                      ) : (
-                        <text
-                          x={cx + pos.x}
-                          y={cy + pos.y}
-                          textAnchor="middle"
-                          dominantBaseline="central"
-                          fontSize={14}
-                          fontFamily="sans-serif"
-                          fill="#444"
-                          pointerEvents="none"
-                        >
-                          {digit}
-                        </text>
-                      )}
-                    </g>
-                  );
-                })}
-              </g>
+              <RadialInput
+                cx={col * CELL_SIZE + CELL_SIZE / 2}
+                cy={row * CELL_SIZE + CELL_SIZE / 2}
+                backdrop={{ x: -PAD, y: -PAD, width, height }}
+                onDigit={enterValue}
+                onErase={clearValue}
+                onDismiss={() => setActiveCell(null)}
+              />
             );
           })()}
         </g>

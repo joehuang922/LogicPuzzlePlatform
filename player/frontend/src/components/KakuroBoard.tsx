@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { KakuroCanon } from "../types/canon";
 import { getRuns, analyzeKakuro } from "../liveValidators/kakuro";
+import RadialInput from "./RadialInput";
 
 interface KakuroBoardProps {
   canon: KakuroCanon;
@@ -107,29 +108,25 @@ export default function KakuroBoard({
     [readonly]
   );
 
-  const handleNumpad = useCallback(
+  // Entering a value (via dial or keyboard) also dismisses the picker, matching
+  // the Sudoku boards' radial-input UX.
+  const enterValue = useCallback(
     (digit: number) => {
       if (!selectedCell) return;
-      setValues((prev) => {
-        const next = { ...prev };
-        if (prev[selectedCell] === digit) {
-          delete next[selectedCell];
-        } else {
-          next[selectedCell] = digit;
-        }
-        return next;
-      });
+      setValues((prev) => ({ ...prev, [selectedCell]: digit }));
+      setSelectedCell(null);
     },
     [selectedCell]
   );
 
-  const handleClear = useCallback(() => {
+  const clearValue = useCallback(() => {
     if (!selectedCell) return;
     setValues((prev) => {
       const next = { ...prev };
       delete next[selectedCell];
       return next;
     });
+    setSelectedCell(null);
   }, [selectedCell]);
 
   // Keyboard support
@@ -138,16 +135,16 @@ export default function KakuroBoard({
     const handler = (e: KeyboardEvent) => {
       const digit = parseInt(e.key);
       if (digit >= 1 && digit <= 9) {
-        handleNumpad(digit);
+        enterValue(digit);
       } else if (e.key === "Backspace" || e.key === "Delete") {
-        handleClear();
+        clearValue();
       } else if (e.key === "Escape") {
         setSelectedCell(null);
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [readonly, selectedCell, handleNumpad, handleClear]);
+  }, [readonly, selectedCell, enterValue, clearValue]);
 
   const elements: JSX.Element[] = [];
 
@@ -303,56 +300,30 @@ export default function KakuroBoard({
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
       <div style={{ maxWidth: svgWidth, width: "100%" }}>
+        {/* overflow visible so a dial popped at an edge cell isn't clipped */}
         <svg
           width="100%"
           viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-          style={{ border: "1px solid #ccc", userSelect: "none", display: "block" }}
+          style={{ border: "1px solid #ccc", userSelect: "none", display: "block", overflow: "visible" }}
         >
           {elements}
           {targets}
+          {/* Radial digit picker, on both desktop and mobile */}
+          {selectedCell && !readonly && (() => {
+            const [col, row] = selectedCell.split(",").map(Number);
+            return (
+              <RadialInput
+                cx={PAD + col * CELL_SIZE + CELL_SIZE / 2}
+                cy={PAD + row * CELL_SIZE + CELL_SIZE / 2}
+                backdrop={{ x: 0, y: 0, width: svgWidth, height: svgHeight }}
+                onDigit={enterValue}
+                onErase={clearValue}
+                onDismiss={() => setSelectedCell(null)}
+              />
+            );
+          })()}
         </svg>
       </div>
-      {!readonly && (
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center" }}>
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => (
-            <button
-              key={d}
-              onClick={() => handleNumpad(d)}
-              disabled={!selectedCell}
-              style={{
-                width: 36,
-                height: 36,
-                fontSize: 16,
-                fontWeight: "bold",
-                border: "2px solid #999",
-                borderRadius: 4,
-                background: selectedCell && values[selectedCell] === d ? "#cde" : "#fff",
-                cursor: selectedCell ? "pointer" : "default",
-                opacity: selectedCell ? 1 : 0.5,
-              }}
-            >
-              {d}
-            </button>
-          ))}
-          <button
-            onClick={handleClear}
-            disabled={!selectedCell}
-            style={{
-              width: 36,
-              height: 36,
-              fontSize: 14,
-              border: "2px solid #999",
-              borderRadius: 4,
-              background: "#fff",
-              cursor: selectedCell ? "pointer" : "default",
-              opacity: selectedCell ? 1 : 0.5,
-            }}
-            title="Clear"
-          >
-            ✕
-          </button>
-        </div>
-      )}
     </div>
   );
 }
