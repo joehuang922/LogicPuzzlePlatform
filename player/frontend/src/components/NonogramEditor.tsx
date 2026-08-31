@@ -123,7 +123,6 @@ export default function NonogramEditor({ initialCanon, onChange }: NonogramEdito
           <input
             type="number"
             min={5}
-            max={50}
             step={5}
             value={rows}
             onChange={(e) => resizeRows(Number(e.target.value) || 5)}
@@ -135,7 +134,6 @@ export default function NonogramEditor({ initialCanon, onChange }: NonogramEdito
           <input
             type="number"
             min={5}
-            max={50}
             step={5}
             value={cols}
             onChange={(e) => resizeCols(Number(e.target.value) || 5)}

@@ -120,8 +120,8 @@ async function createPuzzle(
   const id = uuidv4();
 
   await executeStatement(
-    `INSERT INTO puzzle_questions (id, puzzle_type, title, author, difficulty, width, height, canon_repr, src_collection)
-     VALUES (:id, :puzzleType, :title, :author, :difficulty, :width, :height, :canonRepr, :srcCollection)`,
+    `INSERT INTO puzzle_questions (id, puzzle_type, title, author, difficulty, width, height, canon_repr, src_collection, special)
+     VALUES (:id, :puzzleType, :title, :author, :difficulty, :width, :height, :canonRepr, :srcCollection, :special)`,
     [
       { name: "id", value: { stringValue: id } },
       { name: "puzzleType", value: { longValue: body.puzzleType } },
@@ -132,6 +132,7 @@ async function createPuzzle(
       { name: "height", value: body.height != null ? { longValue: body.height } : { isNull: true } },
       { name: "canonRepr", value: { stringValue: JSON.stringify(body.canonRepr) } },
       { name: "srcCollection", value: body.srcCollection != null ? { longValue: body.srcCollection } : { isNull: true } },
+      { name: "special", value: { booleanValue: !!body.special } },
     ]
   );
 
@@ -208,6 +209,11 @@ async function updatePuzzle(
       name: "srcCollection",
       value: body.srcCollection ? { longValue: body.srcCollection } : { isNull: true },
     });
+  }
+
+  if (body.special !== undefined) {
+    sets.push("special = :special");
+    params.push({ name: "special", value: { booleanValue: !!body.special } });
   }
 
   if (sets.length === 0) return response(400, { error: "No fields to update" });

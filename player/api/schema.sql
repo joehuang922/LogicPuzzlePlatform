@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS puzzle_questions (
   height          INT          NULL,
   canon_repr      JSON         NOT NULL,
   src_collection  INT          NULL,
+  special         BOOLEAN      NOT NULL DEFAULT FALSE,
   created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (puzzle_type) REFERENCES puzzle_types(id),

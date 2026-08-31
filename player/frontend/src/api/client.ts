@@ -55,6 +55,8 @@ export interface Puzzle {
   srcCollection: number | null;
   srcCollectionName: string | null;
   srcCollectionCoverSrc: string | null;
+  // MySQL BOOLEAN comes back over the Data API as 0/1.
+  special: boolean | number;
 }
 
 export function listPuzzles(filters?: { puzzleType?: string; srcCollection?: number | "none"; limit?: number }) {
@@ -79,6 +81,7 @@ export function createPuzzle(data: {
   width?: number;
   height?: number;
   srcCollection?: number;
+  special?: boolean;
 }) {
   return request<{ id: string }>("/puzzles", {
     method: "POST",
@@ -92,6 +95,7 @@ export function updatePuzzle(id: string, data: {
   difficulty?: number;
   canonRepr?: Record<string, unknown>;
   srcCollection?: number | null;
+  special?: boolean;
 }) {
   return request<{ puzzle: Puzzle }>(`/puzzles/${id}`, {
     method: "PATCH",

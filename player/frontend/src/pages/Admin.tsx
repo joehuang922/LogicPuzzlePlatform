@@ -143,6 +143,7 @@ function QuestionForm({
   const [difficulty, setDifficulty] = useState("");
   const [canonRepr, setCanonRepr] = useState("");
   const [srcCollection, setSrcCollection] = useState("");
+  const [special, setSpecial] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
@@ -269,12 +270,14 @@ function QuestionForm({
         width: w,
         height: h,
         ...(srcCollection ? { srcCollection: Number(srcCollection) } : {}),
+        special,
       });
       setSuccess(`Puzzle created (id: ${res.id})`);
       setTitle("");
       setAuthor("");
       setCanonRepr("");
       setImagePreview(null);
+      setSpecial(false);
       setErrors({});
     } catch (err: unknown) {
       setErrors({ form: err instanceof Error ? err.message : "Failed to create" });
@@ -363,6 +366,12 @@ function QuestionForm({
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
+        </div>
+        <div style={fieldStyle}>
+          <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <input type="checkbox" checked={special} onChange={(e) => setSpecial(e.target.checked)} />
+            Special
+          </label>
         </div>
 
         <div style={{ border: "1px dashed #aaa", borderRadius: 8, padding: "1rem", background: "#fafafa" }}>
@@ -478,6 +487,7 @@ function PuzzleEditRow({
   const [author, setAuthor] = useState(puzzle.author || "");
   const [difficulty, setDifficulty] = useState(String(puzzle.difficulty));
   const [srcCollection, setSrcCollection] = useState(puzzle.srcCollection ? String(puzzle.srcCollection) : "");
+  const [special, setSpecial] = useState(!!puzzle.special);
   const [canonRepr, setCanonRepr] = useState(
     typeof puzzle.canonRepr === "string" ? puzzle.canonRepr : JSON.stringify(puzzle.canonRepr, null, 2)
   );
@@ -506,6 +516,7 @@ function PuzzleEditRow({
         author: author.trim() || null,
         difficulty: Number(difficulty),
         canonRepr: parsedCanon,
+        special,
       };
       if (showCollectionPicker) {
         updateData.srcCollection = srcCollection ? Number(srcCollection) : null;
@@ -551,6 +562,12 @@ function PuzzleEditRow({
                 </select>
               </div>
             )}
+            <div style={fieldStyle}>
+              <label style={{ fontSize: "0.75rem", fontWeight: "bold", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                <input type="checkbox" checked={special} onChange={(e) => setSpecial(e.target.checked)} />
+                Special
+              </label>
+            </div>
           </div>
           <div style={fieldStyle}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>

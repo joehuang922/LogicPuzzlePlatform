@@ -31,6 +31,7 @@ export interface PuzzleQuestion {
   height: number | null;
   canonRepr: Record<string, unknown>;
   srcCollection: number | null;
+  special: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -44,6 +45,7 @@ export interface CreatePuzzleRequest {
   height?: number;
   canonRepr: Record<string, unknown>;
   srcCollection?: number;
+  special?: boolean;
 }
 
 export interface ListPuzzlesQuery {
