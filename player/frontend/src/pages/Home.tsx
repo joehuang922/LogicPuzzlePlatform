@@ -232,9 +232,12 @@ export default function Home() {
     }
   }
 
-  function handleCollectionPuzzleClick(puzzle: Puzzle) {
+  async function handleCollectionPuzzleClick(puzzle: Puzzle) {
     setSelectedPuzzle(puzzle as unknown as PuzzleDefinition);
     setShowChoiceDialog(true);
+    setHasPreviousAttempts(false);
+    const res = await listAttempts(HARDCODED_PLAYER_ID, puzzle.id);
+    setHasPreviousAttempts(res.attempts.length > 0);
   }
 
   async function handleLoadPrevious() {
