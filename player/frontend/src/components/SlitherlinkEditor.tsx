@@ -62,7 +62,7 @@ export default function SlitherlinkEditor({ initialCanon, onChange }: Slitherlin
         <label>
           Rows:{" "}
           <input
-            type="number"
+            type="number" onFocus={(e) => e.currentTarget.select()}
             min={1}
             max={100}
             value={rows}
@@ -73,7 +73,7 @@ export default function SlitherlinkEditor({ initialCanon, onChange }: Slitherlin
         <label>
           Cols:{" "}
           <input
-            type="number"
+            type="number" onFocus={(e) => e.currentTarget.select()}
             min={1}
             max={100}
             value={cols}

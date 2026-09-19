@@ -87,7 +87,7 @@ export default function NumberLinkEditor({ initialCanon, onChange }: NumberLinkE
         <label>
           Rows:{" "}
           <input
-            type="number"
+            type="number" onFocus={(e) => e.currentTarget.select()}
             min={1}
             max={100}
             value={rows}
@@ -98,7 +98,7 @@ export default function NumberLinkEditor({ initialCanon, onChange }: NumberLinkE
         <label>
           Cols:{" "}
           <input
-            type="number"
+            type="number" onFocus={(e) => e.currentTarget.select()}
             min={1}
             max={100}
             value={cols}

@@ -277,13 +277,13 @@ export default function HeyawakeEditor({
       <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1rem", alignItems: "center", flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
           <label style={{ fontSize: "0.85rem", fontWeight: "bold" }}>Width:</label>
-          <input type="number" min={1} max={100} value={width}
+          <input type="number" onFocus={(e) => e.currentTarget.select()} min={1} max={100} value={width}
             onChange={(e) => handleResize(Number(e.target.value) || 1, height)}
             style={{ width: 50, padding: "0.25rem", fontSize: "0.85rem", border: "1px solid #ccc", borderRadius: 4 }} />
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
           <label style={{ fontSize: "0.85rem", fontWeight: "bold" }}>Height:</label>
-          <input type="number" min={1} max={100} value={height}
+          <input type="number" onFocus={(e) => e.currentTarget.select()} min={1} max={100} value={height}
             onChange={(e) => handleResize(width, Number(e.target.value) || 1)}
             style={{ width: 50, padding: "0.25rem", fontSize: "0.85rem", border: "1px solid #ccc", borderRadius: 4 }} />
         </div>

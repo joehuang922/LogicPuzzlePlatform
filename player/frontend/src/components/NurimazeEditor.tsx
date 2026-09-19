@@ -275,7 +275,7 @@ export default function NurimazeEditor({ initialJson, onChange }: NurimazeEditor
         <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
           <label style={{ fontSize: "0.85rem", fontWeight: "bold" }}>Rows:</label>
           <input
-            type="number"
+            type="number" onFocus={(e) => e.currentTarget.select()}
             value={rows}
             readOnly
             style={{ width: 50, padding: "0.25rem", fontSize: "0.85rem", background: "#eee", border: "1px solid #ccc", borderRadius: 4 }}
@@ -284,7 +284,7 @@ export default function NurimazeEditor({ initialJson, onChange }: NurimazeEditor
         <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
           <label style={{ fontSize: "0.85rem", fontWeight: "bold" }}>Cols:</label>
           <input
-            type="number"
+            type="number" onFocus={(e) => e.currentTarget.select()}
             value={cols}
             readOnly
             style={{ width: 50, padding: "0.25rem", fontSize: "0.85rem", background: "#eee", border: "1px solid #ccc", borderRadius: 4 }}

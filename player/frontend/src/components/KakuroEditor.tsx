@@ -122,11 +122,11 @@ export default function KakuroEditor({ initialCanon, onChange }: KakuroEditorPro
       <div style={{ display: "flex", gap: "1rem", alignItems: "center", flexWrap: "wrap" }}>
         <label>
           Rows:{" "}
-          <input type="number" min={2} max={30} value={rows} onChange={(e) => resizeGrid(Number(e.target.value) || 2, cols)} style={{ width: 50 }} />
+          <input type="number" onFocus={(e) => e.currentTarget.select()} min={2} max={30} value={rows} onChange={(e) => resizeGrid(Number(e.target.value) || 2, cols)} style={{ width: 50 }} />
         </label>
         <label>
           Cols:{" "}
-          <input type="number" min={2} max={30} value={cols} onChange={(e) => resizeGrid(rows, Number(e.target.value) || 2)} style={{ width: 50 }} />
+          <input type="number" onFocus={(e) => e.currentTarget.select()} min={2} max={30} value={cols} onChange={(e) => resizeGrid(rows, Number(e.target.value) || 2)} style={{ width: 50 }} />
         </label>
         <span style={{ fontSize: "0.8rem", color: "#666" }}>Click: toggle clue/empty. Right-click clue: edit numbers.</span>
       </div>
@@ -205,7 +205,7 @@ export default function KakuroEditor({ initialCanon, onChange }: KakuroEditorPro
             <label style={{ display: "block", marginBottom: 4 }}>
               Right (→):{" "}
               <input
-                type="number"
+                type="number" onFocus={(e) => e.currentTarget.select()}
                 min={1}
                 max={45}
                 value={(cells[editingClue.r][editingClue.c] as { type: "clue"; right?: number | null; down?: number | null }).right ?? ""}
@@ -216,7 +216,7 @@ export default function KakuroEditor({ initialCanon, onChange }: KakuroEditorPro
             <label style={{ display: "block" }}>
               Down (↓):{" "}
               <input
-                type="number"
+                type="number" onFocus={(e) => e.currentTarget.select()}
                 min={1}
                 max={45}
                 value={(cells[editingClue.r][editingClue.c] as { type: "clue"; right?: number | null; down?: number | null }).down ?? ""}

@@ -158,7 +158,7 @@ export default function HellGolfEditor({
         <label>
           Rows:{" "}
           <input
-            type="number"
+            type="number" onFocus={(e) => e.currentTarget.select()}
             min={1}
             max={100}
             value={rows}
@@ -169,7 +169,7 @@ export default function HellGolfEditor({
         <label>
           Cols:{" "}
           <input
-            type="number"
+            type="number" onFocus={(e) => e.currentTarget.select()}
             min={1}
             max={100}
             value={cols}

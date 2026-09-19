@@ -240,7 +240,7 @@ export default function AkariEditor({
             Rows:
           </label>
           <input
-            type="number"
+            type="number" onFocus={(e) => e.currentTarget.select()}
             min={1}
             max={100}
             value={rows}
@@ -259,7 +259,7 @@ export default function AkariEditor({
             Cols:
           </label>
           <input
-            type="number"
+            type="number" onFocus={(e) => e.currentTarget.select()}
             min={1}
             max={100}
             value={cols}

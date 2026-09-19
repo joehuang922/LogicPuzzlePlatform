@@ -233,7 +233,7 @@ export default function NuritwinEditor({ initialJson, onChange }: NuritwinEditor
         <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
           <label style={{ fontSize: "0.85rem", fontWeight: "bold" }}>Rows:</label>
           <input
-            type="number"
+            type="number" onFocus={(e) => e.currentTarget.select()}
             min={1}
             max={100}
             value={rows}
@@ -244,7 +244,7 @@ export default function NuritwinEditor({ initialJson, onChange }: NuritwinEditor
         <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
           <label style={{ fontSize: "0.85rem", fontWeight: "bold" }}>Cols:</label>
           <input
-            type="number"
+            type="number" onFocus={(e) => e.currentTarget.select()}
             min={1}
             max={100}
             value={cols}

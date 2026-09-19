@@ -242,7 +242,7 @@ export default function ShakashakaEditor({
             Rows:
           </label>
           <input
-            type="number"
+            type="number" onFocus={(e) => e.currentTarget.select()}
             min={1}
             max={100}
             value={rows}
@@ -261,7 +261,7 @@ export default function ShakashakaEditor({
             Cols:
           </label>
           <input
-            type="number"
+            type="number" onFocus={(e) => e.currentTarget.select()}
             min={1}
             max={100}
             value={cols}

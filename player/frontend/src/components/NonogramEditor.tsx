@@ -121,7 +121,7 @@ export default function NonogramEditor({ initialCanon, onChange }: NonogramEdito
         <label>
           Rows:{" "}
           <input
-            type="number"
+            type="number" onFocus={(e) => e.currentTarget.select()}
             min={5}
             step={5}
             value={rows}
@@ -132,7 +132,7 @@ export default function NonogramEditor({ initialCanon, onChange }: NonogramEdito
         <label>
           Cols:{" "}
           <input
-            type="number"
+            type="number" onFocus={(e) => e.currentTarget.select()}
             min={5}
             step={5}
             value={cols}

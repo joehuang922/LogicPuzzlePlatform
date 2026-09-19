@@ -183,8 +183,8 @@ export default function SlalomEditor({ initialCanon, onChange }: SlalomEditorPro
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
       <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", flexWrap: "wrap" }}>
-        <label>Rows: <input type="number" min={3} max={25} value={rows} onChange={(e) => resizeGrid(Number(e.target.value) || 3, cols)} style={{ width: 50 }} /></label>
-        <label>Cols: <input type="number" min={3} max={25} value={cols} onChange={(e) => resizeGrid(rows, Number(e.target.value) || 3)} style={{ width: 50 }} /></label>
+        <label>Rows: <input type="number" onFocus={(e) => e.currentTarget.select()} min={3} max={25} value={rows} onChange={(e) => resizeGrid(Number(e.target.value) || 3, cols)} style={{ width: 50 }} /></label>
+        <label>Cols: <input type="number" onFocus={(e) => e.currentTarget.select()} min={3} max={25} value={cols} onChange={(e) => resizeGrid(rows, Number(e.target.value) || 3)} style={{ width: 50 }} /></label>
         <button onClick={() => setMode("wall")} style={{ fontWeight: mode === "wall" ? "bold" : undefined }}>Wall</button>
         <button onClick={() => setMode("start")} style={{ fontWeight: mode === "start" ? "bold" : undefined }}>Start</button>
         <button onClick={() => setMode("gate")} style={{ fontWeight: mode === "gate" ? "bold" : undefined }}>Gate</button>
@@ -198,7 +198,7 @@ export default function SlalomEditor({ initialCanon, onChange }: SlalomEditorPro
               {" "}| Selected gate #{selectedGate + 1}:
               {" "}Crossing order:
               <input
-                type="number" min={1} placeholder="—"
+                type="number" onFocus={(e) => e.currentTarget.select()} min={1} placeholder="—"
                 value={gates[selectedGate]?.number ?? ""}
                 onChange={(e) => handleSetGateNumber(e.target.value)}
                 style={{ width: 50, marginLeft: 4 }}

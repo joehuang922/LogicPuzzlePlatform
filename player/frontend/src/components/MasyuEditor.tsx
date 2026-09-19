@@ -75,7 +75,7 @@ export default function MasyuEditor({ initialCanon, onChange }: MasyuEditorProps
         <label>
           Rows:{" "}
           <input
-            type="number"
+            type="number" onFocus={(e) => e.currentTarget.select()}
             min={1}
             max={100}
             value={rows}
@@ -86,7 +86,7 @@ export default function MasyuEditor({ initialCanon, onChange }: MasyuEditorProps
         <label>
           Cols:{" "}
           <input
-            type="number"
+            type="number" onFocus={(e) => e.currentTarget.select()}
             min={1}
             max={100}
             value={cols}

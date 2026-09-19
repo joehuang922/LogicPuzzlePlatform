@@ -84,9 +84,9 @@ export default function DoubleChocoEditor({ initialJson, onChange }: DoubleChoco
         </p>
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "1rem" }}>
           <label style={{ fontSize: "0.85rem" }}>Rows:</label>
-          <input type="number" value={newRows} onChange={(e) => setNewRows(Number(e.target.value))} style={{ width: 50 }} min={2} />
+          <input type="number" onFocus={(e) => e.currentTarget.select()} value={newRows} onChange={(e) => setNewRows(Number(e.target.value))} style={{ width: 50 }} min={2} />
           <label style={{ fontSize: "0.85rem" }}>Cols:</label>
-          <input type="number" value={newCols} onChange={(e) => setNewCols(Number(e.target.value))} style={{ width: 50 }} min={2} />
+          <input type="number" onFocus={(e) => e.currentTarget.select()} value={newCols} onChange={(e) => setNewCols(Number(e.target.value))} style={{ width: 50 }} min={2} />
           <button onClick={handleCreateEmpty}>Create Empty Board</button>
         </div>
         <textarea
@@ -145,11 +145,11 @@ export default function DoubleChocoEditor({ initialJson, onChange }: DoubleChoco
       <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1rem", alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
           <label style={{ fontSize: "0.85rem", fontWeight: "bold" }}>Rows:</label>
-          <input type="number" value={rows} readOnly style={{ width: 50, padding: "0.25rem", fontSize: "0.85rem", background: "#eee", border: "1px solid #ccc", borderRadius: 4 }} />
+          <input type="number" onFocus={(e) => e.currentTarget.select()} value={rows} readOnly style={{ width: 50, padding: "0.25rem", fontSize: "0.85rem", background: "#eee", border: "1px solid #ccc", borderRadius: 4 }} />
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
           <label style={{ fontSize: "0.85rem", fontWeight: "bold" }}>Cols:</label>
-          <input type="number" value={cols} readOnly style={{ width: 50, padding: "0.25rem", fontSize: "0.85rem", background: "#eee", border: "1px solid #ccc", borderRadius: 4 }} />
+          <input type="number" onFocus={(e) => e.currentTarget.select()} value={cols} readOnly style={{ width: 50, padding: "0.25rem", fontSize: "0.85rem", background: "#eee", border: "1px solid #ccc", borderRadius: 4 }} />
         </div>
         <div style={{ fontSize: "0.75rem", color: "#666", marginLeft: "auto" }}>
           Left-click: toggle gray/white | Right-click: set number

@@ -209,7 +209,7 @@ export default function TentaishowEditor({
         <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
           <label style={{ fontSize: "0.85rem", fontWeight: "bold" }}>Width:</label>
           <input
-            type="number"
+            type="number" onFocus={(e) => e.currentTarget.select()}
             min={1}
             max={100}
             value={width}
@@ -226,7 +226,7 @@ export default function TentaishowEditor({
         <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
           <label style={{ fontSize: "0.85rem", fontWeight: "bold" }}>Height:</label>
           <input
-            type="number"
+            type="number" onFocus={(e) => e.currentTarget.select()}
             min={1}
             max={100}
             value={height}

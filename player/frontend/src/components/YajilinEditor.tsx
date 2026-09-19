@@ -107,7 +107,7 @@ export default function YajilinEditor({ initialCanon, onChange }: YajilinEditorP
         <label>
           Rows:{" "}
           <input
-            type="number" min={1} max={100} value={rows}
+            type="number" onFocus={(e) => e.currentTarget.select()} min={1} max={100} value={rows}
             onChange={(e) => resizeGrid(Number(e.target.value) || 1, cols)}
             style={{ width: 50 }}
           />
@@ -115,7 +115,7 @@ export default function YajilinEditor({ initialCanon, onChange }: YajilinEditorP
         <label>
           Cols:{" "}
           <input
-            type="number" min={1} max={100} value={cols}
+            type="number" onFocus={(e) => e.currentTarget.select()} min={1} max={100} value={cols}
             onChange={(e) => resizeGrid(rows, Number(e.target.value) || 1)}
             style={{ width: 50 }}
           />
