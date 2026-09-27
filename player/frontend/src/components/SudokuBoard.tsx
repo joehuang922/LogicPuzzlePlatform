@@ -6,6 +6,8 @@ import RadialInput from "./RadialInput";
 interface SudokuBoardProps {
   hints: number[][];
   initialUserValues?: Record<string, number>;
+  // Pencil-mark candidates keyed by "col,row"; each an ascending digit list.
+  initialNotes?: Record<string, number[]>;
   onValuesChange?: (values: Record<string, number>) => void;
   onComplete?: () => void;
   liveValidate?: boolean;
@@ -16,18 +18,39 @@ const PAD = CELL_SIZE;
 const THIN = 1;
 const MEDIUM = 2;
 const THICK = 3;
-export default function SudokuBoard({ hints, initialUserValues, onValuesChange, onComplete, liveValidate }: SudokuBoardProps) {
+function notesFromInitial(initial?: Record<string, number[]>): Record<string, Set<number>> {
+  const map: Record<string, Set<number>> = {};
+  if (initial) {
+    for (const [key, digits] of Object.entries(initial)) {
+      const set = new Set(digits.filter((d) => d >= 1 && d <= 9));
+      if (set.size > 0) map[key] = set;
+    }
+  }
+  return map;
+}
+
+export default function SudokuBoard({ hints, initialUserValues, initialNotes, onValuesChange, onComplete, liveValidate }: SudokuBoardProps) {
   const isMobile = useIsMobile();
   const width = 9 * CELL_SIZE + PAD * 2;
   const height = 9 * CELL_SIZE + PAD * 2;
 
   const [userValues, setUserValues] = useState<Record<string, number>>(initialUserValues ?? {});
+  const [notes, setNotes] = useState<Record<string, Set<number>>>(() => notesFromInitial(initialNotes));
+  const [noteMode, setNoteMode] = useState(false);
   const [activeCell, setActiveCell] = useState<string | null>(null);
   const [hoveredCell, setHoveredCell] = useState<string | null>(null);
 
+  // Emit a single flat map: committed answers under "col,row" and note flags
+  // under "n:col,row:digit" -> 1. The extractor/progress split them back apart.
   useEffect(() => {
-    onValuesChange?.(userValues);
-  }, [userValues, onValuesChange]);
+    const flat: Record<string, number> = { ...userValues };
+    for (const [key, set] of Object.entries(notes)) {
+      // Notes on an answered cell are dropped (answer overwrites notes).
+      if (userValues[key] != null && userValues[key] > 0) continue;
+      for (const digit of set) flat[`n:${key}:${digit}`] = 1;
+    }
+    onValuesChange?.(flat);
+  }, [userValues, notes, onValuesChange]);
 
   const hintCells = useMemo(() => {
     const set = new Set<string>();
@@ -140,24 +163,58 @@ export default function SudokuBoard({ hints, initialUserValues, onValuesChange, 
     return peerMap.get(highlightSource) ?? new Set<string>();
   }, [highlightSource, peerMap]);
 
+  // A cell that already holds a committed answer can't take notes: force answer
+  // mode and disable the toggle while such a cell is active.
+  const activeHasAnswer = activeCell != null && (userValues[activeCell] ?? 0) > 0;
+  const effectiveNoteMode = noteMode && !activeHasAnswer;
+
   const enterValue = useCallback(
     (digit: number) => {
       if (!activeCell) return;
+      if (noteMode && (userValues[activeCell] ?? 0) === 0) {
+        // Toggle the candidate; keep the picker open so several can be marked.
+        setNotes((prev) => {
+          const next = { ...prev };
+          const set = new Set(next[activeCell] ?? []);
+          if (set.has(digit)) set.delete(digit);
+          else set.add(digit);
+          if (set.size === 0) delete next[activeCell];
+          else next[activeCell] = set;
+          return next;
+        });
+        return;
+      }
+      // Answer mode: commit the digit and clear that cell's notes.
       setUserValues((prev) => ({ ...prev, [activeCell]: digit }));
+      setNotes((prev) => {
+        if (!prev[activeCell]) return prev;
+        const next = { ...prev };
+        delete next[activeCell];
+        return next;
+      });
       setActiveCell(null);
     },
-    [activeCell]
+    [activeCell, noteMode, userValues]
   );
 
   const clearValue = useCallback(() => {
     if (!activeCell) return;
+    if (noteMode && (userValues[activeCell] ?? 0) === 0) {
+      setNotes((prev) => {
+        if (!prev[activeCell]) return prev;
+        const next = { ...prev };
+        delete next[activeCell];
+        return next;
+      });
+      return;
+    }
     setUserValues((prev) => {
       const next = { ...prev };
       delete next[activeCell];
       return next;
     });
     setActiveCell(null);
-  }, [activeCell]);
+  }, [activeCell, noteMode, userValues]);
 
   useEffect(() => {
     if (!activeCell) return;
@@ -169,11 +226,13 @@ export default function SudokuBoard({ hints, initialUserValues, onValuesChange, 
         clearValue();
       } else if (e.key === "Escape") {
         setActiveCell(null);
+      } else if (e.key === "n" || e.key === "N") {
+        if (!activeHasAnswer) setNoteMode((m) => !m);
       }
     }
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [activeCell, enterValue, clearValue]);
+  }, [activeCell, activeHasAnswer, enterValue, clearValue]);
 
   function handleCellClick(key: string) {
     if (hintCells.has(key)) return;
@@ -300,6 +359,34 @@ export default function SudokuBoard({ hints, initialUserValues, onValuesChange, 
             );
           })}
 
+          {/* Pencil-mark notes: small grey digits in a fixed 3x3 sub-layout
+              (1 2 3 / 4 5 6 / 7 8 9). Hidden once the cell holds an answer/hint. */}
+          {Object.entries(notes).map(([key, set]) => {
+            const [col, row] = key.split(",").map(Number);
+            if (hintCells.has(key) || (userValues[key] ?? 0) > 0) return null;
+            const third = CELL_SIZE / 3;
+            return Array.from(set).map((digit) => {
+              const sub = digit - 1;
+              const sx = col * CELL_SIZE + ((sub % 3) + 0.5) * third;
+              const sy = row * CELL_SIZE + (Math.floor(sub / 3) + 0.5) * third;
+              return (
+                <text
+                  key={`note-${key}-${digit}`}
+                  x={sx}
+                  y={sy}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fontSize={third * 0.8}
+                  fontFamily="sans-serif"
+                  fill="#999"
+                  pointerEvents="none"
+                >
+                  {digit}
+                </text>
+              );
+            });
+          })}
+
           {/* User-entered values */}
           {Object.entries(userValues).map(([key, val]) => {
             if (activeCell === key) return null;
@@ -332,6 +419,9 @@ export default function SudokuBoard({ hints, initialUserValues, onValuesChange, 
                 onDigit={enterValue}
                 onErase={clearValue}
                 onDismiss={() => setActiveCell(null)}
+                noteMode={effectiveNoteMode}
+                onToggleMode={() => setNoteMode((m) => !m)}
+                modeDisabled={activeHasAnswer}
               />
             );
           })()}
@@ -344,6 +434,9 @@ export default function SudokuBoard({ hints, initialUserValues, onValuesChange, 
           onDigit={enterValue}
           onClear={clearValue}
           onDismiss={() => setActiveCell(null)}
+          noteMode={effectiveNoteMode}
+          onToggleMode={() => setNoteMode((m) => !m)}
+          modeDisabled={activeHasAnswer}
         />
       )}
     </div>

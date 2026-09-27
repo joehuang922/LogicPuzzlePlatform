@@ -96,11 +96,19 @@ fun PlayScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
-            if (state.selectedCell != null) {
+            val selected = state.selectedCell
+            if (selected != null) {
+                // Only Sudoku (type 1) offers pencil-mark notes; a cell that already
+                // holds a committed answer can't take notes, so disable the toggle.
+                val notesEnabled = state.puzzle?.puzzleType == 1
+                val cellHasAnswer = (state.userValues[selected] ?: 0) > 0
                 DigitBar(
                     onDigit = vm::enterDigit,
                     onClear = vm::clearCell,
                     onDismiss = { vm.selectCell(null) },
+                    noteMode = state.noteMode && !cellHasAnswer,
+                    onToggleNoteMode = if (notesEnabled) vm::toggleNoteMode else null,
+                    noteModeDisabled = cellHasAnswer,
                 )
             }
         },

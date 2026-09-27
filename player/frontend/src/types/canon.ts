@@ -2,6 +2,14 @@ export interface SudokuCanon {
   hints: number[][];
 }
 
+export interface SudokuAnswer {
+  // 9x9 committed answers (canon hints merged with the player's entries)
+  hints: number[][];
+  // 9x9; each cell an ascending list of candidate digits (1-9). Optional/additive:
+  // absent on legacy snapshots. A cell with a committed answer carries [].
+  notes?: number[][][];
+}
+
 export interface ComboSudokuSubBoard {
   x: number;
   y: number;

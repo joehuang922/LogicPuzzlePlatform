@@ -2,9 +2,14 @@ interface DigitBarProps {
   onDigit: (digit: number) => void;
   onClear: () => void;
   onDismiss: () => void;
+  // Optional note/answer mode toggle. When onToggleMode is provided, an extra
+  // "123" button toggles note mode. Omit for answer-only consumers.
+  noteMode?: boolean;
+  onToggleMode?: () => void;
+  modeDisabled?: boolean;
 }
 
-export default function DigitBar({ onDigit, onClear, onDismiss }: DigitBarProps) {
+export default function DigitBar({ onDigit, onClear, onDismiss, noteMode, onToggleMode, modeDisabled }: DigitBarProps) {
   return (
     <div style={containerStyle}>
       {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => (
@@ -12,6 +17,22 @@ export default function DigitBar({ onDigit, onClear, onDismiss }: DigitBarProps)
           {d}
         </button>
       ))}
+      {onToggleMode && (
+        <button
+          style={{
+            ...digitBtnStyle,
+            background: noteMode ? "#1976d2" : "#fff",
+            color: noteMode ? "#fff" : "#1976d2",
+            opacity: modeDisabled ? 0.4 : 1,
+            cursor: modeDisabled ? "not-allowed" : "pointer",
+          }}
+          disabled={modeDisabled}
+          onClick={onToggleMode}
+          title={noteMode ? "Note mode (on)" : "Note mode (off)"}
+        >
+          123
+        </button>
+      )}
       <button style={{ ...digitBtnStyle, color: "#c62828", borderColor: "#c62828" }} onClick={onClear}>
         ✕
       </button>

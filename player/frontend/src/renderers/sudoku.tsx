@@ -17,14 +17,31 @@ function extractUserValues(hints: number[][], answer: number[][] | undefined): R
   return values;
 }
 
+// Restore saved pencil marks. Tolerant of legacy snapshots with no `notes`.
+function extractNotes(hints: number[][], notes: number[][][] | undefined): Record<string, number[]> {
+  if (!notes) return {};
+  const result: Record<string, number[]> = {};
+  for (let row = 0; row < 9; row++) {
+    for (let col = 0; col < 9; col++) {
+      const hintVal = hints[row]?.[col] ?? 0;
+      const cell = notes[row]?.[col];
+      if (hintVal === 0 && Array.isArray(cell) && cell.length > 0) {
+        result[`${col},${row}`] = cell.filter((d) => d >= 1 && d <= 9);
+      }
+    }
+  }
+  return result;
+}
+
 export const sudokuRenderer: PuzzleRenderer = {
   puzzleType: 1,
 
   render(puzzle: PuzzleDefinition, state: PuzzleState, onValuesChange?: (values: Record<string, number>) => void, onComplete?: () => void, liveValidate?: boolean) {
     const canonRepr = (typeof puzzle.canonRepr === "string" ? JSON.parse(puzzle.canonRepr) : puzzle.canonRepr) as SudokuCanon;
-    const answerGrid = (state.playerGrid as { hints?: number[][] })?.hints;
-    const initialUserValues = extractUserValues(canonRepr.hints, answerGrid);
-    return <SudokuBoard hints={canonRepr.hints} initialUserValues={initialUserValues} onValuesChange={onValuesChange} onComplete={onComplete} liveValidate={liveValidate} />;
+    const savedAnswer = state.playerGrid as { hints?: number[][]; notes?: number[][][] } | undefined;
+    const initialUserValues = extractUserValues(canonRepr.hints, savedAnswer?.hints);
+    const initialNotes = extractNotes(canonRepr.hints, savedAnswer?.notes);
+    return <SudokuBoard hints={canonRepr.hints} initialUserValues={initialUserValues} initialNotes={initialNotes} onValuesChange={onValuesChange} onComplete={onComplete} liveValidate={liveValidate} />;
   },
 
   handleInput(state: PuzzleState, _action: PlayerAction) {

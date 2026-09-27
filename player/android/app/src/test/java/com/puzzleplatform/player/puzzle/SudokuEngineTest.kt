@@ -256,6 +256,86 @@ class SudokuEngineTest {
         assertEquals(mapOf("1,0" to 3), restored)
     }
 
+    // -- notes (pencil marks) ----------------------------------------------
+
+    @Test
+    fun extractAnswer_emitsNotesFor9x9OfCandidateLists() {
+        val puzzle = puzzleWithHints(emptyGrid)
+        // Two pencil marks in cell (1,0): digits 3 and 7 (added out of order).
+        val userValues = mapOf(
+            SudokuEngine.noteKey(1, 0, 7) to 1,
+            SudokuEngine.noteKey(1, 0, 3) to 1,
+        )
+        val answer = SudokuEngine.extractAnswer(puzzle, userValues)
+        val notes = (answer["notes"] as JsonArray).map { row -> row.jsonArray.map { it.jsonArray } }
+
+        assertEquals(9, notes.size)
+        notes.forEach { assertEquals(9, it.size) }
+        // (col=1,row=0) holds an ascending [3,7]; every other cell is empty.
+        assertEquals(listOf(3, 7), notes[0][1].map { it.jsonPrimitive.int })
+        assertTrue(notes[0][0].isEmpty())
+        assertTrue(notes[5][5].isEmpty())
+    }
+
+    @Test
+    fun extractAnswer_dropsNotesOnAnsweredOrHintCells() {
+        val hints = emptyGrid.toMutableList().map { it.toMutableList() }
+        hints[0][0] = 5
+        val puzzle = puzzleWithHints(hints)
+        val userValues = mapOf(
+            // committed answer at (1,0) plus a stray note there
+            "1,0" to 4,
+            SudokuEngine.noteKey(1, 0, 8) to 1,
+            // note on a hint cell (0,0)
+            SudokuEngine.noteKey(0, 0, 2) to 1,
+            // a legitimate note on an empty cell (2,0)
+            SudokuEngine.noteKey(2, 0, 6) to 1,
+        )
+        val answer = SudokuEngine.extractAnswer(puzzle, userValues)
+        val notes = (answer["notes"] as JsonArray).map { row -> row.jsonArray.map { it.jsonArray } }
+
+        assertTrue(notes[0][0].isEmpty()) // hint cell
+        assertTrue(notes[0][1].isEmpty()) // answered cell
+        assertEquals(listOf(6), notes[0][2].map { it.jsonPrimitive.int })
+    }
+
+    @Test
+    fun notes_roundTripThroughExtractAndRestore() {
+        val puzzle = puzzleWithHints(emptyGrid)
+        val original = mapOf(
+            "0,0" to 5, // committed answer
+            SudokuEngine.noteKey(1, 0, 2) to 1,
+            SudokuEngine.noteKey(1, 0, 9) to 1,
+            SudokuEngine.noteKey(3, 4, 4) to 1,
+        )
+        val answer = SudokuEngine.extractAnswer(puzzle, original)
+        val restored = SudokuEngine.restoreUserValues(puzzle, answer)
+        assertEquals(original, restored)
+    }
+
+    @Test
+    fun restore_toleratesMissingNotesKey() {
+        // A legacy answer JSON with only "hints" must still restore (no crash, no notes).
+        val puzzle = puzzleWithHints(emptyGrid)
+        val rows = solution.map { row -> JsonArray(row.map { JsonPrimitive(it) }) }
+        val legacyAnswer = JsonObject(mapOf("hints" to JsonArray(rows)))
+        val restored = SudokuEngine.restoreUserValues(puzzle, legacyAnswer)
+        assertEquals(gridToUserValues(solution), restored)
+    }
+
+    @Test
+    fun notes_doNotCountTowardProgressOrCompletion() {
+        val puzzle = puzzleWithHints(emptyGrid)
+        // A full solution (complete) plus scattered notes must still be complete,
+        // and notes alone must not move progress off zero.
+        val notesOnly = mapOf(
+            SudokuEngine.noteKey(0, 0, 1) to 1,
+            SudokuEngine.noteKey(0, 0, 2) to 1,
+        )
+        assertEquals(0.0, SudokuEngine.computeProgress(puzzle, notesOnly), 0.0001)
+        assertFalse(SudokuEngine.isComplete(puzzle, notesOnly))
+    }
+
     // -- parseHints tolerance ----------------------------------------------
 
     @Test

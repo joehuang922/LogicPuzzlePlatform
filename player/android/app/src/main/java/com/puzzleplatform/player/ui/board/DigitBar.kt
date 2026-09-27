@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,6 +19,10 @@ import androidx.compose.ui.unit.sp
 /**
  * Bottom digit entry bar for number puzzles, the Compose analog of
  * frontend/src/components/DigitBar.tsx. Digits 1-9 plus clear (✕) and dismiss (↩).
+ *
+ * When [onToggleNoteMode] is provided, an extra "123" button toggles pencil-mark
+ * (note) entry; it's disabled via [noteModeDisabled] when the selected cell holds
+ * a committed answer.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -26,6 +31,9 @@ fun DigitBar(
     onClear: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    noteMode: Boolean = false,
+    onToggleNoteMode: (() -> Unit)? = null,
+    noteModeDisabled: Boolean = false,
 ) {
     FlowRow(
         modifier = modifier
@@ -45,6 +53,27 @@ fun DigitBar(
                 contentPadding = noPadding,
             ) {
                 Text(d.toString(), fontSize = 18.sp)
+            }
+        }
+        if (onToggleNoteMode != null) {
+            if (noteMode) {
+                Button(
+                    onClick = onToggleNoteMode,
+                    enabled = !noteModeDisabled,
+                    modifier = Modifier.size(46.dp),
+                    contentPadding = noPadding,
+                ) {
+                    Text("123", fontSize = 13.sp)
+                }
+            } else {
+                OutlinedButton(
+                    onClick = onToggleNoteMode,
+                    enabled = !noteModeDisabled,
+                    modifier = Modifier.size(46.dp),
+                    contentPadding = noPadding,
+                ) {
+                    Text("123", fontSize = 13.sp)
+                }
             }
         }
         OutlinedButton(

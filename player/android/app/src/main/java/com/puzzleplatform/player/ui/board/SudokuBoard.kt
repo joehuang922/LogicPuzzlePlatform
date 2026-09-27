@@ -25,6 +25,7 @@ private val GRID_BG = Color.White
 private val LINE = Color.Black
 private val HINT_COLOR = Color.Black
 private val USER_COLOR = Color(0xFF888888)
+private val NOTE_COLOR = Color(0xFF999999)
 private val CONFLICT_COLOR = Color(0xFFD32F2F)
 private val SELECT_FILL = Color(0x9963A4FF)
 private val PEER_FILL = Color(0x33BBDEFB)
@@ -93,6 +94,7 @@ fun SudokuBoard(
 
         // Values.
         val textSize = cell * 0.55f
+        val noteTextSize = cell / 3f * 0.8f
         for (row in 0 until 9) {
             for (col in 0 until 9) {
                 val key = "$col,$row"
@@ -104,7 +106,16 @@ fun SudokuBoard(
                     color = if (conflicts.contains(key)) CONFLICT_COLOR else HINT_COLOR
                 } else {
                     val entered = userValues[key] ?: 0
-                    if (entered <= 0) continue
+                    if (entered <= 0) {
+                        // Empty cell: render pencil marks in a fixed 3x3 sub-layout
+                        // (1 2 3 / 4 5 6 / 7 8 9).
+                        for (digit in 1..9) {
+                            if (userValues["n:$key:$digit"] == 1) {
+                                drawNote(digit, col, row, cell, noteTextSize)
+                            }
+                        }
+                        continue
+                    }
                     value = entered
                     color = if (conflicts.contains(key)) CONFLICT_COLOR else USER_COLOR
                 }
@@ -112,6 +123,23 @@ fun SudokuBoard(
             }
         }
     }
+}
+
+/** Draw a single pencil-mark digit at its fixed 3x3 sub-cell within cell (col,row). */
+private fun DrawScope.drawNote(digit: Int, col: Int, row: Int, cell: Float, textSize: Float) {
+    val paint = android.graphics.Paint().apply {
+        this.color = NOTE_COLOR.toArgb()
+        this.textSize = textSize
+        this.textAlign = android.graphics.Paint.Align.CENTER
+        this.isAntiAlias = true
+        this.typeface = android.graphics.Typeface.DEFAULT
+    }
+    val third = cell / 3f
+    val sub = digit - 1
+    val cx = col * cell + ((sub % 3) + 0.5f) * third
+    val fm = paint.fontMetrics
+    val cy = row * cell + (sub / 3 + 0.5f) * third - (fm.ascent + fm.descent) / 2
+    drawContext.canvas.nativeCanvas.drawText(digit.toString(), cx, cy, paint)
 }
 
 private fun DrawScope.drawCellFill(col: Int, row: Int, cell: Float, color: Color) {

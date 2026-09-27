@@ -24,6 +24,7 @@ data class PlayUiState(
     val puzzle: Puzzle? = null,
     val userValues: Map<String, Int> = emptyMap(),
     val selectedCell: String? = null,
+    val noteMode: Boolean = false,
     val liveValidate: Boolean = false,
     val progress: Double = 0.0,
     val elapsedSeconds: Int = 0,
@@ -102,14 +103,35 @@ class PlayViewModel(
 
     fun toggleLiveValidate() = _state.update { it.copy(liveValidate = !it.liveValidate) }
 
+    fun toggleNoteMode() = _state.update { it.copy(noteMode = !it.noteMode) }
+
+    /** A committed answer sits at "col,row"; a cell with one can't take notes. */
+    private fun cellHasAnswer(values: Map<String, Int>, cell: String): Boolean =
+        (values[cell] ?: 0) > 0
+
     fun enterDigit(digit: Int) {
         val cell = _state.value.selectedCell ?: return
-        updateValues(_state.value.userValues + (cell to digit), clearSelection = true)
+        val values = _state.value.userValues
+        if (_state.value.noteMode && !cellHasAnswer(values, cell)) {
+            // Toggle the pencil mark; keep the cell selected so several can be marked.
+            val key = SudokuEngine.noteKey(cell.split(",")[0].toInt(), cell.split(",")[1].toInt(), digit)
+            val next = if (values[key] == 1) values - key else values + (key to 1)
+            updateValues(next, clearSelection = false)
+            return
+        }
+        // Answer mode: commit the digit and clear that cell's pencil marks.
+        val next = (values.filterKeys { !it.startsWith("n:$cell:") }) + (cell to digit)
+        updateValues(next, clearSelection = true)
     }
 
     fun clearCell() {
         val cell = _state.value.selectedCell ?: return
-        updateValues(_state.value.userValues - cell, clearSelection = true)
+        val values = _state.value.userValues
+        if (_state.value.noteMode && !cellHasAnswer(values, cell)) {
+            updateValues(values.filterKeys { !it.startsWith("n:$cell:") }, clearSelection = false)
+            return
+        }
+        updateValues(values - cell, clearSelection = true)
     }
 
     private fun updateValues(newValues: Map<String, Int>, clearSelection: Boolean) {
