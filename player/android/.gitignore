@@ -1,0 +1,21 @@
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+/build
+/app/build
+/captures
+.externalNativeBuild
+.cxx
+# Release signing material — never commit
+/certs/
+*.jks
+*.keystore
+
+# Local corporate-proxy (Netskope) TLS trust for debug builds. Environment-specific
+# to a dev machine behind TLS inspection; not needed by CI or other clones. Kept
+# together so a plain clone's debug build uses default trust and still compiles.
+/app/src/debug/AndroidManifest.xml
+/app/src/debug/res/xml/network_security_config.xml
+/app/src/debug/res/raw/netskope_ca.pem
