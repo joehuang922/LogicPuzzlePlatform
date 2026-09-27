@@ -47,6 +47,30 @@ jobs:
       - name: Run unit tests
         run: ./gradlew test --stacktrace
 
+      # Fail fast with a clear message if the signing secrets are missing. Without them the build
+      # would still "succeed" but emit an UNSIGNED APK that Android refuses to install
+      # (INSTALL_PARSE_FAILED_NO_CERTIFICATES) — a confusing failure to hit only on-device. See the
+      # workflow header / player/android/README.md for how to set these repo secrets.
+      - name: Verify signing secrets are present
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          missing=""
+          [ -z "$RELEASE_KEYSTORE_BASE64" ] && missing="$missing RELEASE_KEYSTORE_BASE64"
+          [ -z "$RELEASE_STORE_PASSWORD" ] && missing="$missing RELEASE_STORE_PASSWORD"
+          [ -z "$RELEASE_KEY_ALIAS" ] && missing="$missing RELEASE_KEY_ALIAS"
+          [ -z "$RELEASE_KEY_PASSWORD" ] && missing="$missing RELEASE_KEY_PASSWORD"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing release signing secret(s):$missing"
+            echo "::error::Set them under Settings → Secrets and variables → Actions, then re-run."
+            echo "::error::Without them the APK would be unsigned and uninstallable. See player/android/README.md."
+            exit 1
+          fi
+          echo "All release signing secrets are present."
+
       # Decode the release keystore (stored base64-encoded as a repo secret) to a file the
       # Gradle signingConfig can read. Written to RUNNER_TEMP, outside the repo tree, so it is
       # never committed. RELEASE_STORE_FILE is an absolute path, which rootProject.file() honors.
