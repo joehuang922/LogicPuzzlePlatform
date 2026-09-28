@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Adaptive-icon background: light lavender matching the app's purple accents. -->
-    <color name="ic_launcher_background">#EADDFF</color>
+    <!-- Adaptive-icon background: light pink matching the launcher art's outer ring. -->
+    <color name="ic_launcher_background">#FFEFF2</color>
 </resources>
