@@ -66,6 +66,7 @@ fun ProfileScreen(
                     Modifier.fillMaxSize().padding(padding).padding(horizontal = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
+                        item { SyncStatusRow(state.syncState) }
                     item { Header("Achievements ($unlocked / ${state.achievements.size})") }
                     items(state.achievements, key = { it.id }) { a ->
                         Card(Modifier.fillMaxWidth()) {
@@ -114,6 +115,48 @@ fun ProfileScreen(
                 }
             }
         }
+    }
+}
+
+/**
+ * A compact "local ↔ remote sync" status line. Backed by a live Room count, so
+ * it works offline and flips to "all synced" automatically once a push lands.
+ */
+@Composable
+private fun SyncStatusRow(sync: com.puzzleplatform.player.data.sync.SyncState) {
+    val (icon, text) = when {
+        sync.syncing -> "⟳" to "Syncing…"
+        sync.pendingCount == 0 -> "✓" to buildString {
+            append("All progress synced")
+            sync.lastSyncedAt?.let { append(" · ${formatRelativeTime(it)}") }
+        }
+        else -> "⭯" to "${sync.pendingCount} change${if (sync.pendingCount == 1) "" else "s"} waiting to sync"
+    }
+    val color = if (sync.pendingCount == 0 && !sync.syncing) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Card(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth().padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(icon, color = color)
+            Text(text, style = MaterialTheme.typography.bodyMedium, color = color)
+        }
+    }
+}
+
+/** "just now" / "5 min ago" / "2 h ago" for the last-synced timestamp. */
+private fun formatRelativeTime(epochMillis: Long): String {
+    val deltaSec = (System.currentTimeMillis() - epochMillis) / 1000
+    return when {
+        deltaSec < 60 -> "just now"
+        deltaSec < 3600 -> "${deltaSec / 60} min ago"
+        deltaSec < 86400 -> "${deltaSec / 3600} h ago"
+        else -> "${deltaSec / 86400} d ago"
     }
 }
 

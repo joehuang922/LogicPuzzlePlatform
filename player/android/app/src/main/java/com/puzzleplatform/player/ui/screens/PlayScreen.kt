@@ -17,6 +17,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -68,6 +70,7 @@ fun PlayScreen(
     puzzleId: String,
     attemptId: String,
     onBack: () -> Unit,
+    onOpenAttempt: (puzzleId: String, attemptId: String) -> Unit,
 ) {
     val vm: PlayViewModel = viewModel(
         key = "play-$puzzleId-$attemptId",
@@ -128,6 +131,16 @@ fun PlayScreen(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    // Non-destructive notice when the puzzle was edited server-side
+                    // since this attempt started. Progress stays; reload is opt-in.
+                    if (state.puzzleEdited) {
+                        EditedPuzzleBanner(
+                            reloading = state.reloading,
+                            onReload = { vm.reloadUpdatedPuzzle(onOpenAttempt) },
+                            onDismiss = vm::dismissEditedNotice,
+                        )
+                    }
+
                     // Info line, with the collection cover thumbnail (CloudFront) when present.
                     val diff = DIFFICULTY_LABELS[puzzle.difficulty] ?: "${puzzle.difficulty}/5"
                     Row(
@@ -260,6 +273,32 @@ fun PlayScreen(
                 TextButton(onClick = vm::dismissCongrats) { Text("Close") }
             },
         )
+    }
+}
+
+@Composable
+private fun EditedPuzzleBanner(
+    reloading: Boolean,
+    onReload: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Card(
+        Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("This puzzle was updated", fontWeight = FontWeight.Bold)
+            Text(
+                "A newer version is available. Your current progress is kept — you can keep playing it, or start a fresh attempt on the updated puzzle.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onReload, enabled = !reloading) {
+                    Text(if (reloading) "Loading…" else "Reload updated version")
+                }
+                TextButton(onClick = onDismiss) { Text("Keep playing") }
+            }
+        }
     }
 }
 

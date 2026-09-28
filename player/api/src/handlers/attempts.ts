@@ -3,6 +3,13 @@ import { v4 as uuidv4 } from "uuid";
 import { executeStatement } from "../lib/db";
 import { evaluateAndUnlock } from "../lib/achievements";
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isUuid(value: unknown): value is string {
+  return typeof value === "string" && UUID_RE.test(value);
+}
+
 function toCamelCase(str: string): string {
   return str.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 }
@@ -36,10 +43,14 @@ async function createAttempt(
     return response(400, { error: "player and question are required" });
   }
 
-  const attemptId = uuidv4();
+  // The offline-capable client generates its own UUIDs so an attempt can be
+  // created without a network round trip, then replayed on sync. Accept a
+  // client-supplied id (validated) and fall back to a server id for the web
+  // client, which omits it. Inserts are INSERT IGNORE so a replay is a no-op.
+  const attemptId = isUuid(body.attemptId) ? body.attemptId : uuidv4();
 
   await executeStatement(
-    `INSERT INTO player_attempt (id, player, question) VALUES (:id, :player, :question)`,
+    `INSERT IGNORE INTO player_attempt (id, player, question) VALUES (:id, :player, :question)`,
     [
       { name: "id", value: { stringValue: attemptId } },
       { name: "player", value: { longValue: body.player } },
@@ -47,13 +58,13 @@ async function createAttempt(
     ]
   );
 
-  const snapshotId = uuidv4();
+  const snapshotId = isUuid(body.snapshotId) ? body.snapshotId : uuidv4();
   const initialAnswer = body.initialAnswer
     ? JSON.stringify(body.initialAnswer)
     : "{}";
 
   await executeStatement(
-    `INSERT INTO player_attempt_snapshot (id, attempt, current_answer, progress, elapsed_seconds, finished)
+    `INSERT IGNORE INTO player_attempt_snapshot (id, attempt, current_answer, progress, elapsed_seconds, finished)
      VALUES (:id, :attempt, :currentAnswer, 0, 0, FALSE)`,
     [
       { name: "id", value: { stringValue: snapshotId } },
@@ -231,10 +242,12 @@ async function saveSnapshot(
     });
   }
 
-  const snapshotId = uuidv4();
+  // Accept a client-generated snapshot id so an offline save can be replayed
+  // idempotently on sync; the web client omits it and gets a server id.
+  const snapshotId = isUuid(body.snapshotId) ? body.snapshotId : uuidv4();
 
   await executeStatement(
-    `INSERT INTO player_attempt_snapshot (id, attempt, current_answer, progress, elapsed_seconds, finished)
+    `INSERT IGNORE INTO player_attempt_snapshot (id, attempt, current_answer, progress, elapsed_seconds, finished)
      VALUES (:id, :attempt, :currentAnswer, :progress, :elapsedSeconds, :finished)`,
     [
       { name: "id", value: { stringValue: snapshotId } },

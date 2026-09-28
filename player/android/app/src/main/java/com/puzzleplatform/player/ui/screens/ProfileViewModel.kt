@@ -7,6 +7,8 @@ import com.puzzleplatform.player.data.ServiceLocator
 import com.puzzleplatform.player.data.model.ProfileAchievement
 import com.puzzleplatform.player.data.model.ProfileCollectionRow
 import com.puzzleplatform.player.data.model.ProfileQuestionStat
+import com.puzzleplatform.player.data.sync.SyncManager
+import com.puzzleplatform.player.data.sync.SyncState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,16 +32,29 @@ data class ProfileUiState(
     val questionStats: List<ProfileQuestionStat> = emptyList(),
     val collectionGroups: List<CollectionGroup> = emptyList(),
     val achievements: List<ProfileAchievement> = emptyList(),
+    val syncState: SyncState = SyncState(),
 )
 
 class ProfileViewModel(
     private val repo: PuzzleRepository = ServiceLocator.repository,
+    private val syncManager: SyncManager = ServiceLocator.syncManager,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ProfileUiState())
     val state: StateFlow<ProfileUiState> = _state.asStateFlow()
 
-    init { load() }
+    init {
+        load()
+        observeSync()
+    }
+
+    private fun observeSync() {
+        viewModelScope.launch {
+            syncManager.syncState.collect { s ->
+                _state.update { it.copy(syncState = s) }
+            }
+        }
+    }
 
     fun load() {
         _state.update { it.copy(loading = true, error = null) }

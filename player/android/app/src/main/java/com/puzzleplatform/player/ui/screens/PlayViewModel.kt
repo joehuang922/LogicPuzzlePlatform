@@ -38,6 +38,10 @@ data class PlayUiState(
     val newAchievements: List<AchievementUnlock> = emptyList(),
     val completionError: String? = null,
     val retrying: Boolean = false,
+    // Non-destructive notice: the puzzle was edited server-side since this
+    // attempt started. Current progress stays playable; reload is opt-in.
+    val puzzleEdited: Boolean = false,
+    val reloading: Boolean = false,
 )
 
 class PlayViewModel(
@@ -73,6 +77,11 @@ class PlayViewModel(
                 }
                 val (values, elapsed) = restored
                 val progress = PuzzleEngines.forType(puzzle.puzzleType)?.computeProgress(puzzle, values) ?: 0.0
+                val edited = try {
+                    repo.isPuzzleEditedSinceAttempt(puzzleId, attemptId)
+                } catch (_: Exception) {
+                    false
+                }
                 _state.update {
                     it.copy(
                         loading = false,
@@ -80,6 +89,7 @@ class PlayViewModel(
                         userValues = values,
                         elapsedSeconds = elapsed,
                         progress = progress,
+                        puzzleEdited = edited,
                     )
                 }
                 startTimer()
@@ -247,6 +257,30 @@ class PlayViewModel(
     }
 
     fun dismissCongrats() = _state.update { it.copy(showCongrats = false) }
+
+    /** Dismiss the edited-puzzle notice; the current attempt stays as-is. */
+    fun dismissEditedNotice() = _state.update { it.copy(puzzleEdited = false) }
+
+    /**
+     * Opt-in reload: start a fresh attempt on the updated puzzle and hand its
+     * ids back via [onReady] so the caller can navigate. The old attempt and its
+     * progress are never touched.
+     */
+    fun reloadUpdatedPuzzle(onReady: (puzzleId: String, attemptId: String) -> Unit) {
+        val puzzle = _state.value.puzzle ?: return
+        _state.update { it.copy(reloading = true) }
+        viewModelScope.launch {
+            try {
+                val engine = PuzzleEngines.forType(puzzle.puzzleType)
+                val initial = engine?.extractAnswer(puzzle, emptyMap()) ?: kotlinx.serialization.json.JsonObject(emptyMap())
+                val result = repo.createAttempt(puzzle.id, initial)
+                _state.update { it.copy(reloading = false, puzzleEdited = false) }
+                onReady(puzzle.id, result.attemptId)
+            } catch (e: Exception) {
+                _state.update { it.copy(reloading = false, toast = "Reload failed: ${e.message}") }
+            }
+        }
+    }
 
     override fun onCleared() {
         timerJob?.cancel()

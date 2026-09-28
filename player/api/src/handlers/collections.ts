@@ -28,11 +28,36 @@ async function listCollections(): Promise<APIGatewayProxyResult> {
   const result = await executeStatement(
     `SELECT pc.*, COUNT(pq.id) AS puzzle_count
      FROM puzzle_collections pc
-     LEFT JOIN puzzle_questions pq ON pq.src_collection = pc.id
+     LEFT JOIN puzzle_questions pq
+       ON pq.src_collection = pc.id AND pq.deleted_at IS NULL
      GROUP BY pc.id
      ORDER BY pc.id`
   );
   return response(200, { collections: result.records.map(mapRecord) });
+}
+
+/**
+ * A tiny change-detection manifest for the offline client: the (id, updatedAt,
+ * deletedAt) of every puzzle in a collection, with no canon_repr. The client
+ * diffs this against its local copy to find edited / added / deleted puzzles
+ * and only re-downloads full content for the ones that actually changed.
+ * Includes soft-deleted rows so the client can hide them locally.
+ */
+async function collectionManifest(
+  event: APIGatewayProxyEvent
+): Promise<APIGatewayProxyResult> {
+  const id = event.pathParameters?.id;
+  if (!id) return response(400, { error: "Missing collection id" });
+
+  const result = await executeStatement(
+    `SELECT id, updated_at, deleted_at
+     FROM puzzle_questions
+     WHERE src_collection = :id
+     ORDER BY id`,
+    [{ name: "id", value: { longValue: Number(id) } }]
+  );
+
+  return response(200, { puzzles: result.records.map(mapRecord) });
 }
 
 async function createCollection(
@@ -63,7 +88,12 @@ export async function handler(
   event: APIGatewayProxyEvent
 ): Promise<APIGatewayProxyResult> {
   const method = event.httpMethod;
+  const hasId = !!event.pathParameters?.id;
+  const subResource = event.pathParameters?.proxy;
 
+  if (method === "GET" && hasId && subResource === "manifest") {
+    return collectionManifest(event);
+  }
   if (method === "GET") {
     return listCollections();
   }

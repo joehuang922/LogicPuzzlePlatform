@@ -45,6 +45,13 @@ fun PuzzleApp() {
                 puzzleId = puzzleId,
                 attemptId = attemptId,
                 onBack = { navController.popBackStack() },
+                onOpenAttempt = { pid, aid ->
+                    // Replace the current play route so Back doesn't return to the
+                    // stale attempt after an opt-in reload of an updated puzzle.
+                    navController.navigate(Routes.play(pid, aid)) {
+                        popUpTo(Routes.PLAY) { inclusive = true }
+                    }
+                },
             )
         }
         composable(Routes.PROFILE) {

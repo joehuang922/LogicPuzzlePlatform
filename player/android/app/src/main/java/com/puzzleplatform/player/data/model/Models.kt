@@ -107,6 +107,9 @@ data class CreateAttemptRequest(
     val player: Int,
     val question: String,
     val initialAnswer: JsonObject,
+    // Client-generated ids so an attempt can be created offline and replayed.
+    val attemptId: String? = null,
+    val snapshotId: String? = null,
 )
 
 @Serializable
@@ -148,6 +151,52 @@ data class SaveSnapshotRequest(
     val progress: Double,
     val elapsedSeconds: Int,
     val finished: Boolean? = null,
+    // Client-generated id so an offline save replays idempotently on sync.
+    val snapshotId: String? = null,
+)
+
+// --- Offline sync DTOs ---
+
+/** One puzzle's change-detection info from GET /collections/{id}/manifest. */
+@Serializable
+data class ManifestPuzzle(
+    val id: String,
+    val updatedAt: String? = null,
+    val deletedAt: String? = null,
+)
+
+@Serializable
+data class CollectionManifestResponse(val puzzles: List<ManifestPuzzle> = emptyList())
+
+@Serializable
+data class SyncSnapshotInput(
+    val id: String,
+    val currentAnswer: JsonObject,
+    val progress: Double,
+    val elapsedSeconds: Int,
+    val finished: Boolean = false,
+    val createdAt: String,
+)
+
+@Serializable
+data class SyncAttemptInput(
+    val id: String,
+    val question: String,
+    val createdAt: String,
+    val snapshots: List<SyncSnapshotInput> = emptyList(),
+)
+
+@Serializable
+data class SyncRequest(
+    val player: Int,
+    val attempts: List<SyncAttemptInput> = emptyList(),
+)
+
+@Serializable
+data class SyncResponse(
+    val syncedAttemptIds: List<String> = emptyList(),
+    val syncedSnapshotIds: List<String> = emptyList(),
+    val newAchievements: List<AchievementUnlock> = emptyList(),
 )
 
 @Serializable

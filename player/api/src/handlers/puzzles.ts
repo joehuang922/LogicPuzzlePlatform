@@ -46,7 +46,8 @@ async function listPuzzles(
 
   let sql = PUZZLE_SELECT;
   const params: { name: string; value: any }[] = [];
-  const conditions: string[] = [];
+  // Hide soft-deleted puzzles from listings (getPuzzle still resolves them).
+  const conditions: string[] = ["pq.deleted_at IS NULL"];
 
   if (puzzleType) {
     conditions.push("pq.puzzle_type = :puzzleType");
@@ -237,9 +238,12 @@ async function deletePuzzle(
   const id = event.pathParameters?.id;
   if (!id) return response(400, { error: "Missing puzzle id" });
 
-  await executeStatement("DELETE FROM puzzle_questions WHERE id = :id", [
-    { name: "id", value: { stringValue: id } },
-  ]);
+  // Soft delete: keep the row so any offline attempt with an FK to it can still
+  // sync. listPuzzles hides deleted rows; getPuzzle still resolves them.
+  await executeStatement(
+    "UPDATE puzzle_questions SET deleted_at = CURRENT_TIMESTAMP WHERE id = :id",
+    [{ name: "id", value: { stringValue: id } }]
+  );
 
   return response(204, null);
 }

@@ -2,6 +2,7 @@ package com.puzzleplatform.player.data.api
 
 import com.puzzleplatform.player.data.model.AttemptListResponse
 import com.puzzleplatform.player.data.model.CollectionListResponse
+import com.puzzleplatform.player.data.model.CollectionManifestResponse
 import com.puzzleplatform.player.data.model.CollectionProgressResponse
 import com.puzzleplatform.player.data.model.CreateAttemptRequest
 import com.puzzleplatform.player.data.model.CreateAttemptResponse
@@ -14,6 +15,8 @@ import com.puzzleplatform.player.data.model.SaveSnapshotResponse
 import com.puzzleplatform.player.data.model.SnapshotResponse
 import com.puzzleplatform.player.data.model.SnapshotSummaryListResponse
 import com.puzzleplatform.player.data.model.SolvedQuestionsResponse
+import com.puzzleplatform.player.data.model.SyncRequest
+import com.puzzleplatform.player.data.model.SyncResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -42,6 +45,9 @@ interface PuzzleApi {
 
     @GET("collections")
     suspend fun listCollections(): CollectionListResponse
+
+    @GET("collections/{id}/manifest")
+    suspend fun getCollectionManifest(@Path("id") id: Int): CollectionManifestResponse
 
     @POST("attempts")
     suspend fun createAttempt(@Body body: CreateAttemptRequest): CreateAttemptResponse
@@ -85,4 +91,7 @@ interface PuzzleApi {
 
     @GET("profile")
     suspend fun getProfile(@Query("player") player: Int): ProfileResponse
+
+    @POST("sync")
+    suspend fun sync(@Body body: SyncRequest): SyncResponse
 }

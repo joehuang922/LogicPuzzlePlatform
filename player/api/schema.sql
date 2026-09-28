@@ -40,6 +40,9 @@ CREATE TABLE IF NOT EXISTS puzzle_questions (
   special         BOOLEAN      NOT NULL DEFAULT FALSE,
   created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  -- Soft delete: rows are never hard-deleted so an offline attempt (with an FK
+  -- to this table) can always sync. NULL = live; a timestamp = deleted/hidden.
+  deleted_at      TIMESTAMP    NULL,
   FOREIGN KEY (puzzle_type) REFERENCES puzzle_types(id),
   FOREIGN KEY (src_collection) REFERENCES puzzle_collections(id)
 );

@@ -89,6 +89,12 @@ export class ApiStack extends cdk.Stack {
     collections.addMethod("GET", collectionIntegration);
     collections.addMethod("POST", collectionIntegration);
 
+    // collections/{id}/{proxy} → e.g. GET /collections/3/manifest, the tiny
+    // change-detection manifest the offline client diffs against its local copy.
+    const singleCollection = collections.addResource("{id}");
+    const collectionSubResource = singleCollection.addResource("{proxy}");
+    collectionSubResource.addMethod("GET", collectionIntegration);
+
     // Assets: mints presigned S3 PUT URLs so the browser can upload binaries
     // (e.g. cover images) directly to the assets bucket, then serves them back
     // through the CloudFront distribution at a stable public URL.
@@ -175,6 +181,28 @@ export class ApiStack extends cdk.Stack {
     const attemptSubResource = singleAttempt.addResource("{proxy}");
     attemptSubResource.addMethod("GET", attemptIntegration);
     attemptSubResource.addMethod("POST", attemptIntegration);
+
+    // Batch upstream sync for the offline Android client: pushes a whole offline
+    // session (attempts + snapshots) in one request. Idempotent by client UUID.
+    const syncHandler = new lambda.Function(this, "SyncHandler", {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: "handlers/sync.handler",
+      code: lambda.Code.fromAsset(path.join(__dirname, "../../../api/dist")),
+      environment: {
+        CLUSTER_ARN: props.cluster.clusterArn,
+        SECRET_ARN: props.cluster.secret!.secretArn,
+        DATABASE_NAME: props.databaseName,
+      },
+      // 29s = API Gateway's max integration timeout. Gives the DB layer's
+      // resume-retry loop room to outlast an Aurora cold start (~10-25s).
+      timeout: cdk.Duration.seconds(29),
+    });
+
+    props.cluster.secret!.grantRead(syncHandler);
+    props.cluster.grantDataApiAccess(syncHandler);
+
+    const sync = api.root.addResource("sync");
+    sync.addMethod("POST", new apigw.LambdaIntegration(syncHandler));
 
     // Parser Lambda — container-based with Function URL (bypasses APIGW 29s timeout)
     const parserHandler = new lambda.DockerImageFunction(this, "OcrParserHandler", {

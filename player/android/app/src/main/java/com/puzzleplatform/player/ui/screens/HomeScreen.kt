@@ -14,6 +14,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -87,7 +89,10 @@ fun HomeScreen(
                             collection = c,
                             expanded = state.expandedCollectionId == c.id,
                             progressText = state.collectionProgress[c.id]?.let { "${it.solved}/${it.total}" },
+                            downloaded = state.downloadedCollectionIds.contains(c.id),
+                            downloading = state.downloadingCollectionIds.contains(c.id),
                             onToggle = { vm.toggleCollection(c.id) },
+                            onDownload = { vm.downloadCollection(c.id) },
                         )
                         if (state.expandedCollectionId == c.id) {
                             if (state.loadingCollectionPuzzles) {
@@ -200,7 +205,10 @@ private fun CollectionRow(
     collection: Collection,
     expanded: Boolean,
     progressText: String?,
+    downloaded: Boolean,
+    downloading: Boolean,
     onToggle: () -> Unit,
+    onDownload: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onToggle)) {
         Row(
@@ -226,6 +234,19 @@ private fun CollectionRow(
                 }
             }
             Text(progressText ?: "${collection.puzzleCount}", style = MaterialTheme.typography.bodySmall)
+            // Offline download control: spinner while fetching, ✓ when available,
+            // otherwise a download affordance. Stops row-toggle propagation.
+            when {
+                downloading -> CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                downloaded -> Icon(
+                    Icons.Filled.CloudDone,
+                    contentDescription = "Available offline",
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+                else -> IconButton(onClick = onDownload) {
+                    Icon(Icons.Filled.Download, contentDescription = "Download for offline")
+                }
+            }
         }
     }
 }

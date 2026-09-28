@@ -9,6 +9,7 @@ import com.puzzleplatform.player.data.model.Collection
 import com.puzzleplatform.player.data.model.CollectionProgress
 import com.puzzleplatform.player.data.model.Puzzle
 import com.puzzleplatform.player.data.model.PuzzleType
+import com.puzzleplatform.player.data.sync.SyncManager
 import com.puzzleplatform.player.puzzle.PuzzleEngines
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,16 +36,46 @@ data class HomeUiState(
     val hasPreviousAttempts: Boolean = false,
     // Previous-attempts dialog
     val previousAttempts: List<Attempt>? = null,
+    // Offline availability
+    val downloadedCollectionIds: Set<Int> = emptySet(),
+    val downloadingCollectionIds: Set<Int> = emptySet(),
 )
 
 class HomeViewModel(
     private val repo: PuzzleRepository = ServiceLocator.repository,
+    private val syncManager: SyncManager = ServiceLocator.syncManager,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(HomeUiState())
     val state: StateFlow<HomeUiState> = _state.asStateFlow()
 
-    init { load() }
+    init {
+        load()
+        observeDownloads()
+    }
+
+    private fun observeDownloads() {
+        viewModelScope.launch {
+            syncManager.downloadedCollectionIds.collect { ids ->
+                _state.update { it.copy(downloadedCollectionIds = ids.toSet()) }
+            }
+        }
+    }
+
+    /** Download a collection for offline play, then refresh Home progress. */
+    fun downloadCollection(collectionId: Int) {
+        if (_state.value.downloadingCollectionIds.contains(collectionId)) return
+        _state.update { it.copy(downloadingCollectionIds = it.downloadingCollectionIds + collectionId) }
+        viewModelScope.launch {
+            try {
+                repo.downloadCollection(collectionId)
+            } catch (e: Exception) {
+                _state.update { it.copy(error = e.message ?: "Download failed") }
+            } finally {
+                _state.update { it.copy(downloadingCollectionIds = it.downloadingCollectionIds - collectionId) }
+            }
+        }
+    }
 
     fun load() {
         _state.update { it.copy(loading = true, error = null) }
