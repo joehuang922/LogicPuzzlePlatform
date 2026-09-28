@@ -179,7 +179,7 @@ object SudokuEngine : PuzzleEngine {
     }
 
     /** True when all 81 cells are filled and no conflicts remain. */
-    fun isComplete(puzzle: Puzzle, userValues: Map<String, Int>): Boolean {
+    override fun isComplete(puzzle: Puzzle, userValues: Map<String, Int>): Boolean {
         val hints = parseHints(puzzle)
         val totalHints = hints.sumOf { row -> row.count { it > 0 } }
         // Count committed answers only; pencil-mark ("n:") keys don't fill a cell.

@@ -49,9 +49,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import com.puzzleplatform.player.puzzle.PuzzleEngines
 import com.puzzleplatform.player.ui.DIFFICULTY_LABELS
 import com.puzzleplatform.player.ui.board.DigitBar
+import com.puzzleplatform.player.ui.board.KakuroBoard
 import com.puzzleplatform.player.ui.board.SudokuBoard
 import com.puzzleplatform.player.ui.formatElapsed
 
@@ -197,17 +197,23 @@ fun PlayScreen(
                         Text("%.1f %%".format(state.progress), fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
                     }
 
-                    // Board (only Sudoku is supported at this version)
-                    if (PuzzleEngines.isSupported(puzzle.puzzleType) && puzzle.puzzleType == 1) {
-                        SudokuBoard(
+                    // Board, dispatched by puzzle type.
+                    when (puzzle.puzzleType) {
+                        1 -> SudokuBoard(
                             puzzle = puzzle,
                             userValues = state.userValues,
                             liveValidate = state.liveValidate,
                             selectedCell = state.selectedCell,
                             onSelectCell = vm::selectCell,
                         )
-                    } else {
-                        Text("This puzzle type isn't playable in this version yet.")
+                        12 -> KakuroBoard(
+                            puzzle = puzzle,
+                            userValues = state.userValues,
+                            liveValidate = state.liveValidate,
+                            selectedCell = state.selectedCell,
+                            onSelectCell = vm::selectCell,
+                        )
+                        else -> Text("This puzzle type isn't playable in this version yet.")
                     }
                 }
             }

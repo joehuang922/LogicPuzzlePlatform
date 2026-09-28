@@ -155,8 +155,8 @@ class PlayViewModel(
                 selectedCell = if (clearSelection) null else it.selectedCell,
             )
         }
-        // Auto-complete on a full, conflict-free grid (mirrors SudokuBoard.tsx onComplete).
-        if (!completed && eng is SudokuEngine && eng.isComplete(puzzle, newValues)) {
+        // Auto-complete on a full, valid solution (mirrors the web boards' onComplete).
+        if (!completed && eng != null && eng.isComplete(puzzle, newValues)) {
             handleComplete()
         }
     }

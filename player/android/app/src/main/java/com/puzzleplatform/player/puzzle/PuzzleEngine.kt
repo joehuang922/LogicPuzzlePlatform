@@ -25,12 +25,16 @@ interface PuzzleEngine {
 
     /** Rebuild the "col,row" -> value input map from a previously saved answer. */
     fun restoreUserValues(puzzle: Puzzle, answer: JsonObject): Map<String, Int>
+
+    /** True when the current input is a full, valid solution (triggers auto-complete). */
+    fun isComplete(puzzle: Puzzle, userValues: Map<String, Int>): Boolean
 }
 
 /** Registry mapping puzzleType id -> engine. Add engines here as more types are ported. */
 object PuzzleEngines {
     private val engines: Map<Int, PuzzleEngine> = listOf(
         SudokuEngine,
+        KakuroEngine,
     ).associateBy { it.puzzleType }
 
     fun forType(puzzleType: Int): PuzzleEngine? = engines[puzzleType]
