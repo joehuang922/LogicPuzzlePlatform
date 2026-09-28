@@ -52,6 +52,7 @@ import coil.compose.AsyncImage
 import com.puzzleplatform.player.ui.DIFFICULTY_LABELS
 import com.puzzleplatform.player.ui.board.DigitBar
 import com.puzzleplatform.player.ui.board.KakuroBoard
+import com.puzzleplatform.player.ui.board.MasyuBoard
 import com.puzzleplatform.player.ui.board.SudokuBoard
 import com.puzzleplatform.player.ui.formatElapsed
 
@@ -212,6 +213,12 @@ fun PlayScreen(
                             liveValidate = state.liveValidate,
                             selectedCell = state.selectedCell,
                             onSelectCell = vm::selectCell,
+                        )
+                        7 -> MasyuBoard(
+                            puzzle = puzzle,
+                            userValues = state.userValues,
+                            liveValidate = state.liveValidate,
+                            onSetEdge = vm::setUserValue,
                         )
                         else -> Text("This puzzle type isn't playable in this version yet.")
                     }

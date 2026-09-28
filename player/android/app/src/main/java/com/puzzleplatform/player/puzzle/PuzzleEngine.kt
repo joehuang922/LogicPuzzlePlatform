@@ -35,6 +35,7 @@ object PuzzleEngines {
     private val engines: Map<Int, PuzzleEngine> = listOf(
         SudokuEngine,
         KakuroEngine,
+        MasyuEngine,
     ).associateBy { it.puzzleType }
 
     fun forType(puzzleType: Int): PuzzleEngine? = engines[puzzleType]

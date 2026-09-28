@@ -1,8 +1,6 @@
 package com.puzzleplatform.player.ui.board
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,21 +21,28 @@ import androidx.compose.ui.unit.dp
 private val MAX_CELL = 40.dp
 /** Default target: auto-zoom so cells are at least this big when a board opens. */
 private val AUTO_CELL = 28.dp
-/** Below this, cells are too small to tap reliably, so entry (tap-to-select) is off. */
+/** Below this, cells are too small to tap/draw reliably, so input is off. */
 private val ENTRY_FLOOR = 24.dp
 
 /**
- * A square, pinch-to-zoom + pan viewport for grid boards, shared by every puzzle
+ * A square, two-finger pan/zoom viewport for grid boards, shared by every puzzle
  * renderer. The child draws in board pixel coordinates via [draw], which receives
- * the current cell size in px; taps are translated back to (col, row) via
- * [onTapCell] with the pan/zoom inverted.
+ * the current cell size in px.
+ *
+ * Gesture model (see [detectBoardGestures]): one finger is for content — a tap
+ * selects a cell via [onTapCell], and a one-finger drag draws (loop/edge puzzles)
+ * via [onDrawStart]/[onDrawTo]/[onDrawEnd] when those are supplied; two fingers
+ * pan and pinch-zoom. Separating by finger count is what lets drawing boards use
+ * the single-finger drag for drawing without fighting the pan.
  *
  * The zoom/pan math lives in [BoardTransform] (unit-tested); this composable only
  * wires gestures and drawing to it. A board small enough to fit at the max cell
- * size (e.g. 9x9 Sudoku on a phone) has no zoom range and behaves exactly like a
- * plain fit-to-width board.
+ * size (e.g. 9x9 Sudoku on a phone) has no zoom range and simply ignores the
+ * two-finger transform.
  *
  * [resetKey] recomputes the default zoom/pan when it changes (pass the puzzle id).
+ * The draw callbacks receive a (col, row) or null when the finger is off-grid /
+ * cells are too small to input.
  */
 @Composable
 fun ZoomableBoard(
@@ -46,10 +51,14 @@ fun ZoomableBoard(
     onTapCell: (col: Int, row: Int) -> Unit,
     modifier: Modifier = Modifier,
     resetKey: Any? = null,
+    onDrawStart: ((cell: Pair<Int, Int>?) -> Unit)? = null,
+    onDrawTo: ((cell: Pair<Int, Int>?) -> Unit)? = null,
+    onDrawEnd: (() -> Unit)? = null,
     draw: DrawScope.(cellPx: Float) -> Unit,
 ) {
     if (cols <= 0 || rows <= 0) return
     val density = LocalDensity.current
+    val drawable = onDrawTo != null
 
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val vpx = with(density) { maxWidth.toPx() } // viewport is square: vpx x vpx
@@ -63,22 +72,23 @@ fun ZoomableBoard(
         // A version counter so gesture-driven mutations to `transform` recompose.
         var version by remember(transform) { mutableStateOf(0) }
 
-        var canvasMod = Modifier
+        val canvasMod = Modifier
             .fillMaxWidth()
             .aspectRatio(1f)
-            .pointerInput(transform) {
-                detectTapGestures { off ->
-                    transform.cellAt(off.x, off.y)?.let { (col, row) -> onTapCell(col, row) }
-                }
+            .pointerInput(transform, drawable) {
+                detectBoardGestures(
+                    transformEnabled = transform.zoomable,
+                    drawEnabled = drawable,
+                    onTap = { off -> transform.cellAt(off.x, off.y)?.let { (col, row) -> onTapCell(col, row) } },
+                    onDragStart = { off -> onDrawStart?.invoke(transform.cellAt(off.x, off.y)) },
+                    onDrag = { off -> onDrawTo?.invoke(transform.cellAt(off.x, off.y)) },
+                    onDragEnd = { onDrawEnd?.invoke() },
+                    onTransform = { centroid, pan, zoom ->
+                        transform.transform(centroid.x, centroid.y, pan.x, pan.y, zoom)
+                        version++
+                    },
+                )
             }
-        if (transform.zoomable) {
-            canvasMod = canvasMod.pointerInput(transform) {
-                detectTransformGestures { centroid, panChange, zoomChange, _ ->
-                    transform.transform(centroid.x, centroid.y, panChange.x, panChange.y, zoomChange)
-                    version++
-                }
-            }
-        }
 
         Canvas(canvasMod) {
             version // read so the draw re-runs after a gesture

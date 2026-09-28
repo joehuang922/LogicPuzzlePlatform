@@ -134,6 +134,18 @@ class PlayViewModel(
         updateValues(next, clearSelection = true)
     }
 
+    /**
+     * Set or clear a single flat userValues entry. Used by loop/edge puzzles
+     * (e.g. Masyu) whose input is drag-to-draw rather than tap-to-enter-a-digit:
+     * the board decides the exact key ("h:r,c" / "v:r,c") and whether it's on.
+     */
+    fun setUserValue(key: String, on: Boolean) {
+        val values = _state.value.userValues
+        val next = if (on) values + (key to 1) else values - key
+        if (next == values) return
+        updateValues(next, clearSelection = false)
+    }
+
     fun clearCell() {
         val cell = _state.value.selectedCell ?: return
         val values = _state.value.userValues
