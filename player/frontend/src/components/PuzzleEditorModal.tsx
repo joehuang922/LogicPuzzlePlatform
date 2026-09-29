@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef, useLayoutEffect } from "react";
 import { PuzzleType, Collection } from "../api/client";
 import { DIFFICULTY_OPTIONS } from "../constants";
 import { inputStyle, fieldStyle } from "../styles/admin";
@@ -83,6 +83,216 @@ function CanonEditor({
   }
 }
 
+/**
+ * Shows the original scan for side-by-side proofreading. Source images are
+ * high-resolution scans (often 2000px+ wide), so by default the whole image is
+ * scaled to *fit* the pane — that's the glance editors want. From there you can
+ * zoom in (buttons or Ctrl/⌘ + wheel) and drag to pan around the enlarged image.
+ */
+function ImagePane({
+  imageUrl,
+  fillHeight,
+  onOrientation,
+}: {
+  imageUrl: string;
+  /** true = image is beside the editor (portrait); false = stacked below (landscape). */
+  fillHeight: boolean;
+  onOrientation: (o: "portrait" | "landscape") => void;
+}) {
+  const boxRef = useRef<HTMLDivElement>(null);
+  // zoom 1 = "fit to pane"; larger zooms in. Panning is only possible above fit.
+  const [zoom, setZoom] = useState(1);
+  const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
+  const [box, setBox] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
+  const panStart = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
+  // Pending scroll to apply after the resized <img> lands, so a zoomed-in point
+  // stays under the cursor (same pattern as BoardViewport).
+  const zoomAnchor = useRef<{ ix: number; iy: number; ox: number; oy: number } | null>(null);
+
+  const ZOOM_MIN = 1;
+  const ZOOM_MAX = 8;
+  const clampZoom = (z: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
+
+  function handleLoad(e: React.SyntheticEvent<HTMLImageElement>) {
+    const img = e.currentTarget;
+    setNatural({ w: img.naturalWidth, h: img.naturalHeight });
+    onOrientation(img.naturalWidth > img.naturalHeight ? "landscape" : "portrait");
+  }
+
+  // Track the scroll box's content size so we can compute the fit scale.
+  useLayoutEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const measure = () => setBox({ w: el.clientWidth, h: el.clientHeight });
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // "Fit" scale: shrink the whole image to sit inside the box (never upscale
+  // past 1:1 at fit). Displayed size = fit * zoom.
+  const fitScale =
+    natural && box.w > 0 && box.h > 0
+      ? Math.min(box.w / natural.w, box.h / natural.h, 1)
+      : 0;
+  const dispW = natural ? natural.w * fitScale * zoom : 0;
+  const dispH = natural ? natural.h * fitScale * zoom : 0;
+
+  const zoomBy = useCallback((factor: number, clientX?: number, clientY?: number) => {
+    const el = boxRef.current;
+    setZoom((prev) => {
+      const next = clampZoom(prev * factor);
+      if (next === prev) return prev;
+      if (el) {
+        // Record the intrinsic point under the cursor; restore it post-render.
+        const rect = el.getBoundingClientRect();
+        const ox = clientX != null ? clientX - rect.left : el.clientWidth / 2;
+        const oy = clientY != null ? clientY - rect.top : el.clientHeight / 2;
+        zoomAnchor.current = {
+          ix: (el.scrollLeft + ox) / prev,
+          iy: (el.scrollTop + oy) / prev,
+          ox,
+          oy,
+        };
+      }
+      return next;
+    });
+  }, []);
+
+  // Ctrl/⌘ + wheel to zoom (also Mac trackpad pinch). Native listener so we can
+  // preventDefault the browser's page zoom.
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      zoomBy(Math.exp(-e.deltaY * 0.0015), e.clientX, e.clientY);
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [zoomBy]);
+
+  // Apply the pending zoom anchor once the image has re-rendered at the new size.
+  useLayoutEffect(() => {
+    const el = boxRef.current;
+    const a = zoomAnchor.current;
+    if (!el) return;
+    if (a) {
+      el.scrollLeft = a.ix * zoom - a.ox;
+      el.scrollTop = a.iy * zoom - a.oy;
+      zoomAnchor.current = null;
+    } else if (zoom === 1) {
+      el.scrollLeft = 0;
+      el.scrollTop = 0;
+    }
+  }, [zoom]);
+
+  function onPointerDown(e: React.PointerEvent) {
+    if (zoom <= 1) return; // nothing to pan when fitted
+    const el = boxRef.current;
+    if (!el) return;
+    el.setPointerCapture(e.pointerId);
+    panStart.current = { x: e.clientX, y: e.clientY, left: el.scrollLeft, top: el.scrollTop };
+  }
+  function onPointerMove(e: React.PointerEvent) {
+    const start = panStart.current;
+    const el = boxRef.current;
+    if (!start || !el) return;
+    el.scrollLeft = start.left - (e.clientX - start.x);
+    el.scrollTop = start.top - (e.clientY - start.y);
+  }
+  function onPointerUp(e: React.PointerEvent) {
+    panStart.current = null;
+    boxRef.current?.releasePointerCapture(e.pointerId);
+  }
+
+  const zoomed = zoom > 1;
+
+  const btnStyle: React.CSSProperties = {
+    border: "1px solid #cbd5e1",
+    background: "white",
+    borderRadius: 6,
+    padding: "2px 9px",
+    fontSize: 13,
+    cursor: "pointer",
+    lineHeight: 1.4,
+  };
+
+  return (
+    <div
+      style={{
+        // Definite basis in both orientations so the fitted image (and the
+        // zoom percentages) resolve against a stable pane size: a fraction of
+        // the row width when beside the editor, of the column height when below.
+        flex: fillHeight ? "0 0 42%" : "0 0 40%",
+        minWidth: 0,
+        minHeight: 0,
+        display: "flex",
+        flexDirection: "column",
+        border: "1px solid #ddd",
+        borderRadius: 6,
+        background: "#fafafa",
+        padding: "0.5rem",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: "0.35rem", flexShrink: 0 }}>
+        <span style={{ fontSize: "0.75rem", fontWeight: "bold", color: "#666" }}>Original image</span>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
+          <button type="button" style={btnStyle} onClick={() => zoomBy(1 / 1.25)} aria-label="Zoom out" disabled={zoom <= ZOOM_MIN}>
+            −
+          </button>
+          <span style={{ fontSize: 12, color: "#475569", minWidth: 40, textAlign: "center" }}>{Math.round(zoom * 100)}%</span>
+          <button type="button" style={btnStyle} onClick={() => zoomBy(1.25)} aria-label="Zoom in" disabled={zoom >= ZOOM_MAX}>
+            +
+          </button>
+          <button type="button" style={btnStyle} onClick={() => setZoom(1)} disabled={zoom === 1}>
+            Fit
+          </button>
+        </div>
+      </div>
+      <div
+        ref={boxRef}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        title={zoomed ? "Drag to pan" : natural ? `${natural.w}×${natural.h}px — Ctrl/⌘ + scroll to zoom` : undefined}
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflow: zoomed ? "auto" : "hidden",
+          display: "flex",
+          // At fit, center the (contained) image; when zoomed, pin to top-left
+          // so the scrollable content fills the box with no dead margins.
+          alignItems: zoomed ? "flex-start" : "center",
+          justifyContent: zoomed ? "flex-start" : "center",
+          touchAction: "none",
+          cursor: zoomed ? "grab" : "default",
+        }}
+      >
+        <img
+          src={imageUrl}
+          alt="Original puzzle"
+          onLoad={handleLoad}
+          draggable={false}
+          style={{
+            display: "block",
+            userSelect: "none",
+            flex: "none",
+            width: dispW ? `${dispW}px` : "auto",
+            height: dispH ? `${dispH}px` : "auto",
+            maxWidth: dispW ? "none" : "100%",
+            maxHeight: dispH ? "none" : "100%",
+            objectFit: "contain",
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 export interface PuzzleEditorResult {
   canonRepr: string;
   title: string;
@@ -147,11 +357,6 @@ export default function PuzzleEditorModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [onCancel]);
 
-  function handleImageLoad(e: React.SyntheticEvent<HTMLImageElement>) {
-    const img = e.currentTarget;
-    setOrientation(img.naturalWidth > img.naturalHeight ? "landscape" : "portrait");
-  }
-
   async function handleCopy() {
     try {
       await navigator.clipboard.writeText(canon);
@@ -170,27 +375,7 @@ export default function PuzzleEditorModal({
   const isRow = !hasImage || orientation === "portrait";
 
   const imagePane = hasImage && (
-    <div
-      style={{
-        flex: orientation === "portrait" ? "0 0 auto" : "0 0 40%",
-        maxWidth: orientation === "portrait" ? "45%" : "100%",
-        overflow: "auto",
-        border: "1px solid #ddd",
-        borderRadius: 6,
-        background: "#fafafa",
-        padding: "0.5rem",
-      }}
-    >
-      <div style={{ fontSize: "0.75rem", fontWeight: "bold", color: "#666", marginBottom: "0.35rem" }}>
-        Original image
-      </div>
-      <img
-        src={imageUrl}
-        alt="Original puzzle"
-        onLoad={handleImageLoad}
-        style={{ display: "block", maxWidth: "none" }}
-      />
-    </div>
+    <ImagePane imageUrl={imageUrl!} fillHeight={orientation === "portrait"} onOrientation={setOrientation} />
   );
 
   const editorPane = (
