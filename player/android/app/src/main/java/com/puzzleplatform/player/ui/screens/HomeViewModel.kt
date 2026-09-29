@@ -20,6 +20,7 @@ import kotlinx.serialization.json.JsonObject
 
 data class HomeUiState(
     val loading: Boolean = true,
+    val refreshing: Boolean = false,
     val error: String? = null,
     val puzzles: List<Puzzle> = emptyList(),
     val collections: List<Collection> = emptyList(),
@@ -81,24 +82,54 @@ class HomeViewModel(
         _state.update { it.copy(loading = true, error = null) }
         viewModelScope.launch {
             try {
-                val puzzles = repo.listPuzzles(limit = 10)
-                val collections = repo.listCollections()
-                val types = repo.listPuzzleTypes()
-                val progress = if (collections.isNotEmpty()) {
-                    repo.getCollectionProgress(collections.map { it.id }).associateBy { it.collectionId }
-                } else emptyMap()
-                _state.update {
-                    it.copy(
-                        loading = false,
-                        puzzles = puzzles,
-                        collections = collections,
-                        puzzleTypes = types,
-                        collectionProgress = progress,
-                    )
-                }
+                fetchHome()
+                _state.update { it.copy(loading = false) }
             } catch (e: Exception) {
                 _state.update { it.copy(loading = false, error = e.message ?: "Failed to load") }
             }
+        }
+    }
+
+    /**
+     * Pull-to-refresh: pull down server-side puzzle edits for every downloaded
+     * collection, then re-read Home. This is the app's primary trigger for content
+     * updates reaching the device (see PuzzleRepository.refreshDownloadedCollections).
+     * If a collection is currently expanded, its puzzle list is refreshed too, so an
+     * edited/added/removed puzzle shows immediately.
+     */
+    fun refresh() {
+        if (_state.value.refreshing) return
+        _state.update { it.copy(refreshing = true, error = null) }
+        viewModelScope.launch {
+            try {
+                repo.refreshDownloadedCollections()
+                fetchHome()
+                _state.value.expandedCollectionId?.let { reloadCollectionPuzzles(it) }
+            } catch (e: Exception) {
+                _state.update { it.copy(error = e.message ?: "Refresh failed") }
+            } finally {
+                _state.update { it.copy(refreshing = false) }
+            }
+        }
+    }
+
+    /** Load the Home lists (Latest + collections + progress) into state. */
+    private suspend fun fetchHome() {
+        // "Latest" shows the puzzles the player most recently worked on
+        // (by latest snapshot), capped at 3.
+        val puzzles = repo.listRecentlyPlayed(limit = 3)
+        val collections = repo.listCollections()
+        val types = repo.listPuzzleTypes()
+        val progress = if (collections.isNotEmpty()) {
+            repo.getCollectionProgress(collections.map { it.id }).associateBy { it.collectionId }
+        } else emptyMap()
+        _state.update {
+            it.copy(
+                puzzles = puzzles,
+                collections = collections,
+                puzzleTypes = types,
+                collectionProgress = progress,
+            )
         }
     }
 
@@ -112,21 +143,32 @@ class HomeViewModel(
         }
         viewModelScope.launch {
             try {
-                val puzzles = repo.listPuzzles(srcCollection = collectionId.toString())
-                val solved = repo.getSolvedQuestions(puzzles.map { it.id })
-                _state.update { s ->
-                    s.copy(
-                        loadingCollectionPuzzles = false,
-                        collectionPuzzles = puzzles,
-                        solvedPuzzleIds = solved.solvedQuestions.toSet(),
-                        attemptedPuzzleIds = solved.attemptedQuestions.toSet(),
-                        collectionProgress = s.collectionProgress + (collectionId to
-                            CollectionProgress(collectionId, puzzles.size, solved.solvedQuestions.size)),
-                    )
-                }
+                reloadCollectionPuzzles(collectionId)
             } catch (e: Exception) {
                 _state.update { it.copy(loadingCollectionPuzzles = false, error = e.message) }
             }
+        }
+    }
+
+    /** Load and sort one collection's puzzles + solved/attempted state into UI state. */
+    private suspend fun reloadCollectionPuzzles(collectionId: Int) {
+        // Order the collection's puzzles by type, then by title, so like
+        // puzzles group together and read alphabetically within a type.
+        val puzzles = repo.listPuzzles(srcCollection = collectionId.toString())
+            .sortedWith(
+                compareBy<Puzzle> { it.puzzleType }
+                    .thenBy { it.title?.lowercase() ?: "" }
+            )
+        val solved = repo.getSolvedQuestions(puzzles.map { it.id })
+        _state.update { s ->
+            s.copy(
+                loadingCollectionPuzzles = false,
+                collectionPuzzles = puzzles,
+                solvedPuzzleIds = solved.solvedQuestions.toSet(),
+                attemptedPuzzleIds = solved.attemptedQuestions.toSet(),
+                collectionProgress = s.collectionProgress + (collectionId to
+                    CollectionProgress(collectionId, puzzles.size, solved.solvedQuestions.size)),
+            )
         }
     }
 

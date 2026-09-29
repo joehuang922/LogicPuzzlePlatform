@@ -39,6 +39,23 @@ interface PuzzleDao {
     @Query("SELECT * FROM puzzles WHERE deletedAt IS NULL ORDER BY id LIMIT :limit")
     suspend fun listRecent(limit: Int): List<PuzzleEntity>
 
+    // Puzzles the player most recently worked on, newest-snapshot first. Joins
+    // through attempts to snapshots and orders by each puzzle's latest snapshot
+    // (createdAt is a lexicographically-sortable UTC datetime). Soft-deleted
+    // puzzles are excluded, matching listRecent.
+    @Query(
+        """
+        SELECT p.* FROM puzzles p
+        JOIN attempts a ON a.question = p.id
+        JOIN snapshots s ON s.attempt = a.id
+        WHERE p.deletedAt IS NULL
+        GROUP BY p.id
+        ORDER BY MAX(s.createdAt) DESC
+        LIMIT :limit
+        """
+    )
+    suspend fun listRecentlyPlayed(limit: Int): List<PuzzleEntity>
+
     @Query("SELECT * FROM puzzles WHERE srcCollection = :collectionId AND deletedAt IS NULL ORDER BY id")
     suspend fun listByCollection(collectionId: Int): List<PuzzleEntity>
 

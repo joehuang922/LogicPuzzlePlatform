@@ -72,6 +72,14 @@ class PuzzleRepository(
         }
     }
 
+    /**
+     * The [limit] puzzles the player most recently worked on (by latest snapshot),
+     * newest first. Progress is local-first, so this reads only from Room — an empty
+     * list simply means nothing has been played yet.
+     */
+    suspend fun listRecentlyPlayed(limit: Int): List<Puzzle> =
+        db.puzzleDao().listRecentlyPlayed(limit).map { it.toModel(json) }
+
     suspend fun getPuzzle(id: String): Puzzle {
         db.puzzleDao().getById(id)?.let { return it.toModel(json) }
         val puzzle = api.getPuzzle(id).puzzle
@@ -219,6 +227,22 @@ class PuzzleRepository(
     suspend fun downloadCollection(collectionId: Int) = sync.downloadCollection(collectionId)
 
     suspend fun refreshCollection(collectionId: Int) = sync.refreshCollection(collectionId)
+
+    /**
+     * Best-effort manifest refresh of every offline-downloaded collection, so
+     * server-side puzzle edits/additions/deletions land locally. This is the only
+     * path by which content edits reach an already-downloaded puzzle. A failure on
+     * one collection is swallowed so the rest still refresh. Never touches progress.
+     */
+    suspend fun refreshDownloadedCollections() {
+        for (id in db.collectionDownloadDao().getAll().map { it.collectionId }) {
+            try {
+                sync.refreshCollection(id)
+            } catch (_: Exception) {
+                // Offline or a transient server error; leave this collection as-is.
+            }
+        }
+    }
 
     /**
      * True if the puzzle has been edited server-side since this attempt started

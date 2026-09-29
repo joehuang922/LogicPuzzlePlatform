@@ -29,6 +29,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -73,38 +74,51 @@ fun HomeScreen(
                     TextButton(onClick = { vm.load() }) { Text("Retry") }
                 }
             }
-            else -> LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+            // Pull down to pull server-side puzzle edits into downloaded
+            // collections, then re-read Home (see HomeViewModel.refresh).
+            else -> PullToRefreshBox(
+                isRefreshing = state.refreshing,
+                onRefresh = { vm.refresh() },
+                modifier = Modifier.fillMaxSize().padding(padding),
             ) {
-                item { SectionHeader("Recent Puzzles") }
-                items(state.puzzles, key = { it.id }) { p ->
-                    PuzzleRow(p) { vm.selectPuzzle(p) }
-                }
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    // "Latest": the puzzles the player most recently worked on. Hidden
+                    // entirely until there's at least one, so a fresh install isn't a
+                    // lone empty header.
+                    if (state.puzzles.isNotEmpty()) {
+                        item { SectionHeader("Latest") }
+                        items(state.puzzles, key = { it.id }) { p ->
+                            PuzzleRow(p) { vm.selectPuzzle(p) }
+                        }
+                    }
 
-                if (state.collections.isNotEmpty()) {
-                    item { SectionHeader("Collections") }
-                    items(state.collections, key = { "col-${it.id}" }) { c ->
-                        CollectionRow(
-                            collection = c,
-                            expanded = state.expandedCollectionId == c.id,
-                            progressText = state.collectionProgress[c.id]?.let { "${it.solved}/${it.total}" },
-                            downloaded = state.downloadedCollectionIds.contains(c.id),
-                            downloading = state.downloadingCollectionIds.contains(c.id),
-                            onToggle = { vm.toggleCollection(c.id) },
-                            onDownload = { vm.downloadCollection(c.id) },
-                        )
-                        if (state.expandedCollectionId == c.id) {
-                            if (state.loadingCollectionPuzzles) {
-                                Text("Loading questions…", modifier = Modifier.padding(start = 16.dp, bottom = 8.dp))
-                            } else {
-                                for (p in state.collectionPuzzles) {
-                                    CollectionPuzzleRow(
-                                        puzzle = p,
-                                        solved = state.solvedPuzzleIds.contains(p.id),
-                                        attempted = state.attemptedPuzzleIds.contains(p.id),
-                                        onClick = { vm.selectPuzzle(p) },
-                                    )
+                    if (state.collections.isNotEmpty()) {
+                        item { SectionHeader("Collections") }
+                        items(state.collections, key = { "col-${it.id}" }) { c ->
+                            CollectionRow(
+                                collection = c,
+                                expanded = state.expandedCollectionId == c.id,
+                                progressText = state.collectionProgress[c.id]?.let { "${it.solved}/${it.total}" },
+                                downloaded = state.downloadedCollectionIds.contains(c.id),
+                                downloading = state.downloadingCollectionIds.contains(c.id),
+                                onToggle = { vm.toggleCollection(c.id) },
+                                onDownload = { vm.downloadCollection(c.id) },
+                            )
+                            if (state.expandedCollectionId == c.id) {
+                                if (state.loadingCollectionPuzzles) {
+                                    Text("Loading questions…", modifier = Modifier.padding(start = 16.dp, bottom = 8.dp))
+                                } else {
+                                    for (p in state.collectionPuzzles) {
+                                        CollectionPuzzleRow(
+                                            puzzle = p,
+                                            solved = state.solvedPuzzleIds.contains(p.id),
+                                            attempted = state.attemptedPuzzleIds.contains(p.id),
+                                            onClick = { vm.selectPuzzle(p) },
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -263,8 +277,10 @@ private fun CollectionPuzzleRow(puzzle: Puzzle, solved: Boolean, attempted: Bool
     ) {
         Column(Modifier.weight(1f)) {
             Text(puzzle.title ?: "(none)", style = MaterialTheme.typography.bodyMedium)
+            val diff = DIFFICULTY_LABELS[puzzle.difficulty] ?: puzzle.difficulty
+            val size = puzzle.width?.let { w -> puzzle.height?.let { h -> " · $w x $h" } } ?: ""
             Text(
-                "${puzzle.puzzleTypeJpLabel} · ${DIFFICULTY_LABELS[puzzle.difficulty] ?: puzzle.difficulty}",
+                "${puzzle.puzzleTypeJpLabel} · $diff$size",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
