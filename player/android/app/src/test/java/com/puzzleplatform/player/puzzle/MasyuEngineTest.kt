@@ -86,10 +86,38 @@ class MasyuEngineTest {
     // -- computeProgress ----------------------------------------------------
 
     @Test
-    fun computeProgress_isAlwaysZero() {
-        val p = puzzle(canon4x4)
-        assertEquals(0.0, MasyuEngine.computeProgress(p, emptyMap()), 0.0)
-        assertEquals(0.0, MasyuEngine.computeProgress(p, perimeter), 0.0)
+    fun computeProgress_zeroForEmptyBoard() {
+        // Two circles, none satisfied yet.
+        assertEquals(0.0, MasyuEngine.computeProgress(puzzle(canon4x4), emptyMap()), 0.0)
+    }
+
+    @Test
+    fun computeProgress_hundredForSolvedBoard() {
+        // The solved perimeter loop satisfies both circles.
+        assertEquals(100.0, MasyuEngine.computeProgress(puzzle(canon4x4), perimeter), 1e-9)
+    }
+
+    @Test
+    fun computeProgress_countsPartiallySatisfiedCircles() {
+        // Black circle at (0,0), white at (0,2). Draw only the top+left edges so the
+        // black corner turns (down+right) with straight neighbors -> satisfied; the
+        // white circle has just one segment so far -> not satisfied. Expect 1/2 = 50%.
+        val partial = mapOf(
+            "h:0,0" to 1, "h:0,1" to 1, // top edge through (0,0),(0,1),(0,2)
+            "v:0,0" to 1, "v:1,0" to 1, // left edge down from (0,0)
+        )
+        assertEquals(50.0, MasyuEngine.computeProgress(puzzle(canon4x4), partial), 1e-9)
+    }
+
+    @Test
+    fun computeProgress_zeroWhenNoCircles() {
+        val noCircles = """{"cells":[
+            [0,0,0,0],
+            [0,0,0,0],
+            [0,0,0,0],
+            [0,0,0,0]
+        ]}"""
+        assertEquals(0.0, MasyuEngine.computeProgress(puzzle(noCircles), perimeter), 0.0)
     }
 
     // -- isComplete ---------------------------------------------------------

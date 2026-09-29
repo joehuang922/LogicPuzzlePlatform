@@ -84,7 +84,7 @@ At least one edge exists AND the edges form a single connected closed loop with 
 
 ### Progress calculation
 
-`(cells that have at least one adjacent edge drawn / total cells that are part of the solution loop) * 100`. Since the solution loop length is unknown, use: `(cells with at least one edge / total cell count) * 100` as an approximation.
+`(circles whose constraint is fully satisfied / total circles) * 100`. A circle counts as satisfied when the segments drawn so far already meet its rule using the same per-circle check as the completion criteria: exactly two connected segments, plus the white/black constraint (white passes straight through with a turn in ≥1 along-line neighbor; black turns here with both outgoing segments continuing straight ≥1 cell). A solved board therefore reads exactly 100%; a board with no circles reads 0.
 
 ## Puzzle Editor
 

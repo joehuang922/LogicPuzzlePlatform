@@ -103,11 +103,59 @@ object MasyuEngine : PuzzleEngine {
     }
 
     /**
-     * Masyu has no natural "cells filled" percentage (a loop puzzle), so the web
-     * client registers no progress calculator and reports 0 until solved. Match
-     * that here to keep the saved progress identical.
+     * Progress = (circles whose constraint is fully satisfied / total circles) * 100.
+     * "Satisfied" uses the same per-circle predicate as completion ([circleSatisfied]),
+     * so a solved board reads exactly 100% and a board with no circles reads 0.
      */
-    override fun computeProgress(puzzle: Puzzle, userValues: Map<String, Int>): Double = 0.0
+    override fun computeProgress(puzzle: Puzzle, userValues: Map<String, Int>): Double {
+        val cells = parseCells(puzzle)
+        val (rows, cols) = dims(cells)
+        if (rows == 0 || cols == 0) return 0.0
+        val e = edges(cells, userValues)
+
+        var total = 0
+        var satisfied = 0
+        for (r in 0 until rows) {
+            for (c in 0 until cells[r].size) {
+                val kind = cells[r][c]
+                if (kind == EMPTY) continue
+                total++
+                if (circleSatisfied(r, c, kind, e, rows, cols)) satisfied++
+            }
+        }
+        if (total == 0) return 0.0
+        return satisfied.toDouble() / total * 100.0
+    }
+
+    /**
+     * True when the circle at (r,c) has its Masyu constraint fully satisfied by the
+     * segments drawn so far — the same rule applied per-circle at completion:
+     *  - exactly two connected segments, and
+     *  - WHITE: passes straight through with a turn in ≥1 along-line neighbor;
+     *  - BLACK: turns here, with both outgoing segments continuing straight ≥1 cell.
+     */
+    fun circleSatisfied(r: Int, c: Int, kind: Int, e: Edges, rows: Int, cols: Int): Boolean {
+        val dirs = connections(r, c, e, rows, cols)
+        if (dirs.size != 2) return false
+        return when (kind) {
+            WHITE -> {
+                if (!isStraight(dirs)) return false
+                if (dirs.contains(Direction.LEFT) && dirs.contains(Direction.RIGHT)) {
+                    isTurn(connections(r, c - 1, e, rows, cols)) || isTurn(connections(r, c + 1, e, rows, cols))
+                } else {
+                    isTurn(connections(r - 1, c, e, rows, cols)) || isTurn(connections(r + 1, c, e, rows, cols))
+                }
+            }
+            BLACK -> {
+                if (!isTurn(dirs)) return false
+                dirs.all { d ->
+                    val (nr, nc) = step(r, c, d)
+                    isStraight(connections(nr, nc, e, rows, cols))
+                }
+            }
+            else -> false
+        }
+    }
 
     override fun restoreUserValues(puzzle: Puzzle, answer: JsonObject): Map<String, Int> {
         val cells = parseCells(puzzle)
@@ -314,28 +362,12 @@ object MasyuEngine : PuzzleEngine {
         }
         if (visitedCount != loopCellCount) return false
 
-        // Circle rules.
+        // Circle rules (same per-circle predicate as computeProgress).
         for (r in 0 until rows) {
             for (c in 0 until cells[r].size) {
                 val kind = cells[r][c]
                 if (kind == EMPTY) continue
-                val dirs = connections(r, c, e, rows, cols)
-                if (dirs.size != 2) return false
-                if (kind == WHITE) {
-                    if (!isStraight(dirs)) return false
-                    val neighborTurns = if (dirs.contains(Direction.LEFT) && dirs.contains(Direction.RIGHT)) {
-                        isTurn(connections(r, c - 1, e, rows, cols)) || isTurn(connections(r, c + 1, e, rows, cols))
-                    } else {
-                        isTurn(connections(r - 1, c, e, rows, cols)) || isTurn(connections(r + 1, c, e, rows, cols))
-                    }
-                    if (!neighborTurns) return false
-                } else { // BLACK
-                    if (!isTurn(dirs)) return false
-                    for (d in dirs) {
-                        val (nr, nc) = step(r, c, d)
-                        if (!isStraight(connections(nr, nc, e, rows, cols))) return false
-                    }
-                }
+                if (!circleSatisfied(r, c, kind, e, rows, cols)) return false
             }
         }
         return true
