@@ -36,7 +36,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,6 +55,8 @@ import com.puzzleplatform.player.ui.DIFFICULTY_LABELS
 import com.puzzleplatform.player.ui.board.DigitBar
 import com.puzzleplatform.player.ui.board.KakuroBoard
 import com.puzzleplatform.player.ui.board.MasyuBoard
+import com.puzzleplatform.player.ui.board.NonogramBoard
+import com.puzzleplatform.player.ui.board.NonogramMode
 import com.puzzleplatform.player.ui.board.SudokuBoard
 import com.puzzleplatform.player.ui.formatElapsed
 
@@ -220,6 +224,29 @@ fun PlayScreen(
                             liveValidate = state.liveValidate,
                             onSetEdge = vm::setUserValue,
                         )
+                        6 -> {
+                            var nonogramMode by remember(puzzle.id) { mutableStateOf(NonogramMode.FILL) }
+                            NonogramBoard(
+                                puzzle = puzzle,
+                                userValues = state.userValues,
+                                liveValidate = state.liveValidate,
+                                mode = nonogramMode,
+                                onSetCell = vm::setCellState,
+                            )
+                            // Fill / cross paint-mode toggle (touch has no right-click).
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FilterChip(
+                                    selected = nonogramMode == NonogramMode.FILL,
+                                    onClick = { nonogramMode = NonogramMode.FILL },
+                                    label = { Text("■ Fill") },
+                                )
+                                FilterChip(
+                                    selected = nonogramMode == NonogramMode.CROSS,
+                                    onClick = { nonogramMode = NonogramMode.CROSS },
+                                    label = { Text("✕ Cross") },
+                                )
+                            }
+                        }
                         else -> Text("This puzzle type isn't playable in this version yet.")
                     }
                 }

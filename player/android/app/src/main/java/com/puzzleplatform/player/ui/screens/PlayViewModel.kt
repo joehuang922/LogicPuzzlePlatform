@@ -146,6 +146,19 @@ class PlayViewModel(
         updateValues(next, clearSelection = false)
     }
 
+    /**
+     * Set a "col,row" cell to an explicit state, removing the key when [state] is 0.
+     * Used by multi-state paint puzzles (e.g. Nonogram: 1 = filled, 2 = crossed) whose
+     * input is drag-to-paint rather than digit entry.
+     */
+    fun setCellState(col: Int, row: Int, state: Int) {
+        val key = "$col,$row"
+        val values = _state.value.userValues
+        val next = if (state == 0) values - key else values + (key to state)
+        if (next == values) return
+        updateValues(next, clearSelection = false)
+    }
+
     fun clearCell() {
         val cell = _state.value.selectedCell ?: return
         val values = _state.value.userValues
