@@ -285,4 +285,26 @@ object NonogramEngine : PuzzleEngine {
         }
         return true
     }
+
+    /**
+     * The solved answer grid IS the picture for a Nonogram: filled cells become opaque
+     * black, everything else stays blank. Crosses are a solving aid, not part of the
+     * picture, so they read as blank. Returns null when the grid is empty.
+     */
+    override fun renderThumbnail(puzzle: Puzzle, answer: JsonObject): PuzzleThumbnail? {
+        val clues = parseClues(puzzle)
+        val rows = clues.rows
+        val cols = clues.cols
+        if (rows == 0 || cols == 0) return null
+        val values = restoreUserValues(puzzle, answer)
+        val cells = IntArray(rows * cols) { i ->
+            val c = i % cols
+            val r = i / cols
+            if (values["$c,$r"] == FILLED) THUMB_FILL_ARGB else 0
+        }
+        return PuzzleThumbnail(width = cols, height = rows, cells = cells)
+    }
 }
+
+/** Opaque near-black for a filled nonogram cell, matching the board's FILL_COLOR. */
+private const val THUMB_FILL_ARGB = 0xFF222222.toInt()

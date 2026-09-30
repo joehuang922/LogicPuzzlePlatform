@@ -28,6 +28,15 @@ interface PuzzleEngine {
 
     /** True when the current input is a full, valid solution (triggers auto-complete). */
     fun isComplete(puzzle: Puzzle, userValues: Map<String, Int>): Boolean
+
+    /**
+     * Render a solved puzzle's "picture" into a [PuzzleThumbnail] for the collection
+     * view, or null when this type has no picture worth previewing (the default).
+     * [answer] is a saved, finished answer (the same JSON [restoreUserValues] reads).
+     * Picture-type puzzles override this: Nonogram maps filled cells to black; a future
+     * Tentaishow colors each cell by its region's dot.
+     */
+    fun renderThumbnail(puzzle: Puzzle, answer: JsonObject): PuzzleThumbnail? = null
 }
 
 /** Registry mapping puzzleType id -> engine. Add engines here as more types are ported. */

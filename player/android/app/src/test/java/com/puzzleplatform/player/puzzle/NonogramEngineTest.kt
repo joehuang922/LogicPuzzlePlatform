@@ -10,6 +10,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -198,5 +199,35 @@ class NonogramEngineTest {
         assertEquals(0, clues.rows)
         assertEquals(0, clues.cols)
         assertFalse(NonogramEngine.isComplete(p, emptyMap()))
+    }
+
+    // -- renderThumbnail ----------------------------------------------------
+
+    @Test
+    fun renderThumbnail_mapsFilledCellsToBlackAndRestBlank() {
+        val p = puzzle(plusCanon)
+        val answer = NonogramEngine.extractAnswer(p, plusSolved)
+        val thumb = NonogramEngine.renderThumbnail(p, answer)!!
+        assertEquals(3, thumb.width)
+        assertEquals(3, thumb.height)
+        // Filled center-plus cells are opaque; corners are blank (0).
+        assertEquals(0, thumb.cells[0])                 // (col0,row0) blank
+        assertEquals(0xFF222222.toInt(), thumb.cells[1]) // (col1,row0) filled
+        assertEquals(0xFF222222.toInt(), thumb.cells[4]) // (col1,row1) filled
+        assertEquals(0, thumb.cells[8])                 // (col2,row2) blank
+    }
+
+    @Test
+    fun renderThumbnail_crossesReadAsBlank() {
+        // A cross is a solving aid, not part of the picture.
+        val p = puzzle(plusCanon)
+        val answer = NonogramEngine.extractAnswer(p, mapOf("0,0" to 2))
+        val thumb = NonogramEngine.renderThumbnail(p, answer)!!
+        assertEquals(0, thumb.cells[0])
+    }
+
+    @Test
+    fun renderThumbnail_nullForEmptyClues() {
+        assertNull(NonogramEngine.renderThumbnail(puzzle("""{}"""), JsonObject(emptyMap())))
     }
 }

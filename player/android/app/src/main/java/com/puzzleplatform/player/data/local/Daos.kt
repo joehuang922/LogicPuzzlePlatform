@@ -107,7 +107,35 @@ interface SnapshotDao {
 
     @Query("SELECT * FROM snapshots WHERE id = :id")
     suspend fun getById(id: String): SnapshotEntity?
+
+    /**
+     * The finished answer for each of the given questions: the newest finished
+     * snapshot of any finished attempt on that question. Powers the collection
+     * view's solved-picture thumbnails. Questions with no local finished snapshot
+     * are simply absent from the result.
+     *
+     * MAX(createdAt) is selected (not just used in HAVING) so SQLite's bare-column
+     * rule pins currentAnswer to the row holding that maximum.
+     */
+    @Query(
+        """
+        SELECT a.question AS question, s.currentAnswer AS currentAnswer,
+               MAX(s.createdAt) AS latestCreatedAt
+        FROM snapshots s
+        JOIN attempts a ON a.id = s.attempt
+        WHERE a.question IN (:questionIds) AND a.finishedAt IS NOT NULL AND s.finished = 1
+        GROUP BY a.question
+        """
+    )
+    suspend fun finishedAnswersByQuestion(questionIds: List<String>): List<FinishedAnswer>
 }
+
+/** Projection: one question's saved finished answer (stringified JSON). */
+data class FinishedAnswer(
+    val question: String,
+    val currentAnswer: String,
+    val latestCreatedAt: String,
+)
 
 /** Queries for the sync engine and the Profile sync-status indicator. */
 @Dao

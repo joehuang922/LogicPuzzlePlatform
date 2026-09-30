@@ -11,6 +11,7 @@ import com.puzzleplatform.player.data.model.Puzzle
 import com.puzzleplatform.player.data.model.PuzzleType
 import com.puzzleplatform.player.data.sync.SyncManager
 import com.puzzleplatform.player.puzzle.PuzzleEngines
+import com.puzzleplatform.player.puzzle.PuzzleThumbnail
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,6 +33,8 @@ data class HomeUiState(
     val loadingCollectionPuzzles: Boolean = false,
     val solvedPuzzleIds: Set<String> = emptySet(),
     val attemptedPuzzleIds: Set<String> = emptySet(),
+    // Solved-picture previews, lazily loaded per visible row (see loadThumbnail).
+    val thumbnails: Map<String, PuzzleThumbnail> = emptyMap(),
     // Start-puzzle dialog
     val selectedPuzzle: Puzzle? = null,
     val hasPreviousAttempts: Boolean = false,
@@ -169,6 +172,30 @@ class HomeViewModel(
                 collectionProgress = s.collectionProgress + (collectionId to
                     CollectionProgress(collectionId, puzzles.size, solved.solvedQuestions.size)),
             )
+        }
+    }
+
+    // Puzzle ids whose thumbnail has been requested this session, so a row that
+    // recomposes (scroll, re-expand) doesn't re-dispatch the load. The repo memoizes
+    // the derived image itself; this just avoids redundant coroutine launches.
+    private val requestedThumbnails = mutableSetOf<String>()
+
+    /**
+     * Lazily load one solved puzzle's picture thumbnail, invoked by a collection row
+     * the first time it composes. No-op for a puzzle that isn't solved or whose type
+     * has no picture — the repo returns nothing and the row shows its plain ✓ marker.
+     */
+    fun loadThumbnail(puzzleId: String) {
+        if (!requestedThumbnails.add(puzzleId)) return
+        viewModelScope.launch {
+            try {
+                val thumbs = repo.getSolvedThumbnails(listOf(puzzleId))
+                val thumb = thumbs[puzzleId] ?: return@launch
+                _state.update { it.copy(thumbnails = it.thumbnails + (puzzleId to thumb)) }
+            } catch (_: Exception) {
+                // A missing thumbnail is non-fatal; allow a later retry.
+                requestedThumbnails.remove(puzzleId)
+            }
         }
     }
 

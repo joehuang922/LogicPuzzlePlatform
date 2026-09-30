@@ -31,6 +31,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,7 +44,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.puzzleplatform.player.data.model.Collection
 import com.puzzleplatform.player.data.model.Puzzle
+import com.puzzleplatform.player.puzzle.PuzzleThumbnail
 import com.puzzleplatform.player.ui.DIFFICULTY_LABELS
+import com.puzzleplatform.player.ui.board.SolvedThumbnail
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -116,6 +119,8 @@ fun HomeScreen(
                                             puzzle = p,
                                             solved = state.solvedPuzzleIds.contains(p.id),
                                             attempted = state.attemptedPuzzleIds.contains(p.id),
+                                            thumbnail = state.thumbnails[p.id],
+                                            onRequestThumbnail = { vm.loadThumbnail(p.id) },
                                             onClick = { vm.selectPuzzle(p) },
                                         )
                                     }
@@ -266,7 +271,19 @@ private fun CollectionRow(
 }
 
 @Composable
-private fun CollectionPuzzleRow(puzzle: Puzzle, solved: Boolean, attempted: Boolean, onClick: () -> Unit) {
+private fun CollectionPuzzleRow(
+    puzzle: Puzzle,
+    solved: Boolean,
+    attempted: Boolean,
+    thumbnail: PuzzleThumbnail?,
+    onRequestThumbnail: () -> Unit,
+    onClick: () -> Unit,
+) {
+    // Kick off a lazy thumbnail load the first time a solved row composes; the VM
+    // dedups and the repo memoizes, so scrolling this row in and out is cheap.
+    if (solved) {
+        LaunchedEffect(puzzle.id) { onRequestThumbnail() }
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -286,7 +303,10 @@ private fun CollectionPuzzleRow(puzzle: Puzzle, solved: Boolean, attempted: Bool
             )
         }
         Spacer(Modifier.width(8.dp))
+        // Solved picture-puzzles show their emerging picture; other solved puzzles
+        // keep the plain ✓. Attempted-but-unsolved stays a half-circle.
         when {
+            thumbnail != null -> SolvedThumbnail(thumbnail, size = 40.dp)
             solved -> Text("✓", color = MaterialTheme.colorScheme.primary)
             attempted -> Text("◐", color = MaterialTheme.colorScheme.tertiary)
         }

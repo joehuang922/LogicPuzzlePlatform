@@ -22,6 +22,10 @@ import com.puzzleplatform.player.data.model.SolvedQuestionsResponse
 import com.puzzleplatform.player.data.sync.SyncClock
 import com.puzzleplatform.player.data.sync.SyncManager
 import com.puzzleplatform.player.data.sync.SyncWorker
+import com.puzzleplatform.player.puzzle.PuzzleEngines
+import com.puzzleplatform.player.puzzle.PuzzleThumbnail
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import java.util.UUID
@@ -43,6 +47,11 @@ class PuzzleRepository(
     private val json: Json,
     private val context: Context,
 ) {
+    // Session-lifetime memo of derived solved-picture thumbnails, keyed by
+    // "puzzleId@updatedAt" so a server-side canonRepr edit invalidates. Bounded
+    // implicitly by the number of solved picture-puzzles browsed this session.
+    private val thumbnailCache = java.util.concurrent.ConcurrentHashMap<String, PuzzleThumbnail>()
+
     // --- Reads (local-first with network fallback for non-downloaded data) ---
 
     suspend fun listPuzzles(
@@ -215,6 +224,45 @@ class PuzzleRepository(
         SyncWorker.enqueue(context)
         return SaveSnapshotResponse(snapshotId = snapshotId)
     }
+
+    /**
+     * Solved-picture thumbnails for the given puzzles, for the collection view. Only
+     * puzzles that are (a) locally finished and (b) of a picture-type whose engine
+     * produces a thumbnail appear in the result; everything else is silently absent.
+     *
+     * Derivation (JSON parse + engine render, e.g. a Tentaishow flood-fill) runs off the
+     * main thread and is memoized in [thumbnailCache], keyed by puzzle id + the puzzle's
+     * updatedAt so a server-side canonRepr edit (which changes the derived picture)
+     * invalidates the cached image. A finished answer is itself immutable, so nothing
+     * else can stale the entry.
+     */
+    suspend fun getSolvedThumbnails(puzzleIds: List<String>): Map<String, PuzzleThumbnail> =
+        withContext(Dispatchers.Default) {
+            if (puzzleIds.isEmpty()) return@withContext emptyMap()
+            val answers = db.snapshotDao().finishedAnswersByQuestion(puzzleIds).associateBy { it.question }
+            buildMap {
+                for (id in puzzleIds) {
+                    val answer = answers[id] ?: continue
+                    val puzzleEntity = db.puzzleDao().getById(id) ?: continue
+                    val engine = PuzzleEngines.forType(puzzleEntity.puzzleType) ?: continue
+                    val key = "$id@${puzzleEntity.updatedAt}"
+                    val cached = thumbnailCache[key]
+                    if (cached != null) {
+                        put(id, cached)
+                        continue
+                    }
+                    val parsed = try {
+                        parseAnswer(answer.currentAnswer)
+                    } catch (_: Exception) {
+                        continue // corrupt saved answer; skip its thumbnail
+                    }
+                    // Engine has no picture for this type -> leave the row without one.
+                    val rendered = engine.renderThumbnail(puzzleEntity.toModel(json), parsed) ?: continue
+                    thumbnailCache[key] = rendered
+                    put(id, rendered)
+                }
+            }
+        }
 
     suspend fun getProfile(): ProfileResponse = api.getProfile(PLAYER_ID)
 

@@ -30,6 +30,9 @@ import com.puzzleplatform.player.puzzle.NonogramEngine.ClueStatus
 private val GRID_BG = Color.White
 private val BAND_BG = Color(0xFFF2F2F2)
 private val CORNER_BG = Color(0xFFE8E8E8)
+private val THUMB_BG = Color.White
+private val THUMB_BORDER = Color(0xFFCCCCCC)
+private val THUMB_FILL = Color(0xFF222222)
 private val GRID_LINE = Color(0xFFBBBBBB)
 private val GRID_LINE_MAJOR = Color(0xFF333333)
 private val BORDER = Color(0xFF333333)
@@ -147,6 +150,11 @@ fun NonogramBoard(
             drawRect(BAND_BG, Offset(bandPx, 0f), Size(gridW, bandPx))   // column-clue band
             drawRect(BAND_BG, Offset(0f, bandPx), Size(bandPx, gridH))   // row-clue band
 
+            // Live thumbnail of the filled cells in the static corner, mirroring the
+            // web board's upper-left preview so the emerging picture is always visible
+            // regardless of pan/zoom.
+            drawNonogramThumbnail(cols, rows, bandPx, valuesState.value)
+
             // --- Grid region (pans in both axes) ---
             clipRect(left = bandPx, top = bandPx, right = vpx, bottom = vpx) {
                 translate(bandPx + panX, bandPx + panY) {
@@ -222,6 +230,41 @@ private fun DrawScope.drawNonogramGrid(
         val major = c % 5 == 0
         drawLine(if (major) GRID_LINE_MAJOR else GRID_LINE, Offset(x, 0f), Offset(x, boardH), if (major) 2f else 1f)
     }
+}
+
+/**
+ * Draw a miniature of the currently-filled cells inside the static corner, the analog
+ * of the web board's upper-left thumbnail preview. Only filled (1) cells are shown —
+ * crosses and unset cells stay blank, so the solver sees the emerging picture. The
+ * thumbnail is aspect-preserving and centered in the corner, with a small margin.
+ */
+private fun DrawScope.drawNonogramThumbnail(
+    cols: Int,
+    rows: Int,
+    bandPx: Float,
+    values: Map<String, Int>,
+) {
+    if (cols == 0 || rows == 0) return
+    val margin = bandPx * 0.12f
+    val avail = bandPx - margin * 2
+    if (avail <= 0f) return
+    val thumbCell = minOf(avail / cols, avail / rows)
+    if (thumbCell <= 0f) return
+
+    val thumbW = thumbCell * cols
+    val thumbH = thumbCell * rows
+    val ox = (bandPx - thumbW) / 2
+    val oy = (bandPx - thumbH) / 2
+
+    drawRect(THUMB_BG, Offset(ox, oy), Size(thumbW, thumbH))
+    for (r in 0 until rows) {
+        for (c in 0 until cols) {
+            if ((values["$c,$r"] ?: NonogramEngine.UNSET) == NonogramEngine.FILLED) {
+                drawRect(THUMB_FILL, Offset(ox + c * thumbCell, oy + r * thumbCell), Size(thumbCell, thumbCell))
+            }
+        }
+    }
+    drawRect(THUMB_BORDER, Offset(ox, oy), Size(thumbW, thumbH), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1f))
 }
 
 /** Row clues, right-aligned in the left band; row r's numbers sit at grid row r. */
