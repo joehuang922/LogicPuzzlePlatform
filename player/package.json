@@ -5,6 +5,7 @@
   "workspaces": [
     "frontend",
     "api",
-    "infra"
+    "infra",
+    "solver"
   ]
 }

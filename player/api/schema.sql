@@ -38,6 +38,11 @@ CREATE TABLE IF NOT EXISTS puzzle_questions (
   canon_repr      JSON         NOT NULL,
   src_collection  INT          NULL,
   special         BOOLEAN      NOT NULL DEFAULT FALSE,
+  -- Auto-solve gate (docs/auto-solve): computed at registration for supported types.
+  -- solution_repr holds the unique solution (canonical shape); validation_status is
+  -- 'unique' | 'multiple' | 'none' | NULL (unchecked / unsupported type).
+  solution_repr     JSON         NULL,
+  validation_status VARCHAR(16)  NULL,
   created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   -- Soft delete: rows are never hard-deleted so an offline attempt (with an FK

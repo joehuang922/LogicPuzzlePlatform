@@ -2,7 +2,27 @@ import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { v4 as uuidv4 } from "uuid";
 import { executeStatement } from "../lib/db";
 import { validateCanon } from "../lib/schema";
+import { gate } from "@puzzle/solver";
 import { CreatePuzzleRequest } from "../models/types";
+
+// Run the registration gate for supported puzzle types. Returns the validation status
+// and (when unique) the solution to persist, or throws a 400-worthy Error when the
+// puzzle has no unique solution. Types with no registered solver bypass the gate and
+// return { status: null } (D8).
+function runGate(
+  puzzleType: number,
+  canon: unknown
+): { status: string | null; solution: string | null } {
+  const result = gate(puzzleType, canon);
+  if (!result) return { status: null, solution: null };
+  if (result.verdict === "none") {
+    throw new Error("Puzzle has no solution and cannot be registered");
+  }
+  if (result.verdict === "multiple") {
+    throw new Error("Puzzle has multiple solutions and cannot be registered");
+  }
+  return { status: "unique", solution: JSON.stringify(result.solution) };
+}
 
 function toCamelCase(str: string): string {
   return str.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
@@ -111,8 +131,10 @@ async function createPuzzle(
     });
   }
 
+  let gateResult: { status: string | null; solution: string | null };
   try {
     validateCanon(body.puzzleType, body.canonRepr);
+    gateResult = runGate(body.puzzleType, body.canonRepr);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Invalid canonRepr";
     return response(400, { error: message });
@@ -121,8 +143,8 @@ async function createPuzzle(
   const id = uuidv4();
 
   await executeStatement(
-    `INSERT INTO puzzle_questions (id, puzzle_type, title, author, difficulty, width, height, canon_repr, src_collection, special)
-     VALUES (:id, :puzzleType, :title, :author, :difficulty, :width, :height, :canonRepr, :srcCollection, :special)`,
+    `INSERT INTO puzzle_questions (id, puzzle_type, title, author, difficulty, width, height, canon_repr, src_collection, special, solution_repr, validation_status)
+     VALUES (:id, :puzzleType, :title, :author, :difficulty, :width, :height, :canonRepr, :srcCollection, :special, :solutionRepr, :validationStatus)`,
     [
       { name: "id", value: { stringValue: id } },
       { name: "puzzleType", value: { longValue: body.puzzleType } },
@@ -134,6 +156,8 @@ async function createPuzzle(
       { name: "canonRepr", value: { stringValue: JSON.stringify(body.canonRepr) } },
       { name: "srcCollection", value: body.srcCollection != null ? { longValue: body.srcCollection } : { isNull: true } },
       { name: "special", value: { booleanValue: !!body.special } },
+      { name: "solutionRepr", value: gateResult.solution != null ? { stringValue: gateResult.solution } : { isNull: true } },
+      { name: "validationStatus", value: gateResult.status != null ? { stringValue: gateResult.status } : { isNull: true } },
     ]
   );
 
@@ -173,8 +197,10 @@ async function updatePuzzle(
     if (existing.records.length === 0) return response(404, { error: "Puzzle not found" });
     const puzzleType = existing.records[0].puzzle_type as number;
 
+    let gateResult: { status: string | null; solution: string | null };
     try {
       validateCanon(puzzleType, body.canonRepr);
+      gateResult = runGate(puzzleType, body.canonRepr);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Invalid canonRepr";
       return response(400, { error: message });
@@ -182,6 +208,13 @@ async function updatePuzzle(
 
     sets.push("canon_repr = :canonRepr");
     params.push({ name: "canonRepr", value: { stringValue: JSON.stringify(body.canonRepr) } });
+
+    // Recompute the gate outcome whenever the canon changes so solution_repr and
+    // validation_status never drift from the stored puzzle.
+    sets.push("solution_repr = :solutionRepr");
+    params.push({ name: "solutionRepr", value: gateResult.solution != null ? { stringValue: gateResult.solution } : { isNull: true } });
+    sets.push("validation_status = :validationStatus");
+    params.push({ name: "validationStatus", value: gateResult.status != null ? { stringValue: gateResult.status } : { isNull: true } });
 
     if (body.canonRepr.hints) {
       sets.push("width = :width, height = :height");

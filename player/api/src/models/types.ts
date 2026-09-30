@@ -34,6 +34,9 @@ export interface PuzzleQuestion {
   special: boolean;
   createdAt: string;
   updatedAt: string;
+  // Auto-solve gate (docs/auto-solve). Null on unchecked rows or unsupported types.
+  solutionRepr: Record<string, unknown> | null;
+  validationStatus: "unique" | "multiple" | "none" | null;
 }
 
 export interface CreatePuzzleRequest {
