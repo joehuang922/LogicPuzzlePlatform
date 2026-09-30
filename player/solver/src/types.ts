@@ -33,11 +33,46 @@ export interface ConstraintModel {
   solution(): number[][];
 }
 
+/** Player-entered values, keyed `"col,row"` to match the client convention. */
+export type CellValues = Record<string, number>;
+
 /**
- * The per-type asset. `buildModel` is required (feeds the gate); `techniques` is the
- * hint ladder, grown over time (Phase 3+). An empty ladder is valid — gate-only.
+ * A single pedagogical hint: the shallowest technique that makes progress on the
+ * player's current board. Cell ids are opaque per-type integers (Sudoku: row * 9 + col;
+ * decode with the plugin's helper). This shape is expected to churn at the second
+ * puzzle type — a non-grid type may not have a single placement cell.
  */
-export interface SolverPlugin<Canon = unknown> {
+export interface Step {
+  /** Technique name, e.g. "naked-single". */
+  technique: string;
+  /** Cell(s) the player should look at. */
+  focusCells: number[];
+  /** Candidate eliminations this technique justifies (no placement yet). */
+  eliminations?: { cell: number; digits: number[] }[];
+  /** A forced placement, when the technique determines one. */
+  placement?: { cell: number; value: number };
+  /** Human-readable "why", referencing the focus cells. */
+  explanation: string;
+  /** Ladder index: 0 = easiest. Also the difficulty signal. */
+  depth: number;
+}
+
+/**
+ * A hint rule over a per-type candidate board. Returns the step it justifies, or null
+ * when it does not apply to the current board.
+ */
+export interface Technique<Board = unknown> {
+  name: string;
+  depth: number;
+  apply(board: Board): Step | null;
+}
+
+/**
+ * The per-type asset. `buildModel` is required (feeds the gate). The hint pieces
+ * (`buildBoard` + `techniques`) are optional and grown over time; a plugin with
+ * neither is gate-only.
+ */
+export interface SolverPlugin<Canon = unknown, Board = unknown> {
   puzzleType: number;
   buildModel(canon: Canon): ConstraintModel;
   /**
@@ -46,5 +81,8 @@ export interface SolverPlugin<Canon = unknown> {
    * mirror its answer shape.
    */
   serializeSolution?(grid: number[][]): unknown;
-  // techniques: Technique[];  // added in Phase 3
+  /** Build the candidate board the technique ladder reasons over, from current play. */
+  buildBoard?(canon: Canon, values: CellValues): Board;
+  /** Ordered hint ladder (easiest first by `depth`). */
+  techniques?: Technique<Board>[];
 }
