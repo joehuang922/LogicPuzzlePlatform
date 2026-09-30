@@ -96,6 +96,18 @@ class PuzzleRepository(
         return puzzle
     }
 
+    /**
+     * Reference data already cached in Room, local-only (no network). Empty until the
+     * first successful sync. Home reads these to paint immediately, so a cold backend
+     * never blocks the first render; [listPuzzleTypes]/[listCollections] then refresh
+     * from the network in the background.
+     */
+    suspend fun getCachedPuzzleTypes(): List<PuzzleType> =
+        db.puzzleTypeDao().getAll().map { it.toModel() }
+
+    suspend fun getCachedCollections(): List<Collection> =
+        db.collectionDao().getAll().map { it.toModel() }
+
     suspend fun listPuzzleTypes(): List<PuzzleType> {
         return try {
             val types = api.listPuzzleTypes().puzzleTypes

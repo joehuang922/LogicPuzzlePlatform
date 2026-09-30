@@ -70,7 +70,21 @@ fun HomeScreen(
         },
     ) { padding ->
         when {
-            state.loading -> Centered(Modifier.padding(padding)) { CircularProgressIndicator() }
+            state.loading -> Centered(Modifier.padding(padding)) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator()
+                    // First launch with an empty cache has to wait on a cold backend;
+                    // explain the delay so it doesn't read as a hang.
+                    if (state.waking) {
+                        Text(
+                            "Waking up the server…",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 12.dp),
+                        )
+                    }
+                }
+            }
             state.error != null -> Centered(Modifier.padding(padding)) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("Error: ${state.error}", color = MaterialTheme.colorScheme.error)

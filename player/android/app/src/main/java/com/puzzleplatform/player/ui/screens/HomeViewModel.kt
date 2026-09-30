@@ -21,6 +21,9 @@ import kotlinx.serialization.json.JsonObject
 
 data class HomeUiState(
     val loading: Boolean = true,
+    // True only while a first-launch load is blocked on the network (no local cache
+    // yet). Drives the "waking up the server" hint, since a cold Aurora is slow.
+    val waking: Boolean = false,
     val refreshing: Boolean = false,
     val error: String? = null,
     val puzzles: List<Puzzle> = emptyList(),
@@ -81,14 +84,59 @@ class HomeViewModel(
         }
     }
 
+    /**
+     * Cache-first startup. Paints from Room immediately so a cold backend never blocks
+     * the first render (the local-first promise), then refreshes reference data from the
+     * network in the background. Only a genuine first launch — nothing cached yet —
+     * falls through to a blocking network load, flagged [waking] so the UI can explain
+     * the wait (Aurora Serverless cold-starts in ~10-25s).
+     */
     fun load() {
         _state.update { it.copy(loading = true, error = null) }
         viewModelScope.launch {
+            val puzzles = repo.listRecentlyPlayed(limit = 3)
+            val cachedCollections = repo.getCachedCollections()
+            val cachedTypes = repo.getCachedPuzzleTypes()
+
+            if (cachedCollections.isNotEmpty() || cachedTypes.isNotEmpty() || puzzles.isNotEmpty()) {
+                // Have something local: render now, then refresh in the background.
+                val progress = if (cachedCollections.isNotEmpty()) {
+                    repo.getCollectionProgress(cachedCollections.map { it.id }).associateBy { it.collectionId }
+                } else emptyMap()
+                _state.update {
+                    it.copy(
+                        loading = false,
+                        puzzles = puzzles,
+                        collections = cachedCollections,
+                        puzzleTypes = cachedTypes,
+                        collectionProgress = progress,
+                    )
+                }
+                backgroundRefreshReferenceData()
+            } else {
+                // First launch, empty cache: we must hit the network. Flag the wait.
+                _state.update { it.copy(waking = true) }
+                try {
+                    fetchHome()
+                    _state.update { it.copy(loading = false, waking = false) }
+                } catch (e: Exception) {
+                    _state.update { it.copy(loading = false, waking = false, error = e.message ?: "Failed to load") }
+                }
+            }
+        }
+    }
+
+    /**
+     * Refresh reference data (collections, types, progress) from the network after a
+     * cache-first paint, updating state when it lands. Silent on failure: the cached
+     * data already shown stays put, keeping the app usable offline.
+     */
+    private fun backgroundRefreshReferenceData() {
+        viewModelScope.launch {
             try {
                 fetchHome()
-                _state.update { it.copy(loading = false) }
-            } catch (e: Exception) {
-                _state.update { it.copy(loading = false, error = e.message ?: "Failed to load") }
+            } catch (_: Exception) {
+                // Offline or cold-start timeout; the cached lists remain on screen.
             }
         }
     }
