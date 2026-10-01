@@ -10,6 +10,7 @@ import com.puzzleplatform.player.data.model.SnapshotSummary
 import com.puzzleplatform.player.puzzle.PuzzleEngine
 import com.puzzleplatform.player.puzzle.PuzzleEngines
 import com.puzzleplatform.player.puzzle.SudokuEngine
+import com.puzzleplatform.player.puzzle.SudokuHinter
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,7 +43,21 @@ data class PlayUiState(
     // attempt started. Current progress stays playable; reload is opt-in.
     val puzzleEdited: Boolean = false,
     val reloading: Boolean = false,
+    // Offline Sudoku hint (docs/auto-solve). Null when none is being shown.
+    val hint: HintView? = null,
 )
+
+/**
+ * A hint surfaced to the player. Mirrors the web client's HintView:
+ *  - [Step] a teachable technique (highlight focus cells, optional placement/eliminations),
+ *  - [Reveal] the solution-backed "give up" fallback (one correct cell),
+ *  - [Message] an informational note (e.g. conflicts present, or no step available).
+ */
+sealed interface HintView {
+    data class Step(val step: SudokuHinter.Step) : HintView
+    data class Reveal(val cell: Int, val value: Int) : HintView
+    data class Message(val text: String) : HintView
+}
 
 class PlayViewModel(
     private val puzzleId: String,
@@ -115,6 +130,78 @@ class PlayViewModel(
 
     fun toggleNoteMode() = _state.update { it.copy(noteMode = !it.noteMode) }
 
+    /**
+     * Compute and show the next offline hint for Sudoku (type 1). Prefers a teachable
+     * technique; falls back to a solution-backed reveal of one correct cell; otherwise
+     * shows an informational message. No-op for types without a hinter.
+     */
+    fun requestHint() {
+        val puzzle = _state.value.puzzle ?: return
+        if (puzzle.puzzleType != SudokuEngine.puzzleType) return
+        val values = _state.value.userValues
+
+        // A contradictory board makes candidate reasoning meaningless; ask the player to
+        // fix conflicts first (mirrors the web client's guard).
+        if (SudokuEngine.findConflicts(puzzle, values).isNotEmpty()) {
+            _state.update {
+                it.copy(hint = HintView.Message("Fix the conflicting cells first, then ask for a hint."))
+            }
+            return
+        }
+
+        val step = SudokuHinter.nextHint(puzzle, values)
+        if (step != null) {
+            _state.update { it.copy(hint = HintView.Step(step)) }
+            return
+        }
+
+        // No logical step: reveal one correct cell from the stored solution, if any.
+        val reveal = firstRevealCell(puzzle, values)
+        _state.update {
+            it.copy(
+                hint = reveal
+                    ?: HintView.Message("No simple next step from here — try a different cell, or keep going."),
+            )
+        }
+    }
+
+    /**
+     * The first empty, non-hint cell whose stored-solution digit is known — the "give up"
+     * reveal target. Null when the puzzle has no stored solution or the board is full.
+     */
+    private fun firstRevealCell(puzzle: Puzzle, values: Map<String, Int>): HintView.Reveal? {
+        val solution = SudokuEngine.parseSolution(puzzle) ?: return null
+        val hints = SudokuEngine.parseHints(puzzle)
+        for (id in 0 until 81) {
+            val row = id / 9
+            val col = id % 9
+            if (hints[row][col] != 0) continue
+            if ((values["$col,$row"] ?: 0) > 0) continue
+            val value = solution[row][col]
+            if (value > 0) return HintView.Reveal(id, value)
+        }
+        return null
+    }
+
+    /** Commit a hint's placement (a step placement or a reveal) and dismiss the hint. */
+    fun applyHint() {
+        val placement: SudokuHinter.Placement = when (val hint = _state.value.hint) {
+            is HintView.Reveal -> SudokuHinter.Placement(hint.cell, hint.value)
+            is HintView.Step -> hint.step.placement ?: return
+            else -> return // Message or null: nothing to apply
+        }
+        val col = placement.cell % 9
+        val row = placement.cell / 9
+        val key = "$col,$row"
+        val values = _state.value.userValues
+        // Commit the digit and clear that cell's pencil marks (matches enterDigit).
+        val next = values.filterKeys { !it.startsWith("n:$key:") } + (key to placement.value)
+        _state.update { it.copy(hint = null) }
+        updateValues(next, clearSelection = true)
+    }
+
+    fun clearHint() = _state.update { it.copy(hint = null) }
+
     /** A committed answer sits at "col,row"; a cell with one can't take notes. */
     private fun cellHasAnswer(values: Map<String, Int>, cell: String): Boolean =
         (values[cell] ?: 0) > 0
@@ -178,6 +265,8 @@ class PlayViewModel(
                 userValues = newValues,
                 progress = progress,
                 selectedCell = if (clearSelection) null else it.selectedCell,
+                // The board moved on; a previously-shown hint may no longer apply.
+                hint = null,
             )
         }
         // Auto-complete on a full, valid solution (mirrors the web boards' onComplete).
@@ -236,6 +325,7 @@ class PlayViewModel(
                         snapshots = null,
                         selectedCell = null,
                         showCongrats = false,
+                        hint = null,
                     )
                 }
                 startTimer()

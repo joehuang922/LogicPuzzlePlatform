@@ -39,6 +39,7 @@ fun Puzzle.toEntity(json: Json, updatedAt: String?, deletedAt: String?) = Puzzle
     srcCollectionName = srcCollectionName,
     srcCollectionCoverSrc = srcCollectionCoverSrc,
     special = special,
+    solutionRepr = solutionRepr?.let { json.encodeToString(JsonObject.serializer(), it) },
     updatedAt = updatedAt,
     deletedAt = deletedAt,
 )
@@ -58,6 +59,7 @@ fun PuzzleEntity.toModel(json: Json) = Puzzle(
     srcCollectionName = srcCollectionName,
     srcCollectionCoverSrc = srcCollectionCoverSrc,
     special = special,
+    solutionRepr = solutionRepr?.let { json.parseToJsonElement(it) as JsonObject },
 )
 
 fun SnapshotEntity.toModel() = Snapshot(

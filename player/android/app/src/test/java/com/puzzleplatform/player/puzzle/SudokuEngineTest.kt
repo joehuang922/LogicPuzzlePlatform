@@ -10,6 +10,8 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -351,6 +353,33 @@ class SudokuEngineTest {
         val grid = SudokuEngine.parseHints(puzzle)
         assertEquals(9, grid.size)
         assertTrue(grid.all { row -> row.size == 9 && row.all { it == 0 } })
+    }
+
+    // -- parseSolution (auto-solve reveal source) --------------------------
+
+    @Test
+    fun parseSolution_nullWhenNoStoredSolution() {
+        val puzzle = puzzleWithHints(emptyGrid)
+        assertNull(SudokuEngine.parseSolution(puzzle))
+    }
+
+    @Test
+    fun parseSolution_readsSolutionReprHintsGrid() {
+        val rows = solution.map { row -> JsonArray(row.map { JsonPrimitive(it) }) }
+        val solutionRepr = JsonObject(mapOf("hints" to JsonArray(rows)))
+        val puzzle = Puzzle(
+            id = "p1",
+            puzzleType = 1,
+            puzzleTypeName = "sudoku",
+            puzzleTypeJpLabel = "数独",
+            difficulty = 3,
+            canonRepr = JsonObject(mapOf("hints" to JsonArray(emptyGrid.map { row -> JsonArray(row.map { JsonPrimitive(it) }) }))),
+            solutionRepr = solutionRepr,
+        )
+        val grid = SudokuEngine.parseSolution(puzzle)
+        assertNotNull(grid)
+        assertEquals(solution[0][0], grid!![0][0])
+        assertEquals(solution[8][8], grid[8][8])
     }
 
     @Test

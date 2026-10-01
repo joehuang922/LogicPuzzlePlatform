@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 /**
  * The on-device mirror of the remote data. Reference data is cached for offline
@@ -18,7 +20,7 @@ import androidx.room.RoomDatabase
         SnapshotEntity::class,
         CollectionDownloadEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -34,13 +36,25 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var instance: AppDatabase? = null
 
+        /**
+         * v1 -> v2: add puzzles.solutionRepr for the offline hint "reveal" fallback.
+         * A plain additive column migration — reference data is server-authoritative
+         * and re-synced, but attempts/snapshots live in this same DB, so we migrate
+         * rather than drop (which would lose unsynced progress).
+         */
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE puzzles ADD COLUMN solutionRepr TEXT")
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
                     "puzzle-player.db",
-                ).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2).build().also { instance = it }
             }
     }
 }

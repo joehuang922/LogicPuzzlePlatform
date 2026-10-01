@@ -115,6 +115,36 @@ class ModelsDeserializationTest {
     }
 
     @Test
+    fun solutionRepr_acceptsStringifiedJsonFromTheApi() {
+        // Like canon_repr, the auto-solve solution column (JSON) arrives stringified
+        // over the RDS Data API, so the same serializer must parse it to an object.
+        val raw = """
+            {
+              "puzzle": {
+                "id": "abc",
+                "puzzleType": 1,
+                "puzzleTypeName": "sudoku",
+                "puzzleTypeJpLabel": "数独",
+                "difficulty": 3,
+                "canonRepr": "{\"hints\":[[0,0,0]]}",
+                "solutionRepr": "{\"hints\":[[4,8,3]]}",
+                "special": 0
+              }
+            }
+        """.trimIndent()
+        val p = json.decodeFromString<PuzzleResponse>(raw).puzzle
+        val hints = (p.solutionRepr!!["hints"] as JsonArray)[0].jsonArray
+        assertEquals(4, hints[0].jsonPrimitive.int)
+    }
+
+    @Test
+    fun solutionRepr_defaultsNullWhenAbsent() {
+        // Types with no solver (or pre-gate puzzles) ship no solution; must stay null.
+        val p = json.decodeFromString<PuzzleResponse>(puzzleJson("0")).puzzle
+        assertEquals(null, p.solutionRepr)
+    }
+
+    @Test
     fun snapshot_currentAnswerStaysAStringAndParsesOnDemand() {
         // currentAnswer is a JSON string containing escaped JSON.
         val raw = """

@@ -58,6 +58,7 @@ import com.puzzleplatform.player.ui.board.MasyuBoard
 import com.puzzleplatform.player.ui.board.NonogramBoard
 import com.puzzleplatform.player.ui.board.NonogramMode
 import com.puzzleplatform.player.ui.board.SudokuBoard
+import com.puzzleplatform.player.puzzle.SudokuHinter
 import com.puzzleplatform.player.ui.formatElapsed
 
 private class PlayViewModelFactory(
@@ -204,13 +205,25 @@ fun PlayScreen(
 
                     // Board, dispatched by puzzle type.
                     when (puzzle.puzzleType) {
-                        1 -> SudokuBoard(
-                            puzzle = puzzle,
-                            userValues = state.userValues,
-                            liveValidate = state.liveValidate,
-                            selectedCell = state.selectedCell,
-                            onSelectCell = vm::selectCell,
-                        )
+                        1 -> {
+                            val h = state.hint
+                            val step = (h as? HintView.Step)?.step
+                            val reveal = h as? HintView.Reveal
+                            SudokuBoard(
+                                puzzle = puzzle,
+                                userValues = state.userValues,
+                                liveValidate = state.liveValidate,
+                                selectedCell = state.selectedCell,
+                                onSelectCell = vm::selectCell,
+                                hintFocusCells = step?.focusCells?.map { SudokuHinter.cellKey(it) }?.toSet() ?: emptySet(),
+                                hintRevealCell = reveal?.let { SudokuHinter.cellKey(it.cell) },
+                                hintElimCells = step?.eliminations?.map { SudokuHinter.cellKey(it.cell) }?.toSet() ?: emptySet(),
+                                hintStrikes = step?.eliminations
+                                    ?.associate { SudokuHinter.cellKey(it.cell) to it.digits.toSet() }
+                                    ?: emptyMap(),
+                            )
+                            HintControls(hint = h, onRequest = vm::requestHint, onApply = vm::applyHint, onClear = vm::clearHint)
+                        }
                         12 -> KakuroBoard(
                             puzzle = puzzle,
                             userValues = state.userValues,
@@ -313,6 +326,58 @@ fun PlayScreen(
                 TextButton(onClick = vm::dismissCongrats) { Text("Close") }
             },
         )
+    }
+}
+
+/**
+ * Offline Sudoku hint affordance (docs/auto-solve): a "Hint" button, and when a hint is
+ * showing, an explanation card with an apply action for placements/reveals. Fully
+ * client-side — works in airplane mode.
+ */
+@Composable
+private fun HintControls(
+    hint: HintView?,
+    onRequest: () -> Unit,
+    onApply: () -> Unit,
+    onClear: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = onRequest) { Text("Hint") }
+            if (hint != null) {
+                TextButton(onClick = onClear) { Text("Clear hint") }
+            }
+        }
+
+        if (hint == null) return@Column
+        val explanation: String
+        val applyLabel: String?
+        when (hint) {
+            is HintView.Step -> {
+                explanation = hint.step.explanation
+                applyLabel = if (hint.step.placement != null) "Place it" else null
+            }
+            is HintView.Reveal -> {
+                explanation = "No simple next step was found. The answer here is ${hint.value}."
+                applyLabel = "Fill it in"
+            }
+            is HintView.Message -> {
+                explanation = hint.text
+                applyLabel = null
+            }
+        }
+
+        Card(
+            Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        ) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(explanation, style = MaterialTheme.typography.bodyMedium)
+                if (applyLabel != null) {
+                    Button(onClick = onApply) { Text(applyLabel) }
+                }
+            }
+        }
     }
 }
 

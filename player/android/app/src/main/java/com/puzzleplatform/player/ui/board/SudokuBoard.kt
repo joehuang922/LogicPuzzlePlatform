@@ -22,6 +22,11 @@ private val NOTE_COLOR = Color(0xFF999999)
 private val CONFLICT_COLOR = Color(0xFFD32F2F)
 private val SELECT_FILL = Color(0x9963A4FF)
 private val PEER_FILL = Color(0x33BBDEFB)
+// Hint highlights (docs/auto-solve): amber focus, green reveal, red elimination target.
+private val HINT_FOCUS_FILL = Color(0xFFFFF59D)
+private val HINT_REVEAL_FILL = Color(0xFFC8E6C9)
+private val HINT_ELIM_FILL = Color(0xFFFFCDD2)
+private val HINT_STRIKE_COLOR = Color(0xFFD32F2F)
 
 /**
  * Compose Canvas renderer for Sudoku, the analog of
@@ -45,6 +50,12 @@ fun SudokuBoard(
     selectedCell: String?,
     onSelectCell: (String?) -> Unit,
     modifier: Modifier = Modifier,
+    // Hint highlights (docs/auto-solve), all keyed "col,row". Empty when no hint is shown.
+    hintFocusCells: Set<String> = emptySet(),
+    hintRevealCell: String? = null,
+    hintElimCells: Set<String> = emptySet(),
+    // Candidate digits a hint eliminates, drawn struck-through in their note positions.
+    hintStrikes: Map<String, Set<Int>> = emptyMap(),
 ) {
     val hints = remember(puzzle.id) { SudokuEngine.parseHints(puzzle) }
     val conflicts = if (liveValidate) SudokuEngine.findConflicts(puzzle, userValues) else emptySet()
@@ -62,6 +73,12 @@ fun SudokuBoard(
     ) { cell ->
         val boardSize = SIZE * cell
         drawRect(color = GRID_BG, size = androidx.compose.ui.geometry.Size(boardSize, boardSize))
+
+        // Hint highlights, drawn under the selection/peer layer so a selected cell still
+        // reads as selected. Elimination targets first, then focus, then the reveal cell.
+        for (key in hintElimCells) key.toColRow()?.let { (c, r) -> drawCellFill(c, r, cell, HINT_ELIM_FILL) }
+        for (key in hintFocusCells) key.toColRow()?.let { (c, r) -> drawCellFill(c, r, cell, HINT_FOCUS_FILL) }
+        hintRevealCell?.toColRow()?.let { (c, r) -> drawCellFill(c, r, cell, HINT_REVEAL_FILL) }
 
         // Highlight selected cell + peers.
         selectedCell?.let { key ->
@@ -115,7 +132,26 @@ fun SudokuBoard(
                 drawDigit(value, col, row, cell, textSize, color, bold = hint > 0)
             }
         }
+
+        // Candidate-elimination strikes: draw each eliminated digit in red at its fixed
+        // note position with a strike-through, so the "why" of a locked-candidates /
+        // naked-pair hint is visible even on cells with no pencil marks.
+        if (hintStrikes.isNotEmpty()) {
+            for ((key, digits) in hintStrikes) {
+                val (col, row) = key.toColRow() ?: continue
+                for (digit in digits) drawStruckNote(digit, col, row, cell, noteTextSize)
+            }
+        }
     }
+}
+
+/** Parse a "col,row" cell key into a (col, row) pair, or null if malformed. */
+private fun String.toColRow(): Pair<Int, Int>? {
+    val parts = split(",")
+    if (parts.size != 2) return null
+    val col = parts[0].toIntOrNull() ?: return null
+    val row = parts[1].toIntOrNull() ?: return null
+    return col to row
 }
 
 /** Draw a single pencil-mark digit at its fixed 3x3 sub-cell within cell (col,row). */
@@ -125,6 +161,24 @@ private fun DrawScope.drawNote(digit: Int, col: Int, row: Int, cell: Float, text
         this.textSize = textSize
         this.textAlign = android.graphics.Paint.Align.CENTER
         this.isAntiAlias = true
+        this.typeface = android.graphics.Typeface.DEFAULT
+    }
+    val third = cell / 3f
+    val sub = digit - 1
+    val cx = col * cell + ((sub % 3) + 0.5f) * third
+    val fm = paint.fontMetrics
+    val cy = row * cell + (sub / 3 + 0.5f) * third - (fm.ascent + fm.descent) / 2
+    drawContext.canvas.nativeCanvas.drawText(digit.toString(), cx, cy, paint)
+}
+
+/** Draw an eliminated candidate digit (red, struck through) at its 3x3 note position. */
+private fun DrawScope.drawStruckNote(digit: Int, col: Int, row: Int, cell: Float, textSize: Float) {
+    val paint = android.graphics.Paint().apply {
+        this.color = HINT_STRIKE_COLOR.toArgb()
+        this.textSize = textSize
+        this.textAlign = android.graphics.Paint.Align.CENTER
+        this.isAntiAlias = true
+        this.isStrikeThruText = true
         this.typeface = android.graphics.Typeface.DEFAULT
     }
     val third = cell / 3f

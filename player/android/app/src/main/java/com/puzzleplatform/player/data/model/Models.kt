@@ -43,6 +43,12 @@ data class Puzzle(
     // MySQL BOOLEAN comes back over the Data API as 0/1 or a bool; tolerate both.
     @Serializable(with = FlexibleBooleanSerializer::class)
     val special: Boolean = false,
+    // Auto-solve gate output (docs/auto-solve). The stored solution, delivered like
+    // canonRepr (stringified over the wire, so the same serializer applies); null for
+    // types with no solver or puzzles predating the gate/backfill. Backs the offline
+    // "reveal" fallback when the on-device hinter finds no logical next step.
+    @Serializable(with = StringifiedJsonObjectSerializer::class)
+    val solutionRepr: JsonObject? = null,
 )
 
 @Serializable

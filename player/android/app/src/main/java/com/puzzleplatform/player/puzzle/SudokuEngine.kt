@@ -38,6 +38,17 @@ object SudokuEngine : PuzzleEngine {
     /** Parse the 9x9 hint grid from a puzzle's canonRepr. Missing cells read as 0. */
     fun parseHints(puzzle: Puzzle): Array<IntArray> = parseGrid(puzzle.canonRepr["hints"])
 
+    /**
+     * The stored solution grid (auto-solve `solutionRepr.hints`), or null when the
+     * puzzle has no stored solution. Backs the offline hint "reveal" fallback — when
+     * the hinter finds no logical step, reveal one correct cell from here.
+     */
+    fun parseSolution(puzzle: Puzzle): Array<IntArray>? {
+        val solution = puzzle.solutionRepr ?: return null
+        if (solution["hints"] !is JsonArray) return null
+        return parseGrid(solution["hints"])
+    }
+
     override fun extractAnswer(puzzle: Puzzle, userValues: Map<String, Int>): JsonObject {
         val hints = parseHints(puzzle)
         val answers = Array(SIZE) { row ->

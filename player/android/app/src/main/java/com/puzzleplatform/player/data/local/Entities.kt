@@ -52,6 +52,9 @@ data class PuzzleEntity(
     val srcCollectionName: String?,
     val srcCollectionCoverSrc: String?,
     val special: Boolean,
+    // Auto-solve stored solution (docs/auto-solve), raw JSON string or null. Kept so the
+    // offline hinter's "reveal" fallback works without a network round-trip.
+    val solutionRepr: String?,
     // Change-detection fields diffed against the server manifest.
     val updatedAt: String?,
     // Non-null => soft-deleted server-side; hidden from listings but kept so an
