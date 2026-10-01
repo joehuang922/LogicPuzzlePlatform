@@ -686,6 +686,150 @@ function SortableHeader({ label, sortKey, currentKey, currentDir, onSort, style 
 
 const NO_COLLECTION_ID = -1;
 
+// Small coloured chip for a puzzle's auto-solve gate verdict (docs/auto-solve).
+// Only the problem states are worth surfacing; "unique" and unclassified render nothing.
+function ValidationBadge({ status }: { status?: Puzzle["validationStatus"] }) {
+  if (status !== "multiple" && status !== "none") return null;
+  const label = status === "none" ? "No solution" : "Multiple solutions";
+  return (
+    <span
+      title="Flagged by the registration gate — needs editorial review"
+      style={{
+        marginLeft: "0.4rem",
+        padding: "0.05rem 0.4rem",
+        fontSize: "0.7rem",
+        fontWeight: 600,
+        color: "#b71c1c",
+        background: "#ffebee",
+        border: "1px solid #ef9a9a",
+        borderRadius: 3,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
+/**
+ * Editorial review queue: the puzzles the registration gate could not uniquely solve
+ * (validation_status IN 'multiple','none'). These are almost always mis-transcribed
+ * clues; editors fix the canon inline and re-save, which re-runs the gate server-side.
+ * Backfill flags only — nothing here is hidden or deleted automatically (D9).
+ */
+function ReviewQueue({
+  puzzleTypes,
+  collections,
+}: {
+  puzzleTypes: PuzzleType[];
+  collections: Collection[];
+}) {
+  const [puzzles, setPuzzles] = useState<Puzzle[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const puzzleTypeMap = Object.fromEntries(puzzleTypes.map((pt) => [pt.id, pt.jpLabel]));
+
+  async function load() {
+    setLoading(true);
+    try {
+      const res = await listPuzzles({ validation: "flagged" });
+      setPuzzles(res.puzzles);
+      setLoaded(true);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleToggle() {
+    const next = !expanded;
+    setExpanded(next);
+    if (next && !loaded) load();
+  }
+
+  function handleSaved(updated: Puzzle) {
+    // A successful re-save re-runs the gate. If it's now unique it drops out of the
+    // flagged set; otherwise keep it with its new verdict.
+    if (updated.validationStatus === "multiple" || updated.validationStatus === "none") {
+      setPuzzles((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+    } else {
+      setPuzzles((prev) => prev.filter((p) => p.id !== updated.id));
+    }
+    setEditingId(null);
+  }
+
+  return (
+    <div style={{ ...cardStyle, borderLeft: "4px solid #ef5350" }}>
+      <div
+        onClick={handleToggle}
+        style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: "0.5rem" }}
+      >
+        <h2 style={{ margin: 0 }}>Editorial Review</h2>
+        <span style={{ fontSize: "0.8rem", color: "#666" }}>
+          {loaded ? `(${puzzles.length} flagged)` : "— puzzles the solver couldn't uniquely solve"}
+        </span>
+        <span style={{ marginLeft: "auto", fontSize: "0.9rem" }}>{expanded ? "▲" : "▼"}</span>
+      </div>
+
+      {expanded && (
+        <div style={{ marginTop: "0.75rem" }}>
+          {loading ? (
+            <p style={{ margin: 0, fontSize: "0.85rem" }}>Loading…</p>
+          ) : puzzles.length === 0 ? (
+            <p style={{ margin: 0, fontSize: "0.85rem", color: "#2e7d32" }}>
+              Nothing flagged — every solvable puzzle has a unique solution. 🎉
+            </p>
+          ) : (
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.8rem" }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid #ddd", textAlign: "left" }}>
+                  <th style={{ padding: "0.3rem" }}>Type</th>
+                  <th style={{ padding: "0.3rem" }}>Title</th>
+                  <th style={{ padding: "0.3rem" }}>Collection</th>
+                  <th style={{ padding: "0.3rem" }}>Verdict</th>
+                  <th style={{ padding: "0.3rem", width: 50 }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {puzzles.map((p) => (
+                  <>
+                    <tr key={p.id} style={{ borderBottom: editingId === p.id ? "none" : "1px solid #f0f0f0" }}>
+                      <td style={{ padding: "0.3rem" }}>{puzzleTypeMap[p.puzzleType] || `Type ${p.puzzleType}`}</td>
+                      <td style={{ padding: "0.3rem" }}>{p.title || "(none)"}</td>
+                      <td style={{ padding: "0.3rem" }}>{p.srcCollectionName || "—"}</td>
+                      <td style={{ padding: "0.3rem" }}><ValidationBadge status={p.validationStatus} /></td>
+                      <td style={{ padding: "0.3rem", textAlign: "center" }}>
+                        <button
+                          onClick={() => setEditingId(editingId === p.id ? null : p.id)}
+                          style={{ padding: "0.15rem 0.4rem", fontSize: "0.75rem", border: "1px solid #4a90d9", borderRadius: 3, background: editingId === p.id ? "#4a90d9" : "#f0f7ff", color: editingId === p.id ? "#fff" : "#4a90d9", cursor: "pointer" }}
+                        >
+                          Edit
+                        </button>
+                      </td>
+                    </tr>
+                    {editingId === p.id && (
+                      <PuzzleEditRow
+                        key={`${p.id}-edit`}
+                        puzzle={p}
+                        puzzleTypes={puzzleTypes}
+                        collections={collections}
+                        onSaved={handleSaved}
+                        onCancel={() => setEditingId(null)}
+                      />
+                    )}
+                  </>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CollectionBrowser({
   collections,
   puzzleTypes,
@@ -852,7 +996,7 @@ function CollectionBrowser({
                                       onChange={() => toggleCheck(p.id)}
                                     />
                                   </td>
-                                  <td style={{ padding: "0.3rem" }}>{p.title || "(none)"}</td>
+                                  <td style={{ padding: "0.3rem" }}>{p.title || "(none)"}<ValidationBadge status={p.validationStatus} /></td>
                                   <td style={{ padding: "0.3rem" }}>{DIFFICULTY_LABELS[p.difficulty] || String(p.difficulty)}</td>
                                   <td style={{ padding: "0.3rem" }}>{p.author || "N/A"}</td>
                                   <td style={{ padding: "0.3rem" }}>{p.width && p.height ? `${p.width} x ${p.height}` : "—"}</td>
@@ -942,7 +1086,7 @@ function CollectionBrowser({
                                           onChange={() => toggleCheck(p.id)}
                                         />
                                       </td>
-                                      <td style={{ padding: "0.3rem" }}>{p.title || "(none)"}</td>
+                                      <td style={{ padding: "0.3rem" }}>{p.title || "(none)"}<ValidationBadge status={p.validationStatus} /></td>
                                       <td style={{ padding: "0.3rem" }}>{DIFFICULTY_LABELS[p.difficulty] || String(p.difficulty)}</td>
                                       <td style={{ padding: "0.3rem" }}>{p.author || "N/A"}</td>
                                       <td style={{ padding: "0.3rem" }}>{p.width && p.height ? `${p.width} x ${p.height}` : "—"}</td>
@@ -1004,6 +1148,7 @@ export default function Admin() {
   return (
     <div>
       <h1>Admin</h1>
+      <ReviewQueue puzzleTypes={puzzleTypes} collections={collections} />
       <CollectionBrowser collections={collections} puzzleTypes={puzzleTypes} onDataChanged={loadData} />
       <CollectionForm onCreated={loadData} />
       <BatchUploadForm puzzleTypes={puzzleTypes} collections={collections} />

@@ -63,11 +63,17 @@ async function listPuzzles(
   const puzzleType = event.queryStringParameters?.puzzleType;
   const srcCollection = event.queryStringParameters?.srcCollection;
   const limit = event.queryStringParameters?.limit;
+  const validation = event.queryStringParameters?.validation;
 
   let sql = PUZZLE_SELECT;
   const params: { name: string; value: any }[] = [];
   // Hide soft-deleted puzzles from listings (getPuzzle still resolves them).
   const conditions: string[] = ["pq.deleted_at IS NULL"];
+
+  // Editorial review set: puzzles the registration gate could not uniquely solve.
+  if (validation === "flagged") {
+    conditions.push("pq.validation_status IN ('multiple', 'none')");
+  }
 
   if (puzzleType) {
     conditions.push("pq.puzzle_type = :puzzleType");
