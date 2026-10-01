@@ -41,7 +41,10 @@ export const sudokuRenderer: PuzzleRenderer = {
     const savedAnswer = state.playerGrid as { hints?: number[][]; notes?: number[][][] } | undefined;
     const initialUserValues = extractUserValues(canonRepr.hints, savedAnswer?.hints);
     const initialNotes = extractNotes(canonRepr.hints, savedAnswer?.notes);
-    return <SudokuBoard hints={canonRepr.hints} initialUserValues={initialUserValues} initialNotes={initialNotes} onValuesChange={onValuesChange} onComplete={onComplete} liveValidate={liveValidate} />;
+    // Gate-computed solution for the reveal hint fallback. Stored as { hints: grid }.
+    const solutionRepr = (typeof puzzle.solutionRepr === "string" ? JSON.parse(puzzle.solutionRepr) : puzzle.solutionRepr) as { hints?: number[][] } | null | undefined;
+    const solution = solutionRepr?.hints ?? null;
+    return <SudokuBoard hints={canonRepr.hints} initialUserValues={initialUserValues} initialNotes={initialNotes} solution={solution} onValuesChange={onValuesChange} onComplete={onComplete} liveValidate={liveValidate} />;
   },
 
   handleInput(state: PuzzleState, _action: PlayerAction) {

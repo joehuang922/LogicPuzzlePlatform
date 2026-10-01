@@ -2,15 +2,33 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useIsMobile } from "../hooks/useIsMobile";
 import DigitBar from "./DigitBar";
 import RadialInput from "./RadialInput";
+import { nextHint, cellLabel, Step } from "@puzzle/solver";
 
 interface SudokuBoardProps {
   hints: number[][];
   initialUserValues?: Record<string, number>;
   // Pencil-mark candidates keyed by "col,row"; each an ascending digit list.
   initialNotes?: Record<string, number[]>;
+  // The gate-computed solution grid, when stored. Backs the "reveal" hint fallback
+  // for boards where no logical next step is found. See docs/auto-solve.
+  solution?: number[][] | null;
   onValuesChange?: (values: Record<string, number>) => void;
   onComplete?: () => void;
   liveValidate?: boolean;
+}
+
+// The hint affordance's view model: a logical step, a revealed cell, or a plain message.
+type HintView =
+  | { kind: "step"; step: Step }
+  | { kind: "reveal"; cellId: number; value: number }
+  | { kind: "message"; text: string };
+
+const idToKey = (id: number) => `${id % 9},${Math.floor(id / 9)}`;
+
+// Title-case a technique slug, e.g. "naked-single" -> "Naked single".
+function techniqueLabel(name: string): string {
+  const spaced = name.replace(/-/g, " ");
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
 const CELL_SIZE = 40;
@@ -29,7 +47,7 @@ function notesFromInitial(initial?: Record<string, number[]>): Record<string, Se
   return map;
 }
 
-export default function SudokuBoard({ hints, initialUserValues, initialNotes, onValuesChange, onComplete, liveValidate }: SudokuBoardProps) {
+export default function SudokuBoard({ hints, initialUserValues, initialNotes, solution, onValuesChange, onComplete, liveValidate }: SudokuBoardProps) {
   const isMobile = useIsMobile();
   const width = 9 * CELL_SIZE + PAD * 2;
   const height = 9 * CELL_SIZE + PAD * 2;
@@ -163,6 +181,90 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, on
     return peerMap.get(highlightSource) ?? new Set<string>();
   }, [highlightSource, peerMap]);
 
+  // --- Hint affordance (docs/auto-solve, Phase 4) -------------------------------
+  // Runs the client-side solver on the committed board to surface the shallowest
+  // logical next step; falls back to revealing one cell from the stored solution.
+  const [hint, setHint] = useState<HintView | null>(null);
+
+  const requestHint = useCallback(() => {
+    // Hints reason from committed entries as if they're correct, so a contradiction
+    // makes the candidate analysis unsound — steer the player to fix conflicts first.
+    if (conflictCells.size > 0) {
+      setHint({ kind: "message", text: "Fix the conflicting cells first — hints assume your entries are correct." });
+      return;
+    }
+    const canon = { hints };
+    const step = nextHint(1, canon, userValues);
+    if (step) {
+      setHint({ kind: "step", step });
+      return;
+    }
+    // No logical step the ladder knows: reveal the first unfilled cell, if we have
+    // a stored solution to draw from.
+    if (solution) {
+      for (let id = 0; id < 81; id++) {
+        const r = Math.floor(id / 9);
+        const c = id % 9;
+        const filled = (hints[r]?.[c] ?? 0) > 0 || (userValues[`${c},${r}`] ?? 0) > 0;
+        const sol = solution[r]?.[c] ?? 0;
+        if (!filled && sol > 0) {
+          setHint({ kind: "reveal", cellId: id, value: sol });
+          return;
+        }
+      }
+      setHint({ kind: "message", text: "The board is already complete." });
+      return;
+    }
+    setHint({ kind: "message", text: "No further hints are available for this puzzle." });
+  }, [conflictCells, hints, userValues, solution]);
+
+  // Commit the hinted cell (placement step or reveal). Elimination hints have no
+  // placement to apply — they're informational and only dismissed.
+  const applyHint = useCallback(() => {
+    const placement =
+      hint?.kind === "reveal"
+        ? { cell: hint.cellId, value: hint.value }
+        : hint?.kind === "step"
+        ? hint.step.placement
+        : undefined;
+    if (!placement) return;
+    const key = `${placement.cell % 9},${Math.floor(placement.cell / 9)}`;
+    setUserValues((prev) => ({ ...prev, [key]: placement.value }));
+    setNotes((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    setHint(null);
+  }, [hint]);
+
+  // A hint reflects a specific board; once the player changes it, drop the stale hint.
+  const userValuesAtHint = useRef(userValues);
+  useEffect(() => {
+    if (hint && userValues !== userValuesAtHint.current) setHint(null);
+    userValuesAtHint.current = userValues;
+  }, [userValues, hint]);
+
+  // Cells to tint for the current hint, and candidate digits struck through for
+  // elimination hints (keyed "col,row" -> digits removed).
+  const hintFocusKeys = useMemo(() => {
+    if (!hint) return new Set<string>();
+    if (hint.kind === "reveal") return new Set([idToKey(hint.cellId)]);
+    if (hint.kind === "step") return new Set(hint.step.focusCells.map(idToKey));
+    return new Set<string>();
+  }, [hint]);
+
+  const hintStrikes = useMemo(() => {
+    const map = new Map<string, Set<number>>();
+    if (hint?.kind === "step" && hint.step.eliminations) {
+      for (const { cell, digits } of hint.step.eliminations) {
+        map.set(idToKey(cell), new Set(digits));
+      }
+    }
+    return map;
+  }, [hint]);
+
   // A cell that already holds a committed answer can't take notes: force answer
   // mode and disable the toggle while such a cell is active.
   const activeHasAnswer = activeCell != null && (userValues[activeCell] ?? 0) > 0;
@@ -270,6 +372,89 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, on
 
   return (
     <div style={{ maxWidth: width, width: "100%", paddingBottom: isMobile && activeCell ? 60 : 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
+        <button
+          onClick={requestHint}
+          style={{
+            fontSize: "0.85rem",
+            padding: "0.35rem 0.9rem",
+            background: "#1976d2",
+            color: "white",
+            border: "none",
+            borderRadius: 4,
+            cursor: "pointer",
+          }}
+          title="Suggest the next logical step"
+        >
+          Hint
+        </button>
+        {hint && (
+          <button
+            onClick={() => setHint(null)}
+            style={{
+              fontSize: "0.85rem",
+              padding: "0.35rem 0.9rem",
+              background: "#f0f0f0",
+              border: "1px solid #ccc",
+              borderRadius: 4,
+              cursor: "pointer",
+            }}
+          >
+            Clear hint
+          </button>
+        )}
+      </div>
+
+      {hint && (
+        <div
+          style={{
+            marginBottom: "0.6rem",
+            padding: "0.6rem 0.8rem",
+            background: hint.kind === "reveal" ? "#e8f5e9" : hint.kind === "message" ? "#fff8e1" : "#e3f2fd",
+            border: `1px solid ${hint.kind === "reveal" ? "#a5d6a7" : hint.kind === "message" ? "#ffe082" : "#90caf9"}`,
+            borderRadius: 6,
+            fontSize: "0.85rem",
+            lineHeight: 1.4,
+          }}
+        >
+          {hint.kind === "step" && (
+            <>
+              <div style={{ fontWeight: 600, marginBottom: "0.2rem" }}>
+                {techniqueLabel(hint.step.technique)}
+              </div>
+              <div style={{ color: "#333" }}>{hint.step.explanation}</div>
+            </>
+          )}
+          {hint.kind === "reveal" && (
+            <>
+              <div style={{ fontWeight: 600, marginBottom: "0.2rem" }}>Revealed cell</div>
+              <div style={{ color: "#333" }}>
+                No simple logical step was found, so here's one cell from the solution:{" "}
+                {cellLabel(hint.cellId)} is {hint.value}.
+              </div>
+            </>
+          )}
+          {hint.kind === "message" && <div style={{ color: "#333" }}>{hint.text}</div>}
+          {(hint.kind === "reveal" || (hint.kind === "step" && hint.step.placement)) && (
+            <button
+              onClick={applyHint}
+              style={{
+                marginTop: "0.5rem",
+                fontSize: "0.8rem",
+                padding: "0.3rem 0.8rem",
+                background: hint.kind === "reveal" ? "#43a047" : "#1976d2",
+                color: "white",
+                border: "none",
+                borderRadius: 4,
+                cursor: "pointer",
+              }}
+            >
+              {hint.kind === "reveal" ? "Fill it in" : "Place it"}
+            </button>
+          )}
+        </div>
+      )}
+
       <svg
         width="100%"
         viewBox={`0 0 ${width} ${height}`}
@@ -283,6 +468,42 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, on
         }}
       >
         <g transform={`translate(${PAD},${PAD})`}>
+          {/* Hint highlight layer: amber for the pattern/placement cells, red for
+              cells a hint says to eliminate candidates from. Drawn beneath the
+              peer-highlight so an active cell still reads clearly. */}
+          {hint && (hint.kind === "step" || hint.kind === "reveal") && (
+            <g>
+              {Array.from(hintFocusKeys).map((key) => {
+                const [col, row] = key.split(",").map(Number);
+                return (
+                  <rect
+                    key={`hint-focus-${key}`}
+                    x={col * CELL_SIZE + 1}
+                    y={row * CELL_SIZE + 1}
+                    width={CELL_SIZE - 2}
+                    height={CELL_SIZE - 2}
+                    fill={hint.kind === "reveal" ? "#c8e6c9" : "#fff59d"}
+                    fillOpacity={0.8}
+                  />
+                );
+              })}
+              {Array.from(hintStrikes.keys()).map((key) => {
+                const [col, row] = key.split(",").map(Number);
+                return (
+                  <rect
+                    key={`hint-elim-${key}`}
+                    x={col * CELL_SIZE + 1}
+                    y={row * CELL_SIZE + 1}
+                    width={CELL_SIZE - 2}
+                    height={CELL_SIZE - 2}
+                    fill="#ffcdd2"
+                    fillOpacity={0.7}
+                  />
+                );
+              })}
+            </g>
+          )}
+
           {/* Highlight layer */}
           {highlightSource && (
             <g>
@@ -383,6 +604,43 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, on
                 >
                   {digit}
                 </text>
+              );
+            });
+          })}
+
+          {/* Hint candidate strikes: for elimination hints, show the removed digits
+              as small red struck-through marks in the 3x3 sub-layout, so the player
+              sees which candidates the technique rules out. Only on empty cells. */}
+          {Array.from(hintStrikes.entries()).map(([key, digits]) => {
+            const [col, row] = key.split(",").map(Number);
+            if (hintCells.has(key) || (userValues[key] ?? 0) > 0) return null;
+            const third = CELL_SIZE / 3;
+            return Array.from(digits).map((digit) => {
+              const sub = digit - 1;
+              const sx = col * CELL_SIZE + ((sub % 3) + 0.5) * third;
+              const sy = row * CELL_SIZE + (Math.floor(sub / 3) + 0.5) * third;
+              return (
+                <g key={`strike-${key}-${digit}`} pointerEvents="none">
+                  <text
+                    x={sx}
+                    y={sy}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    fontSize={third * 0.8}
+                    fontFamily="sans-serif"
+                    fill="#d32f2f"
+                  >
+                    {digit}
+                  </text>
+                  <line
+                    x1={sx - third * 0.35}
+                    y1={sy + third * 0.35}
+                    x2={sx + third * 0.35}
+                    y2={sy - third * 0.35}
+                    stroke="#d32f2f"
+                    strokeWidth={1}
+                  />
+                </g>
               );
             });
           })}
