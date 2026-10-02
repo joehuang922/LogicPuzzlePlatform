@@ -39,6 +39,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
@@ -56,6 +58,13 @@ fun HomeScreen(
     vm: HomeViewModel = viewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+
+    // Re-read local progress whenever Home returns to the foreground. Finishing a
+    // puzzle on the Play screen writes the solved state to Room, but this HomeViewModel
+    // survives on the nav back stack, so its solved/thumbnail state would otherwise
+    // stay stale until a pull-to-refresh. ON_RESUME also fires on first composition,
+    // which the VM's own in-flight-load guard makes a no-op.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.refreshLocalProgress() }
 
     Scaffold(
         topBar = {

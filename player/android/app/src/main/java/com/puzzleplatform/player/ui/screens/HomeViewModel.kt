@@ -164,6 +164,49 @@ class HomeViewModel(
         }
     }
 
+    /**
+     * Re-read local progress — Latest, collection counts, and the open collection's
+     * solved/attempted marks — from Room only (no network). Called when Home returns
+     * to the foreground after finishing a puzzle on the Play screen: the HomeViewModel
+     * survives that round trip on the nav back stack, so without this a freshly-solved
+     * puzzle's thumbnail and bumped counts would appear only after a pull-to-refresh.
+     *
+     * Flipping [solvedPuzzleIds] is what makes a solved row's thumbnail load: the row's
+     * LaunchedEffect(onRequestThumbnail) only runs once `solved` turns true. Skipped
+     * while an initial load or pull-to-refresh is already in flight, and reads nothing
+     * over the network so it's cheap enough to run on every resume.
+     */
+    fun refreshLocalProgress() {
+        val current = _state.value
+        if (current.loading || current.refreshing) return
+        viewModelScope.launch {
+            val recentlyPlayed = repo.listRecentlyPlayed(limit = 3)
+            var progress = if (current.collections.isNotEmpty()) {
+                repo.getCollectionProgress(current.collections.map { it.id }).associateBy { it.collectionId }
+            } else emptyMap()
+            // Recompute solved/attempted against the already-loaded puzzle list rather
+            // than re-fetching it, keeping this a purely local read.
+            val expandedId = current.expandedCollectionId
+            val solved = if (expandedId != null && current.collectionPuzzles.isNotEmpty()) {
+                repo.getSolvedQuestions(current.collectionPuzzles.map { it.id })
+            } else null
+            // Pin the open collection's count to the solved set we just computed, so its
+            // header matches the ✓/thumbnail rows below it (as reloadCollectionPuzzles does).
+            if (expandedId != null && solved != null) {
+                progress = progress + (expandedId to
+                    CollectionProgress(expandedId, current.collectionPuzzles.size, solved.solvedQuestions.size))
+            }
+            _state.update {
+                it.copy(
+                    puzzles = recentlyPlayed,
+                    collectionProgress = progress,
+                    solvedPuzzleIds = solved?.solvedQuestions?.toSet() ?: it.solvedPuzzleIds,
+                    attemptedPuzzleIds = solved?.attemptedQuestions?.toSet() ?: it.attemptedPuzzleIds,
+                )
+            }
+        }
+    }
+
     /** Load the Home lists (Latest + collections + progress) into state. */
     private suspend fun fetchHome() {
         // "Latest" shows the puzzles the player most recently worked on
