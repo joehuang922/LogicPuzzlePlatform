@@ -92,10 +92,14 @@ class KakuroParser(PuzzleParser):
 
         # Use LLM to read numbers in clue cells
         if clue_cell_crops:
-            inverted_crops = []
-            for crop in clue_cell_crops:
-                _, binary = cv2.threshold(crop, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-                inverted_crops.append(cv2.bitwise_not(binary))
+            # Invert (white-on-dark clue -> dark-on-light) but DON'T binarize:
+            # Otsu thresholding destroys the faint, soft-focus pen strokes of
+            # multi-digit clues, collapsing e.g. 18->1 or 29->2. Keeping the
+            # grayscale gradient roughly doubled exact-cell OCR accuracy and
+            # eliminated run-to-run variance. Inversion still turns any dark
+            # edge-bleed from neighbouring cells into white (which blends into
+            # the montage canvas) rather than readable strokes.
+            inverted_crops = [cv2.bitwise_not(crop) for crop in clue_cell_crops]
             cols_per_row = min(10, len(inverted_crops))
             crop_grid: list[list[NDArray]] = []
             for i in range(0, len(inverted_crops), cols_per_row):
