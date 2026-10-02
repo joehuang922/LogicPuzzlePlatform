@@ -1,20 +1,63 @@
 # Logic Puzzle Platform
 
-A platform for parsing logic puzzle images into structured data and playing them interactively via a web interface.
+A platform for parsing logic puzzle images into structured data and playing them interactively on web and Android.
 
 ## Components
 
 ### Parsers (`parsers/`)
-Python package that converts scanned puzzle images into JSON representations. Extensible plugin system — add new puzzle types by implementing the `PuzzleParser` interface.
-
-**Supported puzzle types:**
-- **Combo-Sudoku** — overlapping 9x9 sudoku sub-boards arranged in a cross pattern
+Python package that converts scanned puzzle images into JSON representations. Extensible plugin system — add new puzzle types by implementing the `PuzzleParser` interface. Registered in `parsers/lambda_handler.py`.
 
 ### Player (`player/`)
-AWS serverless web application for playing puzzles:
-- **frontend/** — React + TypeScript (Vite)
+- **frontend/** — React + TypeScript (Vite) web client, admin, and editors
+- **android/** — Jetpack Compose native player
+- **solver/** — TypeScript solving/hint engine (gates auto-solve, powers hints)
 - **api/** — Lambda functions (TypeScript, Node.js)
 - **infra/** — AWS CDK infrastructure
+
+## Puzzle Type Completeness
+
+**Baseline (table stakes).** Every onboarded type ships these — all 25 have them, so they're omitted from the table below: **Doc** (`docs/<name>/`), **Schema** (`schemas/canon/<name>.json`), **Schema validator** (canon shape-check at ingest, `player/api/src/lib/schema.ts`), **DB** row (`player/api/seed.sql`), **Types** (`player/frontend/src/types/canon.ts`), **Board** (`<Name>Board.tsx`, incl. the completion check that fires `onComplete`), **Renderer** (registered in `player/frontend/src/main.tsx`), and **Extractor** (maps the player's in-progress board state into the canonical answer JSON for persistence, `player/frontend/src/extractors/<name>.ts`). Together these make a type parseable, storable, and playable on the web.
+
+**Differentiating components.** These vary by type:
+
+- **Conflicts** — live, rule-based conflict/error highlighting *during* solving (a sub-capability of the Board, gated by the `liveValidate` toggle). Distinct from the schema validator (puzzle shape at ingest) and the completion check (only detects a fully-solved board).
+- **Editor** — web editor component (`player/frontend/src/components/<Name>Editor.tsx`).
+- **Progress** — progress calculator returning 0–100 for a partial solution (`player/frontend/src/progress/<name>.ts`).
+- **Parser** — image parser (`parsers/src/puzzle_parsers/<name>/`) + lambda registration.
+- **Android** — Kotlin engine + Compose board (`player/android/.../puzzle` + `.../ui/board`).
+- **Solver** — solving/hint plugin (`player/solver/src/plugins/<name>/`; Android hinter).
+
+Legend: ✅ = implemented · 🟡 = partial · blank = not yet. In the **Parser** column, **★** marks a parser whose extraction accuracy is high enough to need no manual calibration/editorial correction after parsing — a ✅ without a ★ works but still needs a human to verify/fix its output.
+
+| ID | Puzzle Type | Conflicts | Editor | Progress | Parser | Android | Solver |
+|----|-------------|:--------:|:------:|:--------:|:------:|:-------:|:------:|
+| 1  | sudoku        | ✅ | ✅ | ✅ | ✅★ | ✅ | ✅ |
+| 2  | combo-sudoku  |    | ✅ | ✅ | ✅ |    |    |
+| 3  | nurimaze      |    | ✅ | ✅ | ✅ |    |    |
+| 4  | double-choco  |    | ✅ | ✅ | ✅ |    |    |
+| 5  | slitherlink   |    | ✅ | ✅ | ✅ |    |    |
+| 6  | nonogram      | ✅ | ✅ | ✅ | ✅ | ✅ |    |
+| 7  | masyu         | ✅ | ✅ | ✅ | ✅ | ✅ |    |
+| 8  | pencils       |    | ✅ | ✅ | ✅ |    |    |
+| 9  | nuritwin      |    | ✅ | ✅ | ✅ |    |    |
+| 10 | slalom        |    | ✅ | ✅ | ✅ |    |    |
+| 11 | shakashaka    |    | ✅ | ✅ | ✅ |    |    |
+| 12 | kakuro        | ✅ | ✅ | ✅ | ✅ | ✅ |    |
+| 13 | yajilin       |    | ✅ | ✅ | ✅ |    |    |
+| 14 | fillomino     |    | ✅ | ✅ | ✅ |    |    |
+| 15 | lits          |    | ✅ | ✅ | ✅ |    |    |
+| 16 | choco-banana  |    | ✅ | ✅ | ✅ |    |    |
+| 17 | number-link   |    | ✅ | ✅ | ✅ |    |    |
+| 18 | akari         | 🟡 | ✅ | ✅ | ✅ |    |    |
+| 19 | hell-golf     |    | ✅ | ✅ | ✅ |    |    |
+| 20 | tentaishow    |    | ✅ | ✅ | ✅ |    |    |
+| 21 | heyawake      |    | ✅ | ✅ | ✅ |    |    |
+| 22 | shikaku       |    | ✅ | ✅ | ✅ |    |    |
+| 23 | norinori      |    | ✅ | ✅ | ✅ |    |    |
+| 24 | nurikabe      |    | ✅ | ✅ | ✅ |    |    |
+| 25 | ripple-effect |    | ✅ | ✅ | ✅ |    |    |
+
+**Summary:** all 25 types are fully playable on the web, with editors, progress, and parsers complete across the board. The gaps are: **live conflict highlighting** (4 full — sudoku, nonogram, masyu, kakuro — plus a partial akari, which flags only mutually-illuminating bulbs); **parser accuracy** (only sudoku ★ parses cleanly enough to skip manual calibration; the other 24 need editorial correction); **Android** (4 — sudoku, nonogram, masyu, kakuro); and the **solver/hint engine** (1 — sudoku).
 
 ## Tech Stack
 
