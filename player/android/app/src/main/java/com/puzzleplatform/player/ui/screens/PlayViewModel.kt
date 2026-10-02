@@ -234,6 +234,19 @@ class PlayViewModel(
     }
 
     /**
+     * Set an arbitrary flat userValues entry to an explicit integer, removing the key
+     * when [value] is 0. Used by puzzles whose input isn't a "col,row" digit or a
+     * boolean edge — e.g. Hell Golf, which stores each trail stop as
+     * "t:<ball>:<step>" -> an encoded cell (always > 0).
+     */
+    fun putUserValue(key: String, value: Int) {
+        val values = _state.value.userValues
+        val next = if (value == 0) values - key else values + (key to value)
+        if (next == values) return
+        updateValues(next, clearSelection = false)
+    }
+
+    /**
      * Set a "col,row" cell to an explicit state, removing the key when [state] is 0.
      * Used by multi-state paint puzzles (e.g. Nonogram: 1 = filled, 2 = crossed) whose
      * input is drag-to-paint rather than digit entry.

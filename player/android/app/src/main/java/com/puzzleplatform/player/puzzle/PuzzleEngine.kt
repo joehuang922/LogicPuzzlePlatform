@@ -46,6 +46,7 @@ object PuzzleEngines {
         KakuroEngine,
         MasyuEngine,
         NonogramEngine,
+        HellGolfEngine,
     ).associateBy { it.puzzleType }
 
     fun forType(puzzleType: Int): PuzzleEngine? = engines[puzzleType]

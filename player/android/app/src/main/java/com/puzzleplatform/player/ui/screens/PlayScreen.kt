@@ -53,6 +53,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.puzzleplatform.player.ui.DIFFICULTY_LABELS
 import com.puzzleplatform.player.ui.board.DigitBar
+import com.puzzleplatform.player.ui.board.HellGolfBoard
 import com.puzzleplatform.player.ui.board.KakuroBoard
 import com.puzzleplatform.player.ui.board.MasyuBoard
 import com.puzzleplatform.player.ui.board.NonogramBoard
@@ -236,6 +237,11 @@ fun PlayScreen(
                             userValues = state.userValues,
                             liveValidate = state.liveValidate,
                             onSetEdge = vm::setUserValue,
+                        )
+                        19 -> HellGolfBoard(
+                            puzzle = puzzle,
+                            userValues = state.userValues,
+                            onPutValue = vm::putUserValue,
                         )
                         6 -> {
                             var nonogramMode by remember(puzzle.id) { mutableStateOf(NonogramMode.FILL) }

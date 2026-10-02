@@ -49,7 +49,7 @@ Legend: ✅ = implemented · 🟡 = partial · blank = not yet. In the **Parser*
 | 16 | choco-banana  |    | ✅ | ✅ | ✅ |    |    |
 | 17 | number-link   |    | ✅ | ✅ | ✅ |    |    |
 | 18 | akari         | 🟡 | ✅ | ✅ | ✅ |    |    |
-| 19 | hell-golf     |    | ✅ | ✅ | ✅ |    |    |
+| 19 | hell-golf     |    | ✅ | ✅ | ✅ | ✅ |    |
 | 20 | tentaishow    |    | ✅ | ✅ | ✅ |    |    |
 | 21 | heyawake      |    | ✅ | ✅ | ✅ |    |    |
 | 22 | shikaku       |    | ✅ | ✅ | ✅ |    |    |
@@ -57,7 +57,7 @@ Legend: ✅ = implemented · 🟡 = partial · blank = not yet. In the **Parser*
 | 24 | nurikabe      |    | ✅ | ✅ | ✅ |    |    |
 | 25 | ripple-effect |    | ✅ | ✅ | ✅ |    |    |
 
-**Summary:** all 25 types are fully playable on the web, with editors, progress, and parsers complete across the board. The gaps are: **live conflict highlighting** (4 full — sudoku, nonogram, masyu, kakuro — plus a partial akari, which flags only mutually-illuminating bulbs); **parser accuracy** (only sudoku ★ parses cleanly enough to skip manual calibration; the other 24 need editorial correction); **Android** (4 — sudoku, nonogram, masyu, kakuro); and the **solver/hint engine** (1 — sudoku).
+**Summary:** all 25 types are fully playable on the web, with editors, progress, and parsers complete across the board. The gaps are: **live conflict highlighting** (4 full — sudoku, nonogram, masyu, kakuro — plus a partial akari, which flags only mutually-illuminating bulbs); **parser accuracy** (only sudoku ★ parses cleanly enough to skip manual calibration; the other 24 need editorial correction); **Android** (5 — sudoku, nonogram, masyu, kakuro, hell-golf); and the **solver/hint engine** (1 — sudoku).
 
 ## Tech Stack
 
