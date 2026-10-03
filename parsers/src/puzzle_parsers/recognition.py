@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import io
 from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from numpy.typing import NDArray
 from PIL import Image
@@ -78,10 +79,10 @@ class GeminiRecognizer(CellRecognizer):
     def __init__(
         self,
         client=None,
-        model: str = "gemini-2.5-flash",
+        model: str = "gemini-3.8-flash",
         *,
-        fallback_model: str = "gemini-2.0-flash",
-        timeout: float = 60.0,
+        fallback_model: str = "gemini-2.5-flash",
+        timeout: float = 40.0,
     ) -> None:
         import os
 
@@ -171,40 +172,75 @@ class GeminiRecognizer(CellRecognizer):
             return []
 
         rows_per_batch = max(1, max_cells_per_batch // num_cols)
+        batches = [
+            (start_row, min(start_row + rows_per_batch, num_rows))
+            for start_row in range(0, num_rows, rows_per_batch)
+        ]
+        multi_batch = num_rows > rows_per_batch
+
+        # Batches are independent API calls, so run them concurrently rather than
+        # serially: the parse is bounded by the single slowest batch instead of
+        # their sum. Each call already enforces its own wall-clock timeout, so a
+        # pool of blocking threads is the simplest safe fan-out. Results are
+        # written back by index to preserve row order.
+        if len(batches) == 1:
+            return self._recognize_batch(
+                cells, prompt, num_cols, batches[0], multi_batch
+            )
+
+        batch_results: list[list[list] | None] = [None] * len(batches)
+        with ThreadPoolExecutor(max_workers=len(batches)) as pool:
+            futures = {
+                pool.submit(
+                    self._recognize_batch, cells, prompt, num_cols, span, multi_batch
+                ): i
+                for i, span in enumerate(batches)
+            }
+            for future in as_completed(futures):
+                batch_results[futures[future]] = future.result()
+
         all_results: list[list] = []
-
-        for start_row in range(0, num_rows, rows_per_batch):
-            end_row = min(start_row + rows_per_batch, num_rows)
-            batch_crops = cells[start_row:end_row]
-            batch_rows = end_row - start_row
-
-            png_bytes = cells_to_png_bytes(batch_crops, row_offset=start_row)
-            montage_image = Image.open(io.BytesIO(png_bytes))
-
-            batch_prompt = prompt
-            if num_rows > rows_per_batch:
-                batch_prompt += (
-                    f"\n\nThis batch has {batch_rows} rows and {num_cols} columns "
-                    f"(rows {start_row} to {end_row - 1} of the full grid)."
-                )
-
-            response = self._generate([montage_image, batch_prompt])
-            batch_result = parse_json_response(response.text)
-
-            if not isinstance(batch_result, list) or len(batch_result) != batch_rows:
-                raise ValueError(
-                    f"Expected {batch_rows} rows from Gemini (batch rows {start_row}-{end_row-1}), "
-                    f"got {len(batch_result) if isinstance(batch_result, list) else type(batch_result)}"
-                )
-            for r, row in enumerate(batch_result):
-                if not isinstance(row, list) or len(row) != num_cols:
-                    raise ValueError(
-                        f"Expected {num_cols} cols in row {start_row + r}, "
-                        f"got {len(row) if isinstance(row, list) else type(row)}"
-                    )
-            all_results.extend(batch_result)
-
+        for result in batch_results:
+            all_results.extend(result or [])
         return all_results
+
+    def _recognize_batch(
+        self,
+        cells: list[list[NDArray]],
+        prompt: str,
+        num_cols: int,
+        span: tuple[int, int],
+        multi_batch: bool,
+    ) -> list[list]:
+        start_row, end_row = span
+        batch_crops = cells[start_row:end_row]
+        batch_rows = end_row - start_row
+
+        png_bytes = cells_to_png_bytes(batch_crops, row_offset=start_row)
+        montage_image = Image.open(io.BytesIO(png_bytes))
+
+        batch_prompt = prompt
+        if multi_batch:
+            batch_prompt += (
+                f"\n\nThis batch has {batch_rows} rows and {num_cols} columns "
+                f"(rows {start_row} to {end_row - 1} of the full grid)."
+            )
+
+        response = self._generate([montage_image, batch_prompt])
+        batch_result = parse_json_response(response.text)
+
+        if not isinstance(batch_result, list) or len(batch_result) != batch_rows:
+            raise ValueError(
+                f"Expected {batch_rows} rows from Gemini (batch rows {start_row}-{end_row-1}), "
+                f"got {len(batch_result) if isinstance(batch_result, list) else type(batch_result)}"
+            )
+        for r, row in enumerate(batch_result):
+            if not isinstance(row, list) or len(row) != num_cols:
+                raise ValueError(
+                    f"Expected {num_cols} cols in row {start_row + r}, "
+                    f"got {len(row) if isinstance(row, list) else type(row)}"
+                )
+        return batch_result
 
     def recognize_full_image(
         self,
