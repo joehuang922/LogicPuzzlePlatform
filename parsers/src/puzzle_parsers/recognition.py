@@ -82,7 +82,7 @@ class GeminiRecognizer(CellRecognizer):
         model: str = "gemini-3.8-flash",
         *,
         fallback_model: str = "gemini-2.5-flash",
-        timeout: float = 40.0,
+        timeout: float = 50.0,
     ) -> None:
         import os
 

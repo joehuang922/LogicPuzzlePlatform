@@ -16,7 +16,7 @@ import {
 import PuzzleEditorModal, { hasVisualEditor } from "../components/PuzzleEditorModal";
 import CanonPreview from "../components/CanonPreview";
 import BatchUploadForm from "../components/BatchUploadForm";
-import { extractBase64, downscaleDataUrlForParse } from "../utils/image";
+import { extractBase64 } from "../utils/image";
 import { cardStyle, fieldStyle, inputStyle, errorStyle } from "../styles/admin";
 import { DIFFICULTY_OPTIONS, DIFFICULTY_LABELS } from "../constants";
 
@@ -303,10 +303,7 @@ function QuestionForm({
       setParsing(true);
 
       try {
-        // Downscale only the copy sent to the parser; the full-res dataUrl stays
-        // in the on-screen preview.
-        const parseDataUrl = await downscaleDataUrlForParse(dataUrl);
-        const base64 = extractBase64(parseDataUrl);
+        const base64 = extractBase64(dataUrl);
 
         const timeout = new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error("Parsing timed out (2min). Cold start may take a while — try again.")), PARSE_TIMEOUT_MS)
