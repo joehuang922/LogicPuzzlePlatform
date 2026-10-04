@@ -4,9 +4,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -38,7 +41,12 @@ fun DigitBar(
     FlowRow(
         modifier = modifier
             .fillMaxWidth()
-            .padding(8.dp),
+            // Lift the pad clear of the system gesture/navigation bar at the
+            // screen's bottom edge; without consuming this inset the pad draws
+            // into the gesture-pill zone and sits uncomfortably low. The extra
+            // bottom padding adds a little breathing room above that inset.
+            .windowInsetsPadding(WindowInsets.navigationBars)
+            .padding(start = 8.dp, top = 8.dp, end = 8.dp, bottom = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
