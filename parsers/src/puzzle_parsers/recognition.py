@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 import io
+import math
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -15,6 +16,32 @@ from numpy.typing import NDArray
 from PIL import Image
 
 from puzzle_parsers.llm_vision import cells_to_png_bytes, parse_json_response
+
+
+def _split_rows(
+    num_rows: int, num_cols: int, max_cells_per_batch: int
+) -> list[tuple[int, int]]:
+    """Partition rows into (start, end) spans for concurrent batch recognition.
+
+    ``max_cells_per_batch // num_cols`` caps how many rows a single API call may
+    carry. Rather than greedily filling batches to that cap — which leaves a fat
+    first batch and a tiny trailing one (e.g. 22 rows -> 20 + 2) and so wastes the
+    concurrency, since wall-clock tracks the largest batch — we pick the minimum
+    number of batches that honours the cap and spread rows as evenly as possible
+    across them (22 -> 11 + 11). Each batch's recognition latency scales with its
+    cell count, so balanced batches minimise the slowest one.
+    """
+    rows_per_batch = max(1, max_cells_per_batch // num_cols)
+    num_batches = max(1, math.ceil(num_rows / rows_per_batch))
+    base, remainder = divmod(num_rows, num_batches)
+
+    spans: list[tuple[int, int]] = []
+    start = 0
+    for i in range(num_batches):
+        size = base + (1 if i < remainder else 0)
+        spans.append((start, start + size))
+        start += size
+    return spans
 
 
 class CellRecognizer(ABC):
@@ -171,12 +198,8 @@ class GeminiRecognizer(CellRecognizer):
         if num_cols == 0:
             return []
 
-        rows_per_batch = max(1, max_cells_per_batch // num_cols)
-        batches = [
-            (start_row, min(start_row + rows_per_batch, num_rows))
-            for start_row in range(0, num_rows, rows_per_batch)
-        ]
-        multi_batch = num_rows > rows_per_batch
+        batches = _split_rows(num_rows, num_cols, max_cells_per_batch)
+        multi_batch = len(batches) > 1
 
         # Batches are independent API calls, so run them concurrently rather than
         # serially: the parse is bounded by the single slowest batch instead of

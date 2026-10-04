@@ -21,6 +21,36 @@ from puzzle_parsers.recognition_schemas import DUAL_INT_CELL_PROMPT
 BLACK_THRESHOLD = 200
 
 
+def _coerce_int(value: object) -> int:
+    """Best-effort parse of a single clue number to a non-negative int."""
+    if isinstance(value, bool):
+        return 0
+    if isinstance(value, int):
+        return value if value > 0 else 0
+    if isinstance(value, str):
+        value = value.strip()
+        return int(value) if value.isdigit() else 0
+    return 0
+
+
+def _parse_dual_int(result: object) -> tuple[int, int]:
+    """Decode one clue cell into (top_right, bottom_left) numbers.
+
+    The recognizer emits the compact ``"TR/BL"`` string form (e.g. ``"3/5"``,
+    ``"7/0"``). A dict of ``{"top_right", "bottom_left"}`` is still accepted so a
+    model that ignores the format instruction, or an older cached response, keeps
+    working.
+    """
+    if isinstance(result, str):
+        parts = result.split("/", 1)
+        top_right = _coerce_int(parts[0])
+        bottom_left = _coerce_int(parts[1]) if len(parts) > 1 else 0
+        return top_right, bottom_left
+    if isinstance(result, dict):
+        return _coerce_int(result.get("top_right")), _coerce_int(result.get("bottom_left"))
+    return 0, 0
+
+
 class KakuroParser(PuzzleParser):
     puzzle_type = "kakuro"
 
@@ -116,13 +146,10 @@ class KakuroParser(PuzzleParser):
             for i, (r, c) in enumerate(clue_cell_coords):
                 if i >= len(flat_results):
                     break
-                result = flat_results[i]
-                if isinstance(result, dict):
-                    top_right = result.get("top_right", 0)
-                    bottom_left = result.get("bottom_left", 0)
-                    right_val = top_right if isinstance(top_right, int) and top_right > 0 else None
-                    down_val = bottom_left if isinstance(bottom_left, int) and bottom_left > 0 else None
-                    cells[r][c] = KakuroClueCell(right=right_val, down=down_val)
+                top_right, bottom_left = _parse_dual_int(flat_results[i])
+                right_val = top_right if top_right > 0 else None
+                down_val = bottom_left if bottom_left > 0 else None
+                cells[r][c] = KakuroClueCell(right=right_val, down=down_val)
 
         # Post-process: fix single-number clue cells using structural constraints.
         # A cell can only have right if there's an empty cell to its right,

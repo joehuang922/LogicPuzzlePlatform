@@ -137,12 +137,13 @@ DUAL_INT_CELL_PROMPT = (
     "Each cell is labeled with its row,col position. "
     "Some cells are split by a diagonal line from upper-left to lower-right, "
     "with a number in the top-right half and a number in the bottom-left half. "
-    "Other cells may be empty or contain a single number (treat as top_right). "
-    "For each cell, output an object with 'top_right' (integer, 0 if empty) "
-    "and 'bottom_left' (integer, 0 if empty). "
-    "Respond with ONLY a JSON array of arrays of objects. "
-    'Example: [[{"top_right":3,"bottom_left":5},{"top_right":0,"bottom_left":0}]]. '
-    "No explanation, just the JSON."
+    "Other cells may be empty or contain a single number (treat it as the "
+    "top-right number). "
+    'For each cell output a short string "TR/BL" where TR is the top-right '
+    "number (0 if none) and BL is the bottom-left number (0 if none), "
+    'e.g. "3/5", "7/0", "0/12", "0/0". '
+    "Respond with ONLY a JSON array of arrays of these strings, one per cell. "
+    'Example for a 1x3: [["3/5","0/0","7/0"]]. No explanation, just the JSON.'
 )
 
 

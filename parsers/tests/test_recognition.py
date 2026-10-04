@@ -7,7 +7,7 @@ import time
 
 import numpy as np
 
-from puzzle_parsers.recognition import GeminiRecognizer
+from puzzle_parsers.recognition import GeminiRecognizer, _split_rows
 
 
 class _FakeResponse:
@@ -96,3 +96,29 @@ def test_multi_batch_runs_concurrently():
     rec.recognize(_cells(30, 2), "prompt", max_cells_per_batch=20)
     elapsed = time.monotonic() - start
     assert elapsed < 0.5, f"batches did not overlap (took {elapsed:.2f}s)"
+
+
+def test_split_rows_balances_instead_of_leaving_a_fat_trailing_batch():
+    # 22 rows x 10 cols, cap 200 -> cap allows 20 rows/batch, so 2 batches are
+    # needed; they must split evenly (11+11), not greedily (20+2).
+    spans = _split_rows(22, 10, 200)
+    assert spans == [(0, 11), (11, 22)]
+    sizes = [end - start for start, end in spans]
+    assert max(sizes) - min(sizes) <= 1
+
+
+def test_split_rows_single_batch_when_under_cap():
+    assert _split_rows(3, 4, 200) == [(0, 3)]
+
+
+def test_split_rows_covers_every_row_without_gaps_or_overlap():
+    for num_rows in (1, 7, 20, 21, 44, 100):
+        spans = _split_rows(num_rows, 10, 200)
+        rows_per_batch = max(1, 200 // 10)
+        assert spans[0][0] == 0
+        assert spans[-1][1] == num_rows
+        for (_, prev_end), (next_start, _) in zip(spans, spans[1:]):
+            assert prev_end == next_start  # contiguous, no gap/overlap
+        sizes = [end - start for start, end in spans]
+        assert max(sizes) <= rows_per_batch  # honours the per-batch cell cap
+        assert max(sizes) - min(sizes) <= 1  # balanced
