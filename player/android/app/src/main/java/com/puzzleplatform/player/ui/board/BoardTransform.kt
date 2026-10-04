@@ -71,6 +71,20 @@ class BoardTransform(
         return if (col in 0 until cols && row in 0 until rows) col to row else null
     }
 
+    /**
+     * Map a tap to *fractional* board coordinates in cell units — e.g. (1.5, 2.0) is
+     * the top edge of cell (col 1, row 2). Returns null outside the grid or when entry
+     * is disabled. Lets a board decide a sub-cell target (which grid line a tap is
+     * nearest) that the integer [cellAt] can't express; the whole closed range
+     * [0, cols] x [0, rows] is in-bounds so taps on the far border still map.
+     */
+    fun fractionalCellAt(x: Float, y: Float): Pair<Float, Float>? {
+        if (!entryEnabled) return null
+        val col = (x - panX) / cellPx
+        val row = (y - panY) / cellPx
+        return if (col in 0f..cols.toFloat() && row in 0f..rows.toFloat()) col to row else null
+    }
+
     companion object {
         /**
          * Clamp one axis of the pan offset: center the board when it's smaller than

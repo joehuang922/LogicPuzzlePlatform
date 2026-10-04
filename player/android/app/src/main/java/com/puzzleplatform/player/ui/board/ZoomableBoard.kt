@@ -51,6 +51,10 @@ fun ZoomableBoard(
     onTapCell: (col: Int, row: Int) -> Unit,
     modifier: Modifier = Modifier,
     resetKey: Any? = null,
+    // Fractional-coordinate tap, in cell units (e.g. col 1.5 is the right edge of
+    // col 1). Fires on the same tap as [onTapCell] for boards that target sub-cell
+    // features — a Fillomino wall tap snaps to the nearest interior grid line.
+    onTapPrecise: ((col: Float, row: Float) -> Unit)? = null,
     onDrawStart: ((cell: Pair<Int, Int>?) -> Unit)? = null,
     onDrawTo: ((cell: Pair<Int, Int>?) -> Unit)? = null,
     onDrawEnd: (() -> Unit)? = null,
@@ -79,7 +83,12 @@ fun ZoomableBoard(
                 detectBoardGestures(
                     transformEnabled = transform.zoomable,
                     drawEnabled = drawable,
-                    onTap = { off -> transform.cellAt(off.x, off.y)?.let { (col, row) -> onTapCell(col, row) } },
+                    onTap = { off ->
+                    transform.cellAt(off.x, off.y)?.let { (col, row) -> onTapCell(col, row) }
+                    onTapPrecise?.let { cb ->
+                        transform.fractionalCellAt(off.x, off.y)?.let { (col, row) -> cb(col, row) }
+                    }
+                },
                     onDragStart = { off -> onDrawStart?.invoke(transform.cellAt(off.x, off.y)) },
                     onDrag = { off -> onDrawTo?.invoke(transform.cellAt(off.x, off.y)) },
                     onDragEnd = { onDrawEnd?.invoke() },

@@ -71,6 +71,11 @@ class PlayViewModel(
     private var timerJob: Job? = null
     private var completed = false
 
+    // Fillomino multi-digit entry: when true, the next digit starts a new number
+    // (replacing the cell) rather than appending to the one already shown. Set when a
+    // cell is freshly selected; cleared after the first digit so 1 then 2 -> 12.
+    private var fillominoFreshEntry = true
+
     private val engine: PuzzleEngine?
         get() = _state.value.puzzle?.let { PuzzleEngines.forType(it.puzzleType) }
 
@@ -124,7 +129,11 @@ class PlayViewModel(
         }
     }
 
-    fun selectCell(key: String?) = _state.update { it.copy(selectedCell = key) }
+    fun selectCell(key: String?) {
+        // A freshly selected cell starts a new Fillomino number on the next digit.
+        fillominoFreshEntry = true
+        _state.update { it.copy(selectedCell = key) }
+    }
 
     fun toggleLiveValidate() = _state.update { it.copy(liveValidate = !it.liveValidate) }
 
@@ -219,6 +228,45 @@ class PlayViewModel(
         // Answer mode: commit the digit and clear that cell's pencil marks.
         val next = (values.filterKeys { !it.startsWith("n:$cell:") }) + (cell to digit)
         updateValues(next, clearSelection = true)
+    }
+
+    /**
+     * Enter a Fillomino room number into the selected cell ("c:col,row"), supporting
+     * multi-digit sizes (tap 1 then 2 -> 12). The first digit after selecting a cell
+     * replaces it; subsequent digits append. A leading 0 is ignored (a number can't
+     * start with 0), and the value is capped at the grid's cell count — no room can be
+     * larger than that, so a bigger entry is a typo and the keystroke is dropped.
+     */
+    fun enterFillominoDigit(digit: Int) {
+        val puzzle = _state.value.puzzle ?: return
+        val cell = _state.value.selectedCell ?: return
+        val values = _state.value.userValues
+        val current = values[cell] ?: 0
+        val next = if (fillominoFreshEntry || current == 0) {
+            if (digit == 0) return // can't start a number with 0
+            digit
+        } else {
+            val combined = current * 10 + digit
+            if (combined > fillominoMaxRoom(puzzle)) return // overshoot -> ignore
+            combined
+        }
+        fillominoFreshEntry = false
+        updateValues(values + (cell to next), clearSelection = false)
+    }
+
+    /** Clear the selected Fillomino cell but keep it selected so the player can retype. */
+    fun clearFillominoCell() {
+        val cell = _state.value.selectedCell ?: return
+        fillominoFreshEntry = true
+        updateValues(_state.value.userValues - cell, clearSelection = false)
+    }
+
+    /** Largest possible room = total cell count (rows * cols) from the canon grid. */
+    private fun fillominoMaxRoom(puzzle: Puzzle): Int {
+        val cells = com.puzzleplatform.player.puzzle.FillominoEngine.parseCells(puzzle)
+        val rows = cells.size
+        val cols = cells.maxOfOrNull { it.size } ?: 0
+        return (rows * cols).coerceAtLeast(1)
     }
 
     /**

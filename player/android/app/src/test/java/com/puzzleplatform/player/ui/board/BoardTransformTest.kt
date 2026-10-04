@@ -145,4 +145,29 @@ class BoardTransformTest {
         // Left margin (before the board starts) is empty space.
         assertNull(t.cellAt(1f, 540f))
     }
+
+    // -- fractional tap mapping (Fillomino wall snapping) ------------------
+
+    @Test
+    fun fractionalCellAtGivesSubCellPosition() {
+        val t = make(60, 60) // 28px cell, pan (0,0)
+        // 42px is 1.5 cells across -> the interior line between col 1 and col 2.
+        val (col, row) = t.fractionalCellAt(42f, 14f)!!
+        assertEquals(1.5f, col, 0.01f)
+        assertEquals(0.5f, row, 0.01f)
+    }
+
+    @Test
+    fun fractionalCellAtIncludesFarBorder() {
+        val t = make(9, 9) // 40px cell, board centered at panX = 360
+        // A tap exactly on the right border maps to col == cols (9.0), still in-bounds.
+        val (col, _) = t.fractionalCellAt(t.panX + 9 * 40f, t.panY + 40f)!!
+        assertEquals(9f, col, 0.01f)
+    }
+
+    @Test
+    fun fractionalCellAtReturnsNullOutsideGrid() {
+        val t = make(9, 9)
+        assertNull(t.fractionalCellAt(1f, 540f)) // left margin, before the board
+    }
 }

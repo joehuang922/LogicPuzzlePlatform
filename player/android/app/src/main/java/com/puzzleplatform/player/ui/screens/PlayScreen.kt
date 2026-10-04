@@ -53,6 +53,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.puzzleplatform.player.ui.DIFFICULTY_LABELS
 import com.puzzleplatform.player.ui.board.DigitBar
+import com.puzzleplatform.player.ui.board.FillominoBoard
+import com.puzzleplatform.player.ui.board.FillominoMode
 import com.puzzleplatform.player.ui.board.HellGolfBoard
 import com.puzzleplatform.player.ui.board.KakuroBoard
 import com.puzzleplatform.player.ui.board.MasyuBoard
@@ -108,18 +110,29 @@ fun PlayScreen(
         bottomBar = {
             val selected = state.selectedCell
             if (selected != null) {
-                // Only Sudoku (type 1) offers pencil-mark notes; a cell that already
-                // holds a committed answer can't take notes, so disable the toggle.
-                val notesEnabled = state.puzzle?.puzzleType == 1
-                val cellHasAnswer = (state.userValues[selected] ?: 0) > 0
-                DigitBar(
-                    onDigit = vm::enterDigit,
-                    onClear = vm::clearCell,
-                    onDismiss = { vm.selectCell(null) },
-                    noteMode = state.noteMode && !cellHasAnswer,
-                    onToggleNoteMode = if (notesEnabled) vm::toggleNoteMode else null,
-                    noteModeDisabled = cellHasAnswer,
-                )
+                val type = state.puzzle?.puzzleType
+                if (type == 14) {
+                    // Fillomino: multi-digit room numbers (so a "0" key is offered), no notes.
+                    DigitBar(
+                        onDigit = vm::enterFillominoDigit,
+                        onClear = vm::clearFillominoCell,
+                        onDismiss = { vm.selectCell(null) },
+                        includeZero = true,
+                    )
+                } else {
+                    // Only Sudoku (type 1) offers pencil-mark notes; a cell that already
+                    // holds a committed answer can't take notes, so disable the toggle.
+                    val notesEnabled = type == 1
+                    val cellHasAnswer = (state.userValues[selected] ?: 0) > 0
+                    DigitBar(
+                        onDigit = vm::enterDigit,
+                        onClear = vm::clearCell,
+                        onDismiss = { vm.selectCell(null) },
+                        noteMode = state.noteMode && !cellHasAnswer,
+                        onToggleNoteMode = if (notesEnabled) vm::toggleNoteMode else null,
+                        noteModeDisabled = cellHasAnswer,
+                    )
+                }
             }
         },
     ) { padding ->
@@ -238,6 +251,35 @@ fun PlayScreen(
                             liveValidate = state.liveValidate,
                             onSetEdge = vm::setUserValue,
                         )
+                        14 -> {
+                            var fillominoMode by remember(puzzle.id) { mutableStateOf(FillominoMode.NUMBER) }
+                            FillominoBoard(
+                                puzzle = puzzle,
+                                userValues = state.userValues,
+                                mode = fillominoMode,
+                                selectedCell = state.selectedCell,
+                                onSelectCell = vm::selectCell,
+                                onSetEdge = vm::setUserValue,
+                            )
+                            // Number / Wall input-mode toggle (one is numbers, the other
+                            // draws room borders). Leaving Number mode drops any cell
+                            // selection so the digit pad hides.
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FilterChip(
+                                    selected = fillominoMode == FillominoMode.NUMBER,
+                                    onClick = { fillominoMode = FillominoMode.NUMBER },
+                                    label = { Text("Number") },
+                                )
+                                FilterChip(
+                                    selected = fillominoMode == FillominoMode.WALL,
+                                    onClick = {
+                                        fillominoMode = FillominoMode.WALL
+                                        vm.selectCell(null)
+                                    },
+                                    label = { Text("Wall") },
+                                )
+                            }
+                        }
                         19 -> HellGolfBoard(
                             puzzle = puzzle,
                             userValues = state.userValues,
