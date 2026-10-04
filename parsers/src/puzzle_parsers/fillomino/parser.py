@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 from PIL import Image
 
-from puzzle_parsers.base import PuzzleParser
+from puzzle_parsers.base import PuzzleParser, timed
 from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.fillomino.grid_detector import detect_fillomino_grid
 from puzzle_parsers.fillomino.models import FillominoBoard
@@ -43,7 +43,8 @@ class FillominoParser(PuzzleParser):
     ) -> FillominoBoard:
         from pathlib import Path as _Path
 
-        geom = detect_fillomino_grid(img_array, debug_dir=debug_dir)
+        with timed("fillomino grid detect"):
+            geom = detect_fillomino_grid(img_array, debug_dir=debug_dir)
         warped_gray = cv2.cvtColor(geom.warped, cv2.COLOR_BGR2GRAY)
 
         rows = geom.rows
@@ -73,7 +74,8 @@ class FillominoParser(PuzzleParser):
 
         # Recognize numbers via batch OCR
         if self._ocr is not None:
-            cells = self._ocr.recognize_cells(cell_rois)
+            with timed(f"fillomino OCR ({rows}x{cols}={rows * cols} cells)"):
+                cells = self._ocr.recognize_cells(cell_rois)
         else:
             cells = [[0] * cols for _ in range(rows)]
 

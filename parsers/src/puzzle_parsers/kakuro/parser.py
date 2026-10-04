@@ -8,7 +8,7 @@ import numpy as np
 from numpy.typing import NDArray
 from PIL import Image
 
-from puzzle_parsers.base import PuzzleParser
+from puzzle_parsers.base import PuzzleParser, timed
 from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.kakuro.grid_detector import (
     KakuroGeometry,
@@ -75,10 +75,12 @@ class KakuroParser(PuzzleParser):
     def _parse_image(
         self, img_array: np.ndarray, debug_dir: str | None = None
     ) -> KakuroBoard:
-        geom = detect_kakuro_grid(img_array, debug_dir=debug_dir)
+        with timed("kakuro grid detect"):
+            geom = detect_kakuro_grid(img_array, debug_dir=debug_dir)
         warped_gray = cv2.cvtColor(geom.warped, cv2.COLOR_BGR2GRAY)
 
-        cells = self._classify_cells(warped_gray, geom, debug_dir=debug_dir)
+        with timed("kakuro classify + recognize"):
+            cells = self._classify_cells(warped_gray, geom, debug_dir=debug_dir)
         return KakuroBoard(cells=cells)
 
     def _classify_cells(

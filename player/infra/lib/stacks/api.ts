@@ -211,7 +211,12 @@ export class ApiStack extends cdk.Stack {
         { file: "parsers/Dockerfile" }
       ),
       timeout: cdk.Duration.minutes(2),
-      memorySize: 2048,
+      // Lambda allocates ~1 vCPU per 1769 MB; the CPU-bound half of parsing
+      // (OpenCV grid detection, EasyOCR) was starved at 2048 MB (~1.16 vCPU) and
+      // blew the 2-minute timeout on ~10 MP boards. 5308 MB = ~3 vCPU, ~3x the
+      // CV/OCR throughput. Duration drops roughly proportionally, so the extra
+      // GB-seconds per invocation are largely offset.
+      memorySize: 5308,
       environment: {
         GEMINI_API_KEY: this.node.tryGetContext("geminiApiKey") ?? "",
       },
