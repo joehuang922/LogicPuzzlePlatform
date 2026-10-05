@@ -18,6 +18,46 @@ from PIL import Image
 from puzzle_parsers.llm_vision import cells_to_png_bytes, parse_json_response
 
 
+def log_gemini_usage(response: object, model, *, label: str = "") -> None:
+    """Emit a one-line token-usage ledger entry for a Gemini response.
+
+    Prints prompt / output / thinking / total token counts. The ``google-genai``
+    SDK itemises thinking as ``thoughts_token_count``; when that field is absent
+    (e.g. an older response shape) we fall back to deriving it as
+    ``total - prompt - output`` (clamped at 0). On OCR calls the thinking figure
+    is the dominant cost driver, so logging it per call turns the Gemini bill
+    from a monthly surprise into a summable, greppable ledger. The ``exact``
+    marker records whether the thinking count came from the API or was derived.
+
+    Lines are prefixed with ``[gemini-usage]`` for easy CloudWatch filtering.
+    Never raises: usage telemetry must not break a parse.
+    """
+    try:
+        usage = getattr(response, "usage_metadata", None)
+        if usage is None:
+            return
+        prompt = int(getattr(usage, "prompt_token_count", 0) or 0)
+        output = int(getattr(usage, "candidates_token_count", 0) or 0)
+        total = int(getattr(usage, "total_token_count", 0) or 0)
+        cached = int(getattr(usage, "cached_content_token_count", 0) or 0)
+        reported = getattr(usage, "thoughts_token_count", None)
+        if reported is not None:
+            thinking = int(reported)
+            exact = "y"
+        else:
+            # Older response shapes fold thinking into the billed total.
+            thinking = max(0, total - prompt - output)
+            exact = "n"
+        model_name = getattr(model, "model_name", None) or str(model)
+        print(
+            f"  [gemini-usage] model={model_name} label={label or '-'} "
+            f"prompt={prompt} output={output} thinking={thinking} "
+            f"thinking_exact={exact} cached={cached} total={total}"
+        )
+    except Exception as exc:  # noqa: BLE001 - telemetry must never break a parse
+        print(f"  [gemini-usage] (failed to read usage_metadata: {exc})")
+
+
 def _split_rows(
     num_rows: int, num_cols: int, max_cells_per_batch: int
 ) -> list[tuple[int, int]]:
@@ -94,6 +134,32 @@ class CellRecognizer(ABC):
         ...
 
 
+class _GeminiModel:
+    """Thin wrapper binding a ``google-genai`` client to one model name + config.
+
+    The ``google-genai`` SDK dropped the old ``GenerativeModel`` object in favour
+    of ``client.models.generate_content(model=..., config=...)``. This wrapper
+    restores a ``model.generate_content(content)`` surface so the recognizer's
+    timeout harness and the direct call in ``cell_classify`` need no special-
+    casing, and exposes ``model_name`` for the usage logger.
+
+    ``config`` carries ``thinking_config`` (set to ``thinking_budget=0`` for OCR,
+    which is pure perception with no reasoning to do) and ``max_output_tokens``.
+    Disabling thinking is the single biggest cost lever: thinking tokens bill at
+    the output rate and dominated the historical spend.
+    """
+
+    def __init__(self, client, model_name: str, config) -> None:
+        self._client = client
+        self.model_name = model_name
+        self._config = config
+
+    def generate_content(self, content: list):
+        return self._client.models.generate_content(
+            model=self.model_name, contents=content, config=self._config
+        )
+
+
 class GeminiRecognizer(CellRecognizer):
     """Cell recognizer using Google Gemini Vision API.
 
@@ -101,6 +167,11 @@ class GeminiRecognizer(CellRecognizer):
     (times out) or errors, the request is retried against ``fallback_model`` so a
     single sluggish call can't stall the whole parse. When an explicit ``client``
     is supplied (e.g. in tests) no fallback is attempted.
+
+    Thinking is disabled (``thinking_budget=0``) on every call: these are OCR /
+    cell-classification tasks with no multi-step reasoning, and thinking tokens
+    were the dominant historical cost. ``max_output_tokens`` further caps the
+    JSON reply so a runaway response can't balloon the bill.
     """
 
     def __init__(
@@ -110,44 +181,52 @@ class GeminiRecognizer(CellRecognizer):
         *,
         fallback_model: str = "gemini-2.5-flash",
         timeout: float = 50.0,
+        thinking_budget: int = 0,
+        max_output_tokens: int = 8192,
     ) -> None:
         import os
-
-        import google.generativeai as genai
 
         self._timeout = timeout
 
         if client is not None:
+            # Test / explicit injection: use the object as-is, no fallback.
             self._model = client
             self._fallback_model = None
-        else:
-            api_key = os.environ.get("GEMINI_API_KEY")
-            if api_key:
-                genai.configure(api_key=api_key)
-            self._model = genai.GenerativeModel(model)
-            self._fallback_model = (
-                genai.GenerativeModel(fallback_model) if fallback_model else None
-            )
+            return
 
-    def _call_with_timeout(self, model, content: list) -> object:
+        from google import genai
+        from google.genai import types
+
+        api_key = os.environ.get("GEMINI_API_KEY")
+        genai_client = genai.Client(api_key=api_key) if api_key else genai.Client()
+
+        config = types.GenerateContentConfig(
+            thinking_config=types.ThinkingConfig(thinking_budget=thinking_budget),
+            max_output_tokens=max_output_tokens,
+        )
+        self._model = _GeminiModel(genai_client, model, config)
+        self._fallback_model = (
+            _GeminiModel(genai_client, fallback_model, config)
+            if fallback_model
+            else None
+        )
+
+    def _call_with_timeout(self, model, content: list, *, label: str = "") -> object:
         """Run one generate_content call under a hard wall-clock timeout.
 
-        The SDK's own ``request_options`` timeout does not reliably interrupt a
-        stalled connection (e.g. a proxy that holds the socket open), so we run
-        the call on a daemon worker thread and abandon it if it overruns. Using a
-        daemon thread (rather than a thread pool) ensures a wedged call cannot
-        block process exit.
+        The SDK's own request timeout does not reliably interrupt a stalled
+        connection (e.g. a proxy that holds the socket open), so we run the call
+        on a daemon worker thread and abandon it if it overruns. Using a daemon
+        thread (rather than a thread pool) ensures a wedged call cannot block
+        process exit.
         """
         import threading
 
-        request_options = {"timeout": self._timeout}
         result: dict[str, object] = {}
 
         def _run() -> None:
             try:
-                result["value"] = model.generate_content(
-                    content, request_options=request_options
-                )
+                result["value"] = model.generate_content(content)
             except Exception as exc:  # noqa: BLE001 - propagated to caller below
                 result["error"] = exc
 
@@ -160,16 +239,20 @@ class GeminiRecognizer(CellRecognizer):
             )
         if "error" in result:
             raise result["error"]  # type: ignore[misc]
-        return result["value"]
+        response = result["value"]
+        log_gemini_usage(response, model, label=label)
+        return response
 
     def _generate(self, content: list) -> object:
         """Call the primary model with a timeout, falling back on slow/error.
 
         When the primary model is slow (exceeds the wall-clock timeout) or errors,
-        we retry once against the fallback model before giving up.
+        we retry once against the fallback model before giving up. Both the
+        primary and the fallback log their own usage line, so a timeout that
+        triggers a fallback shows up as *two* billed calls in the ledger.
         """
         try:
-            return self._call_with_timeout(self._model, content)
+            return self._call_with_timeout(self._model, content, label="primary")
         except Exception as primary_error:
             if self._fallback_model is None:
                 raise
@@ -178,7 +261,9 @@ class GeminiRecognizer(CellRecognizer):
                 f"({type(primary_error).__name__}: {primary_error}); "
                 f"retrying with fallback model"
             )
-            return self._call_with_timeout(self._fallback_model, content)
+            return self._call_with_timeout(
+                self._fallback_model, content, label="fallback"
+            )
 
     @property
     def supports_full_image(self) -> bool:

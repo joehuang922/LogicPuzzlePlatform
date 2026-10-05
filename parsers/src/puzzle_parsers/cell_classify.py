@@ -29,7 +29,12 @@ from numpy.typing import NDArray
 from PIL import Image
 
 from puzzle_parsers.llm_vision import parse_json_response
-from puzzle_parsers.recognition import CellRecognizer, GeminiRecognizer, ClaudeRecognizer
+from puzzle_parsers.recognition import (
+    CellRecognizer,
+    ClaudeRecognizer,
+    GeminiRecognizer,
+    log_gemini_usage,
+)
 
 T = TypeVar("T")
 
@@ -376,6 +381,7 @@ def _call_recognizer(recognizer: CellRecognizer, montage_bytes: bytes, prompt: s
 
     if isinstance(recognizer, GeminiRecognizer):
         response = recognizer._model.generate_content([montage_image, prompt])
+        log_gemini_usage(response, recognizer._model, label="classify")
         return parse_json_response(response.text)
     elif isinstance(recognizer, ClaudeRecognizer):
         b64_image = base64.b64encode(montage_bytes).decode("utf-8")

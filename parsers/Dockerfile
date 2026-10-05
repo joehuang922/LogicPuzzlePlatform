@@ -22,7 +22,7 @@ RUN pip install --no-cache-dir \
     pydantic>=2.0 \
     jsonschema>=4.20 \
     easyocr>=1.7 \
-    "google-generativeai>=0.8"
+    "google-genai>=1.0"
 
 # Pre-download EasyOCR models into the image
 ENV EASYOCR_MODULE_PATH=${LAMBDA_TASK_ROOT}/models
