@@ -48,6 +48,7 @@ object PuzzleEngines {
         NonogramEngine,
         HellGolfEngine,
         FillominoEngine,
+        LitsEngine,
     ).associateBy { it.puzzleType }
 
     fun forType(puzzleType: Int): PuzzleEngine? = engines[puzzleType]

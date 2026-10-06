@@ -57,10 +57,13 @@ import com.puzzleplatform.player.ui.board.FillominoBoard
 import com.puzzleplatform.player.ui.board.FillominoMode
 import com.puzzleplatform.player.ui.board.HellGolfBoard
 import com.puzzleplatform.player.ui.board.KakuroBoard
+import com.puzzleplatform.player.ui.board.LitsBoard
+import com.puzzleplatform.player.ui.board.LitsMode
 import com.puzzleplatform.player.ui.board.MasyuBoard
 import com.puzzleplatform.player.ui.board.NonogramBoard
 import com.puzzleplatform.player.ui.board.NonogramMode
 import com.puzzleplatform.player.ui.board.SudokuBoard
+import com.puzzleplatform.player.puzzle.LitsEngine
 import com.puzzleplatform.player.puzzle.SudokuHinter
 import com.puzzleplatform.player.ui.formatElapsed
 
@@ -305,6 +308,33 @@ fun PlayScreen(
                                     selected = nonogramMode == NonogramMode.CROSS,
                                     onClick = { nonogramMode = NonogramMode.CROSS },
                                     label = { Text("✕ Cross") },
+                                )
+                            }
+                        }
+                        15 -> {
+                            var litsMode by remember(puzzle.id) { mutableStateOf(LitsMode.SHADE) }
+                            LitsBoard(
+                                puzzle = puzzle,
+                                userValues = state.userValues,
+                                mode = litsMode,
+                                // LITS keys cells "c:col,row" (web convention); route
+                                // through putUserValue, which drops the key when state is 0.
+                                onSetCell = { col, row, st ->
+                                    vm.putUserValue(LitsEngine.cellKey(col, row), st)
+                                },
+                            )
+                            // Shade / Mark paint-mode toggle (touch has no right-click).
+                            // Shade is the rule-bearing fill; Mark is a solver-aid dot.
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FilterChip(
+                                    selected = litsMode == LitsMode.SHADE,
+                                    onClick = { litsMode = LitsMode.SHADE },
+                                    label = { Text("■ Shade") },
+                                )
+                                FilterChip(
+                                    selected = litsMode == LitsMode.MARK,
+                                    onClick = { litsMode = LitsMode.MARK },
+                                    label = { Text("• Mark") },
                                 )
                             }
                         }
