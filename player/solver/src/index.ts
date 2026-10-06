@@ -9,3 +9,5 @@ export { sudokuPlugin, SudokuModel, SudokuBoard, cellLabel } from "./plugins/sud
 export type { SudokuCanon } from "./plugins/sudoku";
 export { kakuroPlugin, KakuroModel } from "./plugins/kakuro";
 export type { KakuroCanon } from "./plugins/kakuro";
+export { litsPlugin, LitsModel } from "./plugins/lits";
+export type { LitsCanon } from "./plugins/lits";
