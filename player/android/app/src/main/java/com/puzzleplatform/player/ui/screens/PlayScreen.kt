@@ -62,6 +62,7 @@ import com.puzzleplatform.player.ui.board.LitsMode
 import com.puzzleplatform.player.ui.board.MasyuBoard
 import com.puzzleplatform.player.ui.board.NonogramBoard
 import com.puzzleplatform.player.ui.board.NonogramMode
+import com.puzzleplatform.player.ui.board.SlitherlinkBoard
 import com.puzzleplatform.player.ui.board.SudokuBoard
 import com.puzzleplatform.player.puzzle.LitsEngine
 import com.puzzleplatform.player.puzzle.SudokuHinter
@@ -253,6 +254,13 @@ fun PlayScreen(
                             userValues = state.userValues,
                             liveValidate = state.liveValidate,
                             onSetEdge = vm::setUserValue,
+                        )
+                        5 -> SlitherlinkBoard(
+                            puzzle = puzzle,
+                            userValues = state.userValues,
+                            // Edges are tri-state (0 empty, 1 line, 2 cross); putUserValue
+                            // sets the explicit state and drops the key when it cycles to 0.
+                            onCycleEdge = { key, next -> vm.putUserValue(key, next) },
                         )
                         14 -> {
                             var fillominoMode by remember(puzzle.id) { mutableStateOf(FillominoMode.NUMBER) }
