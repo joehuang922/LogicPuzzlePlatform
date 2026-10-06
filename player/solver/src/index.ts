@@ -7,3 +7,5 @@ export { nextHint } from "./hint";
 export { getPlugin } from "./registry";
 export { sudokuPlugin, SudokuModel, SudokuBoard, cellLabel } from "./plugins/sudoku";
 export type { SudokuCanon } from "./plugins/sudoku";
+export { kakuroPlugin, KakuroModel } from "./plugins/kakuro";
+export type { KakuroCanon } from "./plugins/kakuro";
