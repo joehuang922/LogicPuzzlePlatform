@@ -154,7 +154,15 @@ function regionPlacements(regionCells: number[], cols: number): Placement[] {
       const r = Math.floor(id / cols);
       const c = id % cols;
       for (const [dr, dc] of DIRS) {
-        const nid = (r + dr) * cols + (c + dc);
+        const nr = r + dr;
+        const nc = c + dc;
+        // Bounds-check the column before indexing: without the guard, the
+        // right-neighbor of a last-column cell would wrap to the next row's first
+        // cell. In practice `inRegion` and the leaf `classify()` reject the wrapped
+        // id, but guarding here keeps the frontier geometrically honest and matches
+        // the bounds-checked neighbor loops elsewhere in this model.
+        if (nc < 0 || nc >= cols) continue;
+        const nid = nr * cols + nc;
         if (inRegion.has(nid) && !chosenSet.has(nid) && nid > anchor) frontier.add(nid);
       }
     }
