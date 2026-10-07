@@ -289,12 +289,20 @@ class PuzzleRepository(
     suspend fun refreshCollection(collectionId: Int) = sync.refreshCollection(collectionId)
 
     /**
-     * Best-effort manifest refresh of every offline-downloaded collection, so
-     * server-side puzzle edits/additions/deletions land locally. This is the only
-     * path by which content edits reach an already-downloaded puzzle. A failure on
-     * one collection is swallowed so the rest still refresh. Never touches progress.
+     * Best-effort two-way sync of every offline-downloaded collection: push any
+     * local progress upstream first, then refresh each collection's reference data
+     * (server-side puzzle edits/additions/deletions) and pull cross-device progress
+     * back down. This is the primary path by which both content edits and progress
+     * made on another device reach an already-downloaded puzzle. A failure on one
+     * collection is swallowed so the rest still refresh.
      */
     suspend fun refreshDownloadedCollections() {
+        // Push local progress first so a round-trip pull sees our latest state too.
+        try {
+            sync.push()
+        } catch (_: Exception) {
+            // Offline or cold start; the pull below is still non-destructive.
+        }
         for (id in db.collectionDownloadDao().getAll().map { it.collectionId }) {
             try {
                 sync.refreshCollection(id)
