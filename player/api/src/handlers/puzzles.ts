@@ -9,6 +9,12 @@ import { CreatePuzzleRequest } from "../models/types";
 // and (when unique) the solution to persist, or throws a 400-worthy Error when the
 // puzzle has no unique solution. Types with no registered solver bypass the gate and
 // return { status: null } (D8).
+//
+// A verdict of "unknown" means the gate's search budget ran out before it could prove
+// uniqueness (almost always a mis-parsed/pathological board). On the interactive
+// create/edit path we reject it like none/multiple so a human fixes the canon rather than
+// registering an unproven puzzle; the backfill, which recomputes gates offline, records
+// "unknown" instead (see backfill-solver.ts) so the board surfaces in editorial review.
 function runGate(
   puzzleType: number,
   canon: unknown
@@ -20,6 +26,9 @@ function runGate(
   }
   if (result.verdict === "multiple") {
     throw new Error("Puzzle has multiple solutions and cannot be registered");
+  }
+  if (result.verdict === "unknown") {
+    throw new Error("Puzzle could not be solved within the time limit; check the clues");
   }
   return { status: "unique", solution: JSON.stringify(result.solution) };
 }
@@ -70,9 +79,10 @@ async function listPuzzles(
   // Hide soft-deleted puzzles from listings (getPuzzle still resolves them).
   const conditions: string[] = ["pq.deleted_at IS NULL"];
 
-  // Editorial review set: puzzles the registration gate could not uniquely solve.
+  // Editorial review set: puzzles the registration gate could not uniquely solve —
+  // proven multiple/none, plus "unknown" (search budget ran out, likely a mis-parse).
   if (validation === "flagged") {
-    conditions.push("pq.validation_status IN ('multiple', 'none')");
+    conditions.push("pq.validation_status IN ('multiple', 'none', 'unknown')");
   }
 
   if (puzzleType) {

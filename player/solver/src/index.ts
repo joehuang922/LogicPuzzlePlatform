@@ -1,7 +1,7 @@
 export * from "./types";
-export { countSolutions, solve, classify } from "./drivers";
-export type { Verdict } from "./drivers";
-export { gate } from "./gate";
+export { countSolutions, solve, classify, SearchBudgetExceeded } from "./drivers";
+export type { Verdict, SearchBudget } from "./drivers";
+export { gate, DEFAULT_GATE_BUDGET_MS } from "./gate";
 export type { GateResult } from "./gate";
 export { nextHint } from "./hint";
 export { getPlugin } from "./registry";

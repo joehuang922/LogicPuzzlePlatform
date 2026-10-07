@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { classify, countSolutions, solve } from "./drivers";
+import { classify, countSolutions, solve, SearchBudgetExceeded } from "./drivers";
 import { SudokuModel } from "./plugins/sudoku";
 import {
   parseGrid,
@@ -68,5 +68,39 @@ describe("solution production — solve()", () => {
     const t0 = performance.now();
     solve(model(INKALA_HARDEST));
     expect(performance.now() - t0).toBeLessThan(1000);
+  });
+});
+
+describe("search budget", () => {
+  // The empty grid has an astronomically large search tree, so a tiny node cap is
+  // guaranteed to trip before it finishes — the stand-in for a pathological board.
+  const EMPTY = () => model("0".repeat(81));
+
+  it("classify() reports 'unknown' when the node budget is exhausted", () => {
+    expect(classify(EMPTY(), { maxNodes: 5 })).toBe("unknown");
+  });
+
+  it("classify() reports 'unknown' when the deadline has already passed", () => {
+    expect(classify(EMPTY(), { deadline: 0 })).toBe("unknown");
+  });
+
+  it("countSolutions() throws SearchBudgetExceeded past the node budget", () => {
+    expect(() => countSolutions(EMPTY(), 2, { maxNodes: 5 })).toThrow(SearchBudgetExceeded);
+  });
+
+  it("solve() throws SearchBudgetExceeded past the node budget", () => {
+    expect(() => solve(EMPTY(), { maxNodes: 5 })).toThrow(SearchBudgetExceeded);
+  });
+
+  it("a generous budget leaves proven verdicts unchanged", () => {
+    // Well within budget: the cap must not perturb a normal classification.
+    const budget = { maxNodes: 1_000_000, deadline: Date.now() + 10_000 };
+    expect(classify(model(INKALA_HARDEST), budget)).toBe("unique");
+    expect(classify(model(CONTRADICTORY), budget)).toBe("none");
+  });
+
+  it("an empty budget object imposes no limit (unbounded)", () => {
+    // Neither field set => no ticking => identical to the no-budget overload.
+    expect(classify(model(INKALA_HARDEST), {})).toBe("unique");
   });
 });

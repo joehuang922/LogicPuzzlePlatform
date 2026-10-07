@@ -57,9 +57,10 @@ export interface Puzzle {
   srcCollectionCoverSrc: string | null;
   // MySQL BOOLEAN comes back over the Data API as 0/1.
   special: boolean | number;
-  // Auto-solve registration gate verdict (docs/auto-solve). Null for types with no
-  // registered solver, or puzzles created before the gate / backfill.
-  validationStatus?: "unique" | "multiple" | "none" | null;
+  // Auto-solve registration gate verdict (docs/auto-solve). "unknown" = the gate's search
+  // budget ran out before it could prove uniqueness (likely a mis-parse). Null for types
+  // with no registered solver, or puzzles created before the gate / backfill.
+  validationStatus?: "unique" | "multiple" | "none" | "unknown" | null;
 }
 
 export function listPuzzles(filters?: {
@@ -67,7 +68,7 @@ export function listPuzzles(filters?: {
   srcCollection?: number | "none";
   limit?: number;
   // "flagged" restricts to puzzles the gate could not uniquely solve
-  // (validation_status IN ('multiple','none')) — the editorial review set.
+  // (validation_status IN ('multiple','none','unknown')) — the editorial review set.
   validation?: "flagged";
 }) {
   const params = new URLSearchParams();

@@ -28,4 +28,18 @@ describe("registration gate — gate()", () => {
     expect(result!.verdict).toBe("none");
     expect(result!.solution).toBeNull();
   });
+
+  it("returns 'unknown' (no solution) when the search budget is too small to finish", () => {
+    // A near-empty grid can't be classified in a handful of nodes; the budget trips and the
+    // gate reports an honest "unknown" instead of hanging — never a bogus 'unique'.
+    const result = gate(1, parseGrid("0".repeat(81)), { maxNodes: 5 });
+    expect(result!.verdict).toBe("unknown");
+    expect(result!.solution).toBeNull();
+  });
+
+  it("a generous explicit budget classifies a unique puzzle normally", () => {
+    const result = gate(1, parseGrid(INKALA_HARDEST), { maxNodes: 1_000_000 });
+    expect(result!.verdict).toBe("unique");
+    expect(result!.solution).not.toBeNull();
+  });
 });

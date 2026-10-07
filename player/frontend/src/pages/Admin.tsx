@@ -689,8 +689,13 @@ const NO_COLLECTION_ID = -1;
 // Small coloured chip for a puzzle's auto-solve gate verdict (docs/auto-solve).
 // Only the problem states are worth surfacing; "unique" and unclassified render nothing.
 function ValidationBadge({ status }: { status?: Puzzle["validationStatus"] }) {
-  if (status !== "multiple" && status !== "none") return null;
-  const label = status === "none" ? "No solution" : "Multiple solutions";
+  if (status !== "multiple" && status !== "none" && status !== "unknown") return null;
+  const label =
+    status === "none"
+      ? "No solution"
+      : status === "multiple"
+        ? "Multiple solutions"
+        : "Unsolved (timed out)";
   return (
     <span
       title="Flagged by the registration gate — needs editorial review"
@@ -751,8 +756,10 @@ function ReviewQueue({
 
   function handleSaved(updated: Puzzle) {
     // A successful re-save re-runs the gate. If it's now unique it drops out of the
-    // flagged set; otherwise keep it with its new verdict.
-    if (updated.validationStatus === "multiple" || updated.validationStatus === "none") {
+    // flagged set; otherwise keep it with its new verdict. (In practice the edit endpoint
+    // rejects a save that doesn't resolve to unique, so this mainly covers the drop case.)
+    const s = updated.validationStatus;
+    if (s === "multiple" || s === "none" || s === "unknown") {
       setPuzzles((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
     } else {
       setPuzzles((prev) => prev.filter((p) => p.id !== updated.id));

@@ -16,7 +16,12 @@
 import { resolve } from "node:path";
 import { readFileSync } from "node:fs";
 
-type Verdict = "unique" | "multiple" | "none";
+type Verdict = "unique" | "multiple" | "none" | "unknown";
+
+// Offline budget per puzzle. Longer than the interactive gate's default (the backfill is
+// not behind the 29s Lambda timeout), but still bounded so one pathological board can't
+// stall a whole-table sweep. Boards that still time out are recorded as "unknown".
+const BACKFILL_GATE_BUDGET_MS = 30_000;
 
 /**
  * Load .env.local making the file authoritative, overriding any ambient shell env.
@@ -100,7 +105,7 @@ async function main() {
   );
   console.log(`Fetched ${rows.records.length} candidate puzzle(s).\n`);
 
-  const counts: Record<Verdict, number> = { unique: 0, multiple: 0, none: 0 };
+  const counts: Record<Verdict, number> = { unique: 0, multiple: 0, none: 0, unknown: 0 };
   const flagged: { id: string; type: number; verdict: Verdict }[] = [];
   let skippedNoPlugin = 0;
   let written = 0;
@@ -122,13 +127,13 @@ async function main() {
       continue;
     }
 
-    const result = gate(puzzleType, canon);
+    const result = gate(puzzleType, canon, { deadline: Date.now() + BACKFILL_GATE_BUDGET_MS });
     if (!result) {
       skippedNoPlugin++;
       continue;
     }
 
-    const verdict = result.verdict;
+    const verdict = result.verdict as Verdict;
     counts[verdict]++;
     if (verdict !== "unique") flagged.push({ id, type: puzzleType, verdict });
 
@@ -155,6 +160,7 @@ async function main() {
   console.log(`  unique:   ${counts.unique}`);
   console.log(`  multiple: ${counts.multiple}`);
   console.log(`  none:     ${counts.none}`);
+  console.log(`  unknown:  ${counts.unknown}`);
   if (skippedNoPlugin > 0) {
     console.log(`  (skipped ${skippedNoPlugin} with no registered solver)`);
   }
