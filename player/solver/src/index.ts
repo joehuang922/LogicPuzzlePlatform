@@ -11,3 +11,5 @@ export { kakuroPlugin, KakuroModel } from "./plugins/kakuro";
 export type { KakuroCanon } from "./plugins/kakuro";
 export { litsPlugin, LitsModel } from "./plugins/lits";
 export type { LitsCanon } from "./plugins/lits";
+export { slitherlinkPlugin, SlitherlinkModel } from "./plugins/slitherlink";
+export type { SlitherlinkCanon, SlitherlinkEdges } from "./plugins/slitherlink";

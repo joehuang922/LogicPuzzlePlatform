@@ -1,8 +1,10 @@
 // Core solver interfaces. See docs/auto-solve/auto-solve.md §4.1.
 //
-// The pilot (Sudoku) is grid-shaped, so `solution()` returns a number grid. When the
-// second puzzle type lands (Phase 7), this is the interface expected to churn — a
-// non-grid type (e.g. Slitherlink edges) will need a more abstract solution shape.
+// The pilot (Sudoku) is grid-shaped, so a number grid is the natural solution shape and
+// stays the default. But the solution type is a model/plugin type parameter (`Solution`),
+// so a non-grid type can return its own shape directly — Slitherlink's two edge grids
+// `{ h, v }` are the first such case. Grid-shaped types (Sudoku, Kakuro, LITS) take the
+// `number[][]` default and are unaffected.
 
 /** A branch point for the backtracking search: an unassigned variable and its legal values. */
 export interface Branch {
@@ -16,8 +18,12 @@ export interface Branch {
  * A constraint model the generic drivers can search. Models are immutable: `assign`
  * returns a new model with the assignment propagated. A model is either live, solved,
  * or dead (a constraint was violated / a domain was wiped out).
+ *
+ * `Solution` is the shape `solution()` returns; it defaults to `number[][]` for the
+ * common grid case. The drivers never inspect it — they only forward it out of `solve`
+ * — so a model is free to pick any shape (e.g. Slitherlink's `{ h, v }` edge grids).
  */
-export interface ConstraintModel {
+export interface ConstraintModel<Solution = number[][]> {
   /** True when propagation has emptied some variable's domain — unsatisfiable. */
   isDead(): boolean;
   /** True when every variable is assigned and all constraints hold. */
@@ -28,9 +34,9 @@ export interface ConstraintModel {
    */
   selectBranch(): Branch | null;
   /** Assign `value` to variable `id` and propagate. Returns a new (possibly dead) model. */
-  assign(id: number, value: number): ConstraintModel;
-  /** The fully-assigned grid. Only meaningful when `isSolved()`. */
-  solution(): number[][];
+  assign(id: number, value: number): ConstraintModel<Solution>;
+  /** The fully-assigned solution. Only meaningful when `isSolved()`. */
+  solution(): Solution;
 }
 
 /** Player-entered values, keyed `"col,row"` to match the client convention. */
@@ -71,16 +77,20 @@ export interface Technique<Board = unknown> {
  * The per-type asset. `buildModel` is required (feeds the gate). The hint pieces
  * (`buildBoard` + `techniques`) are optional and grown over time; a plugin with
  * neither is gate-only.
+ *
+ * `Solution` is the model's solution shape (defaults to `number[][]`); `serializeSolution`
+ * receives exactly that, so each plugin types its own solution precisely instead of
+ * everything funneling through `number[][]`.
  */
-export interface SolverPlugin<Canon = unknown, Board = unknown> {
+export interface SolverPlugin<Canon = unknown, Board = unknown, Solution = number[][]> {
   puzzleType: number;
-  buildModel(canon: Canon): ConstraintModel;
+  buildModel(canon: Canon): ConstraintModel<Solution>;
   /**
-   * Convert a solved grid into the type's canonical `solution_repr` shape for storage.
-   * Defaults to the raw grid when omitted. Sudoku wraps it as `{ hints: grid }` to
-   * mirror its answer shape.
+   * Convert a solved solution into the type's canonical `solution_repr` shape for
+   * storage. Defaults to the raw solution when omitted. Sudoku wraps it as
+   * `{ hints: grid }` to mirror its answer shape; Slitherlink wraps as `{ edges }`.
    */
-  serializeSolution?(grid: number[][]): unknown;
+  serializeSolution?(solution: Solution): unknown;
   /** Build the candidate board the technique ladder reasons over, from current play. */
   buildBoard?(canon: Canon, values: CellValues): Board;
   /** Ordered hint ladder (easiest first by `depth`). */

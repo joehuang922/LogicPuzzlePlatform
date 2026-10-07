@@ -9,7 +9,7 @@ import { ConstraintModel } from "./types";
  * propagates and each model reports `isDead`/`isSolved`, this driver is fully generic —
  * it knows nothing about the puzzle type.
  */
-export function countSolutions(model: ConstraintModel, cap = 2): number {
+export function countSolutions<S>(model: ConstraintModel<S>, cap = 2): number {
   if (model.isDead()) return 0;
   if (model.isSolved()) return 1;
 
@@ -28,10 +28,12 @@ export function countSolutions(model: ConstraintModel, cap = 2): number {
 }
 
 /**
- * Return one full solution, or null if none exists. Assumes the caller wants any
- * solution (at registration the model is already known unique via countSolutions).
+ * Return one full solution in the model's own solution shape, or null if none exists.
+ * Assumes the caller wants any solution (at registration the model is already known
+ * unique via countSolutions). Generic over the solution shape — the driver only forwards
+ * it, never inspects it.
  */
-export function solve(model: ConstraintModel): number[][] | null {
+export function solve<S>(model: ConstraintModel<S>): S | null {
   if (model.isDead()) return null;
   if (model.isSolved()) return model.solution();
 
@@ -42,7 +44,7 @@ export function solve(model: ConstraintModel): number[][] | null {
     const next = model.assign(branch.id, value);
     if (next.isDead()) continue;
     const result = solve(next);
-    if (result) return result;
+    if (result !== null) return result;
   }
   return null;
 }
@@ -50,7 +52,7 @@ export function solve(model: ConstraintModel): number[][] | null {
 export type Verdict = "unique" | "multiple" | "none";
 
 /** Classify a model for the registration gate. */
-export function classify(model: ConstraintModel): Verdict {
+export function classify<S>(model: ConstraintModel<S>): Verdict {
   const n = countSolutions(model, 2);
   return n === 0 ? "none" : n === 1 ? "unique" : "multiple";
 }
