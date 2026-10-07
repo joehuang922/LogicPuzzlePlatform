@@ -130,7 +130,7 @@ function regionPlacements(regionCells: number[], cols: number): Placement[] {
   const out: Placement[] = [];
   const seen = new Set<string>();
 
-  const grow = (chosen: number[], maxId: number) => {
+  const grow = (chosen: number[], anchor: number) => {
     if (chosen.length === 4) {
       const coords = chosen.map((id) => [Math.floor(id / cols), id % cols] as Coord);
       const shape = classify(coords);
@@ -142,22 +142,26 @@ function regionPlacements(regionCells: number[], cols: number): Placement[] {
       out.push({ cells: sorted, cellSet: new Set(sorted), shape });
       return;
     }
-    // Candidate extensions: cells orthogonally adjacent to the current set, in-region,
-    // not already chosen, and greater than the max id so far (canonical growth order,
-    // so each 4-subset is reached once).
+    // Candidate extensions: cells orthogonally adjacent to the current set, in-region, not
+    // already chosen, and greater than the *anchor* (so the anchor is the subset's minimum
+    // id and each subset is reached only from its min — dedup via `seen` covers the
+    // multiple growth orders). Gating on the anchor rather than the running max is
+    // essential: a connected subset can require adding a lower-id cell after a higher-id
+    // one (e.g. a T whose stem is the min id and whose bar extends left), which a
+    // running-max gate would make unreachable, undercounting placements to zero.
     const frontier = new Set<number>();
     for (const id of chosen) {
       const r = Math.floor(id / cols);
       const c = id % cols;
       for (const [dr, dc] of DIRS) {
         const nid = (r + dr) * cols + (c + dc);
-        if (inRegion.has(nid) && !chosenSet.has(nid) && nid > maxId) frontier.add(nid);
+        if (inRegion.has(nid) && !chosenSet.has(nid) && nid > anchor) frontier.add(nid);
       }
     }
     for (const nid of frontier) {
       chosen.push(nid);
       chosenSet.add(nid);
-      grow(chosen, Math.max(maxId, nid));
+      grow(chosen, anchor);
       chosen.pop();
       chosenSet.delete(nid);
     }
@@ -322,7 +326,15 @@ export class LitsModel implements ConstraintModel {
       const r = Math.floor(cell / cols);
       const c = cell % cols;
       for (const [dr, dc] of DIRS) {
-        if (b.cellSet.has((r + dr) * cols + (c + dc))) return true;
+        const nr = r + dr;
+        const nc = c + dc;
+        // Bounds-check both axes before indexing: without the column guard, the
+        // right-neighbor of a last-column cell (nc === cols) would wrap to id
+        // (r+1)*cols, i.e. the first cell of the next row, and the left-neighbor of
+        // a first-column cell (nc === -1) would wrap to the previous row's last
+        // cell — falsely reporting two far-apart pieces as orthogonally adjacent.
+        if (nr < 0 || nc < 0 || nr >= this.rows || nc >= cols) continue;
+        if (b.cellSet.has(nr * cols + nc)) return true;
       }
     }
     return false;

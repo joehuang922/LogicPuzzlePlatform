@@ -40,12 +40,12 @@ describe("solution extraction — solve()", () => {
     expect(isValidSolution(UNIQUE, grid!)).toBe(true);
     // The one shaded pattern for this board (see fixtures UNIQUE).
     expect(grid).toEqual([
+      [0, 1, 0, 1, 0, 0],
+      [0, 1, 0, 1, 0, 0],
       [1, 1, 1, 1, 1, 1],
-      [0, 1, 0, 0, 0, 1],
-      [0, 1, 1, 1, 0, 1],
-      [0, 1, 0, 1, 0, 1],
-      [0, 1, 0, 1, 0, 1],
-      [0, 1, 0, 0, 0, 1],
+      [1, 0, 0, 1, 0, 1],
+      [1, 0, 0, 0, 0, 1],
+      [1, 0, 1, 1, 1, 1],
     ]);
   });
 

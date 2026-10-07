@@ -28,24 +28,25 @@ export function canonFromRegions(rows: string[]): LitsCanon {
 // -- fixtures (defined by their region partition) -----------------------------
 
 /**
- * UNIQUE. A 6x6 board of five regions. Found by searching random sliver-free partitions
- * and keeping one the model proves has exactly one solution; the solution is independently
- * re-checked by isValidSolution in the tests. Its one shaded pattern (# = shaded):
+ * UNIQUE. A 6x6 board of five regions. Found by searching random contiguous partitions and
+ * keeping one that BOTH the model and an independent bounds-safe counter prove has exactly
+ * one solution; the solution is independently re-checked by isValidSolution in the tests.
+ * Its one shaded pattern (# = shaded):
  *
+ *   .#.#..
+ *   .#.#..
  *   ######
- *   .#...#
- *   .###.#
- *   .#.#.#
- *   .#.#.#
- *   .#...#
+ *   #..#.#
+ *   #....#
+ *   #.####
  */
 export const UNIQUE: LitsCanon = canonFromRegions([
-  "AAABBB",
-  "AAABCB",
-  "DDEECC",
-  "DDEECC",
-  "DDDECC",
-  "DDDDCC",
+  "EDAACC",
+  "EDAACC",
+  "EDDACC",
+  "EBDAAC",
+  "EBDDBC",
+  "EBBBBB",
 ]);
 
 /**
@@ -214,10 +215,17 @@ export function isValidSolution(canon: LitsCanon, grid: number[][]): boolean {
   while (stack.length) {
     const [r, c] = stack.pop()!;
     for (const [dr, dc] of DIRS) {
-      const nid = (r + dr) * cols + (c + dc);
+      const nr = r + dr;
+      const nc = c + dc;
+      // Bounds-check both axes before indexing: without the column guard, the
+      // right-neighbor of a last-column cell would wrap to the next row's first
+      // cell (and the left-neighbor of a first-column cell to the previous row's
+      // last cell), falsely joining two disconnected pieces into one group.
+      if (nr < 0 || nc < 0 || nr >= rows || nc >= cols) continue;
+      const nid = nr * cols + nc;
       if (shadedSet.has(nid) && !seen.has(nid)) {
         seen.add(nid);
-        stack.push([r + dr, c + dc]);
+        stack.push([nr, nc]);
       }
     }
   }
