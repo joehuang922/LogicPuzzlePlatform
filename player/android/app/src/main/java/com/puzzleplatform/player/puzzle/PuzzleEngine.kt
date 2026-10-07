@@ -51,6 +51,7 @@ object PuzzleEngines {
         LitsEngine,
         SlitherlinkEngine,
         NurimazeEngine,
+        NurikabeEngine,
     ).associateBy { it.puzzleType }
 
     fun forType(puzzleType: Int): PuzzleEngine? = engines[puzzleType]

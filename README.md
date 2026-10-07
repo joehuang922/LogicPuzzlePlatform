@@ -54,10 +54,10 @@ Legend: ✅ = implemented · 🟡 = partial · blank = not yet. In the **Parser*
 | 21 | heyawake      |    | ✅ | ✅ | ✅ |    |    |
 | 22 | shikaku       |    | ✅ | ✅ | ✅ |    |    |
 | 23 | norinori      |    | ✅ | ✅ | ✅ |    |    |
-| 24 | nurikabe      |    | ✅ | ✅ | ✅ |    |    |
+| 24 | nurikabe      |    | ✅ | ✅ | ✅ | ✅ |    |
 | 25 | ripple-effect |    | ✅ | ✅ | ✅ |    |    |
 
-**Summary:** all 25 types are fully playable on the web, with editors, progress, and parsers complete across the board. The gaps are: **live conflict highlighting** (4 full — sudoku, nonogram, masyu, kakuro — plus a partial akari, which flags only mutually-illuminating bulbs); **parser accuracy** (only sudoku ★ parses cleanly enough to skip manual calibration; the other 24 need editorial correction); **Android** (9 — sudoku, slitherlink, nonogram, masyu, kakuro, hell-golf, fillomino, lits, nurimaze); and the **solver/hint engine** (3 — sudoku, plus gate-only exact solvers for lits and slitherlink).
+**Summary:** all 25 types are fully playable on the web, with editors, progress, and parsers complete across the board. The gaps are: **live conflict highlighting** (4 full — sudoku, nonogram, masyu, kakuro — plus a partial akari, which flags only mutually-illuminating bulbs); **parser accuracy** (only sudoku ★ parses cleanly enough to skip manual calibration; the other 24 need editorial correction); **Android** (10 — sudoku, slitherlink, nonogram, masyu, kakuro, hell-golf, fillomino, lits, nurimaze, nurikabe); and the **solver/hint engine** (3 — sudoku, plus gate-only exact solvers for lits and slitherlink).
 
 ## Tech Stack
 

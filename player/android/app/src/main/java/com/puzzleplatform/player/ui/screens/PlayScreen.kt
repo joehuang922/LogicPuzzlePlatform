@@ -62,6 +62,8 @@ import com.puzzleplatform.player.ui.board.LitsMode
 import com.puzzleplatform.player.ui.board.MasyuBoard
 import com.puzzleplatform.player.ui.board.NonogramBoard
 import com.puzzleplatform.player.ui.board.NonogramMode
+import com.puzzleplatform.player.ui.board.NurikabeBoard
+import com.puzzleplatform.player.ui.board.NurikabeMode
 import com.puzzleplatform.player.ui.board.NurimazeBoard
 import com.puzzleplatform.player.ui.board.SlitherlinkBoard
 import com.puzzleplatform.player.ui.board.SudokuBoard
@@ -307,6 +309,31 @@ fun PlayScreen(
                             userValues = state.userValues,
                             onPutValue = vm::putUserValue,
                         )
+                        24 -> {
+                            var nurikabeMode by remember(puzzle.id) { mutableStateOf(NurikabeMode.BLACK) }
+                            NurikabeBoard(
+                                puzzle = puzzle,
+                                userValues = state.userValues,
+                                mode = nurikabeMode,
+                                // Nurikabe keys cells "col,row" (web convention); setCellState
+                                // writes the explicit state and drops the key when it's 0.
+                                onSetCell = vm::setCellState,
+                            )
+                            // Black / Mark paint-mode toggle (touch has no right-click). Black
+                            // is the rule-bearing sea fill; Mark is a white-island solver dot.
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FilterChip(
+                                    selected = nurikabeMode == NurikabeMode.BLACK,
+                                    onClick = { nurikabeMode = NurikabeMode.BLACK },
+                                    label = { Text("■ Black") },
+                                )
+                                FilterChip(
+                                    selected = nurikabeMode == NurikabeMode.MARK,
+                                    onClick = { nurikabeMode = NurikabeMode.MARK },
+                                    label = { Text("• Mark") },
+                                )
+                            }
+                        }
                         6 -> {
                             var nonogramMode by remember(puzzle.id) { mutableStateOf(NonogramMode.FILL) }
                             NonogramBoard(
