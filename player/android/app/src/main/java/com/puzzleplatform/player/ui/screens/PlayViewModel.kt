@@ -295,6 +295,23 @@ class PlayViewModel(
     }
 
     /**
+     * Apply a batch of "col,row" -> state changes atomically, removing any key whose
+     * state is 0. Used by room-level puzzles (e.g. Nurimaze) where one tap sets every
+     * cell of a room at once: a single update keeps progress/completion recompute O(1)
+     * per tap and avoids transient part-painted rooms.
+     */
+    fun putUserValues(changes: Map<String, Int>) {
+        if (changes.isEmpty()) return
+        val values = _state.value.userValues
+        val next = values.toMutableMap()
+        for ((key, state) in changes) {
+            if (state == 0) next.remove(key) else next[key] = state
+        }
+        if (next == values) return
+        updateValues(next, clearSelection = false)
+    }
+
+    /**
      * Set a "col,row" cell to an explicit state, removing the key when [state] is 0.
      * Used by multi-state paint puzzles (e.g. Nonogram: 1 = filled, 2 = crossed) whose
      * input is drag-to-paint rather than digit entry.

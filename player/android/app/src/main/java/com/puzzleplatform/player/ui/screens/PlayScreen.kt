@@ -62,9 +62,11 @@ import com.puzzleplatform.player.ui.board.LitsMode
 import com.puzzleplatform.player.ui.board.MasyuBoard
 import com.puzzleplatform.player.ui.board.NonogramBoard
 import com.puzzleplatform.player.ui.board.NonogramMode
+import com.puzzleplatform.player.ui.board.NurimazeBoard
 import com.puzzleplatform.player.ui.board.SlitherlinkBoard
 import com.puzzleplatform.player.ui.board.SudokuBoard
 import com.puzzleplatform.player.puzzle.LitsEngine
+import com.puzzleplatform.player.puzzle.NurimazeEngine
 import com.puzzleplatform.player.puzzle.SudokuHinter
 import com.puzzleplatform.player.ui.formatElapsed
 
@@ -261,6 +263,15 @@ fun PlayScreen(
                             // Edges are tri-state (0 empty, 1 line, 2 cross); putUserValue
                             // sets the explicit state and drops the key when it cycles to 0.
                             onCycleEdge = { key, next -> vm.putUserValue(key, next) },
+                        )
+                        3 -> NurimazeBoard(
+                            puzzle = puzzle,
+                            userValues = state.userValues,
+                            // Room-level tap: the engine expands the tapped cell to its
+                            // whole room and cycles their shared state in one atomic update.
+                            onCycleRoom = { col, row ->
+                                vm.putUserValues(NurimazeEngine.cycleRoom(puzzle, state.userValues, col, row))
+                            },
                         )
                         14 -> {
                             var fillominoMode by remember(puzzle.id) { mutableStateOf(FillominoMode.NUMBER) }
