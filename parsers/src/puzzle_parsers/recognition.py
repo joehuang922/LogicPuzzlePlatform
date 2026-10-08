@@ -589,6 +589,20 @@ class EasyOcrBackend(OcrBackend):
             kwargs["download_enabled"] = False
         self._reader = easyocr.Reader(languages or ["en"], **kwargs)
 
+        # Per-cell ``readtext`` is the dominant cost on large boards (measured
+        # ~83s for a 720-cell fillomino on Lambda's ~1.7 vCPU, enough to blow the
+        # timeout). ``readtext`` releases the GIL during torch inference, so we
+        # dispatch cells across a thread pool in ``recognize_cells``. Pinning
+        # torch to a single intra-op thread lets the pool — not torch's own
+        # thread fan-out — own the parallelism, which gave the cleanest scaling
+        # at low core counts (bit-identical output, just faster wall-clock).
+        try:
+            import torch
+
+            torch.set_num_threads(1)
+        except Exception:  # noqa: BLE001 - torch always present with easyocr; be defensive
+            pass
+
     @property
     def supports_full_image(self) -> bool:
         return False
@@ -622,13 +636,33 @@ class EasyOcrBackend(OcrBackend):
         return 0
 
     def recognize_cells(self, cells: list[list[NDArray]]) -> list[list[int]]:
+        import os
+
+        # Flatten to a single work-list so the thread pool load-balances across
+        # all cells rather than one row at a time; reshape back at the end. The
+        # result is identical to the serial path — only the wall-clock differs.
+        flat: list[NDArray] = [cell for row in cells for cell in row]
+        if not flat:
+            return [[] for _ in cells]
+
+        # Lambda allocates ~1 vCPU per 1769 MB; at 3008 MB (~1.7 vCPU) there is
+        # little to gain past 3 workers, and oversubscribing just adds context-
+        # switch overhead. Cap at a small number, scaled to the host but never
+        # starving a tiny board of its one worker.
+        max_workers = min(4, max(1, (os.cpu_count() or 2)))
+        max_workers = min(max_workers, len(flat))
+
+        if max_workers <= 1:
+            flat_digits = [self._recognize_single_cell(c) for c in flat]
+        else:
+            with ThreadPoolExecutor(max_workers=max_workers) as pool:
+                flat_digits = list(pool.map(self._recognize_single_cell, flat))
+
         grid: list[list[int]] = []
+        idx = 0
         for row in cells:
-            row_digits = []
-            for cell in row:
-                digit = self._recognize_single_cell(cell)
-                row_digits.append(digit)
-            grid.append(row_digits)
+            grid.append(flat_digits[idx : idx + len(row)])
+            idx += len(row)
         return grid
 
     def recognize_full_image(
