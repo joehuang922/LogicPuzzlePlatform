@@ -9,18 +9,16 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.dp
 import com.puzzleplatform.player.data.model.Puzzle
 import com.puzzleplatform.player.puzzle.LitsEngine
 
-/** Which mark a paint stroke lays down: a shade (black) or a solver-aid dot. */
-enum class LitsMode { SHADE, MARK }
-
 private val GRID_BG = Color.White
 private val LINE_THIN = Color(0xFFBBBBBB)
 private val LINE_THICK = Color.Black
-private val SHADE_COLOR = Color(0xFF333333)
+// Medium gray: clearly shaded, yet light enough that the black region borders
+// read through it (the dark #333 used before buried the room boundaries).
+private val SHADE_COLOR = Color(0xFF9E9E9E)
 private val MARK_COLOR = Color(0xFF444444)
 
 /**
@@ -29,16 +27,16 @@ private val MARK_COLOR = Color(0xFF444444)
  *
  * The grid is pre-divided into regions by thick borders (drawn from the canon grids,
  * like [FillominoBoard]); the player shades one L/I/T/S tetromino per region. Input is
- * drag-to-paint like [NonogramBoard] — touch has no right-click, so a [mode] toggle
- * (rendered as chips by the caller) picks whether a stroke lays down a shade or a
- * solver-aid dot. One finger paints (a stroke that starts on an already-set cell erases
- * uniformly); two fingers pan/zoom via [ZoomableBoard].
+ * tap-to-cycle, mirroring the web board's left-click: each tap advances the cell
+ * empty -> shaded -> marked -> empty, so there's no fill/mark mode to switch between.
+ * "shaded" is the rule-bearing fill; "marked" is a centered solver-aid dot. One finger
+ * taps a cell; two fingers pan/zoom via [ZoomableBoard]. There is deliberately no
+ * drag-to-paint — a sweep across shaded rooms would too easily clobber a careful fill.
  */
 @Composable
 fun LitsBoard(
     puzzle: Puzzle,
     userValues: Map<String, Int>,
-    mode: LitsMode,
     onSetCell: (col: Int, row: Int, state: Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -47,13 +45,10 @@ fun LitsBoard(
     val cols = grids.cols
     if (rows <= 0 || cols <= 0) return
 
-    // The gesture closures below outlive a recomposition (ZoomableBoard's pointerInput
-    // doesn't restart when these change), so read the freshest values through state.
-    val modeState = rememberUpdatedState(mode)
+    // The tap closure outlives a recomposition (ZoomableBoard's pointerInput doesn't
+    // restart when these change), so read the freshest values through state.
     val valuesState = rememberUpdatedState(userValues)
     val onSet = rememberUpdatedState(onSetCell)
-
-    val drag = remember(puzzle.id) { LitsDragState() }
 
     ZoomableBoard(
         cols = cols,
@@ -61,13 +56,10 @@ fun LitsBoard(
         resetKey = puzzle.id,
         modifier = modifier,
         onTapCell = { col, row ->
-            drag.paintSingle(col, row, modeState.value, valuesState.value) { c, r, st -> onSet.value(c, r, st) }
+            // Cycle empty -> shaded -> marked -> empty (UNSET=0, SHADED=1, MARKED=2).
+            val cur = valuesState.value[LitsEngine.cellKey(col, row)] ?: LitsEngine.UNSET
+            onSet.value(col, row, (cur + 1) % 3)
         },
-        onDrawStart = { cell ->
-            drag.start(cell, modeState.value, valuesState.value) { c, r, st -> onSet.value(c, r, st) }
-        },
-        onDrawTo = { cell -> drag.moveTo(cell) { c, r, st -> onSet.value(c, r, st) } },
-        onDrawEnd = { drag.end() },
     ) { cell ->
         val boardW = cols * cell
         val boardH = rows * cell
@@ -126,44 +118,5 @@ fun LitsBoard(
                 )
             }
         }
-    }
-}
-
-/**
- * Tracks a single paint gesture (port of [NonogramBoard]'s NonogramDragState). The first
- * cell fixes the target state — lay down the active mode's mark, or erase if that cell
- * already holds it — then every cell the finger enters is set to that same target, so a
- * stroke paints or erases uniformly.
- */
-private class LitsDragState {
-    private var last: Pair<Int, Int>? = null
-    private var target: Int = LitsEngine.UNSET
-
-    private fun markFor(mode: LitsMode) =
-        if (mode == LitsMode.MARK) LitsEngine.MARKED else LitsEngine.SHADED
-
-    fun start(cell: Pair<Int, Int>?, mode: LitsMode, values: Map<String, Int>, set: (Int, Int, Int) -> Unit) {
-        if (cell == null) { last = null; return }
-        val (c, r) = cell
-        val mark = markFor(mode)
-        val current = values[LitsEngine.cellKey(c, r)] ?: LitsEngine.UNSET
-        target = if (current == mark) LitsEngine.UNSET else mark
-        set(c, r, target)
-        last = cell
-    }
-
-    fun moveTo(cell: Pair<Int, Int>?, set: (Int, Int, Int) -> Unit) {
-        if (cell == null || cell == last) return
-        set(cell.first, cell.second, target)
-        last = cell
-    }
-
-    fun end() { last = null }
-
-    /** A tap (no drag): toggle the single cell for the active mode. */
-    fun paintSingle(c: Int, r: Int, mode: LitsMode, values: Map<String, Int>, set: (Int, Int, Int) -> Unit) {
-        val mark = markFor(mode)
-        val current = values[LitsEngine.cellKey(c, r)] ?: LitsEngine.UNSET
-        set(c, r, if (current == mark) LitsEngine.UNSET else mark)
     }
 }

@@ -45,6 +45,10 @@ data class PlayUiState(
     val reloading: Boolean = false,
     // Offline Sudoku hint (docs/auto-solve). Null when none is being shown.
     val hint: HintView? = null,
+    // Reverse (undo/redo) history — a pilot wired for Nonogram. These reflect
+    // whether a move can be stepped backward / forward from the current state.
+    val canUndo: Boolean = false,
+    val canRedo: Boolean = false,
 )
 
 /**
@@ -71,6 +75,15 @@ class PlayViewModel(
     private var timerJob: Job? = null
     private var completed = false
 
+    // Reverse (undo/redo) history, a Nonogram pilot: a drag is one reverse step, a
+    // fresh move drops the redo future, capped at 100 moves. The engine is [MoveHistory]
+    // (pure, unit-tested); this ViewModel only feeds it snapshots and mirrors its
+    // canUndo/canRedo into UI state.
+    private val history = MoveHistory(maxDepth = 100)
+
+    /** History is a pilot limited to Nonogram (type 6). */
+    private fun historyEnabled(): Boolean = _state.value.puzzle?.puzzleType == 6
+
     // Fillomino multi-digit entry: when true, the next digit starts a new number
     // (replacing the cell) rather than appending to the one already shown. Set when a
     // cell is freshly selected; cleared after the first digit so 1 then 2 -> 12.
@@ -96,6 +109,7 @@ class PlayViewModel(
                     emptyMap<String, Int>() to 0
                 }
                 val (values, elapsed) = restored
+                history.reset()
                 val progress = PuzzleEngines.forType(puzzle.puzzleType)?.computeProgress(puzzle, values) ?: 0.0
                 val edited = try {
                     repo.isPuzzleEditedSinceAttempt(puzzleId, attemptId)
@@ -337,6 +351,9 @@ class PlayViewModel(
     private fun updateValues(newValues: Map<String, Int>, clearSelection: Boolean) {
         val puzzle = _state.value.puzzle ?: return
         val eng = engine
+        // Record a reverse snapshot before mutating (drag mutations collapse into one
+        // step inside MoveHistory via the stroke hooks).
+        if (historyEnabled()) history.record(_state.value.userValues)
         val progress = eng?.computeProgress(puzzle, newValues) ?: 0.0
         _state.update {
             it.copy(
@@ -345,10 +362,62 @@ class PlayViewModel(
                 selectedCell = if (clearSelection) null else it.selectedCell,
                 // The board moved on; a previously-shown hint may no longer apply.
                 hint = null,
+                canUndo = history.canUndo,
+                canRedo = history.canRedo,
             )
         }
         // Auto-complete on a full, valid solution (mirrors the web boards' onComplete).
         if (!completed && eng != null && eng.isComplete(puzzle, newValues)) {
+            handleComplete()
+        }
+    }
+
+    /**
+     * Mark the start of a drag stroke so every cell it paints collapses into a single
+     * reverse step; [endStroke] closes the group. A tap uses neither and records
+     * per-move.
+     */
+    fun beginStroke() {
+        if (!historyEnabled()) return
+        history.beginStroke(_state.value.userValues)
+    }
+
+    fun endStroke() {
+        if (!historyEnabled()) return
+        history.endStroke()
+    }
+
+    /** Step one move backward: restore the last pre-move snapshot, saving the current one for redo. */
+    fun undo() {
+        val prev = history.undo(_state.value.userValues) ?: return
+        applyHistorySnapshot(prev)
+    }
+
+    /** Step one move forward: re-apply a snapshot that was undone, saving the current one for undo. */
+    fun redo() {
+        val next = history.redo(_state.value.userValues) ?: return
+        applyHistorySnapshot(next)
+    }
+
+    /**
+     * Restore a history snapshot without touching the stacks (undo/redo already moved
+     * the entry across). A reversed-into state may itself be the solution, so completion
+     * is still checked — mirroring [updateValues].
+     */
+    private fun applyHistorySnapshot(values: Map<String, Int>) {
+        val puzzle = _state.value.puzzle ?: return
+        val eng = engine
+        val progress = eng?.computeProgress(puzzle, values) ?: 0.0
+        _state.update {
+            it.copy(
+                userValues = values,
+                progress = progress,
+                hint = null,
+                canUndo = history.canUndo,
+                canRedo = history.canRedo,
+            )
+        }
+        if (!completed && eng != null && eng.isComplete(puzzle, values)) {
             handleComplete()
         }
     }
@@ -395,6 +464,7 @@ class PlayViewModel(
                 val snap = repo.getSnapshotById(attemptId, snapshotId)
                 val values = eng.restoreUserValues(puzzle, repo.parseAnswer(snap.currentAnswer))
                 completed = false
+                history.reset()
                 _state.update {
                     it.copy(
                         userValues = values,
@@ -404,6 +474,8 @@ class PlayViewModel(
                         selectedCell = null,
                         showCongrats = false,
                         hint = null,
+                        canUndo = false,
+                        canRedo = false,
                     )
                 }
                 startTimer()

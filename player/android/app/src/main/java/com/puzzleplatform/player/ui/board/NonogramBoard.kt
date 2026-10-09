@@ -73,6 +73,10 @@ fun NonogramBoard(
     liveValidate: Boolean,
     mode: NonogramMode,
     onSetCell: (col: Int, row: Int, state: Int) -> Unit,
+    // Stroke grouping for the reverse (undo/redo) history: a whole drag collapses into
+    // a single reverse step. Called at the start/end of a one-finger paint gesture.
+    onStrokeStart: () -> Unit = {},
+    onStrokeEnd: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val clues = remember(puzzle.id) { NonogramEngine.parseClues(puzzle) }
@@ -97,6 +101,8 @@ fun NonogramBoard(
     val valuesState = rememberUpdatedState(userValues)
     val onSet = rememberUpdatedState(onSetCell)
     val modeState = rememberUpdatedState(mode)
+    val onStrokeStartState = rememberUpdatedState(onStrokeStart)
+    val onStrokeEndState = rememberUpdatedState(onStrokeEnd)
 
     val density = LocalDensity.current
 
@@ -129,9 +135,12 @@ fun NonogramBoard(
                             drag.paintSingle(c, r, modeState.value, valuesState.value) { col, row, st -> onSet.value(col, row, st) }
                         }
                     },
-                    onDragStart = { off -> drag.start(transform.cellAt(off.x, off.y), modeState.value, valuesState.value) { c, r, st -> onSet.value(c, r, st) } },
-                    onDrag = { off -> drag.moveTo(transform.cellAt(off.x, off.y)) { c, r, st -> onSet.value(c, r, st) } },
-                    onDragEnd = { drag.end() },
+                    onDragStart = { off ->
+                        onStrokeStartState.value()
+                        drag.start(transform.cellAt(off.x, off.y), modeState.value, valuesState.value) { c, r, st -> onSet.value(c, r, st) }
+                    },
+                    onDrag = { off -> drag.moveTo(transform.cellAt(off.x, off.y), valuesState.value) { c, r, st -> onSet.value(c, r, st) } },
+                    onDragEnd = { drag.end(); onStrokeEndState.value() },
                     onTransform = { centroid, pan, zoom ->
                         transform.transform(centroid.x, centroid.y, pan.x, pan.y, zoom)
                         version++
@@ -333,14 +342,22 @@ private fun DrawScope.drawClueText(text: String, cx: Float, cy: Float, textSize:
 }
 
 /**
- * Tracks a single paint gesture. The first cell fixes the target state (draw the
- * active mode's mark, or erase if that cell already holds it), then every cell the
- * finger enters is set to that same target — so a stroke paints or erases uniformly,
- * matching the web board's drag behavior.
+ * Tracks a single paint gesture. The first cell fixes both the target state (draw the
+ * active mode's mark, or erase if that cell already holds it) and the "paint-over"
+ * state — the state the origin cell held before the gesture. As the finger sweeps on,
+ * only cells that currently match that origin state are changed; a cell holding
+ * anything else is left untouched. This stops a drag from silently clobbering answers
+ * already laid down (e.g. a fill-sweep won't erase crosses or overwrite other fills),
+ * while a sweep across uniformly-empty (or uniformly-same) cells still paints the whole
+ * line as before. Only the first cell may override an existing value, mirroring the
+ * common nonogram convention and matching the request to disallow drag overrides.
  */
 private class NonogramDragState {
     private var last: Pair<Int, Int>? = null
     private var target: Int = NonogramEngine.UNSET
+    // The state the origin cell held before this gesture; only cells currently in this
+    // state are affected by subsequent moveTo() calls.
+    private var paintOver: Int = NonogramEngine.UNSET
 
     private fun markFor(mode: NonogramMode) =
         if (mode == NonogramMode.CROSS) NonogramEngine.CROSSED else NonogramEngine.FILLED
@@ -350,14 +367,20 @@ private class NonogramDragState {
         val (c, r) = cell
         val mark = markFor(mode)
         val current = values["$c,$r"] ?: NonogramEngine.UNSET
+        paintOver = current
         target = if (current == mark) NonogramEngine.UNSET else mark
         set(c, r, target)
         last = cell
     }
 
-    fun moveTo(cell: Pair<Int, Int>?, set: (Int, Int, Int) -> Unit) {
+    fun moveTo(cell: Pair<Int, Int>?, values: Map<String, Int>, set: (Int, Int, Int) -> Unit) {
         if (cell == null || cell == last) return
-        set(cell.first, cell.second, target)
+        val (c, r) = cell
+        // Only paint cells that still match the origin's pre-drag state, so the sweep
+        // can't override cells the player had already set to something else.
+        if ((values["$c,$r"] ?: NonogramEngine.UNSET) == paintOver) {
+            set(c, r, target)
+        }
         last = cell
     }
 

@@ -58,7 +58,6 @@ import com.puzzleplatform.player.ui.board.FillominoMode
 import com.puzzleplatform.player.ui.board.HellGolfBoard
 import com.puzzleplatform.player.ui.board.KakuroBoard
 import com.puzzleplatform.player.ui.board.LitsBoard
-import com.puzzleplatform.player.ui.board.LitsMode
 import com.puzzleplatform.player.ui.board.MasyuBoard
 import com.puzzleplatform.player.ui.board.NonogramBoard
 import com.puzzleplatform.player.ui.board.NonogramMode
@@ -342,9 +341,14 @@ fun PlayScreen(
                                 liveValidate = state.liveValidate,
                                 mode = nonogramMode,
                                 onSetCell = vm::setCellState,
+                                // Group a whole drag into one reverse (undo/redo) step.
+                                onStrokeStart = vm::beginStroke,
+                                onStrokeEnd = vm::endStroke,
                             )
-                            // Fill / cross paint-mode toggle (touch has no right-click).
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            // Fill / cross paint-mode toggle (touch has no right-click),
+                            // plus the reverse (undo/redo) controls — a Nonogram pilot that
+                            // steps back and forth through the last 100 moves.
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                                 FilterChip(
                                     selected = nonogramMode == NonogramMode.FILL,
                                     onClick = { nonogramMode = NonogramMode.FILL },
@@ -355,34 +359,23 @@ fun PlayScreen(
                                     onClick = { nonogramMode = NonogramMode.CROSS },
                                     label = { Text("✕ Cross") },
                                 )
+                                Spacer(Modifier.width(4.dp))
+                                OutlinedButton(onClick = vm::undo, enabled = state.canUndo) { Text("↶ Undo") }
+                                OutlinedButton(onClick = vm::redo, enabled = state.canRedo) { Text("↷ Redo") }
                             }
                         }
                         15 -> {
-                            var litsMode by remember(puzzle.id) { mutableStateOf(LitsMode.SHADE) }
                             LitsBoard(
                                 puzzle = puzzle,
                                 userValues = state.userValues,
-                                mode = litsMode,
                                 // LITS keys cells "c:col,row" (web convention); route
                                 // through putUserValue, which drops the key when state is 0.
+                                // Each tap cycles the cell empty -> shade -> mark -> empty,
+                                // so there's no fill/mark mode to switch between.
                                 onSetCell = { col, row, st ->
                                     vm.putUserValue(LitsEngine.cellKey(col, row), st)
                                 },
                             )
-                            // Shade / Mark paint-mode toggle (touch has no right-click).
-                            // Shade is the rule-bearing fill; Mark is a solver-aid dot.
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                FilterChip(
-                                    selected = litsMode == LitsMode.SHADE,
-                                    onClick = { litsMode = LitsMode.SHADE },
-                                    label = { Text("■ Shade") },
-                                )
-                                FilterChip(
-                                    selected = litsMode == LitsMode.MARK,
-                                    onClick = { litsMode = LitsMode.MARK },
-                                    label = { Text("• Mark") },
-                                )
-                            }
                         }
                         else -> Text("This puzzle type isn't playable in this version yet.")
                     }
