@@ -486,10 +486,19 @@ class OcrBackend(ABC):
     """
 
     @abstractmethod
-    def recognize_cells(self, cells: list[list[NDArray]]) -> list[list[int]]:
+    def recognize_cells(
+        self,
+        cells: list[list[NDArray]],
+        *,
+        multi_digit: bool = False,
+        min_confidence: float = 0.0,
+    ) -> list[list[int]]:
         """Recognize digits from a grid of cell images.
 
-        Returns a 2D array where each value is 0 (empty) or 1-9.
+        Returns a 2D array where each value is 0 (empty), 1-9, or — when
+        ``multi_digit`` is set — a larger clue (e.g. 10-13). ``multi_digit`` and
+        ``min_confidence`` tune the local EasyOCR path; LLM-backed backends read
+        via a prompt and accept the flags for interface parity.
         """
         ...
 
@@ -520,7 +529,16 @@ class GeminiOcrBackend(OcrBackend):
     def supports_full_image(self) -> bool:
         return True
 
-    def recognize_cells(self, cells: list[list[NDArray]]) -> list[list[int]]:
+    def recognize_cells(
+        self,
+        cells: list[list[NDArray]],
+        *,
+        multi_digit: bool = False,
+        min_confidence: float = 0.0,
+    ) -> list[list[int]]:
+        # The vision prompt reads whatever is printed, so multi-digit clues and
+        # confidence filtering are handled by the model itself; the flags exist
+        # only for interface parity with the EasyOCR backend.
         return self._recognizer.recognize(cells, self._prompt)
 
     def recognize_full_image(
@@ -554,7 +572,15 @@ class ClaudeOcrBackend(OcrBackend):
     def supports_full_image(self) -> bool:
         return True
 
-    def recognize_cells(self, cells: list[list[NDArray]]) -> list[list[int]]:
+    def recognize_cells(
+        self,
+        cells: list[list[NDArray]],
+        *,
+        multi_digit: bool = False,
+        min_confidence: float = 0.0,
+    ) -> list[list[int]]:
+        # Flags accepted for interface parity; the vision prompt already reads
+        # multi-digit clues and filters noise.
         return self._recognizer.recognize(cells, self._prompt)
 
     def recognize_full_image(
@@ -607,7 +633,44 @@ class EasyOcrBackend(OcrBackend):
     def supports_full_image(self) -> bool:
         return False
 
-    def _recognize_single_cell(self, cell: NDArray) -> int:
+    def _reread_without_zero(self, resized: NDArray, min_confidence: float) -> int:
+        """Re-read a crop that came back as a lone ``0`` with ``0`` banned.
+
+        ``0`` is never a valid single-cell clue in any puzzle we parse, and this
+        print font's ``9`` (closed top loop) is routinely misread as ``0`` when
+        ``0`` is in the allowlist. Dropping ``0`` from the allowlist and reading
+        again recovers the intended ``9`` (or other digit) that the ``0``
+        outvoted.
+        """
+        results = self._reader.readtext(
+            resized, allowlist="123456789", detail=1, paragraph=False
+        )
+        if not results:
+            return 0
+        _, text, conf = results[0]
+        text = text.strip()
+        if float(conf) < min_confidence or not text.isdigit():
+            return 0
+        return int(text)
+
+    def _recognize_single_cell(
+        self,
+        cell: NDArray,
+        *,
+        multi_digit: bool = False,
+        min_confidence: float = 0.0,
+    ) -> int:
+        """Recognize the integer in one cell crop.
+
+        Defaults reproduce the original single-digit behaviour exactly (``1``-
+        ``9`` allowlist, lone digit, ``0`` rejected, no confidence floor), which
+        single-digit boards (sudoku, slitherlink) rely on. Callers whose clues
+        can be multi-digit (nurikabe's ``10``-``13``) pass ``multi_digit=True``,
+        which allows ``0`` in the allowlist, accepts two-plus-character reads,
+        and recovers a lone ``0`` as a ``9`` via :meth:`_reread_without_zero`.
+        ``min_confidence`` drops low-confidence reads — chiefly grid-line
+        fragments and smudges that otherwise surface as ghost digits.
+        """
         import cv2
         import numpy as np
 
@@ -620,23 +683,50 @@ class EasyOcrBackend(OcrBackend):
 
         resized = cv2.resize(gray, (128, 128), interpolation=cv2.INTER_CUBIC)
 
+        # ``0`` must be in the allowlist for multi-digit clues (e.g. ``10``) to
+        # survive; single-digit boards keep the ``1``-``9`` list, which doubles
+        # as a cheap reject of the common 9->0 misread.
+        allowlist = "0123456789" if multi_digit else "123456789"
         results = self._reader.readtext(
             resized,
-            allowlist="123456789",
-            detail=0,
+            allowlist=allowlist,
+            detail=1,
             paragraph=False,
         )
 
         if not results:
             return 0
 
-        text = results[0].strip()
-        if len(text) == 1 and text.isdigit() and text != "0":
+        _, text, conf = results[0]
+        text = text.strip()
+        if float(conf) < min_confidence or not text.isdigit():
+            return 0
+
+        if multi_digit:
+            # Multi-character read: a genuine two-plus-digit clue (10, 11, 13...).
+            if len(text) >= 2:
+                val = int(text)
+                return val if val > 0 else 0
+            # Single character: a lone ``0`` is never valid, so try to recover
+            # the ``9`` (or other digit) it most likely masked.
+            if text == "0":
+                return self._reread_without_zero(resized, min_confidence)
+            return int(text)
+
+        # Single-digit path: original behaviour, byte-for-byte.
+        if len(text) == 1 and text != "0":
             return int(text)
         return 0
 
-    def recognize_cells(self, cells: list[list[NDArray]]) -> list[list[int]]:
+    def recognize_cells(
+        self,
+        cells: list[list[NDArray]],
+        *,
+        multi_digit: bool = False,
+        min_confidence: float = 0.0,
+    ) -> list[list[int]]:
         import os
+        from functools import partial
 
         # Flatten to a single work-list so the thread pool load-balances across
         # all cells rather than one row at a time; reshape back at the end. The
@@ -644,6 +734,12 @@ class EasyOcrBackend(OcrBackend):
         flat: list[NDArray] = [cell for row in cells for cell in row]
         if not flat:
             return [[] for _ in cells]
+
+        recognize = partial(
+            self._recognize_single_cell,
+            multi_digit=multi_digit,
+            min_confidence=min_confidence,
+        )
 
         # Lambda allocates ~1 vCPU per 1769 MB; at 3008 MB (~1.7 vCPU) there is
         # little to gain past 3 workers, and oversubscribing just adds context-
@@ -653,10 +749,10 @@ class EasyOcrBackend(OcrBackend):
         max_workers = min(max_workers, len(flat))
 
         if max_workers <= 1:
-            flat_digits = [self._recognize_single_cell(c) for c in flat]
+            flat_digits = [recognize(c) for c in flat]
         else:
             with ThreadPoolExecutor(max_workers=max_workers) as pool:
-                flat_digits = list(pool.map(self._recognize_single_cell, flat))
+                flat_digits = list(pool.map(recognize, flat))
 
         grid: list[list[int]] = []
         idx = 0
