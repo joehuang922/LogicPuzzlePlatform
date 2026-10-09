@@ -28,7 +28,10 @@ scripts by hand — the harness captures the *exact* ROIs the parser extracted):
 make debug-parser NAME=<name> IMG="<path>"
 ```
 
-Outputs land in `/tmp/parser_debug/<name>/`:
+On macOS/Linux the harness also **opens the review images in the OS viewer**
+(gridlines, warped, montage, board overlay) so the user can eyeball them
+alongside your reads. Add `NOOPEN=1` to suppress this. Outputs land in
+`/tmp/parser_debug/<name>/`:
 - **Geometry**: `01_border.png`, `02_warped.png`, `03_gridlines.png` (names vary
   by parser — slitherlink emits `01_dots_raw.png`, etc.). These show whether
   quadrilateral contour detection and grid-line fitting are correct.

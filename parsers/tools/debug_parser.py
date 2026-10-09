@@ -82,6 +82,30 @@ NAME_TO_TYPE: dict[str, int] = {
 }
 
 
+def _open_images(paths: list[Path]) -> None:
+    """Open the debug images in the OS viewer (macOS Preview / Linux xdg-open).
+
+    Convenience for the human-in-the-loop review: a parse writes several images
+    we want to eyeball together. No-op on platforms without a known opener, and
+    never fatal — failing to open a viewer must not fail the parse.
+    """
+    import subprocess
+
+    if sys.platform == "darwin":
+        opener = ["open"]
+    elif sys.platform.startswith("linux"):
+        opener = ["xdg-open"]
+    else:
+        return
+    existing = [str(p) for p in paths if p.exists()]
+    if not existing:
+        return
+    try:
+        subprocess.run(opener + existing, check=False)
+    except Exception as exc:  # noqa: BLE001 - viewer is best-effort
+        print(f"  (could not open images: {exc})")
+
+
 def _normalize_name(name: str) -> str:
     """Accept 'number-link', 'Number Link', 'numberlink' -> 'number_link'."""
     key = name.strip().lower().replace("-", "_").replace(" ", "_")
@@ -222,6 +246,8 @@ def main() -> None:
     ap.add_argument("image", help="Path to the source image")
     ap.add_argument("--out", default=None, help="Output dir (default /tmp/parser_debug/<name>)")
     ap.add_argument("--oracle", action="store_true", help="Also run the Gemini confusion matrix")
+    ap.add_argument("--no-open", action="store_true",
+                    help="Do not open the images in the OS viewer when done")
     args = ap.parse_args()
 
     name = _normalize_name(args.name)
@@ -279,6 +305,17 @@ def main() -> None:
     print(f"  board JSON:        {out / 'board.json'}")
     if args.oracle and captures:
         print(f"  oracle matrix:     {out / 'oracle.txt'}")
+
+    # Open the review set in the OS viewer: geometry (gridlines, warped) first,
+    # then the clue montage, then the final board overlay — the Phase-2 reading
+    # order. Falls back to all emitted PNGs if the usual names are absent.
+    if not args.no_open:
+        preferred = ["03_gridlines.png", "02_warped.png", "byclass.png",
+                     "04_cells.png", "05_parsed.png"]
+        review = [out / n for n in preferred if (out / n).exists()]
+        if not review:
+            review = sorted(out.glob("*.png"))
+        _open_images(review)
 
 
 if __name__ == "__main__":

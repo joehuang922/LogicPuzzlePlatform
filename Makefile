@@ -13,9 +13,10 @@ parse-combo-sudoku:
 # Parser debugging harness: dump geometry images, a by-prediction clue montage,
 # the parsed board JSON + histogram for one image, so we can refine a parser.
 # Usage: make debug-parser NAME=nurikabe IMG=~/scan.jpg   (add ORACLE=1 for the
-# Gemini confusion matrix). Writes to /tmp/parser_debug/<name>/.
+# Gemini confusion matrix; NOOPEN=1 to skip opening images in the viewer).
+# Writes to /tmp/parser_debug/<name>/ and opens the review images (macOS/Linux).
 debug-parser:
-	@$(PARSERS_PYTHON) parsers/tools/debug_parser.py $(NAME) "$(IMG)" $(if $(ORACLE),--oracle,) $(if $(OUT),--out $(OUT),)
+	@$(PARSERS_PYTHON) parsers/tools/debug_parser.py $(NAME) "$(IMG)" $(if $(ORACLE),--oracle,) $(if $(OUT),--out $(OUT),) $(if $(NOOPEN),--no-open,)
 
 install-parsers:
 	cd parsers && python3 -m venv .venv && .venv/bin/pip install -e ".[all,dev]"
