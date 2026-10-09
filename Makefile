@@ -5,10 +5,17 @@ PARSERS_PYTHON = parsers/.venv/bin/python
 # separate terminals, then open the frontend and go to Admin.
 PARSER_PORT ?= 8000
 
-.PHONY: parse-combo-sudoku install-parsers author-parser author-ui
+.PHONY: parse-combo-sudoku install-parsers author-parser author-ui debug-parser
 
 parse-combo-sudoku:
 	@$(PARSERS_PYTHON) -m puzzle_parsers.combo_sudoku $(ARGS)
+
+# Parser debugging harness: dump geometry images, a by-prediction clue montage,
+# the parsed board JSON + histogram for one image, so we can refine a parser.
+# Usage: make debug-parser NAME=nurikabe IMG=~/scan.jpg   (add ORACLE=1 for the
+# Gemini confusion matrix). Writes to /tmp/parser_debug/<name>/.
+debug-parser:
+	@$(PARSERS_PYTHON) parsers/tools/debug_parser.py $(NAME) "$(IMG)" $(if $(ORACLE),--oracle,) $(if $(OUT),--out $(OUT),)
 
 install-parsers:
 	cd parsers && python3 -m venv .venv && .venv/bin/pip install -e ".[all,dev]"
