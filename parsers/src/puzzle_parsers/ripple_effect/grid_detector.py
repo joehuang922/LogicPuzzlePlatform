@@ -18,13 +18,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import cv2
-import numpy as np
 from numpy.typing import NDArray
 
 from puzzle_parsers.grid_utils import (
     auto_detect_grid_lines,
     classify_border_thickness,
     find_quadrilateral_border,
+    reconcile_square_lines,
     warp_to_rectangle,
 )
 
@@ -64,9 +64,9 @@ def detect_ripple_effect_grid(
     warped_gray = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
     h_lines, v_lines = auto_detect_grid_lines(warped_gray, warp_w, warp_h)
 
-    # Guard against an under-detected axis collapsing the row/column count.
-    # Cells are square, so the smaller per-axis cell-size estimate is reliable.
-    h_lines, v_lines = _reconcile_square_lines(h_lines, v_lines, warp_h, warp_w)
+    # Reconcile the row/column count from the detected pitches: rescue an
+    # under-detected axis, but keep per-axis counts on near-square warped boards.
+    h_lines, v_lines = reconcile_square_lines(h_lines, v_lines, warp_h, warp_w)
 
     rows = len(h_lines) - 1
     cols = len(v_lines) - 1
@@ -86,66 +86,6 @@ def detect_ripple_effect_grid(
         h_lines=h_lines, v_lines=v_lines,
         cell_h=cell_h, cell_w=cell_w,
     )
-
-
-def _reconcile_square_lines(
-    h_lines: list[int], v_lines: list[int], warp_h: int, warp_w: int
-) -> tuple[list[int], list[int]]:
-    """Re-derive both axis line sets assuming square cells.
-
-    A faint/broken axis can be under-detected, which only ever *inflates* that
-    axis's estimated cell size. The smaller of the two per-axis cell-size
-    estimates is therefore the reliable one; we adopt it, derive both counts
-    from it, and snap a uniform grid (preferring detected peaks where aligned).
-    """
-    h_cell = _cell_size_from_lines(h_lines)
-    v_cell = _cell_size_from_lines(v_lines)
-
-    candidates = [c for c in (h_cell, v_cell) if c is not None]
-    if not candidates:
-        return h_lines, v_lines
-
-    cell = min(candidates)
-    n_rows = max(2, round(warp_h / cell))
-    n_cols = max(2, round(warp_w / cell))
-
-    new_h = _uniform_grid_snapped(np.asarray(h_lines), warp_h, n_rows)
-    new_v = _uniform_grid_snapped(np.asarray(v_lines), warp_w, n_cols)
-    return new_h, new_v
-
-
-def _cell_size_from_lines(lines: list[int]) -> float | None:
-    """Estimate cell size (px) from the median spacing of detected lines."""
-    if len(lines) < 3:
-        return None
-    spacings = np.diff(np.asarray(lines))
-    med = float(np.median(spacings))
-    good = spacings[spacings > med * 0.5]
-    if len(good) == 0:
-        return None
-    return float(np.median(good))
-
-
-def _uniform_grid_snapped(
-    peaks: NDArray, total_span: int, n_cells: int
-) -> list[int]:
-    """Generate a uniform grid and snap each position to the nearest peak."""
-    cell_size = total_span / n_cells
-    tolerance = int(cell_size * 0.25)
-
-    result: list[int] = []
-    for i in range(n_cells + 1):
-        expected = int(i * cell_size)
-        if len(peaks) > 0:
-            dists = np.abs(peaks - expected)
-            min_dist = int(np.min(dists))
-            if min_dist < tolerance:
-                result.append(int(peaks[np.argmin(dists)]))
-            else:
-                result.append(expected)
-        else:
-            result.append(expected)
-    return result
 
 
 def classify_borders(

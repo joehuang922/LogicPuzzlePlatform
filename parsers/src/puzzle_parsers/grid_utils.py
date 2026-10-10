@@ -530,6 +530,99 @@ def _grid_uniformity_score(h_lines: list[int], v_lines: list[int]) -> float:
     return float(np.std(all_gaps)) / mean
 
 
+# Max fraction by which the two per-axis pitches may differ before we treat one
+# axis as genuinely under-detected (rather than merely non-square from warp).
+# Warp leaves cells a few percent off square; a faint/broken axis is off by tens
+# of percent. 0.15 cleanly separates the two regimes on real Nikoli scans.
+_RECONCILE_DIVERGE_TOL = 0.15
+
+
+def reconcile_square_lines(
+    h_lines: list[int], v_lines: list[int], warp_h: int, warp_w: int,
+    *, diverge_tol: float = _RECONCILE_DIVERGE_TOL,
+) -> tuple[list[int], list[int]]:
+    """Re-derive both axis line sets from detected pitches, assuming square cells.
+
+    Companion to :func:`auto_detect_grid_lines`: it fixes the row/column *count*
+    once lines are detected. Two failure modes to guard against:
+
+    1. **Under-detection.** A faint/broken axis can lose lines, which only ever
+       *inflates* that axis's estimated cell size (you cannot detect more lines
+       than exist). When the two per-axis pitches diverge a lot, the smaller is
+       the reliable one — we adopt it for both axes to rescue the bad one.
+    2. **Non-square-from-warp.** On a gently warped scan the cells land a few
+       percent off square (e.g. row pitch 78px vs column 75px). Forcing the
+       *smaller* pitch onto both axes then over-counts the longer axis — a 4%
+       error accumulates into ghost rows on a tall board. So when the pitches
+       are *close* (within ``diverge_tol``), each axis keeps its own pitch.
+
+    The split is by pitch divergence: close pitches → per-axis (preserve the
+    true count on near-square warped boards); far-apart pitches → shared smaller
+    pitch (rescue a genuinely under-detected axis). Either way cells stay
+    uniform. See [[grid-parser-robustness]] for the original square-cell rescue.
+    """
+    h_cell = _cell_size_from_lines(h_lines)
+    v_cell = _cell_size_from_lines(v_lines)
+
+    candidates = [c for c in (h_cell, v_cell) if c is not None]
+    if not candidates:
+        return h_lines, v_lines
+
+    if h_cell is not None and v_cell is not None:
+        ratio = max(h_cell, v_cell) / min(h_cell, v_cell)
+        if ratio <= 1 + diverge_tol:
+            # Close pitches: near-square warp, trust each axis's own pitch.
+            n_rows = max(2, round(warp_h / h_cell))
+            n_cols = max(2, round(warp_w / v_cell))
+            new_h = _uniform_grid_snapped(np.asarray(h_lines), warp_h, n_rows)
+            new_v = _uniform_grid_snapped(np.asarray(v_lines), warp_w, n_cols)
+            return new_h, new_v
+
+    # One axis missing, or pitches far apart: adopt the smaller (least
+    # under-detected) pitch for both axes.
+    cell = min(candidates)
+    n_rows = max(2, round(warp_h / cell))
+    n_cols = max(2, round(warp_w / cell))
+
+    new_h = _uniform_grid_snapped(np.asarray(h_lines), warp_h, n_rows)
+    new_v = _uniform_grid_snapped(np.asarray(v_lines), warp_w, n_cols)
+    return new_h, new_v
+
+
+def _cell_size_from_lines(lines: list[int]) -> float | None:
+    """Estimate cell size (px) from the median spacing of detected lines."""
+    if len(lines) < 3:
+        return None
+    spacings = np.diff(np.asarray(lines))
+    med = float(np.median(spacings))
+    good = spacings[spacings > med * 0.5]
+    if len(good) == 0:
+        return None
+    return float(np.median(good))
+
+
+def _uniform_grid_snapped(
+    peaks: NDArray, total_span: int, n_cells: int
+) -> list[int]:
+    """Generate a uniform grid and snap each position to the nearest peak."""
+    cell_size = total_span / n_cells
+    tolerance = int(cell_size * 0.25)
+
+    result: list[int] = []
+    for i in range(n_cells + 1):
+        expected = int(i * cell_size)
+        if len(peaks) > 0:
+            dists = np.abs(peaks - expected)
+            min_dist = int(np.min(dists))
+            if min_dist < tolerance:
+                result.append(int(peaks[np.argmin(dists)]))
+            else:
+                result.append(expected)
+        else:
+            result.append(expected)
+    return result
+
+
 def detect_uniform_grid(
     warped_gray: NDArray,
     warp_w: int,
