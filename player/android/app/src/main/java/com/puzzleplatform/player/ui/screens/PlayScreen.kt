@@ -64,6 +64,8 @@ import com.puzzleplatform.player.ui.board.NonogramMode
 import com.puzzleplatform.player.ui.board.NurikabeBoard
 import com.puzzleplatform.player.ui.board.NurikabeMode
 import com.puzzleplatform.player.ui.board.NurimazeBoard
+import com.puzzleplatform.player.ui.board.NuritwinBoard
+import com.puzzleplatform.player.ui.board.NuritwinMode
 import com.puzzleplatform.player.ui.board.SlitherlinkBoard
 import com.puzzleplatform.player.ui.board.SudokuBoard
 import com.puzzleplatform.player.puzzle.LitsEngine
@@ -274,6 +276,31 @@ fun PlayScreen(
                                 vm.putUserValues(NurimazeEngine.cycleRoom(puzzle, state.userValues, col, row))
                             },
                         )
+                        9 -> {
+                            var nuritwinMode by remember(puzzle.id) { mutableStateOf(NuritwinMode.BLACK) }
+                            NuritwinBoard(
+                                puzzle = puzzle,
+                                userValues = state.userValues,
+                                mode = nuritwinMode,
+                                // Cell-level paint keyed "col,row" (web convention);
+                                // setCellState writes the state and drops the key when it's 0.
+                                onSetCell = vm::setCellState,
+                            )
+                            // Black / Mark paint-mode toggle (touch has no right-click). Black
+                            // is the rule-bearing fill; Mark is a white solver dot.
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FilterChip(
+                                    selected = nuritwinMode == NuritwinMode.BLACK,
+                                    onClick = { nuritwinMode = NuritwinMode.BLACK },
+                                    label = { Text("■ Black") },
+                                )
+                                FilterChip(
+                                    selected = nuritwinMode == NuritwinMode.MARK,
+                                    onClick = { nuritwinMode = NuritwinMode.MARK },
+                                    label = { Text("• Mark") },
+                                )
+                            }
+                        }
                         14 -> {
                             var fillominoMode by remember(puzzle.id) { mutableStateOf(FillominoMode.NUMBER) }
                             FillominoBoard(
