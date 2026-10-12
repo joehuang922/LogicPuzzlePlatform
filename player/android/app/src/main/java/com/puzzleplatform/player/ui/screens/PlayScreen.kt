@@ -362,6 +362,13 @@ fun PlayScreen(
                         }
                         6 -> {
                             var nonogramMode by remember(puzzle.id) { mutableStateOf(NonogramMode.FILL) }
+                            // Reverse (undo/redo) controls sit ABOVE the board — the Nonogram
+                            // pilot steps back and forth through the last 100 moves, and these
+                            // are kept clear of the frequently-tapped Fill/Cross chips below.
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                OutlinedButton(onClick = vm::undo, enabled = state.canUndo) { Text("↶ Undo") }
+                                OutlinedButton(onClick = vm::redo, enabled = state.canRedo) { Text("↷ Redo") }
+                            }
                             NonogramBoard(
                                 puzzle = puzzle,
                                 userValues = state.userValues,
@@ -372,9 +379,8 @@ fun PlayScreen(
                                 onStrokeStart = vm::beginStroke,
                                 onStrokeEnd = vm::endStroke,
                             )
-                            // Fill / cross paint-mode toggle (touch has no right-click),
-                            // plus the reverse (undo/redo) controls — a Nonogram pilot that
-                            // steps back and forth through the last 100 moves.
+                            // Fill / cross paint-mode toggle (touch has no right-click), kept
+                            // next to the board where paint-mode switching happens.
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                                 FilterChip(
                                     selected = nonogramMode == NonogramMode.FILL,
@@ -386,9 +392,6 @@ fun PlayScreen(
                                     onClick = { nonogramMode = NonogramMode.CROSS },
                                     label = { Text("✕ Cross") },
                                 )
-                                Spacer(Modifier.width(4.dp))
-                                OutlinedButton(onClick = vm::undo, enabled = state.canUndo) { Text("↶ Undo") }
-                                OutlinedButton(onClick = vm::redo, enabled = state.canRedo) { Text("↷ Redo") }
                             }
                         }
                         15 -> {

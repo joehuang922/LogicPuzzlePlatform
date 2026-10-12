@@ -204,26 +204,26 @@ class NonogramEngineTest {
     // -- renderThumbnail ----------------------------------------------------
 
     @Test
-    fun renderThumbnail_mapsFilledCellsToBlackAndRestBlank() {
+    fun renderThumbnail_mapsFilledCellsToWhiteAndRestGrey() {
         val p = puzzle(plusCanon)
         val answer = NonogramEngine.extractAnswer(p, plusSolved)
         val thumb = NonogramEngine.renderThumbnail(p, answer)!!
         assertEquals(3, thumb.width)
         assertEquals(3, thumb.height)
-        // Filled center-plus cells are opaque; corners are blank (0).
-        assertEquals(0, thumb.cells[0])                 // (col0,row0) blank
-        assertEquals(0xFF222222.toInt(), thumb.cells[1]) // (col1,row0) filled
-        assertEquals(0xFF222222.toInt(), thumb.cells[4]) // (col1,row1) filled
-        assertEquals(0, thumb.cells[8])                 // (col2,row2) blank
+        // Filled center-plus cells are white; unmarked corners are the light-grey ground.
+        assertEquals(0xFFD9D9D9.toInt(), thumb.cells[0]) // (col0,row0) default grey
+        assertEquals(0xFFFFFFFF.toInt(), thumb.cells[1]) // (col1,row0) filled white
+        assertEquals(0xFFFFFFFF.toInt(), thumb.cells[4]) // (col1,row1) filled white
+        assertEquals(0xFFD9D9D9.toInt(), thumb.cells[8]) // (col2,row2) default grey
     }
 
     @Test
-    fun renderThumbnail_crossesReadAsBlank() {
-        // A cross is a solving aid, not part of the picture.
+    fun renderThumbnail_crossesReadAsGround() {
+        // A cross is a solving aid, not part of the picture, so it reads as the grey ground.
         val p = puzzle(plusCanon)
         val answer = NonogramEngine.extractAnswer(p, mapOf("0,0" to 2))
         val thumb = NonogramEngine.renderThumbnail(p, answer)!!
-        assertEquals(0, thumb.cells[0])
+        assertEquals(0xFFD9D9D9.toInt(), thumb.cells[0])
     }
 
     @Test

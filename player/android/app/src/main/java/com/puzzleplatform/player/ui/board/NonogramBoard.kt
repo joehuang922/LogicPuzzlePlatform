@@ -30,9 +30,12 @@ import com.puzzleplatform.player.puzzle.NonogramEngine.ClueStatus
 private val GRID_BG = Color.White
 private val BAND_BG = Color(0xFFF2F2F2)
 private val CORNER_BG = Color(0xFFE8E8E8)
-private val THUMB_BG = Color.White
-private val THUMB_BORDER = Color(0xFFCCCCCC)
-private val THUMB_FILL = Color(0xFF222222)
+// Preview palette: the unmarked ("default") ground is light grey so that marked cells,
+// drawn WHITE, specifically stand for the emerging picture. The border frames the grey
+// preview against the slightly-lighter static corner.
+private val THUMB_BG = Color(0xFFD9D9D9)
+private val THUMB_BORDER = Color(0xFFAAAAAA)
+private val THUMB_FILL = Color.White
 private val GRID_LINE = Color(0xFFBBBBBB)
 private val GRID_LINE_MAJOR = Color(0xFF333333)
 private val BORDER = Color(0xFF333333)
@@ -43,8 +46,18 @@ private val CLUE_SATISFIED = Color(0xFFAAAAAA)
 private val CLUE_ERROR = Color(0xFFDD3333)
 private val ERROR_FILL = Color(0xFFDD3333)
 
-/** Fixed pixel depth of each clue band, independent of zoom (see design note). */
-private val BAND_DEPTH = 96.dp
+/**
+ * Clue-band depth adapts to the longest clue line so every number stays visible, however
+ * many a line has. The band is sized from the clue data (not zoom), so it stays fixed as
+ * the grid pans/zooms, per the design note: [PER_CLUE_DEPTH] is the room reserved for one
+ * number, so the band holds that times the longest line, clamped to [MIN_BAND_DEPTH] ..
+ * [MAX_BAND_DEPTH]. Past the point where [MAX_BAND_DEPTH] can hold them all at full size,
+ * the numbers shrink to fit instead (see [drawRowClues]/[drawColClues]) — so there is no
+ * hard cap on clue length, just progressively smaller text for very long lines.
+ */
+private val PER_CLUE_DEPTH = 13.dp
+private val MIN_BAND_DEPTH = 84.dp
+private val MAX_BAND_DEPTH = 176.dp
 /** Largest grid cell (zoom-in stop) and the auto-zoom target, matching other boards. */
 private val MAX_CELL = 40.dp
 private val AUTO_CELL = 26.dp
@@ -106,9 +119,22 @@ fun NonogramBoard(
 
     val density = LocalDensity.current
 
+    // Size the clue band from the longest clue line so none of its numbers get clipped;
+    // the depth is a function of the clue data only, so it's stable across pan/zoom.
+    val maxClueLen = remember(clues) {
+        maxOf(
+            clues.rowClues.maxOfOrNull { it.size } ?: 0,
+            clues.colClues.maxOfOrNull { it.size } ?: 0,
+            1,
+        )
+    }
+
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val vpx = with(density) { maxWidth.toPx() }
-        val bandPx = with(density) { BAND_DEPTH.toPx() }
+        val perCluePx = with(density) { PER_CLUE_DEPTH.toPx() }
+        val minBandPx = with(density) { MIN_BAND_DEPTH.toPx() }
+        val maxBandPx = with(density) { MAX_BAND_DEPTH.toPx() }
+        val bandPx = (maxClueLen * perCluePx).coerceIn(minBandPx, maxBandPx)
         val maxCellPx = with(density) { MAX_CELL.toPx() }
         val autoCellPx = with(density) { AUTO_CELL.toPx() }
         val entryFloorPx = with(density) { ENTRY_FLOOR.toPx() }
@@ -285,13 +311,15 @@ private fun DrawScope.drawRowClues(
     rowClueErrors: Set<String>,
     liveValidate: Boolean,
 ) {
-    val textSize = (cell * 0.5f).coerceIn(18f, 34f)
+    val baseTextSize = (cell * 0.5f).coerceIn(18f, 34f)
     for (r in 0 until clues.rows) {
         val clue = clues.rowClues[r]
         val yc = r * cell + cell / 2
-        // Right-align the run of numbers against the band's inner edge.
+        // Right-align the run of numbers against the band's inner edge, shrinking the
+        // slot (and text) when the line is too long to fit the band at full size.
         val n = clue.size
-        val slot = (textSize * 1.15f)
+        val slot = clueSlot(baseTextSize, n, bandPx)
+        val textSize = (slot / 1.15f).coerceAtMost(baseTextSize)
         for (i in clue.indices) {
             val x = bandPx - (n - i - 0.5f) * slot
             val color = clueColor(rowStatus.getOrNull(r)?.getOrNull(i), rowClueErrors.contains("$r:$i"), liveValidate)
@@ -309,18 +337,32 @@ private fun DrawScope.drawColClues(
     colClueErrors: Set<String>,
     liveValidate: Boolean,
 ) {
-    val textSize = (cell * 0.5f).coerceIn(18f, 34f)
+    val baseTextSize = (cell * 0.5f).coerceIn(18f, 34f)
     for (c in 0 until clues.cols) {
         val clue = clues.colClues[c]
         val xc = c * cell + cell / 2
         val n = clue.size
-        val slot = (textSize * 1.15f)
+        val slot = clueSlot(baseTextSize, n, bandPx)
+        val textSize = (slot / 1.15f).coerceAtMost(baseTextSize)
         for (i in clue.indices) {
             val y = bandPx - (n - i - 0.5f) * slot
             val color = clueColor(colStatus.getOrNull(c)?.getOrNull(i), colClueErrors.contains("$c:$i"), liveValidate)
             drawClueText(clue[i].toString(), xc, y, textSize, color)
         }
     }
+}
+
+/**
+ * Per-number slot (center-to-center spacing) for a clue line of [n] numbers. Uses the
+ * full-size slot when the line fits in [bandPx], otherwise divides the band evenly so
+ * every number is shown — the text shrinks to match. A small margin keeps the first
+ * number off the band's outer edge. This is what lets lines of any length stay visible.
+ */
+private fun clueSlot(baseTextSize: Float, n: Int, bandPx: Float): Float {
+    val fullSlot = baseTextSize * 1.15f
+    if (n <= 0) return fullSlot
+    val usable = bandPx * 0.94f
+    return minOf(fullSlot, usable / n)
 }
 
 private fun clueColor(status: ClueStatus?, isError: Boolean, liveValidate: Boolean): Color = when {
