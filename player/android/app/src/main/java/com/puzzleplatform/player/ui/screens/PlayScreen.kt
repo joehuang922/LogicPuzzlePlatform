@@ -61,6 +61,7 @@ import com.puzzleplatform.player.ui.board.LitsBoard
 import com.puzzleplatform.player.ui.board.MasyuBoard
 import com.puzzleplatform.player.ui.board.NonogramBoard
 import com.puzzleplatform.player.ui.board.NonogramMode
+import com.puzzleplatform.player.ui.board.NumberLinkBoard
 import com.puzzleplatform.player.ui.board.NurikabeBoard
 import com.puzzleplatform.player.ui.board.NurikabeMode
 import com.puzzleplatform.player.ui.board.NurimazeBoard
@@ -330,6 +331,13 @@ fun PlayScreen(
                                 )
                             }
                         }
+                        17 -> NumberLinkBoard(
+                            puzzle = puzzle,
+                            userValues = state.userValues,
+                            // Edge-based paths keyed "h:r,c"/"v:r,c"; putUserValue writes the
+                            // segment and drops the key when it's erased (0).
+                            onSetEdge = { key, state -> vm.putUserValue(key, state) },
+                        )
                         19 -> HellGolfBoard(
                             puzzle = puzzle,
                             userValues = state.userValues,
