@@ -55,9 +55,17 @@ normal certificate validation.
 
 ## Release / CI
 
-Tag-triggered GitHub Actions build at `.github/workflows/android-release.yml`
-(repo root). Push an `android-v*` tag (e.g. `android-v0.1.0`) to build a signed
-release APK and attach it to a GitHub Release. Requires these repo secrets:
+GitHub Actions build at `.github/workflows/android-release.yml` (repo root) that
+builds a signed release APK and attaches it to a GitHub Release. Start it either way:
+
+- Push an `android-v*` tag (e.g. `android-v0.1.0`).
+- Run it manually on a branch (`gh workflow run android-release.yml --ref main`, or
+  **Actions → Android Release APK → Run workflow**). It releases as
+  `android-v<versionName>` from `app/build.gradle.kts` and creates that tag itself once
+  the build succeeds, failing up front if the tag already exists. `/cut-release` uses
+  this path, so it works from environments that can't push tags.
+
+Requires these repo secrets:
 `RELEASE_KEYSTORE_BASE64`, `RELEASE_STORE_PASSWORD`, `RELEASE_KEY_ALIAS`,
 `RELEASE_KEY_PASSWORD`. Without a keystore the release build stays unsigned; debug
 builds are unaffected.
