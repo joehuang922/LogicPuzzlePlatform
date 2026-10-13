@@ -35,8 +35,8 @@ android {
         applicationId = "com.puzzleplatform.player"
         minSdk = 26
         targetSdk = 35
-        versionCode = 15
-        versionName = "0.11.1"
+        versionCode = 16
+        versionName = "0.12.0"
 
         // Expose the API base URL to code as BuildConfig.API_BASE_URL
         buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
