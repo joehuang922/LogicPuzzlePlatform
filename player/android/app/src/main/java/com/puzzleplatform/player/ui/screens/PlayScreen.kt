@@ -70,6 +70,7 @@ import com.puzzleplatform.player.ui.board.NuritwinMode
 import com.puzzleplatform.player.ui.board.ShikakuBoard
 import com.puzzleplatform.player.ui.board.SlitherlinkBoard
 import com.puzzleplatform.player.ui.board.SudokuBoard
+import com.puzzleplatform.player.ui.board.TentaishowBoard
 import com.puzzleplatform.player.puzzle.LitsEngine
 import com.puzzleplatform.player.puzzle.NurimazeEngine
 import com.puzzleplatform.player.puzzle.SudokuHinter
@@ -343,6 +344,13 @@ fun PlayScreen(
                             puzzle = puzzle,
                             userValues = state.userValues,
                             onPutValue = vm::putUserValue,
+                        )
+                        20 -> TentaishowBoard(
+                            puzzle = puzzle,
+                            userValues = state.userValues,
+                            // Walls keyed "h:r,c"/"v:r,c" -> 1 (web convention); setUserValue
+                            // drops the key when a wall is toggled off.
+                            onSetEdge = vm::setUserValue,
                         )
                         22 -> ShikakuBoard(
                             puzzle = puzzle,

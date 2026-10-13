@@ -33,7 +33,7 @@ interface PuzzleEngine {
      * Render a solved puzzle's "picture" into a [PuzzleThumbnail] for the collection
      * view, or null when this type has no picture worth previewing (the default).
      * [answer] is a saved, finished answer (the same JSON [restoreUserValues] reads).
-     * Picture-type puzzles override this: Nonogram maps filled cells to black; a future
+     * Picture-type puzzles override this: Nonogram maps filled cells to black;
      * Tentaishow colors each cell by its region's dot.
      */
     fun renderThumbnail(puzzle: Puzzle, answer: JsonObject): PuzzleThumbnail? = null
@@ -55,6 +55,7 @@ object PuzzleEngines {
         NuritwinEngine,
         NumberLinkEngine,
         ShikakuEngine,
+        TentaishowEngine,
     ).associateBy { it.puzzleType }
 
     fun forType(puzzleType: Int): PuzzleEngine? = engines[puzzleType]
