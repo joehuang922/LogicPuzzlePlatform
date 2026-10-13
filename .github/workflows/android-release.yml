@@ -1,8 +1,14 @@
 name: Android Release APK
 
-# Push an Android version tag (e.g. `git tag android-v0.1.0 && git push origin android-v0.1.0`)
-# to trigger. The `android-v*` prefix keeps this workflow independent of the platform's own
-# `v*` tags, so releasing the web/API stack never triggers an APK build.
+# Two ways to trigger:
+#  - Push an Android version tag (e.g. `git tag android-v0.1.0 && git push origin android-v0.1.0`).
+#    The `android-v*` prefix keeps this workflow independent of the platform's own `v*` tags, so
+#    releasing the web/API stack never triggers an APK build.
+#  - Run it manually (workflow_dispatch) on a branch, e.g. `gh workflow run android-release.yml
+#    --ref main`. The tag is then derived from versionName in app/build.gradle.kts and created by
+#    the release step on the dispatched commit, so no tag push is needed. This is the path for
+#    environments that can push branches but not tags (e.g. Claude Code cloud sessions). The run
+#    refuses to start if that tag already exists, so an existing release is never overwritten.
 #
 # The job runs unit tests first; the APK build only happens if tests pass, then a release APK
 # signed with the stable release keystore is attached to a GitHub Release you can download
@@ -12,6 +18,7 @@ on:
   push:
     tags:
       - "android-v*"
+  workflow_dispatch:
 
 permissions:
   contents: write # needed to create the Release and upload the APK asset
@@ -27,6 +34,38 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+
+      # Tag push: release under the pushed tag. Manual run: derive android-v<versionName> from the
+      # checked-out build file and make sure it's new before spending a build on it. The release
+      # step below creates the tag at this commit; a tag created with GITHUB_TOKEN doesn't fire
+      # another workflow run, so this never double-builds.
+      - name: Resolve release tag
+        id: release
+        env:
+          EVENT: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ "$EVENT" = "push" ]; then
+            tag="$REF_NAME"
+          else
+            if [ "$REF_TYPE" != "branch" ]; then
+              echo "::error::Run this workflow on a branch (e.g. main); to release an existing tag, push the tag instead."
+              exit 1
+            fi
+            version=$(sed -n 's/^ *versionName = "\(.*\)".*/\1/p' app/build.gradle.kts)
+            if [ -z "$version" ]; then
+              echo "::error::Could not read versionName from player/android/app/build.gradle.kts."
+              exit 1
+            fi
+            tag="android-v$version"
+            if git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
+              echo "::error::Tag $tag already exists. Bump versionName in app/build.gradle.kts first."
+              exit 1
+            fi
+          fi
+          echo "Releasing $tag at $GITHUB_SHA"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       # Gradle in this project cannot parse newer JDKs; pin to 21 (matches local dev).
       - name: Set up JDK 21
@@ -88,6 +127,9 @@ jobs:
       - name: Attach APK to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.release.outputs.tag }}
+          # Only matters for a manual run: GitHub creates the not-yet-existing tag at this commit.
+          target_commitish: ${{ github.sha }}
           files: player/android/app/build/outputs/apk/release/app-release.apk
           fail_on_unmatched_files: true
           generate_release_notes: true
