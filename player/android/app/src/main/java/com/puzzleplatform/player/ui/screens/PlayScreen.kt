@@ -67,6 +67,7 @@ import com.puzzleplatform.player.ui.board.NurikabeMode
 import com.puzzleplatform.player.ui.board.NurimazeBoard
 import com.puzzleplatform.player.ui.board.NuritwinBoard
 import com.puzzleplatform.player.ui.board.NuritwinMode
+import com.puzzleplatform.player.ui.board.ShikakuBoard
 import com.puzzleplatform.player.ui.board.SlitherlinkBoard
 import com.puzzleplatform.player.ui.board.SudokuBoard
 import com.puzzleplatform.player.puzzle.LitsEngine
@@ -342,6 +343,14 @@ fun PlayScreen(
                             puzzle = puzzle,
                             userValues = state.userValues,
                             onPutValue = vm::putUserValue,
+                        )
+                        22 -> ShikakuBoard(
+                            puzzle = puzzle,
+                            userValues = state.userValues,
+                            // Rectangles keyed "rect:r,c" -> encodeWH(w,h); draw/resize/erase
+                            // apply as an atomic batch (a 0 value drops the key), so a resize
+                            // that moves the top-left can retire the old key in one update.
+                            onApplyChanges = vm::putUserValues,
                         )
                         24 -> {
                             var nurikabeMode by remember(puzzle.id) { mutableStateOf(NurikabeMode.BLACK) }
