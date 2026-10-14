@@ -30,12 +30,13 @@ import com.puzzleplatform.player.puzzle.NonogramEngine.ClueStatus
 private val GRID_BG = Color.White
 private val BAND_BG = Color(0xFFF2F2F2)
 private val CORNER_BG = Color(0xFFE8E8E8)
-// Preview palette: the unmarked ("default") ground is light grey so that marked cells,
-// drawn WHITE, specifically stand for the emerging picture. The border frames the grey
-// preview against the slightly-lighter static corner.
+// Preview palette: unmarked ("default") cells are light grey, filled cells black, and
+// crossed ("marked") cells white, so both solved states stand out from the undecided
+// ground. The border frames the grey preview against the slightly-lighter static corner.
 private val THUMB_BG = Color(0xFFD9D9D9)
 private val THUMB_BORDER = Color(0xFFAAAAAA)
-private val THUMB_FILL = Color.White
+private val THUMB_FILL = Color.Black
+private val THUMB_CROSS = Color.White
 private val GRID_LINE = Color(0xFFBBBBBB)
 private val GRID_LINE_MAJOR = Color(0xFF333333)
 private val BORDER = Color(0xFF333333)
@@ -294,9 +295,12 @@ private fun DrawScope.drawNonogramThumbnail(
     drawRect(THUMB_BG, Offset(ox, oy), Size(thumbW, thumbH))
     for (r in 0 until rows) {
         for (c in 0 until cols) {
-            if ((values["$c,$r"] ?: NonogramEngine.UNSET) == NonogramEngine.FILLED) {
-                drawRect(THUMB_FILL, Offset(ox + c * thumbCell, oy + r * thumbCell), Size(thumbCell, thumbCell))
+            val color = when (values["$c,$r"] ?: NonogramEngine.UNSET) {
+                NonogramEngine.FILLED -> THUMB_FILL
+                NonogramEngine.CROSSED -> THUMB_CROSS
+                else -> continue
             }
+            drawRect(color, Offset(ox + c * thumbCell, oy + r * thumbCell), Size(thumbCell, thumbCell))
         }
     }
     drawRect(THUMB_BORDER, Offset(ox, oy), Size(thumbW, thumbH), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1f))

@@ -287,12 +287,10 @@ object NonogramEngine : PuzzleEngine {
     }
 
     /**
-     * The solved answer grid IS the picture for a Nonogram. The preview uses a light-grey
-     * ground for unmarked ("default") cells so that filled cells, drawn WHITE, specifically
-     * carry the emerging picture — matching the on-board corner preview. Both states are
-     * opaque so no transparent cells fall through to the shared thumbnail's white backing.
-     * Crosses are a solving aid, not part of the picture, so they read as the grey ground.
-     * Returns null when the grid is empty.
+     * The solved answer grid IS the picture for a Nonogram. Matching the on-board corner
+     * preview: unmarked ("default") cells are light grey, filled cells black, and crossed
+     * ("marked") cells white. All states are opaque so no transparent cells fall through
+     * to the shared thumbnail's white backing. Returns null when the grid is empty.
      */
     override fun renderThumbnail(puzzle: Puzzle, answer: JsonObject): PuzzleThumbnail? {
         val clues = parseClues(puzzle)
@@ -303,14 +301,21 @@ object NonogramEngine : PuzzleEngine {
         val cells = IntArray(rows * cols) { i ->
             val c = i % cols
             val r = i / cols
-            if (values["$c,$r"] == FILLED) THUMB_FILL_ARGB else THUMB_GROUND_ARGB
+            when (values["$c,$r"]) {
+                FILLED -> THUMB_FILL_ARGB
+                CROSSED -> THUMB_CROSS_ARGB
+                else -> THUMB_GROUND_ARGB
+            }
         }
         return PuzzleThumbnail(width = cols, height = rows, cells = cells)
     }
 }
 
-/** Opaque white for a filled nonogram cell — the marked picture reads white-on-grey. */
-private const val THUMB_FILL_ARGB = 0xFFFFFFFF.toInt()
+/** Opaque black for a filled nonogram cell. */
+private const val THUMB_FILL_ARGB = 0xFF000000.toInt()
 
-/** Light-grey ground for unmarked/crossed cells, matching the board preview's THUMB_BG. */
+/** Opaque white for a crossed ("marked") cell. */
+private const val THUMB_CROSS_ARGB = 0xFFFFFFFF.toInt()
+
+/** Light-grey ground for unmarked cells, matching the board preview's THUMB_BG. */
 private const val THUMB_GROUND_ARGB = 0xFFD9D9D9.toInt()
