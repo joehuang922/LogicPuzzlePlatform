@@ -71,11 +71,29 @@ export function validateCanon(puzzleType: number, data: unknown): void {
 // solver gate these need no solver: they reject canons that are impossible on their face
 // (typically a mis-parse) for types the gate doesn't cover.
 const semanticChecks: Record<number, (data: any) => void> = {
-  // Nonogram: rows and columns count the same filled cells, so their clue sums must match.
+  // Nonogram
   6: (data: { rowClues: number[][]; colClues: number[][] }) => {
+    const { rowClues, colClues } = data;
+    // Each line's blocks plus one gap between neighbours must fit in the line.
+    const minLength = (clue: number[]) => {
+      const blocks = clue.filter((n) => n > 0);
+      return blocks.reduce((a, b) => a + b, 0) + Math.max(0, blocks.length - 1);
+    };
+    const checkFit = (clues: number[][], label: string, length: number) =>
+      clues.forEach((clue, i) => {
+        if (minLength(clue) > length) {
+          throw new Error(
+            `Invalid nonogram: ${label} ${i} clue [${clue.join(",")}] needs ${minLength(clue)} cells but the line has ${length}`
+          );
+        }
+      });
+    checkFit(rowClues, "row", colClues.length);
+    checkFit(colClues, "column", rowClues.length);
+
+    // Rows and columns count the same filled cells, so their clue sums must match.
     const sum = (clues: number[][]) => clues.flat().reduce((a, b) => a + b, 0);
-    const rowSum = sum(data.rowClues);
-    const colSum = sum(data.colClues);
+    const rowSum = sum(rowClues);
+    const colSum = sum(colClues);
     if (rowSum !== colSum) {
       throw new Error(
         `Invalid nonogram: row clues sum to ${rowSum} but column clues sum to ${colSum}; they must match`

@@ -49,6 +49,12 @@ export default function NonogramEditor({ initialCanon, onChange }: NonogramEdito
   // differ, so surface it here first (a mismatch usually means a mis-parsed line).
   const rowSum = rowClues.flat().reduce((a, b) => a + b, 0);
   const colSum = colClues.flat().reduce((a, b) => a + b, 0);
+  // Cells a clue needs (blocks plus one gap between each); the API rejects a line
+  // whose clue needs more cells than the line has.
+  const minLength = (clue: number[]) => {
+    const blocks = clue.filter((n) => n > 0);
+    return blocks.reduce((a, b) => a + b, 0) + Math.max(0, blocks.length - 1);
+  };
 
   const syncFromJson = useCallback((text: string) => {
     setJsonText(text);
@@ -197,6 +203,11 @@ export default function NonogramEditor({ initialCanon, onChange }: NonogramEdito
                 />
               </label>
               <DeleteButton title={`Delete row R${r}`} disabled={rows <= 1} onClick={() => removeRow(r)} />
+              {minLength(clue) > cols && (
+                <span style={{ marginLeft: 6, fontSize: "0.75rem", color: "#d33" }}>
+                  needs {minLength(clue)} cells, line has {cols}
+                </span>
+              )}
             </div>
           ))}
         </div>
@@ -215,6 +226,11 @@ export default function NonogramEditor({ initialCanon, onChange }: NonogramEdito
                 />
               </label>
               <DeleteButton title={`Delete column C${c}`} disabled={cols <= 1} onClick={() => removeCol(c)} />
+              {minLength(clue) > rows && (
+                <span style={{ marginLeft: 6, fontSize: "0.75rem", color: "#d33" }}>
+                  needs {minLength(clue)} cells, line has {rows}
+                </span>
+              )}
             </div>
           ))}
         </div>
