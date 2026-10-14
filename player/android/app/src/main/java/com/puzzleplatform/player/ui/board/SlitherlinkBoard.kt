@@ -24,6 +24,8 @@ private val DOT = Color(0xFF333333)
 private val LINE_COLOR = Color(0xFF111111)
 private val CROSS_COLOR = Color(0xFFBBBBBB)
 private val CLUE_COLOR = Color(0xFF222222)
+/** Margin around the grid, in cells, so border dots/edges are visible and easy to tap. */
+private const val PAD_CELLS = 0.5f
 
 /**
  * Compose Canvas renderer for Slitherlink (puzzle type 5), the analog of
@@ -37,7 +39,8 @@ private val CLUE_COLOR = Color(0xFF222222)
  *
  * Lines are solid dark segments; crosses are light-gray X marks (a "no edge here" aid).
  * Dots are drawn at every intersection and clue numbers (0-3) centered in their cells.
- * Rendering and pan/zoom run through [ZoomableBoard].
+ * Rendering and pan/zoom run through [ZoomableBoard], with a [PAD_CELLS] margin around
+ * the grid; taps in the margin snap to the nearest border edge.
  */
 @Composable
 fun SlitherlinkBoard(
@@ -60,6 +63,7 @@ fun SlitherlinkBoard(
         cols = cols,
         rows = rows,
         resetKey = puzzle.id,
+        padCells = PAD_CELLS,
         modifier = modifier,
         onTapCell = { _, _ -> }, // Slitherlink has no cell selection
         onTapPrecise = { fx, fy ->
@@ -68,9 +72,12 @@ fun SlitherlinkBoard(
             onCycle.value(key, next)
         },
     ) { cell ->
-        val boardW = cols * cell
-        val boardH = rows * cell
-        drawRect(GRID_BG, topLeft = Offset(0f, 0f), size = Size(boardW, boardH))
+        val pad = PAD_CELLS * cell
+        drawRect(
+            GRID_BG,
+            topLeft = Offset(-pad, -pad),
+            size = Size(cols * cell + 2 * pad, rows * cell + 2 * pad),
+        )
 
         val lineWidth = cell * 0.07f
         val crossArm = cell * 0.16f

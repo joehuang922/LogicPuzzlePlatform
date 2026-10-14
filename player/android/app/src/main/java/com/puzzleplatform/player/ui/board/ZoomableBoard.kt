@@ -40,6 +40,9 @@ private val ENTRY_FLOOR = 24.dp
  * size (e.g. 9x9 Sudoku on a phone) has no zoom range and simply ignores the
  * two-finger transform.
  *
+ * [padCells] reserves a margin (in cells) around the grid; [draw] still draws with the
+ * grid's top-left at (0, 0), so the margin lies at negative / beyond-grid coordinates.
+ *
  * [resetKey] recomputes the default zoom/pan when it changes (pass the puzzle id).
  * The draw callbacks receive a (col, row) or null when the finger is off-grid /
  * cells are too small to input.
@@ -51,6 +54,7 @@ fun ZoomableBoard(
     onTapCell: (col: Int, row: Int) -> Unit,
     modifier: Modifier = Modifier,
     resetKey: Any? = null,
+    padCells: Float = 0f,
     // Fractional-coordinate tap, in cell units (e.g. col 1.5 is the right edge of
     // col 1). Fires on the same tap as [onTapCell] for boards that target sub-cell
     // features — a Fillomino wall tap snaps to the nearest interior grid line.
@@ -70,8 +74,8 @@ fun ZoomableBoard(
         val autoCellPx = with(density) { AUTO_CELL.toPx() }
         val entryFloorPx = with(density) { ENTRY_FLOOR.toPx() }
 
-        val transform = remember(cols, rows, resetKey, vpx) {
-            BoardTransform(cols, rows, vpx, maxCellPx, autoCellPx, entryFloorPx)
+        val transform = remember(cols, rows, resetKey, vpx, padCells) {
+            BoardTransform(cols, rows, vpx, maxCellPx, autoCellPx, entryFloorPx, padCells)
         }
         // A version counter so gesture-driven mutations to `transform` recompose.
         var version by remember(transform) { mutableStateOf(0) }

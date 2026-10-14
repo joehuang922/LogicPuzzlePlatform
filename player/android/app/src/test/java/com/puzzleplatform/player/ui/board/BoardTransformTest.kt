@@ -170,4 +170,45 @@ class BoardTransformTest {
         val t = make(9, 9)
         assertNull(t.fractionalCellAt(1f, 540f)) // left margin, before the board
     }
+
+    // -- padding ------------------------------------------------------------
+
+    private fun makePadded(cols: Int, rows: Int) =
+        BoardTransform(cols, rows, VP, MAX, AUTO, FLOOR, padCells = 0.5f)
+
+    @Test
+    fun padding_smallBoardStaysCenteredOnGrid() {
+        // 9x9 + 0.5-cell margin = 10 cells; fit-all 108px caps at 40px. The padded
+        // 400px board is centered, which leaves the grid itself centered as well.
+        val t = makePadded(9, 9)
+        assertEquals(40f, t.cellPx, 0.01f)
+        assertEquals((1080f - 360f) / 2f, t.panX, 0.01f)
+    }
+
+    @Test
+    fun padding_countsInFitAll() {
+        // 49x49 + margin = 50 cells -> fit-all 21.6px (vs 22.04px without padding).
+        val t = makePadded(49, 49)
+        assertEquals(1080f / 50f, t.minCell, 0.01f)
+    }
+
+    @Test
+    fun padding_largeBoardOpensWithMarginVisible() {
+        // 60x60 at 28px: the top-left margin (14px) is on screen at open...
+        val t = makePadded(60, 60)
+        assertEquals(14f, t.panX, 0.01f)
+        assertEquals(14f, t.panY, 0.01f)
+        // ...and panning to the far end stops with the right margin on screen.
+        t.transform(0f, 0f, -10000f, -10000f, 1f)
+        assertEquals(1080f - 14f - 60 * 28f, t.panX, 0.01f)
+    }
+
+    @Test
+    fun padding_fractionalCellAtMapsMarginTaps() {
+        val t = makePadded(9, 9) // 40px cell, grid origin at 360
+        val (col, row) = t.fractionalCellAt(t.panX - 10f, t.panY + 9 * 40f + 10f)!!
+        assertEquals(-0.25f, col, 0.01f)
+        assertEquals(9.25f, row, 0.01f)
+        assertNull(t.fractionalCellAt(t.panX - 30f, t.panY)) // beyond the margin
+    }
 }

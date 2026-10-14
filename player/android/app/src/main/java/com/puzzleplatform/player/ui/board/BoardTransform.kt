@@ -12,6 +12,10 @@ package com.puzzleplatform.player.ui.board
  *    for large grids — viewing/panning still work, entry is disabled);
  *  - [maxCell] is the largest cell (zoom-in stop);
  *  - the initial cell auto-zooms to at least [autoCellPx], anchored top-left.
+ *
+ * [padCells] adds a margin of that many cells around the grid (part of the board for
+ * fitting, centering and pan clamping), for boards whose targets sit on the outer
+ * border — e.g. Slitherlink's edge vertices. [panX]/[panY] stay the grid's origin.
  */
 class BoardTransform(
     val cols: Int,
@@ -20,6 +24,7 @@ class BoardTransform(
     maxCellPx: Float,
     autoCellPx: Float,
     private val entryFloorPx: Float,
+    val padCells: Float = 0f,
 ) {
     val minCell: Float
     val maxCell: Float
@@ -32,12 +37,13 @@ class BoardTransform(
         private set
 
     init {
-        val fitAll = viewportPx / maxOf(cols, rows)
+        val fitAll = viewportPx / (maxOf(cols, rows) + 2 * padCells)
         minCell = minOf(fitAll, maxCellPx)
         maxCell = maxCellPx.coerceAtLeast(minCell)
         cellPx = fitAll.coerceAtLeast(autoCellPx).coerceIn(minCell, maxCell)
-        panX = clampAxis(0f, cols * cellPx, viewportPx)
-        panY = clampAxis(0f, rows * cellPx, viewportPx)
+        // Anchor the padded board's top-left, so the margin is on screen too.
+        panX = clampGrid(padCells * cellPx, cols, cellPx)
+        panY = clampGrid(padCells * cellPx, rows, cellPx)
     }
 
     /** True when there's a real zoom range (a board that fits at max cell has none). */
@@ -56,8 +62,14 @@ class BoardTransform(
         val nx = centroidX - (centroidX - panX) * ratio + panDx
         val ny = centroidY - (centroidY - panY) * ratio + panDy
         cellPx = newCell
-        panX = clampAxis(nx, cols * newCell, viewportPx)
-        panY = clampAxis(ny, rows * newCell, viewportPx)
+        panX = clampGrid(nx, cols, newCell)
+        panY = clampGrid(ny, rows, newCell)
+    }
+
+    /** [clampAxis] applied to the padded board, returning the grid origin. */
+    private fun clampGrid(gridPan: Float, cells: Int, cell: Float): Float {
+        val pad = padCells * cell
+        return clampAxis(gridPan - pad, cells * cell + 2 * pad, viewportPx) + pad
     }
 
     /**
@@ -76,13 +88,14 @@ class BoardTransform(
      * the top edge of cell (col 1, row 2). Returns null outside the grid or when entry
      * is disabled. Lets a board decide a sub-cell target (which grid line a tap is
      * nearest) that the integer [cellAt] can't express; the whole closed range
-     * [0, cols] x [0, rows] is in-bounds so taps on the far border still map.
+     * [0, cols] x [0, rows] is in-bounds so taps on the far border still map, widened
+     * by [padCells] on every side so taps in the margin map too.
      */
     fun fractionalCellAt(x: Float, y: Float): Pair<Float, Float>? {
         if (!entryEnabled) return null
         val col = (x - panX) / cellPx
         val row = (y - panY) / cellPx
-        return if (col in 0f..cols.toFloat() && row in 0f..rows.toFloat()) col to row else null
+        return if (col in -padCells..cols + padCells && row in -padCells..rows + padCells) col to row else null
     }
 
     companion object {
