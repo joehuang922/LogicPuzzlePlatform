@@ -5,6 +5,25 @@ interface NonogramEditorProps {
   onChange: (json: string) => void;
 }
 
+// Module-level (unlike ClueInput) so its identity survives the re-render that a
+// focused clue input's blur-commit triggers mid-click; otherwise the click is lost.
+function DeleteButton({ title, disabled, onClick }: { title: string; disabled: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      disabled={disabled}
+      onClick={onClick}
+      style={{ marginLeft: 4, padding: "1px 3px", lineHeight: 0, verticalAlign: "middle", cursor: disabled ? "default" : "pointer" }}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6" />
+      </svg>
+    </button>
+  );
+}
+
 export default function NonogramEditor({ initialCanon, onChange }: NonogramEditorProps) {
   let initRowClues: number[][] = [[1], [1], [1], [1], [1]];
   let initColClues: number[][] = [[1], [1], [1], [1], [1]];
@@ -88,6 +107,18 @@ export default function NonogramEditor({ initialCanon, onChange }: NonogramEdito
     syncToJson(rowClues, newColClues);
   }
 
+  // Delete a single row/column (any count, not rounded to 5): a mitigation for the
+  // parser occasionally emitting a phantom duplicate of a neighbouring line.
+  function removeRow(r: number) {
+    if (rowClues.length <= 1) return;
+    syncToJson(rowClues.filter((_, i) => i !== r), colClues);
+  }
+
+  function removeCol(c: number) {
+    if (colClues.length <= 1) return;
+    syncToJson(rowClues, colClues.filter((_, i) => i !== c));
+  }
+
   useEffect(() => {
     onChange(JSON.stringify({ rowClues, colClues }, null, 2));
   }, [rowClues, colClues, onChange]);
@@ -157,6 +188,7 @@ export default function NonogramEditor({ initialCanon, onChange }: NonogramEdito
                   onCommit={(v) => commitRowClue(r, v)}
                 />
               </label>
+              <DeleteButton title={`Delete row R${r}`} disabled={rows <= 1} onClick={() => removeRow(r)} />
             </div>
           ))}
         </div>
@@ -174,6 +206,7 @@ export default function NonogramEditor({ initialCanon, onChange }: NonogramEdito
                   onCommit={(v) => commitColClue(c, v)}
                 />
               </label>
+              <DeleteButton title={`Delete column C${c}`} disabled={cols <= 1} onClick={() => removeCol(c)} />
             </div>
           ))}
         </div>
