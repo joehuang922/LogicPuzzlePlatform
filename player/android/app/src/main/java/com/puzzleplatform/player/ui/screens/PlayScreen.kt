@@ -66,6 +66,7 @@ import com.puzzleplatform.player.ui.board.NurikabeBoard
 import com.puzzleplatform.player.ui.board.NurikabeMode
 import com.puzzleplatform.player.ui.board.NurimazeBoard
 import com.puzzleplatform.player.ui.board.NuritwinBoard
+import com.puzzleplatform.player.ui.board.RippleEffectBoard
 import com.puzzleplatform.player.ui.board.NuritwinMode
 import com.puzzleplatform.player.ui.board.ShikakuBoard
 import com.puzzleplatform.player.ui.board.SlitherlinkBoard
@@ -123,11 +124,12 @@ fun PlayScreen(
             val selected = state.selectedCell
             if (selected != null) {
                 val type = state.puzzle?.puzzleType
-                if (type == 14) {
-                    // Fillomino: multi-digit room numbers (so a "0" key is offered), no notes.
+                if (type == 14 || type == 25) {
+                    // Fillomino room numbers / Ripple Effect cell values: both are
+                    // multi-digit (so a "0" key is offered) with no pencil notes.
                     DigitBar(
-                        onDigit = vm::enterFillominoDigit,
-                        onClear = vm::clearFillominoCell,
+                        onDigit = vm::enterMultiDigit,
+                        onClear = vm::clearSelectedCellRetype,
                         onDismiss = { vm.selectCell(null) },
                         includeZero = true,
                     )
@@ -351,6 +353,15 @@ fun PlayScreen(
                             // Walls keyed "h:r,c"/"v:r,c" -> 1 (web convention); setUserValue
                             // drops the key when a wall is toggled off.
                             onSetEdge = vm::setUserValue,
+                        )
+                        25 -> RippleEffectBoard(
+                            puzzle = puzzle,
+                            userValues = state.userValues,
+                            // The room partition is fixed in the canon, so there's no wall
+                            // mode: tap a non-clue cell to select it, then the DigitBar
+                            // enters a (multi-digit) value keyed "col,row".
+                            selectedCell = state.selectedCell,
+                            onSelectCell = vm::selectCell,
                         )
                         22 -> ShikakuBoard(
                             puzzle = puzzle,

@@ -84,10 +84,11 @@ class PlayViewModel(
     /** History is a pilot limited to Nonogram (type 6). */
     private fun historyEnabled(): Boolean = _state.value.puzzle?.puzzleType == 6
 
-    // Fillomino multi-digit entry: when true, the next digit starts a new number
-    // (replacing the cell) rather than appending to the one already shown. Set when a
-    // cell is freshly selected; cleared after the first digit so 1 then 2 -> 12.
-    private var fillominoFreshEntry = true
+    // Multi-digit number entry (Fillomino room sizes, Ripple Effect values): when true,
+    // the next digit starts a new number (replacing the cell) rather than appending to
+    // the one already shown. Set when a cell is freshly selected; cleared after the first
+    // digit so 1 then 2 -> 12.
+    private var freshDigitEntry = true
 
     private val engine: PuzzleEngine?
         get() = _state.value.puzzle?.let { PuzzleEngines.forType(it.puzzleType) }
@@ -144,8 +145,8 @@ class PlayViewModel(
     }
 
     fun selectCell(key: String?) {
-        // A freshly selected cell starts a new Fillomino number on the next digit.
-        fillominoFreshEntry = true
+        // A freshly selected cell starts a new multi-digit number on the next digit.
+        freshDigitEntry = true
         _state.update { it.copy(selectedCell = key) }
     }
 
@@ -245,38 +246,39 @@ class PlayViewModel(
     }
 
     /**
-     * Enter a Fillomino room number into the selected cell ("c:col,row"), supporting
-     * multi-digit sizes (tap 1 then 2 -> 12). The first digit after selecting a cell
-     * replaces it; subsequent digits append. A leading 0 is ignored (a number can't
-     * start with 0), and the value is capped at the grid's cell count — no room can be
-     * larger than that, so a bigger entry is a typo and the keystroke is dropped.
+     * Enter a multi-digit number into the selected cell, shared by Fillomino (room
+     * sizes, "c:col,row" keys) and Ripple Effect (cell values, "col,row" keys) — both
+     * take values that can exceed 9. The first digit after selecting a cell replaces
+     * it; subsequent digits append (tap 1 then 2 -> 12). A leading 0 is ignored (a
+     * number can't start with 0), and the value is capped at the grid's cell count — no
+     * room or Ripple value can exceed that, so a bigger entry is a typo and dropped.
      */
-    fun enterFillominoDigit(digit: Int) {
+    fun enterMultiDigit(digit: Int) {
         val puzzle = _state.value.puzzle ?: return
         val cell = _state.value.selectedCell ?: return
         val values = _state.value.userValues
         val current = values[cell] ?: 0
-        val next = if (fillominoFreshEntry || current == 0) {
+        val next = if (freshDigitEntry || current == 0) {
             if (digit == 0) return // can't start a number with 0
             digit
         } else {
             val combined = current * 10 + digit
-            if (combined > fillominoMaxRoom(puzzle)) return // overshoot -> ignore
+            if (combined > maxCellValue(puzzle)) return // overshoot -> ignore
             combined
         }
-        fillominoFreshEntry = false
+        freshDigitEntry = false
         updateValues(values + (cell to next), clearSelection = false)
     }
 
-    /** Clear the selected Fillomino cell but keep it selected so the player can retype. */
-    fun clearFillominoCell() {
+    /** Clear the selected cell but keep it selected so the player can retype. */
+    fun clearSelectedCellRetype() {
         val cell = _state.value.selectedCell ?: return
-        fillominoFreshEntry = true
+        freshDigitEntry = true
         updateValues(_state.value.userValues - cell, clearSelection = false)
     }
 
-    /** Largest possible room = total cell count (rows * cols) from the canon grid. */
-    private fun fillominoMaxRoom(puzzle: Puzzle): Int {
+    /** Largest enterable value = total cell count (rows * cols) from the canon grid. */
+    private fun maxCellValue(puzzle: Puzzle): Int {
         val cells = com.puzzleplatform.player.puzzle.FillominoEngine.parseCells(puzzle)
         val rows = cells.size
         val cols = cells.maxOfOrNull { it.size } ?: 0
