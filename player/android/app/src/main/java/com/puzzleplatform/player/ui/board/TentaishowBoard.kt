@@ -18,10 +18,14 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import com.puzzleplatform.player.data.model.Puzzle
 import com.puzzleplatform.player.puzzle.TentaishowEngine
+import kotlin.math.round
 
 private val LINE = Color.Black
 private val DOT_DARK = Color(0xFF111111)
-private val PREVIEW_BORDER = Color(0xFFCCCCCC)
+// Preview palette, as in Nonogram's: the not-yet-enclosed ground is a mid grey so it
+// can't be mistaken for an enclosed white-dot region (drawn pure white).
+private val PREVIEW_BG = Color(0xFFD9D9D9)
+private val PREVIEW_BORDER = Color(0xFFAAAAAA)
 /** The web board's preview box is ~160px; cells there are 3..8px. */
 private val PREVIEW_MAX = 96.dp
 
@@ -145,9 +149,20 @@ private fun PicturePreview(picture: IntArray, rows: Int, cols: Int) {
             .border(1.dp, PREVIEW_BORDER),
     ) {
         val cell = minOf(size.width / cols, size.height / rows)
+        drawRect(PREVIEW_BG)
         for (r in 0 until rows) {
             for (c in 0 until cols) {
-                drawRect(Color(picture[r * cols + c]), Offset(c * cell, r * cell), Size(cell, cell))
+                val argb = picture[r * cols + c]
+                if (argb == TentaishowEngine.GROUND_ARGB) continue
+                // Snap to whole pixels so adjacent same-color cells abut exactly; with
+                // fractional bounds their anti-aliased edges show up as faint gridlines.
+                val left = round(c * cell)
+                val top = round(r * cell)
+                drawRect(
+                    Color(argb),
+                    Offset(left, top),
+                    Size(round((c + 1) * cell) - left, round((r + 1) * cell) - top),
+                )
             }
         }
     }

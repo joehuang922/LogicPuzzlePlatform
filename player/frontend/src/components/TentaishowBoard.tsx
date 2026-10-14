@@ -18,6 +18,9 @@ const EDGE_HIT_WIDTH = 10;
 // Base board color for unmarked cells (light grey so white-dot regions,
 // filled pure white, stand out against it).
 const BOARD_BG = "#eee";
+// Preview ground: a mid grey (as in Nonogram's preview) so not-yet-enclosed cells
+// can't be mistaken for enclosed white-dot regions.
+const THUMB_BG = "#d9d9d9";
 // Fills for enclosed single-dot regions, matching the dot's color.
 const REGION_WHITE = "#fff";
 const REGION_BLACK = "#111";
@@ -400,7 +403,8 @@ export default function TentaishowBoard({
         width={thumbWidth}
         height={thumbHeight}
         viewBox={`0 0 ${thumbWidth} ${thumbHeight}`}
-        style={{ border: "1px solid #ccc", background: BOARD_BG, display: "block" }}
+        style={{ border: "1px solid #aaa", background: THUMB_BG, display: "block" }}
+        shapeRendering="crispEdges"
       >
         {thumbCells}
       </svg>
