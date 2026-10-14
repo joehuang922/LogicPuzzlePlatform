@@ -45,6 +45,10 @@ export default function NonogramEditor({ initialCanon, onChange }: NonogramEdito
 
   const rows = rowClues.length;
   const cols = colClues.length;
+  // Rows and columns count the same filled cells; the API rejects a canon where these
+  // differ, so surface it here first (a mismatch usually means a mis-parsed line).
+  const rowSum = rowClues.flat().reduce((a, b) => a + b, 0);
+  const colSum = colClues.flat().reduce((a, b) => a + b, 0);
 
   const syncFromJson = useCallback((text: string) => {
     setJsonText(text);
@@ -171,6 +175,10 @@ export default function NonogramEditor({ initialCanon, onChange }: NonogramEdito
             style={{ width: 50 }}
           />
         </label>
+        <span style={{ fontSize: "0.85rem", color: rowSum === colSum ? "#666" : "#d33" }}>
+          Clue sums: rows {rowSum}, cols {colSum}
+          {rowSum !== colSum && " (must match)"}
+        </span>
       </div>
 
       <div style={{ display: "flex", gap: "2rem", flexWrap: "wrap" }}>

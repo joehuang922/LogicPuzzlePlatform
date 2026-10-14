@@ -64,4 +64,22 @@ export function validateCanon(puzzleType: number, data: unknown): void {
     const errors = ajv.errorsText(validate.errors);
     throw new Error(`Invalid canonRepr for puzzle type ${puzzleType}: ${errors}`);
   }
+  semanticChecks[puzzleType]?.(data);
 }
+
+// Cheap consistency checks a JSON schema can't express, run after it passes. Unlike the
+// solver gate these need no solver: they reject canons that are impossible on their face
+// (typically a mis-parse) for types the gate doesn't cover.
+const semanticChecks: Record<number, (data: any) => void> = {
+  // Nonogram: rows and columns count the same filled cells, so their clue sums must match.
+  6: (data: { rowClues: number[][]; colClues: number[][] }) => {
+    const sum = (clues: number[][]) => clues.flat().reduce((a, b) => a + b, 0);
+    const rowSum = sum(data.rowClues);
+    const colSum = sum(data.colClues);
+    if (rowSum !== colSum) {
+      throw new Error(
+        `Invalid nonogram: row clues sum to ${rowSum} but column clues sum to ${colSum}; they must match`
+      );
+    }
+  },
+};
