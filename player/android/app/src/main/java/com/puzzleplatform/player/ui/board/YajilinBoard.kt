@@ -58,7 +58,24 @@ fun YajilinBoard(
     val valuesState = rememberUpdatedState(userValues)
     val onTap = rememberUpdatedState(onTapCell)
     val onApply = rememberUpdatedState(onApplyChanges)
-    val drag = remember(puzzle.id) { YajilinDragState(cells, rows, cols) }
+    val drag = remember(puzzle.id) {
+        LoopStroke { from, to, key, current ->
+            val g = YajilinEngine.grids(rows, cols, current)
+            if (!YajilinEngine.canDrawEdge(cells, g, from.first, from.second) ||
+                !YajilinEngine.canDrawEdge(cells, g, to.first, to.second)
+            ) {
+                return@LoopStroke null
+            }
+            // The loop passes through both cells, so neither can stay marked "not black".
+            buildMap {
+                put(key, 1)
+                for ((r, c) in listOf(from, to)) {
+                    val bKey = YajilinEngine.cellKey(c, r)
+                    if (current[bKey] == ShadeCycle.MARKED) put(bKey, 0)
+                }
+            }
+        }
+    }
 
     ZoomableBoard(
         cols = cols,
@@ -66,8 +83,8 @@ fun YajilinBoard(
         resetKey = puzzle.id,
         modifier = modifier,
         onTapCell = { col, row -> onTap.value(col, row) },
-        // ZoomableBoard reports (col, row); the drag state works in (row, col) to match
-        // the row-first "h:r,c"/"v:r,c"/"b:r,c" keys, so swap at the boundary.
+        // ZoomableBoard reports (col, row); the stroke works in (row, col) to match the
+        // row-first "h:r,c"/"v:r,c"/"b:r,c" keys, so swap at the boundary.
         onDrawStart = { cell -> drag.start(cell?.let { (c, r) -> r to c }) },
         onDrawTo = { cell ->
             drag.moveTo(cell?.let { (c, r) -> r to c }, valuesState.value) { onApply.value(it) }
@@ -161,106 +178,5 @@ private fun DrawScope.drawClue(clue: YajilinEngine.Clue, cx: Float, cy: Float, c
     } else {
         canvas.drawText(num, cx - fs * 0.45f, centered(numPaint, cy), numPaint)
         canvas.drawText(arrow, cx + fs * 0.45f, centered(arrowPaint, cy), arrowPaint)
-    }
-}
-
-/**
- * Tracks one loop-drawing stroke. Cells are (row, col). Each step between adjacent cells
- * toggles their shared segment; the first step fixes draw vs erase. A blocked draw (see
- * [YajilinEngine.canDrawEdge]) leaves the anchor in place so a later legal move from the
- * same cell still works.
- *
- * Writes made during the stroke are layered over the incoming values via [pending]: the
- * board's userValues only catch up after a recomposition, and pointer events can arrive
- * faster than that, so without the overlay the degree check and draw/erase decision would
- * read stale state.
- */
-private class YajilinDragState(
-    private val cells: List<List<YajilinEngine.Clue?>>,
-    private val rows: Int,
-    private val cols: Int,
-) {
-    private var last: Pair<Int, Int>? = null
-    // null = undecided, true = erasing, false = drawing.
-    private var erasing: Boolean? = null
-    private val pending = mutableMapOf<String, Int>()
-
-    fun start(cell: Pair<Int, Int>?) {
-        last = cell
-        erasing = null
-        pending.clear()
-    }
-
-    fun end() {
-        last = null
-        erasing = null
-        pending.clear()
-    }
-
-    fun moveTo(cell: Pair<Int, Int>?, values: Map<String, Int>, apply: (Map<String, Int>) -> Unit) {
-        if (cell == null) return
-        val from = last ?: run { last = cell; return }
-        if (cell == from) return
-        val dr = cell.first - from.first
-        val dc = cell.second - from.second
-        if (dr != 0 && dc != 0) {
-            // Cut across a corner: the route is ambiguous, so re-anchor without drawing.
-            last = cell
-            return
-        }
-        // A fast straight drag can skip cells between pointer events; walk each one.
-        val sr = Integer.signum(dr)
-        val sc = Integer.signum(dc)
-        var cur = from
-        while (cur != cell) {
-            val next = (cur.first + sr) to (cur.second + sc)
-            if (!step(cur, next, values, apply)) return // blocked: anchor stays at cur
-            cur = next
-            last = cur
-        }
-    }
-
-    /** Apply one adjacent step; false when a draw is refused. */
-    private fun step(
-        from: Pair<Int, Int>,
-        to: Pair<Int, Int>,
-        values: Map<String, Int>,
-        apply: (Map<String, Int>) -> Unit,
-    ): Boolean {
-        val key = when {
-            to.second == from.second + 1 -> YajilinEngine.hKey(from.first, from.second)
-            to.second == from.second - 1 -> YajilinEngine.hKey(from.first, to.second)
-            to.first == from.first + 1 -> YajilinEngine.vKey(from.first, from.second)
-            else -> YajilinEngine.vKey(to.first, from.second)
-        }
-        val current = if (pending.isEmpty()) values else values + pending
-        val drawn = current[key] == 1
-        if (erasing == null) erasing = drawn
-
-        if (erasing == true) {
-            if (drawn) write(mapOf(key to 0), apply)
-            return true
-        }
-        if (drawn) return true
-
-        val g = YajilinEngine.grids(rows, cols, current)
-        if (!YajilinEngine.canDrawEdge(cells, g, from.first, from.second) ||
-            !YajilinEngine.canDrawEdge(cells, g, to.first, to.second)
-        ) {
-            return false
-        }
-        // The loop passes through both cells, so neither can stay marked "not black".
-        val changes = mutableMapOf(key to 1)
-        for ((r, c) in listOf(from, to)) {
-            val bKey = YajilinEngine.cellKey(c, r)
-            if (current[bKey] == ShadeCycle.MARKED) changes[bKey] = 0
-        }
-        write(changes, apply)
-        return true
-    }
-
-    private fun write(changes: Map<String, Int>, apply: (Map<String, Int>) -> Unit) {
-        pending.putAll(changes)
-        apply(changes)
     }
 }

@@ -67,6 +67,7 @@ import com.puzzleplatform.player.ui.board.NurimazeBoard
 import com.puzzleplatform.player.ui.board.NuritwinBoard
 import com.puzzleplatform.player.ui.board.RippleEffectBoard
 import com.puzzleplatform.player.ui.board.ShikakuBoard
+import com.puzzleplatform.player.ui.board.SlalomBoard
 import com.puzzleplatform.player.ui.board.SlitherlinkBoard
 import com.puzzleplatform.player.ui.board.SudokuBoard
 import com.puzzleplatform.player.ui.board.TentaishowBoard
@@ -393,6 +394,13 @@ fun PlayScreen(
                         )
                         // Yajilin: a tap shades (shared shade/mark cycle), a drag draws the
                         // loop; a loop step and the marks it clears land as one batch.
+                        // Slalom: drag-only trail drawing ("h:r,c"/"v:r,c" -> 1), applied
+                        // as batches like Yajilin's loop.
+                        10 -> SlalomBoard(
+                            puzzle = puzzle,
+                            userValues = state.userValues,
+                            onApplyChanges = vm::putUserValues,
+                        )
                         13 -> YajilinBoard(
                             puzzle = puzzle,
                             userValues = state.userValues,
