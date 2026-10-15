@@ -16,9 +16,6 @@ import androidx.compose.ui.unit.dp
 import com.puzzleplatform.player.data.model.Puzzle
 import com.puzzleplatform.player.puzzle.NuritwinEngine
 
-/** Which mark a paint stroke lays down: a black cell, or a white solver dot. */
-enum class NuritwinMode { BLACK, MARK }
-
 // Light-grey board so shaded fills and white-marked dots both read clearly.
 private val GRID_BG = Color(0xFFEEEEEE)
 private val LINE_THIN = Color(0xFFAAAAAA)
@@ -32,11 +29,11 @@ private val CLUE_COLOR = Color.Black
  *
  * The grid is pre-divided into rooms by thick borders (drawn from the canon grids, like
  * [NurimazeBoard]); some rooms carry a positive integer clue in one cell. Unlike Nurimaze,
- * input is cell-level drag-to-paint like [NurikabeBoard] — touch has no right-click, so a
- * [mode] toggle (rendered as chips by the caller) picks whether a stroke lays down a black
- * cell or a white solver dot. One finger paints (a stroke that starts on an already-set
- * cell erases uniformly); two fingers pan/zoom via [ZoomableBoard]. Every cell is
- * paintable — a clue is a room-size constraint, not a fixed-white cell.
+ * input is cell-level: the shared shade/mark tap-to-cycle
+ * ([com.puzzleplatform.player.puzzle.ShadeCycle]) advances the tapped cell empty -> black
+ * -> white mark -> empty, applied by the caller via [onTapCell]. Two fingers pan/zoom via
+ * [ZoomableBoard]. Every cell is tappable — a clue is a room-size constraint, not a
+ * fixed-white cell.
  *
  * Black cells render as [BoardColors.ROOM_SHADE] so the room borders stay visible; marked
  * cells show a small centered dot. Clue numbers are drawn on top in black, which reads on
@@ -46,8 +43,7 @@ private val CLUE_COLOR = Color.Black
 fun NuritwinBoard(
     puzzle: Puzzle,
     userValues: Map<String, Int>,
-    mode: NuritwinMode,
-    onSetCell: (col: Int, row: Int, state: Int) -> Unit,
+    onTapCell: (col: Int, row: Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val canon = remember(puzzle.id) { NuritwinEngine.parseCanon(puzzle) }
@@ -55,29 +51,17 @@ fun NuritwinBoard(
     val cols = canon.cols
     if (rows == 0 || cols == 0) return
 
-    // The gesture closures below outlive a recomposition (ZoomableBoard's pointerInput
-    // doesn't restart when these change), so read the freshest values through state.
-    val modeState = rememberUpdatedState(mode)
+    // The tap closure outlives a recomposition (ZoomableBoard's pointerInput doesn't
+    // restart when these change), so read the freshest values/callback through state.
     val valuesState = rememberUpdatedState(userValues)
-    val onSet = rememberUpdatedState(onSetCell)
-
-    val drag = remember(puzzle.id) { NuritwinDragState() }
+    val onTap = rememberUpdatedState(onTapCell)
 
     ZoomableBoard(
         cols = cols,
         rows = rows,
         resetKey = puzzle.id,
         modifier = modifier,
-        onTapCell = { col, row ->
-            drag.paintSingle(col, row, modeState.value, valuesState.value) { c, r, st -> onSet.value(c, r, st) }
-        },
-        onDrawStart = { cell ->
-            drag.start(cell, modeState.value, valuesState.value) { col, row, st -> onSet.value(col, row, st) }
-        },
-        onDrawTo = { cell ->
-            drag.moveTo(cell) { col, row, st -> onSet.value(col, row, st) }
-        },
-        onDrawEnd = { drag.end() },
+        onTapCell = { col, row -> onTap.value(col, row) },
     ) { cell ->
         val boardW = cols * cell
         val boardH = rows * cell
@@ -166,43 +150,4 @@ private fun DrawScope.drawClue(value: Int, col: Int, row: Int, cell: Float, colo
     val fm = paint.fontMetrics
     val cy = row * cell + cell / 2 - (fm.ascent + fm.descent) / 2
     drawContext.canvas.nativeCanvas.drawText(value.toString(), cx, cy, paint)
-}
-
-/**
- * Tracks a single paint gesture (port of [NurikabeDragState]). The first cell fixes the
- * target state — lay down the active mode's mark, or erase if that cell already holds it —
- * then every cell the finger enters is set to that same target, so a stroke paints or
- * erases uniformly.
- */
-private class NuritwinDragState {
-    private var last: Pair<Int, Int>? = null
-    private var target: Int = NuritwinEngine.UNSET
-
-    private fun markFor(mode: NuritwinMode) =
-        if (mode == NuritwinMode.MARK) NuritwinEngine.MARKED else NuritwinEngine.BLACK
-
-    fun start(cell: Pair<Int, Int>?, mode: NuritwinMode, values: Map<String, Int>, set: (Int, Int, Int) -> Unit) {
-        if (cell == null) { last = null; return }
-        val (c, r) = cell
-        val mark = markFor(mode)
-        val current = values[NuritwinEngine.cellKey(c, r)] ?: NuritwinEngine.UNSET
-        target = if (current == mark) NuritwinEngine.UNSET else mark
-        set(c, r, target)
-        last = cell
-    }
-
-    fun moveTo(cell: Pair<Int, Int>?, set: (Int, Int, Int) -> Unit) {
-        if (cell == null || cell == last) return
-        set(cell.first, cell.second, target)
-        last = cell
-    }
-
-    fun end() { last = null }
-
-    /** A tap (no drag): toggle the single cell for the active mode. */
-    fun paintSingle(c: Int, r: Int, mode: NuritwinMode, values: Map<String, Int>, set: (Int, Int, Int) -> Unit) {
-        val mark = markFor(mode)
-        val current = values[NuritwinEngine.cellKey(c, r)] ?: NuritwinEngine.UNSET
-        set(c, r, if (current == mark) NuritwinEngine.UNSET else mark)
-    }
 }

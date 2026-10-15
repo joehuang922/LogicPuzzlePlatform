@@ -29,11 +29,12 @@ private val SYMBOL_COLOR = Color(0xFF111111)
  * frontend/src/components/NurimazeBoard.tsx.
  *
  * The grid is pre-divided into rooms by thick borders (drawn from the canon grids, like
- * [LitsBoard]). Input is room-level tap-to-cycle: tapping any cell cycles its whole room
- * (empty -> black -> marked -> empty for normal rooms; empty <-> marked for rooms that
- * hold a special symbol, which can't be painted black). There's no drag, no mode toggle,
- * and no cell selection — [onCycleRoom] receives the tapped (col, row) and the caller
- * expands it to the room via the engine. One finger taps; two fingers pan/zoom.
+ * [LitsBoard]). Input is the shared shade/mark tap-to-cycle
+ * ([com.puzzleplatform.player.puzzle.ShadeCycle]) at room level: tapping any cell cycles
+ * its whole room (empty -> black -> marked -> empty for normal rooms; empty <-> marked for
+ * rooms that hold a special symbol, which can't be painted black). [onTapCell] receives the
+ * tapped (col, row) and the caller expands it to the room via the engine. One finger taps;
+ * two fingers pan/zoom.
  *
  * Black rooms render as [BoardColors.ROOM_SHADE] so the room borders stay visible; marked
  * cells show a small centered dot. Symbols (circle, triangle, S, G) are drawn centered in
@@ -43,7 +44,7 @@ private val SYMBOL_COLOR = Color(0xFF111111)
 fun NurimazeBoard(
     puzzle: Puzzle,
     userValues: Map<String, Int>,
-    onCycleRoom: (col: Int, row: Int) -> Unit,
+    onTapCell: (col: Int, row: Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val canon = remember(puzzle.id) { NurimazeEngine.parseCanon(puzzle) }
@@ -54,14 +55,14 @@ fun NurimazeBoard(
     // The tap closure outlives recomposition (ZoomableBoard's pointerInput doesn't
     // restart when these change), so read the freshest values/callback through state.
     val valuesState = rememberUpdatedState(userValues)
-    val onCycle = rememberUpdatedState(onCycleRoom)
+    val onTap = rememberUpdatedState(onTapCell)
 
     ZoomableBoard(
         cols = cols,
         rows = rows,
         resetKey = puzzle.id,
         modifier = modifier,
-        onTapCell = { col, row -> onCycle.value(col, row) },
+        onTapCell = { col, row -> onTap.value(col, row) },
     ) { cell ->
         val boardW = cols * cell
         val boardH = rows * cell

@@ -63,17 +63,13 @@ import com.puzzleplatform.player.ui.board.NonogramBoard
 import com.puzzleplatform.player.ui.board.NonogramMode
 import com.puzzleplatform.player.ui.board.NumberLinkBoard
 import com.puzzleplatform.player.ui.board.NurikabeBoard
-import com.puzzleplatform.player.ui.board.NurikabeMode
 import com.puzzleplatform.player.ui.board.NurimazeBoard
 import com.puzzleplatform.player.ui.board.NuritwinBoard
 import com.puzzleplatform.player.ui.board.RippleEffectBoard
-import com.puzzleplatform.player.ui.board.NuritwinMode
 import com.puzzleplatform.player.ui.board.ShikakuBoard
 import com.puzzleplatform.player.ui.board.SlitherlinkBoard
 import com.puzzleplatform.player.ui.board.SudokuBoard
 import com.puzzleplatform.player.ui.board.TentaishowBoard
-import com.puzzleplatform.player.puzzle.LitsEngine
-import com.puzzleplatform.player.puzzle.NurimazeEngine
 import com.puzzleplatform.player.puzzle.SudokuHinter
 import com.puzzleplatform.player.ui.formatElapsed
 
@@ -272,40 +268,19 @@ fun PlayScreen(
                             // sets the explicit state and drops the key when it cycles to 0.
                             onCycleEdge = { key, next -> vm.putUserValue(key, next) },
                         )
+                        // Shade/mark puzzles (LITS, Nurikabe, Nuritwin, Nurimaze) all share
+                        // tap-to-cycle input: the engine decides what a tap covers (one cell,
+                        // a whole room, or nothing for a clue) and tapShadeCell applies it.
                         3 -> NurimazeBoard(
                             puzzle = puzzle,
                             userValues = state.userValues,
-                            // Room-level tap: the engine expands the tapped cell to its
-                            // whole room and cycles their shared state in one atomic update.
-                            onCycleRoom = { col, row ->
-                                vm.putUserValues(NurimazeEngine.cycleRoom(puzzle, state.userValues, col, row))
-                            },
+                            onTapCell = vm::tapShadeCell,
                         )
-                        9 -> {
-                            var nuritwinMode by remember(puzzle.id) { mutableStateOf(NuritwinMode.BLACK) }
-                            NuritwinBoard(
-                                puzzle = puzzle,
-                                userValues = state.userValues,
-                                mode = nuritwinMode,
-                                // Cell-level paint keyed "col,row" (web convention);
-                                // setCellState writes the state and drops the key when it's 0.
-                                onSetCell = vm::setCellState,
-                            )
-                            // Black / Mark paint-mode toggle (touch has no right-click). Black
-                            // is the rule-bearing fill; Mark is a white solver dot.
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                FilterChip(
-                                    selected = nuritwinMode == NuritwinMode.BLACK,
-                                    onClick = { nuritwinMode = NuritwinMode.BLACK },
-                                    label = { Text("■ Black") },
-                                )
-                                FilterChip(
-                                    selected = nuritwinMode == NuritwinMode.MARK,
-                                    onClick = { nuritwinMode = NuritwinMode.MARK },
-                                    label = { Text("• Mark") },
-                                )
-                            }
-                        }
+                        9 -> NuritwinBoard(
+                            puzzle = puzzle,
+                            userValues = state.userValues,
+                            onTapCell = vm::tapShadeCell,
+                        )
                         14 -> {
                             var fillominoMode by remember(puzzle.id) { mutableStateOf(FillominoMode.NUMBER) }
                             FillominoBoard(
@@ -371,31 +346,11 @@ fun PlayScreen(
                             // that moves the top-left can retire the old key in one update.
                             onApplyChanges = vm::putUserValues,
                         )
-                        24 -> {
-                            var nurikabeMode by remember(puzzle.id) { mutableStateOf(NurikabeMode.BLACK) }
-                            NurikabeBoard(
-                                puzzle = puzzle,
-                                userValues = state.userValues,
-                                mode = nurikabeMode,
-                                // Nurikabe keys cells "col,row" (web convention); setCellState
-                                // writes the explicit state and drops the key when it's 0.
-                                onSetCell = vm::setCellState,
-                            )
-                            // Black / Mark paint-mode toggle (touch has no right-click). Black
-                            // is the rule-bearing sea fill; Mark is a white-island solver dot.
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                FilterChip(
-                                    selected = nurikabeMode == NurikabeMode.BLACK,
-                                    onClick = { nurikabeMode = NurikabeMode.BLACK },
-                                    label = { Text("■ Black") },
-                                )
-                                FilterChip(
-                                    selected = nurikabeMode == NurikabeMode.MARK,
-                                    onClick = { nurikabeMode = NurikabeMode.MARK },
-                                    label = { Text("• Mark") },
-                                )
-                            }
-                        }
+                        24 -> NurikabeBoard(
+                            puzzle = puzzle,
+                            userValues = state.userValues,
+                            onTapCell = vm::tapShadeCell,
+                        )
                         6 -> {
                             var nonogramMode by remember(puzzle.id) { mutableStateOf(NonogramMode.FILL) }
                             // Reverse (undo/redo) controls sit ABOVE the board — the Nonogram
@@ -430,19 +385,11 @@ fun PlayScreen(
                                 )
                             }
                         }
-                        15 -> {
-                            LitsBoard(
-                                puzzle = puzzle,
-                                userValues = state.userValues,
-                                // LITS keys cells "c:col,row" (web convention); route
-                                // through putUserValue, which drops the key when state is 0.
-                                // Each tap cycles the cell empty -> shade -> mark -> empty,
-                                // so there's no fill/mark mode to switch between.
-                                onSetCell = { col, row, st ->
-                                    vm.putUserValue(LitsEngine.cellKey(col, row), st)
-                                },
-                            )
-                        }
+                        15 -> LitsBoard(
+                            puzzle = puzzle,
+                            userValues = state.userValues,
+                            onTapCell = vm::tapShadeCell,
+                        )
                         else -> Text("This puzzle type isn't playable in this version yet.")
                     }
                 }

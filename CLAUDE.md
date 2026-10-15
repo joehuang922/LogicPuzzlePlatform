@@ -17,3 +17,9 @@ This is a solo project. Do not create pull requests or feature branches.
   `player/frontend/src/components/boardColors.ts` on web, `BoardColors.ROOM_SHADE` on
   Android. Never a near-black like `#333`: it hides the room borders. Text on shaded
   cells is black. This applies to new puzzles and to Android ports of web boards.
+- Puzzles whose player input is "shade or mark cells" (empty / shaded / marked: LITS,
+  Nurikabe, Nuritwin, Nurimaze, ...) share one interaction on Android: tap cycles
+  empty -> shaded -> marked -> empty, with no paint-mode chips and no drag. To port
+  one, make its engine implement `ShadeMarkEngine` (`puzzle/ShadeCycle.kt`) —
+  override `shadeGroup` when a tap covers a room or some cells take no input — and
+  wire its board's `onTapCell` to `vm::tapShadeCell`. Don't hand-roll a cycle.

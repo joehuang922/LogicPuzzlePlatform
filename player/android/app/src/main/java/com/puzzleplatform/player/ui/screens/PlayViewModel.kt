@@ -9,6 +9,8 @@ import com.puzzleplatform.player.data.model.Puzzle
 import com.puzzleplatform.player.data.model.SnapshotSummary
 import com.puzzleplatform.player.puzzle.PuzzleEngine
 import com.puzzleplatform.player.puzzle.PuzzleEngines
+import com.puzzleplatform.player.puzzle.ShadeCycle
+import com.puzzleplatform.player.puzzle.ShadeMarkEngine
 import com.puzzleplatform.player.puzzle.SudokuEngine
 import com.puzzleplatform.player.puzzle.SudokuHinter
 import kotlinx.coroutines.Job
@@ -325,6 +327,18 @@ class PlayViewModel(
         }
         if (next == values) return
         updateValues(next, clearSelection = false)
+    }
+
+    /**
+     * A tap on a shade/mark puzzle's cell (any [ShadeMarkEngine]: LITS, Nurikabe,
+     * Nuritwin, Nurimaze, ...): cycle the tapped cell's group empty -> shaded -> marked ->
+     * empty per [ShadeCycle.tap], applied as one atomic update. Reads the live userValues
+     * here rather than taking them from the caller, so a tap never acts on a stale map.
+     */
+    fun tapShadeCell(col: Int, row: Int) {
+        val puzzle = _state.value.puzzle ?: return
+        val eng = engine as? ShadeMarkEngine ?: return
+        putUserValues(ShadeCycle.tap(eng, puzzle, _state.value.userValues, col, row))
     }
 
     /**

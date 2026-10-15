@@ -25,15 +25,15 @@ import kotlinx.serialization.json.intOrNull
  * live in the one `states` grid the web extractor already emits, so there's no separate
  * Android-only marks layer — the white-mark is a first-class answer value here.
  */
-object NurikabeEngine : PuzzleEngine {
+object NurikabeEngine : ShadeMarkEngine {
     override val puzzleType: Int = 24
 
-    const val UNSET = 0
-    const val BLACK = 1
-    const val MARKED = 2
+    const val UNSET = ShadeCycle.EMPTY
+    const val BLACK = ShadeCycle.SHADED
+    const val MARKED = ShadeCycle.MARKED
 
     /** Build the flat userValues key for the cell at (col, row) — col,row order, like the web board. */
-    fun cellKey(col: Int, row: Int): String = "$col,$row"
+    override fun cellKey(col: Int, row: Int): String = "$col,$row"
 
     /** Parse the rows x cols clue grid from a puzzle's canonRepr; missing/invalid -> 0. */
     fun parseCells(puzzle: Puzzle): List<List<Int>> = parseGrid(puzzle.canonRepr["cells"])
@@ -56,6 +56,10 @@ object NurikabeEngine : PuzzleEngine {
     /** True when (r,c) carries a positive clue — such cells are fixed white and read-only. */
     fun isClue(cells: List<List<Int>>, r: Int, c: Int): Boolean =
         (cells.getOrNull(r)?.getOrNull(c) ?: 0) > 0
+
+    /** A tap cycles the single cell; clue cells take no input. */
+    override fun shadeGroup(puzzle: Puzzle, col: Int, row: Int): ShadeGroup? =
+        if (isClue(parseCells(puzzle), row, col)) null else ShadeGroup(listOf(col to row))
 
     override fun extractAnswer(puzzle: Puzzle, userValues: Map<String, Int>): JsonObject {
         val cells = parseCells(puzzle)

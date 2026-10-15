@@ -24,8 +24,9 @@ private val MARK_COLOR = Color(0xFF444444)
  *
  * The grid is pre-divided into regions by thick borders (drawn from the canon grids,
  * like [FillominoBoard]); the player shades one L/I/T/S tetromino per region. Input is
- * tap-to-cycle, mirroring the web board's left-click: each tap advances the cell
- * empty -> shaded -> marked -> empty, so there's no fill/mark mode to switch between.
+ * the shared shade/mark tap-to-cycle ([com.puzzleplatform.player.puzzle.ShadeCycle]),
+ * mirroring the web board's left-click: each tap advances the cell empty -> shaded ->
+ * marked -> empty, applied by the caller via [onTapCell], so there's no fill/mark mode.
  * "shaded" is the rule-bearing fill; "marked" is a centered solver-aid dot. One finger
  * taps a cell; two fingers pan/zoom via [ZoomableBoard]. There is deliberately no
  * drag-to-paint — a sweep across shaded rooms would too easily clobber a careful fill.
@@ -34,7 +35,7 @@ private val MARK_COLOR = Color(0xFF444444)
 fun LitsBoard(
     puzzle: Puzzle,
     userValues: Map<String, Int>,
-    onSetCell: (col: Int, row: Int, state: Int) -> Unit,
+    onTapCell: (col: Int, row: Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val grids = remember(puzzle.id) { LitsEngine.parseGrids(puzzle) }
@@ -45,18 +46,14 @@ fun LitsBoard(
     // The tap closure outlives a recomposition (ZoomableBoard's pointerInput doesn't
     // restart when these change), so read the freshest values through state.
     val valuesState = rememberUpdatedState(userValues)
-    val onSet = rememberUpdatedState(onSetCell)
+    val onTap = rememberUpdatedState(onTapCell)
 
     ZoomableBoard(
         cols = cols,
         rows = rows,
         resetKey = puzzle.id,
         modifier = modifier,
-        onTapCell = { col, row ->
-            // Cycle empty -> shaded -> marked -> empty (UNSET=0, SHADED=1, MARKED=2).
-            val cur = valuesState.value[LitsEngine.cellKey(col, row)] ?: LitsEngine.UNSET
-            onSet.value(col, row, (cur + 1) % 3)
-        },
+        onTapCell = { col, row -> onTap.value(col, row) },
     ) { cell ->
         val boardW = cols * cell
         val boardH = rows * cell

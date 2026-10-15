@@ -28,14 +28,14 @@ import kotlinx.serialization.json.intOrNull
  *
  * User input rides in the flat userValues map keyed "col,row" -> state (web convention),
  * with unset cells absent. Input is room-level: a tap cycles the tapped cell's entire
- * room (see [cycleRoom]), so every cell of a room always carries the same state.
+ * room (see [shadeGroup]), so every cell of a room always carries the same state.
  */
-object NurimazeEngine : PuzzleEngine {
+object NurimazeEngine : ShadeMarkEngine {
     override val puzzleType: Int = 3
 
-    const val UNSET = 0
-    const val BLACK = 1
-    const val MARKED = 2
+    const val UNSET = ShadeCycle.EMPTY
+    const val BLACK = ShadeCycle.SHADED
+    const val MARKED = ShadeCycle.MARKED
 
     // Cell symbol values in canon.cells.
     private const val SYM_CIRCLE = 1
@@ -44,7 +44,7 @@ object NurimazeEngine : PuzzleEngine {
     private const val SYM_GOAL = 4
 
     /** Build the flat userValues key for the cell at (col, row) — col,row order, like the web board. */
-    fun cellKey(col: Int, row: Int): String = "$col,$row"
+    override fun cellKey(col: Int, row: Int): String = "$col,$row"
 
     /** cells: rows x cols symbol grid. h: (rows-1) x cols, v: rows x (cols-1) thick-border grids. */
     class Canon(
@@ -168,40 +168,27 @@ object NurimazeEngine : PuzzleEngine {
         grid.getOrNull(r)?.getOrNull(c) ?: 0
 
     /**
-     * Compute the userValues changes for tapping cell (col, row): cycle the state of its
-     * entire room. Mirrors NurimazeBoard.tsx handleCellClick:
-     *  - a room holding any special symbol (S/G/circle/triangle) toggles unset <-> marked
-     *    (it can never be painted black),
-     *  - a normal room cycles unset -> black -> marked -> unset.
-     * Returns "col,row" -> next-state for every cell in the room (0 means remove the key).
+     * A tap acts on the tapped cell's whole room (mirrors NurimazeBoard.tsx
+     * handleCellClick). A room holding any special symbol (S/G/circle/triangle) can never
+     * be painted black, so it only toggles unset <-> marked.
      */
-    fun cycleRoom(puzzle: Puzzle, userValues: Map<String, Int>, col: Int, row: Int): Map<String, Int> {
+    override fun shadeGroup(puzzle: Puzzle, col: Int, row: Int): ShadeGroup? {
         val canon = parseCanon(puzzle)
-        val rows = canon.rows
-        val cols = canon.cols
-        if (row !in 0 until rows || col !in 0 until cols) return emptyMap()
+        if (row !in 0 until canon.rows || col !in 0 until canon.cols) return null
 
         val roomIds = computeRooms(canon)
         val rid = roomIds[row][col]
 
         val roomCells = ArrayList<Pair<Int, Int>>()
         var isSpecial = false
-        for (r in 0 until rows) {
-            for (c in 0 until cols) {
+        for (r in 0 until canon.rows) {
+            for (c in 0 until canon.cols) {
                 if (roomIds[r][c] != rid) continue
-                roomCells.add(r to c)
+                roomCells.add(c to r)
                 if (canon.cells[r][c] > 0) isSpecial = true
             }
         }
-
-        val current = userValues[cellKey(col, row)] ?: UNSET
-        val next = if (isSpecial) {
-            if (current == UNSET) MARKED else UNSET // special rooms can't be black
-        } else {
-            (current + 1) % 3 // unset -> black -> marked -> unset
-        }
-
-        return roomCells.associate { (r, c) -> cellKey(c, r) to next }
+        return ShadeGroup(roomCells, canShade = !isSpecial)
     }
 
     /**

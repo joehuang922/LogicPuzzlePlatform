@@ -34,15 +34,15 @@ import kotlinx.serialization.json.intOrNull
  * solving aid that should survive save/restore. This stays forward-compatible with web:
  * the web renderer reads only answer.shaded, so a persisted "marks" grid is ignored there.
  */
-object LitsEngine : PuzzleEngine {
+object LitsEngine : ShadeMarkEngine {
     override val puzzleType: Int = 15
 
-    const val UNSET = 0
-    const val SHADED = 1
-    const val MARKED = 2
+    const val UNSET = ShadeCycle.EMPTY
+    const val SHADED = ShadeCycle.SHADED
+    const val MARKED = ShadeCycle.MARKED
 
     /** Build the flat userValues key for the cell at (col, row) — note col,row order, like the web board. */
-    fun cellKey(col: Int, row: Int): String = "c:$col,$row"
+    override fun cellKey(col: Int, row: Int): String = "c:$col,$row"
 
     /** The thick-border grids. h: (rows-1) x cols, v: rows x (cols-1). */
     class Grids(val h: List<List<Int>>, val v: List<List<Int>>) {

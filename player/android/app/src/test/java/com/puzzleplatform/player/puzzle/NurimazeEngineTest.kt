@@ -95,34 +95,34 @@ class NurimazeEngineTest {
         assertEquals(100.0 / 3.0, NurimazeEngine.computeProgress(puzzle(canon3x3), partial), 1e-9)
     }
 
-    // -- cycleRoom ----------------------------------------------------------
+    // -- tap (shared ShadeCycle over shadeGroup) ---------------------------
 
     @Test
-    fun cycleRoom_normalRoomCyclesUnsetBlackMarked() {
+    fun tap_normalRoomCyclesUnsetBlackMarked() {
         val p = puzzle(canon3x3)
         // Normal cell (col=0,row=1): unset -> black.
-        assertEquals(mapOf("0,1" to 1), NurimazeEngine.cycleRoom(p, emptyMap(), 0, 1))
+        assertEquals(mapOf("0,1" to 1), ShadeCycle.tap(NurimazeEngine, p, emptyMap(), 0, 1))
         // black -> marked.
-        assertEquals(mapOf("0,1" to 2), NurimazeEngine.cycleRoom(p, mapOf("0,1" to 1), 0, 1))
+        assertEquals(mapOf("0,1" to 2), ShadeCycle.tap(NurimazeEngine, p, mapOf("0,1" to 1), 0, 1))
         // marked -> unset (0 means the caller removes the key).
-        assertEquals(mapOf("0,1" to 0), NurimazeEngine.cycleRoom(p, mapOf("0,1" to 2), 0, 1))
+        assertEquals(mapOf("0,1" to 0), ShadeCycle.tap(NurimazeEngine, p, mapOf("0,1" to 2), 0, 1))
     }
 
     @Test
-    fun cycleRoom_specialRoomTogglesUnsetMarkedOnly() {
+    fun tap_specialRoomTogglesUnsetMarkedOnly() {
         val p = puzzle(canon3x3)
         // S cell (col=0,row=0) can never be black: unset -> marked.
-        assertEquals(mapOf("0,0" to 2), NurimazeEngine.cycleRoom(p, emptyMap(), 0, 0))
+        assertEquals(mapOf("0,0" to 2), ShadeCycle.tap(NurimazeEngine, p, emptyMap(), 0, 0))
         // marked -> unset.
-        assertEquals(mapOf("0,0" to 0), NurimazeEngine.cycleRoom(p, mapOf("0,0" to 2), 0, 0))
+        assertEquals(mapOf("0,0" to 0), ShadeCycle.tap(NurimazeEngine, p, mapOf("0,0" to 2), 0, 0))
     }
 
     @Test
-    fun cycleRoom_setsEveryCellOfAMultiCellRoom() {
+    fun tap_setsEveryCellOfAMultiCellRoom() {
         // 1x2 grid, no vertical border between the two cells -> one room of two cells.
         val p = puzzle("""{"cells":[[0,0]],"grids":{"h":[],"v":[[0]]}}""")
         // Tapping either cell cycles both to black together.
-        assertEquals(mapOf("0,0" to 1, "1,0" to 1), NurimazeEngine.cycleRoom(p, emptyMap(), 0, 0))
+        assertEquals(mapOf("0,0" to 1, "1,0" to 1), ShadeCycle.tap(NurimazeEngine, p, emptyMap(), 0, 0))
     }
 
     // -- isComplete ---------------------------------------------------------

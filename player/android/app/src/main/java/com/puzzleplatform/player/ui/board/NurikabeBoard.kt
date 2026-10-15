@@ -16,9 +16,6 @@ import androidx.compose.ui.unit.dp
 import com.puzzleplatform.player.data.model.Puzzle
 import com.puzzleplatform.player.puzzle.NurikabeEngine
 
-/** Which mark a paint stroke lays down: a black sea cell, or a white-island solver dot. */
-enum class NurikabeMode { BLACK, MARK }
-
 // Light-grey board so black fills and white-marked dots both read clearly, matching the
 // web board's BOARD_BG.
 private val GRID_BG = Color(0xFFEEEEEE)
@@ -34,17 +31,16 @@ private val CLUE_COLOR = Color.Black
  *
  * A plain rectangular grid where some cells carry a positive integer clue. Clue cells are
  * fixed white islands and read-only; every other cell is painted toward the solution.
- * Input is drag-to-paint like [LitsBoard] — touch has no right-click, so a [mode] toggle
- * (rendered as chips by the caller) picks whether a stroke lays down a black sea cell or a
- * white-island solver dot. One finger paints (a stroke that starts on an already-set cell
- * erases uniformly); two fingers pan/zoom via [ZoomableBoard]. Clue cells ignore input.
+ * Input is the shared shade/mark tap-to-cycle ([com.puzzleplatform.player.puzzle.ShadeCycle]):
+ * each tap advances a cell empty -> black sea -> white-island mark -> empty, and the caller
+ * applies it via [onTapCell]. Clue cells ignore taps. Two fingers pan/zoom via
+ * [ZoomableBoard].
  */
 @Composable
 fun NurikabeBoard(
     puzzle: Puzzle,
     userValues: Map<String, Int>,
-    mode: NurikabeMode,
-    onSetCell: (col: Int, row: Int, state: Int) -> Unit,
+    onTapCell: (col: Int, row: Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val cells = remember(puzzle.id) { NurikabeEngine.parseCells(puzzle) }
@@ -52,35 +48,17 @@ fun NurikabeBoard(
     val cols = cells.maxOfOrNull { it.size } ?: 0
     if (rows == 0 || cols == 0) return
 
-    // The gesture closures below outlive a recomposition (ZoomableBoard's pointerInput
-    // doesn't restart when these change), so read the freshest values through state.
-    val modeState = rememberUpdatedState(mode)
+    // The tap closure outlives a recomposition (ZoomableBoard's pointerInput doesn't
+    // restart when these change), so read the freshest values/callback through state.
     val valuesState = rememberUpdatedState(userValues)
-    val onSet = rememberUpdatedState(onSetCell)
-    val cellsState = rememberUpdatedState(cells)
-
-    val drag = remember(puzzle.id) { NurikabeDragState() }
+    val onTap = rememberUpdatedState(onTapCell)
 
     ZoomableBoard(
         cols = cols,
         rows = rows,
         resetKey = puzzle.id,
         modifier = modifier,
-        onTapCell = { col, row ->
-            if (NurikabeEngine.isClue(cellsState.value, row, col)) return@ZoomableBoard
-            drag.paintSingle(col, row, modeState.value, valuesState.value) { c, r, st -> onSet.value(c, r, st) }
-        },
-        onDrawStart = { cell ->
-            // Starting a stroke on a clue cell is a no-op (clues are read-only).
-            val startCell = cell?.takeUnless { NurikabeEngine.isClue(cellsState.value, it.second, it.first) }
-            drag.start(startCell, modeState.value, valuesState.value) { col, row, st -> onSet.value(col, row, st) }
-        },
-        onDrawTo = { cell ->
-            // Skip clue cells the finger passes over, but keep the stroke alive.
-            val toCell = cell?.takeUnless { NurikabeEngine.isClue(cellsState.value, it.second, it.first) }
-            drag.moveTo(toCell) { col, row, st -> onSet.value(col, row, st) }
-        },
-        onDrawEnd = { drag.end() },
+        onTapCell = { col, row -> onTap.value(col, row) },
     ) { cell ->
         val boardW = cols * cell
         val boardH = rows * cell
@@ -90,7 +68,7 @@ fun NurikabeBoard(
         // stay on the light background (they're always white islands).
         for (r in 0 until rows) {
             for (c in 0 until cols) {
-                if (NurikabeEngine.isClue(cellsState.value, r, c)) continue
+                if (NurikabeEngine.isClue(cells, r, c)) continue
                 when (valuesState.value[NurikabeEngine.cellKey(c, r)] ?: NurikabeEngine.UNSET) {
                     NurikabeEngine.BLACK -> drawRect(
                         BLACK_FILL,
@@ -159,44 +137,4 @@ private fun DrawScope.drawClue(value: Int, col: Int, row: Int, cell: Float) {
     val fm = paint.fontMetrics
     val cy = row * cell + cell / 2 - (fm.ascent + fm.descent) / 2
     drawContext.canvas.nativeCanvas.drawText(value.toString(), cx, cy, paint)
-}
-
-/**
- * Tracks a single paint gesture (port of [LitsBoard]'s LitsDragState). The first cell
- * fixes the target state — lay down the active mode's mark, or erase if that cell already
- * holds it — then every cell the finger enters is set to that same target, so a stroke
- * paints or erases uniformly. Clue cells are filtered out by the caller before reaching
- * here (passed as null), which pauses the stroke without ending it.
- */
-private class NurikabeDragState {
-    private var last: Pair<Int, Int>? = null
-    private var target: Int = NurikabeEngine.UNSET
-
-    private fun markFor(mode: NurikabeMode) =
-        if (mode == NurikabeMode.MARK) NurikabeEngine.MARKED else NurikabeEngine.BLACK
-
-    fun start(cell: Pair<Int, Int>?, mode: NurikabeMode, values: Map<String, Int>, set: (Int, Int, Int) -> Unit) {
-        if (cell == null) { last = null; return }
-        val (c, r) = cell
-        val mark = markFor(mode)
-        val current = values[NurikabeEngine.cellKey(c, r)] ?: NurikabeEngine.UNSET
-        target = if (current == mark) NurikabeEngine.UNSET else mark
-        set(c, r, target)
-        last = cell
-    }
-
-    fun moveTo(cell: Pair<Int, Int>?, set: (Int, Int, Int) -> Unit) {
-        if (cell == null || cell == last) return
-        set(cell.first, cell.second, target)
-        last = cell
-    }
-
-    fun end() { last = null }
-
-    /** A tap (no drag): toggle the single cell for the active mode. */
-    fun paintSingle(c: Int, r: Int, mode: NurikabeMode, values: Map<String, Int>, set: (Int, Int, Int) -> Unit) {
-        val mark = markFor(mode)
-        val current = values[NurikabeEngine.cellKey(c, r)] ?: NurikabeEngine.UNSET
-        set(c, r, if (current == mark) NurikabeEngine.UNSET else mark)
-    }
 }

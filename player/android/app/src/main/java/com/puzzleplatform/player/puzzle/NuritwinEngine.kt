@@ -35,15 +35,15 @@ import kotlinx.serialization.json.intOrNull
  * clue is a room-size constraint, not a fixed-white cell, so there's no read-only logic.
  * Marked (2) and unset (0) are both treated as white for every rule.
  */
-object NuritwinEngine : PuzzleEngine {
+object NuritwinEngine : ShadeMarkEngine {
     override val puzzleType: Int = 9
 
-    const val UNSET = 0
-    const val BLACK = 1
-    const val MARKED = 2
+    const val UNSET = ShadeCycle.EMPTY
+    const val BLACK = ShadeCycle.SHADED
+    const val MARKED = ShadeCycle.MARKED
 
     /** Build the flat userValues key for the cell at (col, row) — col,row order, like the web board. */
-    fun cellKey(col: Int, row: Int): String = "$col,$row"
+    override fun cellKey(col: Int, row: Int): String = "$col,$row"
 
     /** cells: rows x cols clue grid. h: (rows-1) x cols, v: rows x (cols-1) thick-border grids. */
     class Canon(
