@@ -70,6 +70,7 @@ import com.puzzleplatform.player.ui.board.ShikakuBoard
 import com.puzzleplatform.player.ui.board.SlitherlinkBoard
 import com.puzzleplatform.player.ui.board.SudokuBoard
 import com.puzzleplatform.player.ui.board.TentaishowBoard
+import com.puzzleplatform.player.ui.board.YajilinBoard
 import com.puzzleplatform.player.puzzle.SudokuHinter
 import com.puzzleplatform.player.ui.formatElapsed
 
@@ -389,6 +390,14 @@ fun PlayScreen(
                             puzzle = puzzle,
                             userValues = state.userValues,
                             onTapCell = vm::tapShadeCell,
+                        )
+                        // Yajilin: a tap shades (shared shade/mark cycle), a drag draws the
+                        // loop; a loop step and the marks it clears land as one batch.
+                        13 -> YajilinBoard(
+                            puzzle = puzzle,
+                            userValues = state.userValues,
+                            onTapCell = vm::tapShadeCell,
+                            onApplyChanges = vm::putUserValues,
                         )
                         else -> Text("This puzzle type isn't playable in this version yet.")
                     }
