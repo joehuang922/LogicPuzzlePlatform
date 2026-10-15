@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { HeyawakeCanon } from "../types/canon";
+import { ON_ROOM_SHADE_TEXT, ROOM_SHADE } from "./boardColors";
 
 interface HeyawakeBoardProps {
   canon: HeyawakeCanon;
@@ -17,7 +18,6 @@ const THICK = 3;
 // Base board color for unset cells. Light grey so deliberate white marks
 // (rendered with a dot) and black fills both read clearly.
 const BOARD_BG = "#eee";
-const BLACK_FILL = "#333";
 
 // Build a height x width array of room ids (index into canon.rooms) for each
 // cell. Cells not covered by any room get -1.
@@ -216,7 +216,7 @@ export default function HeyawakeBoard({
 
   const cellFill = (r: number, c: number) => {
     const s = states[r][c];
-    if (s === 1) return BLACK_FILL;
+    if (s === 1) return ROOM_SHADE;
     return BOARD_BG;
   };
 
@@ -309,7 +309,6 @@ export default function HeyawakeBoard({
             const c = i % cols;
             const clue = clueAt.get(`${r},${c}`);
             if (clue === undefined) return null;
-            const onBlack = states[r][c] === 1;
             return (
               <text
                 key={`clue-${r}-${c}`}
@@ -320,7 +319,7 @@ export default function HeyawakeBoard({
                 fontSize={CELL_SIZE * 0.5}
                 fontFamily="sans-serif"
                 fontWeight="bold"
-                fill={onBlack ? "white" : "black"}
+                fill={ON_ROOM_SHADE_TEXT}
                 pointerEvents="none"
               >
                 {clue}

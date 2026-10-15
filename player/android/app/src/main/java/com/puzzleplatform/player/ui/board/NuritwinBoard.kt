@@ -19,14 +19,12 @@ import com.puzzleplatform.player.puzzle.NuritwinEngine
 /** Which mark a paint stroke lays down: a black cell, or a white solver dot. */
 enum class NuritwinMode { BLACK, MARK }
 
-// Light-grey board so black fills and white-marked dots both read clearly.
+// Light-grey board so shaded fills and white-marked dots both read clearly.
 private val GRID_BG = Color(0xFFEEEEEE)
 private val LINE_THIN = Color(0xFFAAAAAA)
 private val LINE_THICK = Color.Black
-private val BLACK_FILL = Color(0xFF333333)
 private val MARK_COLOR = Color(0xFF888888)
 private val CLUE_COLOR = Color.Black
-private val CLUE_ON_BLACK = Color.White
 
 /**
  * Compose Canvas renderer for Nuritwin (puzzle type 9), the analog of
@@ -40,8 +38,9 @@ private val CLUE_ON_BLACK = Color.White
  * cell erases uniformly); two fingers pan/zoom via [ZoomableBoard]. Every cell is
  * paintable — a clue is a room-size constraint, not a fixed-white cell.
  *
- * Black cells render as a dark fill; marked cells show a small centered dot. Clue numbers
- * are drawn on top, flipping to white when their cell is painted black.
+ * Black cells render as [BoardColors.ROOM_SHADE] so the room borders stay visible; marked
+ * cells show a small centered dot. Clue numbers are drawn on top in black, which reads on
+ * both the board and the shade.
  */
 @Composable
 fun NuritwinBoard(
@@ -90,7 +89,7 @@ fun NuritwinBoard(
             for (c in 0 until cols) {
                 when (values[NuritwinEngine.cellKey(c, r)] ?: NuritwinEngine.UNSET) {
                     NuritwinEngine.BLACK -> drawRect(
-                        BLACK_FILL,
+                        BoardColors.ROOM_SHADE,
                         topLeft = Offset(c * cell, r * cell),
                         size = Size(cell, cell),
                     )
@@ -137,13 +136,12 @@ fun NuritwinBoard(
             }
         }
 
-        // Clue numbers on top; white when the cell is painted black, else black.
+        // Clue numbers on top, black on both the board and the shade.
         for (r in 0 until rows) {
             for (c in 0 until cols) {
                 val clue = canon.cells.getOrNull(r)?.getOrNull(c) ?: 0
                 if (clue <= 0) continue
-                val onBlack = (values[NuritwinEngine.cellKey(c, r)] ?: NuritwinEngine.UNSET) == NuritwinEngine.BLACK
-                drawClue(clue, c, r, cell, if (onBlack) CLUE_ON_BLACK else CLUE_COLOR)
+                drawClue(clue, c, r, cell, CLUE_COLOR)
             }
         }
     }

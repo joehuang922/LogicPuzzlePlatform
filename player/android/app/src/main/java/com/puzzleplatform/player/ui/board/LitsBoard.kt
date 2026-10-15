@@ -16,9 +16,6 @@ import com.puzzleplatform.player.puzzle.LitsEngine
 private val GRID_BG = Color.White
 private val LINE_THIN = Color(0xFFBBBBBB)
 private val LINE_THICK = Color.Black
-// Medium gray: clearly shaded, yet light enough that the black region borders
-// read through it (the dark #333 used before buried the room boundaries).
-private val SHADE_COLOR = Color(0xFF9E9E9E)
 private val MARK_COLOR = Color(0xFF444444)
 
 /**
@@ -70,7 +67,7 @@ fun LitsBoard(
             for (c in 0 until cols) {
                 when (valuesState.value[LitsEngine.cellKey(c, r)] ?: LitsEngine.UNSET) {
                     LitsEngine.SHADED -> drawRect(
-                        SHADE_COLOR,
+                        BoardColors.ROOM_SHADE,
                         topLeft = Offset(c * cell, r * cell),
                         size = Size(cell, cell),
                     )

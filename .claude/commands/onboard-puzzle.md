@@ -49,6 +49,7 @@ If any of these are missing, ask before proceeding.
 2. Must accept props: `canon`, `initialUserValues` or `initialAnswer`, `onValuesChange`, `onComplete`, `readonly`.
 3. Must implement solution validation internally and fire `onComplete()` when solved.
 4. Follow the interaction model from the doc.
+5. If the grid is divided into rooms by thick borders and the player shades cells, fill shaded cells with `ROOM_SHADE` from `player/frontend/src/components/boardColors.ts`, never a near-black like `#333` (it hides the room borders). Draw text on shaded cells in black.
 
 ## Phase 5: Editor component
 

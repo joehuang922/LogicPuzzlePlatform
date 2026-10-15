@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { NuritwinCanon } from "../types/canon";
+import { ON_ROOM_SHADE_TEXT, ROOM_SHADE } from "./boardColors";
 
 interface NuritwinBoardProps {
   canon: NuritwinCanon;
@@ -280,7 +281,7 @@ export default function NuritwinBoard({
             const c = i % cols;
             const state = stateGrid[r][c];
             let fill = "white";
-            if (state === 1) fill = "#333";
+            if (state === 1) fill = ROOM_SHADE;
             return (
               <rect
                 key={`fill-${r}-${c}`}
@@ -319,7 +320,6 @@ export default function NuritwinBoard({
             const c = i % cols;
             const val = cells[r][c];
             if (val === 0) return null;
-            const isBlack = stateGrid[r][c] === 1;
             return (
               <text
                 key={`clue-${r}-${c}`}
@@ -330,7 +330,7 @@ export default function NuritwinBoard({
                 fontSize={CELL_SIZE * 0.45}
                 fontFamily="sans-serif"
                 fontWeight="bold"
-                fill={isBlack ? "white" : "black"}
+                fill={ON_ROOM_SHADE_TEXT}
                 pointerEvents="none"
               >
                 {val}

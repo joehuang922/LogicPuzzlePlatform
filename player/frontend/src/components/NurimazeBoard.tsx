@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { NurimazeCanon } from "../types/canon";
+import { ROOM_SHADE } from "./boardColors";
 
 interface NurimazeBoardProps {
   canon: NurimazeCanon;
@@ -417,7 +418,7 @@ export default function NurimazeBoard({ canon, initialUserValues, onValuesChange
             const rid = roomIds[r][c];
             const state = roomStates[rid] ?? 0;
             let fill = "white";
-            if (state === 1) fill = "#333";
+            if (state === 1) fill = ROOM_SHADE;
             return (
               <rect
                 key={`fill-${r}-${c}`}

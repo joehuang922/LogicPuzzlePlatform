@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { LitsCanon } from "../types/canon";
+import { ROOM_SHADE } from "./boardColors";
 
 interface LitsBoardProps {
   canon: LitsCanon;
@@ -326,7 +327,7 @@ export default function LitsBoard({
           y={r * CELL_SIZE}
           width={CELL_SIZE}
           height={CELL_SIZE}
-          fill={state === 1 ? "#333" : "white"}
+          fill={state === 1 ? ROOM_SHADE : "white"}
         />
       );
       if (state === 2) {

@@ -21,7 +21,6 @@ import com.puzzleplatform.player.puzzle.NurimazeEngine
 private val GRID_BG = Color.White
 private val LINE_THIN = Color(0xFFBBBBBB)
 private val LINE_THICK = Color.Black
-private val BLACK_FILL = Color(0xFF333333)
 private val MARK_DOT = Color.Black
 private val SYMBOL_COLOR = Color(0xFF111111)
 
@@ -36,8 +35,9 @@ private val SYMBOL_COLOR = Color(0xFF111111)
  * and no cell selection — [onCycleRoom] receives the tapped (col, row) and the caller
  * expands it to the room via the engine. One finger taps; two fingers pan/zoom.
  *
- * Black rooms render as a dark fill; marked cells show a small centered dot. Symbols
- * (circle, triangle, S, G) are drawn centered in their cells, on top of fills.
+ * Black rooms render as [BoardColors.ROOM_SHADE] so the room borders stay visible; marked
+ * cells show a small centered dot. Symbols (circle, triangle, S, G) are drawn centered in
+ * their cells, on top of fills.
  */
 @Composable
 fun NurimazeBoard(
@@ -73,7 +73,7 @@ fun NurimazeBoard(
             for (c in 0 until cols) {
                 when (values[NurimazeEngine.cellKey(c, r)] ?: NurimazeEngine.UNSET) {
                     NurimazeEngine.BLACK -> drawRect(
-                        BLACK_FILL,
+                        BoardColors.ROOM_SHADE,
                         topLeft = Offset(c * cell, r * cell),
                         size = Size(cell, cell),
                     )
