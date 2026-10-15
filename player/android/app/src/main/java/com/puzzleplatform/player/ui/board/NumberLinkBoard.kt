@@ -15,7 +15,6 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import com.puzzleplatform.player.data.model.Puzzle
 import com.puzzleplatform.player.puzzle.NumberLinkEngine
-import kotlin.math.abs
 
 private val GRID_BG = Color.White
 private val BORDER = Color(0xFF222222)
@@ -65,9 +64,13 @@ fun NumberLinkBoard(
         resetKey = puzzle.id,
         modifier = modifier,
         onTapCell = { _, _ -> }, // a plain tap draws nothing; paths need a drag
-        onDrawStart = { cell -> drag.start(cell) },
+        // ZoomableBoard reports cells as (col, row); the drag state works in (row, col) to
+        // match the "h:row,col"/"v:row,col" segment keys, so swap at the boundary.
+        onDrawStart = { cell -> drag.start(cell?.let { (c, r) -> r to c }) },
         onDrawTo = { cell ->
-            drag.moveTo(cell, cellsState.value, valuesState.value) { key, st -> onSet.value(key, st) }
+            drag.moveTo(cell?.let { (c, r) -> r to c }, cellsState.value, valuesState.value) { key, st ->
+                onSet.value(key, st)
+            }
         },
         onDrawEnd = { drag.end() },
     ) { cell ->
@@ -153,20 +156,28 @@ private fun DrawScope.drawToken(value: Int, cx: Float, cy: Float, cell: Float) {
 }
 
 /**
- * Tracks a single draw/erase stroke (port of NumberLinkBoard.tsx pointer handlers). Each
- * step toggles the segment between the last cell and the newly-entered adjacent cell. The
- * first toggled segment fixes the mode: if it was already drawn, the stroke erases; else it
- * draws. Draw steps are degree-capped so no crossing/branch can be created; a blocked draw
- * leaves the anchor in place so a later legal move from the same cell can still proceed.
+ * Tracks a single draw/erase stroke (port of NumberLinkBoard.tsx pointer handlers). Cells are
+ * (row, col). Each step toggles the segment between the last cell and the newly-entered
+ * adjacent cell. The first toggled segment fixes the mode: if it was already drawn, the
+ * stroke erases; else it draws. Draw steps are degree-capped so no crossing/branch can be
+ * created; a blocked draw leaves the anchor in place so a later legal move from the same
+ * cell can still proceed.
+ *
+ * Writes made during the stroke are kept in [pending] and layered over the incoming values:
+ * the board's userValues only catch up after a recomposition, and pointer events can arrive
+ * faster than that, so without the overlay the degree cap and draw/erase decision would see
+ * stale state.
  */
 private class NumberLinkDragState(private val rows: Int, private val cols: Int) {
     private var last: Pair<Int, Int>? = null
     // null = undecided, true = erasing, false = drawing.
     private var erasing: Boolean? = null
+    private val pending = mutableMapOf<String, Int>()
 
     fun start(cell: Pair<Int, Int>?) {
         last = cell
         erasing = null
+        pending.clear()
     }
 
     fun moveTo(
@@ -180,47 +191,75 @@ private class NumberLinkDragState(private val rows: Int, private val cols: Int) 
         if (cell == from) return
         val dr = cell.first - from.first
         val dc = cell.second - from.second
-        if (abs(dr) + abs(dc) != 1) {
-            // Non-adjacent jump (fast drag): re-anchor without drawing.
+        if (dr != 0 && dc != 0) {
+            // Diagonal jump (finger cut across a corner): the route is ambiguous, so
+            // re-anchor without drawing.
             last = cell
             return
         }
+        // A fast drag along a row/column can skip cells between pointer events; walk each
+        // intermediate step so the path has no gaps.
+        val sr = Integer.signum(dr)
+        val sc = Integer.signum(dc)
+        var cur = from
+        while (cur != cell) {
+            val next = (cur.first + sr) to (cur.second + sc)
+            if (!step(cur, next, cells, values, set)) return // blocked: anchor stays at cur
+            cur = next
+            last = cur
+        }
+    }
 
-        // Identify the shared segment key between `from` and `cell`.
+    /** Apply one adjacent step; false when a draw is blocked by the degree cap. */
+    private fun step(
+        from: Pair<Int, Int>,
+        to: Pair<Int, Int>,
+        cells: List<List<Int>>,
+        values: Map<String, Int>,
+        set: (String, Int) -> Unit,
+    ): Boolean {
+        val dr = to.first - from.first
+        val dc = to.second - from.second
+        // Identify the shared segment key between `from` and `to`.
         val key = when {
             dc == 1 -> NumberLinkEngine.hKey(from.first, from.second)
-            dc == -1 -> NumberLinkEngine.hKey(from.first, cell.second)
+            dc == -1 -> NumberLinkEngine.hKey(from.first, to.second)
             dr == 1 -> NumberLinkEngine.vKey(from.first, from.second)
-            else -> NumberLinkEngine.vKey(cell.first, from.second)
+            else -> NumberLinkEngine.vKey(to.first, from.second)
         }
-        val edgeVal = values[key] ?: NumberLinkEngine.EMPTY
+        val current = if (pending.isEmpty()) values else values + pending
+        val edgeVal = current[key] ?: NumberLinkEngine.EMPTY
 
         if (erasing == null) erasing = edgeVal == NumberLinkEngine.SEGMENT
 
         if (erasing == true) {
-            if (edgeVal == NumberLinkEngine.SEGMENT) set(key, NumberLinkEngine.EMPTY)
-            last = cell
-            return
+            if (edgeVal == NumberLinkEngine.SEGMENT) write(key, NumberLinkEngine.EMPTY, set)
+            return true
         }
 
         // Draw mode: only add if both cells have spare degree capacity.
         if (edgeVal == NumberLinkEngine.EMPTY) {
-            val e = NumberLinkEngine.edges(cells, values)
+            val e = NumberLinkEngine.edges(cells, current)
             val maxFrom = if ((cells.getOrNull(from.first)?.getOrNull(from.second) ?: 0) > 0) 1 else 2
-            val maxCell = if ((cells.getOrNull(cell.first)?.getOrNull(cell.second) ?: 0) > 0) 1 else 2
+            val maxTo = if ((cells.getOrNull(to.first)?.getOrNull(to.second) ?: 0) > 0) 1 else 2
             if (NumberLinkEngine.degreeOf(e, from.first, from.second, rows, cols) >= maxFrom ||
-                NumberLinkEngine.degreeOf(e, cell.first, cell.second, rows, cols) >= maxCell
+                NumberLinkEngine.degreeOf(e, to.first, to.second, rows, cols) >= maxTo
             ) {
-                // Blocked: keep the anchor so a later legal move can retry.
-                return
+                return false
             }
-            set(key, NumberLinkEngine.SEGMENT)
+            write(key, NumberLinkEngine.SEGMENT, set)
         }
-        last = cell
+        return true
+    }
+
+    private fun write(key: String, state: Int, set: (String, Int) -> Unit) {
+        pending[key] = state
+        set(key, state)
     }
 
     fun end() {
         last = null
         erasing = null
+        pending.clear()
     }
 }
