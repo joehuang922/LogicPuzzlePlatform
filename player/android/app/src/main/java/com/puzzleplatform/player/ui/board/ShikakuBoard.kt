@@ -134,16 +134,13 @@ fun ShikakuBoard(
         val values = valuesState.value
         val list = ShikakuEngine.rects(cells, values)
 
-        // Committed rectangles: translucent fill + matching border, colored by validity.
-        val borderW = 2.dp.toPx()
+        // Committed rectangles: translucent fill here, matching border after the grid lines.
         for (rect in list) {
-            val tint = tintFor(rect, cells)
-            val x = rect.c * cell
-            val y = rect.r * cell
-            val w = rect.w * cell
-            val h = rect.h * cell
-            drawRect(tint.copy(alpha = FILL_ALPHA), topLeft = Offset(x, y), size = Size(w, h))
-            drawRect(tint, topLeft = Offset(x, y), size = Size(w, h), style = Stroke(borderW))
+            drawRect(
+                tintFor(rect, cells).copy(alpha = FILL_ALPHA),
+                topLeft = Offset(rect.c * cell, rect.r * cell),
+                size = Size(rect.w * cell, rect.h * cell),
+            )
         }
 
         // Grid: dashed thin interior lines, solid thick border.
@@ -160,6 +157,20 @@ fun ShikakuBoard(
         drawLine(LINE, Offset(0f, boardH), Offset(boardW, boardH), thick)
         drawLine(LINE, Offset(0f, 0f), Offset(0f, boardH), thick)
         drawLine(LINE, Offset(boardW, 0f), Offset(boardW, boardH), thick)
+
+        // Rectangle borders on top of the grid so the dashed lines don't break them up.
+        // Inset by half the stroke so each border sits wholly inside its own rectangle:
+        // neighbours show two distinct bands instead of one overpainting the other.
+        val borderW = 4.dp.toPx()
+        val inset = borderW / 2
+        for (rect in list) {
+            drawRect(
+                tintFor(rect, cells),
+                topLeft = Offset(rect.c * cell + inset, rect.r * cell + inset),
+                size = Size(rect.w * cell - borderW, rect.h * cell - borderW),
+                style = Stroke(borderW),
+            )
+        }
 
         // Live draw/resize preview, red when it would overlap another rectangle.
         drag?.let { d ->
