@@ -122,6 +122,12 @@ jobs:
           RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          # OCR parser Function URL. A plaintext repo variable (not a secret): it's an
+          # endpoint, not a credential, and it's already baked into BuildConfig.PARSER_URL
+          # of every shipped APK — extractable by decompiling — so masking it buys nothing.
+          # Set it under Settings → Secrets and variables → Actions → Variables. Empty is
+          # fine: the Admin image-parse step just stays disabled.
+          PARSER_URL: ${{ vars.PARSER_URL }}
         run: ./gradlew assembleRelease --stacktrace
 
       - name: Attach APK to GitHub Release
