@@ -19,6 +19,14 @@ val apiBaseUrl: String = System.getenv("API_BASE_URL")
     ?: localProps.getProperty("API_BASE_URL")
     ?: "https://ff24npl9f3.execute-api.ap-northeast-1.amazonaws.com/prod"
 
+// The OCR parser's URL. It's a standalone Lambda Function URL (not under the API
+// base), so it has no committed default — set it via env or local.properties
+// (PARSER_URL=...). When left blank, the Admin image-parse step is disabled with
+// an in-app explanation; collection/question creation still work.
+val parserUrl: String = System.getenv("PARSER_URL")
+    ?: localProps.getProperty("PARSER_URL")
+    ?: ""
+
 // Release signing. Values come from env vars in CI or local.properties on a dev machine.
 // If no keystore is configured, the release build stays unsigned (debug builds are unaffected),
 // so the project still builds for anyone without the key.
@@ -40,6 +48,8 @@ android {
 
         // Expose the API base URL to code as BuildConfig.API_BASE_URL
         buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
+        // Expose the OCR parser URL as BuildConfig.PARSER_URL (may be empty).
+        buildConfigField("String", "PARSER_URL", "\"$parserUrl\"")
     }
 
     signingConfigs {

@@ -70,6 +70,53 @@ data class Collection(
 @Serializable
 data class CollectionListResponse(val collections: List<Collection>)
 
+// --- Admin authoring DTOs ---
+
+/** POST /collections body. Mirrors createCollection in frontend/src/api/client.ts. */
+@Serializable
+data class CreateCollectionRequest(
+    val name: String,
+    val publisher: String? = null,
+    // ISO date (YYYY-MM-DD), matching the web admin's date input.
+    val publishAt: String? = null,
+    val coverSrc: String? = null,
+)
+
+@Serializable
+data class CreateCollectionResponse(val id: Int)
+
+/**
+ * POST /puzzles body. The server runs the solver gate and rejects a puzzle with
+ * no / multiple / unprovable solution (400), so each create is self-validating.
+ * canonRepr is the per-type puzzle JSON (sudoku: { hints: Int[9][9] }).
+ */
+@Serializable
+data class CreatePuzzleRequest(
+    val puzzleType: Int,
+    val difficulty: Int,
+    val canonRepr: JsonObject,
+    val title: String? = null,
+    val author: String? = null,
+    val width: Int? = null,
+    val height: Int? = null,
+    val srcCollection: Int? = null,
+    val special: Boolean? = null,
+)
+
+@Serializable
+data class CreatePuzzleResponse(val id: String)
+
+/** POST <PARSER_URL> body: a base64 image + the puzzle type to parse it as. */
+@Serializable
+data class ParseImageRequest(
+    val image: String,
+    val puzzleType: Int,
+)
+
+/** Parser response: { canon: <per-type puzzle JSON> } (sudoku: { hints: ... }). */
+@Serializable
+data class ParseImageResponse(val canon: JsonObject)
+
 @Serializable
 data class PuzzleType(
     val id: Int,

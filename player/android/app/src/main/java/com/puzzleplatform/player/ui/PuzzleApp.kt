@@ -6,6 +6,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.puzzleplatform.player.ui.screens.AdminCollectionScreen
+import com.puzzleplatform.player.ui.screens.AdminQuestionScreen
+import com.puzzleplatform.player.ui.screens.AdminScreen
 import com.puzzleplatform.player.ui.screens.HomeScreen
 import com.puzzleplatform.player.ui.screens.PlayScreen
 import com.puzzleplatform.player.ui.screens.ProfileScreen
@@ -13,6 +16,9 @@ import com.puzzleplatform.player.ui.screens.ProfileScreen
 object Routes {
     const val HOME = "home"
     const val PROFILE = "profile"
+    const val ADMIN = "admin"
+    const val ADMIN_COLLECTION = "admin/collection"
+    const val ADMIN_QUESTION = "admin/question"
     // play/{puzzleId}?attempt={attemptId}
     const val PLAY = "play/{puzzleId}?attempt={attemptId}"
 
@@ -30,6 +36,7 @@ fun PuzzleApp() {
                     navController.navigate(Routes.play(puzzleId, attemptId))
                 },
                 onOpenProfile = { navController.navigate(Routes.PROFILE) },
+                onOpenAdmin = { navController.navigate(Routes.ADMIN) },
             )
         }
         composable(
@@ -56,6 +63,19 @@ fun PuzzleApp() {
         }
         composable(Routes.PROFILE) {
             ProfileScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Routes.ADMIN) {
+            AdminScreen(
+                onBack = { navController.popBackStack() },
+                onCreateCollection = { navController.navigate(Routes.ADMIN_COLLECTION) },
+                onCreateQuestion = { navController.navigate(Routes.ADMIN_QUESTION) },
+            )
+        }
+        composable(Routes.ADMIN_COLLECTION) {
+            AdminCollectionScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Routes.ADMIN_QUESTION) {
+            AdminQuestionScreen(onBack = { navController.popBackStack() })
         }
     }
 }

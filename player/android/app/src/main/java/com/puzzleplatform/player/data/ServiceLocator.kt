@@ -3,6 +3,7 @@ package com.puzzleplatform.player.data
 import android.content.Context
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import com.puzzleplatform.player.BuildConfig
+import com.puzzleplatform.player.data.api.ParserApi
 import com.puzzleplatform.player.data.api.PuzzleApi
 import com.puzzleplatform.player.data.api.RetryInterceptor
 import com.puzzleplatform.player.data.local.AppDatabase
@@ -65,6 +66,36 @@ object ServiceLocator {
             .create(PuzzleApi::class.java)
     }
 
+    // A dedicated client for the OCR parser: a cold parser Lambda can take a
+    // minute-plus on a large scan, well past the 30s used for the quick JSON
+    // API. The parser URL is supplied per-call via @Url, so the baseUrl here is
+    // only a (required) placeholder.
+    private val parserHttpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .addInterceptor(
+                HttpLoggingInterceptor().apply {
+                    level = if (BuildConfig.DEBUG) {
+                        HttpLoggingInterceptor.Level.BASIC
+                    } else {
+                        HttpLoggingInterceptor.Level.NONE
+                    }
+                }
+            )
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(120, TimeUnit.SECONDS)
+            .callTimeout(130, TimeUnit.SECONDS)
+            .build()
+    }
+
+    val parserApi: ParserApi by lazy {
+        Retrofit.Builder()
+            .baseUrl(BuildConfig.API_BASE_URL.trimEnd('/') + "/")
+            .client(parserHttpClient)
+            .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
+            .build()
+            .create(ParserApi::class.java)
+    }
+
     private val database: AppDatabase by lazy { AppDatabase.get(appContext) }
 
     val syncManager: SyncManager by lazy {
@@ -73,5 +104,9 @@ object ServiceLocator {
 
     val repository: PuzzleRepository by lazy {
         PuzzleRepository(api, database, syncManager, json, appContext)
+    }
+
+    val adminRepository: AdminRepository by lazy {
+        AdminRepository(api, parserApi, json, appContext)
     }
 }

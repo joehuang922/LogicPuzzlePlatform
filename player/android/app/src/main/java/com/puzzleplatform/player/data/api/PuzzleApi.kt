@@ -6,6 +6,10 @@ import com.puzzleplatform.player.data.model.CollectionManifestResponse
 import com.puzzleplatform.player.data.model.CollectionProgressResponse
 import com.puzzleplatform.player.data.model.CreateAttemptRequest
 import com.puzzleplatform.player.data.model.CreateAttemptResponse
+import com.puzzleplatform.player.data.model.CreateCollectionRequest
+import com.puzzleplatform.player.data.model.CreateCollectionResponse
+import com.puzzleplatform.player.data.model.CreatePuzzleRequest
+import com.puzzleplatform.player.data.model.CreatePuzzleResponse
 import com.puzzleplatform.player.data.model.ProfileResponse
 import com.puzzleplatform.player.data.model.PuzzleListResponse
 import com.puzzleplatform.player.data.model.PuzzleResponse
@@ -45,6 +49,14 @@ interface PuzzleApi {
 
     @GET("collections")
     suspend fun listCollections(): CollectionListResponse
+
+    // --- Admin authoring (no auth: the API has no authorizer) ---
+
+    @POST("collections")
+    suspend fun createCollection(@Body body: CreateCollectionRequest): CreateCollectionResponse
+
+    @POST("puzzles")
+    suspend fun createPuzzle(@Body body: CreatePuzzleRequest): CreatePuzzleResponse
 
     @GET("collections/{id}/manifest")
     suspend fun getCollectionManifest(@Path("id") id: Int): CollectionManifestResponse
