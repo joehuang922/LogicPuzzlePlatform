@@ -35,16 +35,17 @@ enum class ItemStatus {
 object BatchRules {
 
     /**
-     * A tile is sent on "Create all valid" only when it has a parsed grid, the user
-     * hasn't excluded it, and it isn't already created. This is what makes the button
-     * re-runnable: created tiles drop out, so a second press sends only the rest.
+     * A tile is sent on "Create all valid" only when it has a parsed grid and isn't
+     * already created. This is what makes the button re-runnable: created tiles drop
+     * out, so a second press sends only the rest. A tile the user doesn't want is
+     * removed from the batch outright, so there's no "excluded but present" state.
      *
      * CREATE_FAILED is intentionally *not* eligible on its own — editing the tile
      * (which resets it to PARSED, see [afterEdit]) is what re-arms it, so a press that
      * changes nothing doesn't blindly re-POST a board the gate just rejected.
      */
-    fun isEligibleToCreate(status: ItemStatus, excluded: Boolean, createdId: String?): Boolean =
-        status == ItemStatus.PARSED && !excluded && createdId == null
+    fun isEligibleToCreate(status: ItemStatus, createdId: String?): Boolean =
+        status == ItemStatus.PARSED && createdId == null
 
     /** A tile's effective difficulty: its own override, else the shared batch default. */
     fun resolveDifficulty(itemDifficulty: Int?, defaultDifficulty: Int): Int =

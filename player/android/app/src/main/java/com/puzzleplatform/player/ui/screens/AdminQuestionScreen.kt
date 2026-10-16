@@ -1,5 +1,6 @@
 package com.puzzleplatform.player.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -23,6 +25,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
@@ -35,12 +39,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -49,7 +53,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -63,14 +66,16 @@ import com.puzzleplatform.player.ui.DIFFICULTY_LABELS
 import com.puzzleplatform.player.ui.board.DigitBar
 import com.puzzleplatform.player.ui.board.SudokuBoard
 import com.puzzleplatform.player.ui.board.SudokuMiniBoard
+import com.puzzleplatform.player.ui.board.ZoomableImage
 
 /**
  * Create one *or many* sudoku questions from album photos (the pilot for in-app
  * authoring). A single pick is just a batch of one — same flow throughout. Steps:
  * pick images → Parse all (OCR each) → review/fix any tile on the real player board
- * in a bottom sheet → Create all valid, which runs the server's per-question solver
- * gate on each. The create button is re-runnable: created tiles drop out, so fixing
- * a rejected board and pressing again sends only the remainder.
+ * (full-screen, with the source photo beside it) → Create all valid, which runs the
+ * server's per-question solver gate on each. The create button is re-runnable:
+ * created tiles drop out, so fixing a rejected board and pressing again sends only
+ * the remainder.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -79,6 +84,26 @@ fun AdminQuestionScreen(
     vm: AdminQuestionViewModel = viewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+
+    // A tile under review takes over the whole screen so the source photo and the
+    // board are both visible without a cramped sheet. Same VM, so edits persist.
+    val reviewItem = state.reviewItem
+    if (reviewItem != null) {
+        ReviewScreen(
+            item = reviewItem,
+            selectedCell = state.selectedCell,
+            defaultDifficulty = state.defaultDifficulty,
+            onDone = vm::closeReview,
+            onSelectCell = vm::selectCell,
+            onDigit = vm::enterDigit,
+            onClear = vm::clearCell,
+            onTitle = { vm.setItemTitle(reviewItem.id, it) },
+            onAuthor = { vm.setItemAuthor(reviewItem.id, it) },
+            onDifficulty = { vm.setItemDifficulty(reviewItem.id, it) },
+            onRemove = { vm.removeItem(reviewItem.id) },
+        )
+        return
+    }
 
     val picker = rememberLauncherForActivityResult(
         // No-arg = the system's own max-selection limit; avoids the IllegalArgument
@@ -190,7 +215,8 @@ fun AdminQuestionScreen(
                             )
                         }
                         Text(
-                            "Tap a tile to review its grid, fix mis-read digits, and set its title.",
+                            "Tap a tile to review its photo and grid side by side, fix mis-read " +
+                                "digits, and set its title.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -203,34 +229,13 @@ fun AdminQuestionScreen(
             }
         }
     }
-
-    // Per-tile review sheet, reusing the full interactive player board.
-    val reviewItem = state.reviewItem
-    if (reviewItem != null) {
-        ReviewSheet(
-            item = reviewItem,
-            selectedCell = state.selectedCell,
-            onDismiss = vm::closeReview,
-            onSelectCell = vm::selectCell,
-            onDigit = vm::enterDigit,
-            onClear = vm::clearCell,
-            onTitle = { vm.setItemTitle(reviewItem.id, it) },
-            onAuthor = { vm.setItemAuthor(reviewItem.id, it) },
-            onDifficulty = { vm.setItemDifficulty(reviewItem.id, it) },
-            onToggleExclude = { vm.toggleExcluded(reviewItem.id) },
-            defaultDifficulty = state.defaultDifficulty,
-        )
-    }
 }
 
 /** One image in the grid: its mini-board (or picked photo while un-parsed) + a status badge. */
 @Composable
 private fun BatchTile(item: BatchItem, onClick: () -> Unit) {
-    val dim = if (item.excluded) 0.4f else 1f
     Column(
-        modifier = Modifier
-            .clickable(onClick = onClick)
-            .alpha(dim),
+        modifier = Modifier.clickable(onClick = onClick),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.size(120.dp)) {
@@ -270,12 +275,10 @@ private fun BatchTile(item: BatchItem, onClick: () -> Unit) {
 
 @Composable
 private fun StatusBadge(item: BatchItem, modifier: Modifier = Modifier) {
-    val (label, color) = when {
-        item.excluded -> "excluded" to MaterialTheme.colorScheme.outline
-        item.status == ItemStatus.CREATED -> "✓" to MaterialTheme.colorScheme.primary
-        item.status == ItemStatus.PARSE_FAILED || item.status == ItemStatus.CREATE_FAILED ->
-            "!" to MaterialTheme.colorScheme.error
-        item.status == ItemStatus.PARSED -> "ready" to MaterialTheme.colorScheme.secondary
+    val (label, color) = when (item.status) {
+        ItemStatus.CREATED -> "✓" to MaterialTheme.colorScheme.primary
+        ItemStatus.PARSE_FAILED, ItemStatus.CREATE_FAILED -> "!" to MaterialTheme.colorScheme.error
+        ItemStatus.PARSED -> "ready" to MaterialTheme.colorScheme.secondary
         else -> return
     }
     Surface(color = color, shape = RoundedCornerShape(50), modifier = modifier) {
@@ -325,39 +328,85 @@ private fun CreateFooter(
     }
 }
 
+/**
+ * Full-screen review for a single tile: the zoomable source photo on top (so the user
+ * can read the original closely) and the interactive player board below, reused
+ * verbatim from the player. A pinned top bar and a bottom button both say Done — every
+ * edit is already saved to state as it's typed, so "Done" just returns to the grid.
+ */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun ReviewSheet(
+private fun ReviewScreen(
     item: BatchItem,
     selectedCell: String?,
-    onDismiss: () -> Unit,
+    defaultDifficulty: Int,
+    onDone: () -> Unit,
     onSelectCell: (String?) -> Unit,
     onDigit: (Int) -> Unit,
     onClear: () -> Unit,
     onTitle: (String) -> Unit,
     onAuthor: (String) -> Unit,
     onDifficulty: (Int?) -> Unit,
-    onToggleExclude: () -> Unit,
-    defaultDifficulty: Int,
+    onRemove: () -> Unit,
 ) {
     // The review board reuses the player SudokuBoard verbatim; an all-zero-hints
     // puzzle keeps every cell editable (parsed givens ride in as userValues).
     val reviewPuzzle = remember { SudokuAuthoring.blankPuzzle() }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    // System back closes the review rather than leaving the authoring screen.
+    BackHandler(onBack = onDone)
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Review") },
+                navigationIcon = {
+                    IconButton(onClick = onDone) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Done")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onRemove) {
+                        Icon(Icons.Filled.Delete, contentDescription = "Remove from batch")
+                    }
+                    TextButton(onClick = onDone) {
+                        Icon(Icons.Filled.Check, contentDescription = null)
+                        Text("Done")
+                    }
+                },
+            )
+        },
+    ) { padding ->
         Column(
             Modifier
-                .fillMaxWidth()
+                .fillMaxSize()
+                .padding(padding)
                 .padding(horizontal = 16.dp)
-                .padding(bottom = 24.dp)
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                "Review the grid — tap a cell to fix a mis-read digit. Conflicts show in red.",
+                "Compare the photo with the grid — pinch to zoom the photo, tap a cell to fix a " +
+                    "mis-read digit. Conflicts show in red.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+
+            // Source photo: a 4:3 window the user can pinch/pan to read closely.
+            Surface(
+                tonalElevation = 1.dp,
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                ZoomableImage(
+                    model = item.uri,
+                    contentDescription = "Source puzzle photo",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(4f / 3f),
+                )
+            }
+
             SudokuBoard(
                 puzzle = reviewPuzzle,
                 userValues = item.userValues,
@@ -410,11 +459,9 @@ private fun ReviewSheet(
                 }
             }
 
-            FilterChip(
-                selected = item.excluded,
-                onClick = onToggleExclude,
-                label = { Text(if (item.excluded) "Excluded from batch" else "Exclude from batch") },
-            )
+            Button(onClick = onDone, modifier = Modifier.fillMaxWidth()) {
+                Text("Done")
+            }
         }
     }
 }
@@ -489,12 +536,11 @@ private fun tileCaption(item: BatchItem): String {
     }
 }
 
-/** "8 created · 1 failed · 1 excluded" — null when nothing noteworthy has happened yet. */
+/** "8 created · 1 failed" — null when nothing noteworthy has happened yet. */
 private fun batchSummary(state: AdminQuestionUiState): String? {
     val parts = buildList {
         if (state.createdCount > 0) add("${state.createdCount} created")
         if (state.failedCount > 0) add("${state.failedCount} failed")
-        if (state.excludedCount > 0) add("${state.excludedCount} excluded")
     }
     return parts.takeIf { it.isNotEmpty() }?.joinToString(" · ")
 }

@@ -13,19 +13,14 @@ import org.junit.Test
 class BatchRulesTest {
 
     @Test
-    fun `only a parsed, not-excluded, not-created tile is eligible`() {
-        assertTrue(BatchRules.isEligibleToCreate(ItemStatus.PARSED, excluded = false, createdId = null))
-    }
-
-    @Test
-    fun `excluded tile is never eligible`() {
-        assertFalse(BatchRules.isEligibleToCreate(ItemStatus.PARSED, excluded = true, createdId = null))
+    fun `only a parsed, not-created tile is eligible`() {
+        assertTrue(BatchRules.isEligibleToCreate(ItemStatus.PARSED, createdId = null))
     }
 
     @Test
     fun `already-created tile drops out of the eligible set`() {
         // This is the idempotency guarantee: pressing Create again won't re-POST it.
-        assertFalse(BatchRules.isEligibleToCreate(ItemStatus.CREATED, excluded = false, createdId = "42"))
+        assertFalse(BatchRules.isEligibleToCreate(ItemStatus.CREATED, createdId = "42"))
     }
 
     @Test
@@ -39,7 +34,7 @@ class BatchRulesTest {
         )) {
             assertFalse(
                 "status $status should not be eligible",
-                BatchRules.isEligibleToCreate(status, excluded = false, createdId = null),
+                BatchRules.isEligibleToCreate(status, createdId = null),
             )
         }
     }
@@ -47,12 +42,12 @@ class BatchRulesTest {
     @Test
     fun `a create-failed tile is only re-armed by an edit`() {
         // Pressing Create again changes nothing (gate just rejected it)...
-        assertFalse(BatchRules.isEligibleToCreate(ItemStatus.CREATE_FAILED, excluded = false, createdId = null))
+        assertFalse(BatchRules.isEligibleToCreate(ItemStatus.CREATE_FAILED, createdId = null))
         // ...until the user edits the grid, which resets it to PARSED...
         val reArmed = BatchRules.afterEdit(ItemStatus.CREATE_FAILED)
         assertEquals(ItemStatus.PARSED, reArmed)
         // ...and now it's eligible again.
-        assertTrue(BatchRules.isEligibleToCreate(reArmed, excluded = false, createdId = null))
+        assertTrue(BatchRules.isEligibleToCreate(reArmed, createdId = null))
     }
 
     @Test

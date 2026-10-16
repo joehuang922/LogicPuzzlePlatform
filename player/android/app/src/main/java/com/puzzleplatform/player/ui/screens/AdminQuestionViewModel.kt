@@ -34,7 +34,6 @@ data class BatchItem(
     val title: String = "",
     val author: String = "",
     val difficulty: Int? = null,
-    val excluded: Boolean = false,
     val createdId: String? = null,
     val error: String? = null,
 )
@@ -55,12 +54,11 @@ data class AdminQuestionUiState(
 ) {
     /** Tiles that the next "Create all valid" press would send. */
     val eligibleCount: Int
-        get() = items.count { BatchRules.isEligibleToCreate(it.status, it.excluded, it.createdId) }
+        get() = items.count { BatchRules.isEligibleToCreate(it.status, it.createdId) }
 
     val createdCount: Int get() = items.count { it.status == ItemStatus.CREATED }
     val failedCount: Int
         get() = items.count { it.status == ItemStatus.PARSE_FAILED || it.status == ItemStatus.CREATE_FAILED }
-    val excludedCount: Int get() = items.count { it.excluded && it.status != ItemStatus.CREATED }
 
     /** The open tile, if any. */
     val reviewItem: BatchItem? get() = items.firstOrNull { it.id == reviewItemId }
@@ -186,7 +184,15 @@ class AdminQuestionViewModel(
     fun setItemTitle(id: String, v: String) = updateItem(id) { it.copy(title = v) }
     fun setItemAuthor(id: String, v: String) = updateItem(id) { it.copy(author = v) }
     fun setItemDifficulty(id: String, v: Int?) = updateItem(id) { it.copy(difficulty = v) }
-    fun toggleExcluded(id: String) = updateItem(id) { it.copy(excluded = !it.excluded) }
+
+    /** Drop a tile from the batch entirely. Closes the review if it was the open one. */
+    fun removeItem(id: String) = _state.update { s ->
+        s.copy(
+            items = s.items.filterNot { it.id == id },
+            reviewItemId = if (s.reviewItemId == id) null else s.reviewItemId,
+            selectedCell = if (s.reviewItemId == id) null else s.selectedCell,
+        )
+    }
 
     // --- Shared metadata ---
 
@@ -194,7 +200,7 @@ class AdminQuestionViewModel(
     fun setSrcCollection(id: Int?) = _state.update { it.copy(srcCollectionId = id) }
 
     /**
-     * Create every eligible tile (parsed, not excluded, not already created). Each is
+     * Create every eligible tile (parsed, not already created). Each is
      * POSTed on its own through the server's solver gate; a tile flips to CREATED (with
      * its id) or CREATE_FAILED (with the gate's message). Already-created tiles are
      * skipped, so the button can be pressed again after fixing the failures and sends
@@ -205,7 +211,7 @@ class AdminQuestionViewModel(
         val s = _state.value
         if (s.creating) return
         val targets = s.items.filter {
-            BatchRules.isEligibleToCreate(it.status, it.excluded, it.createdId)
+            BatchRules.isEligibleToCreate(it.status, it.createdId)
         }
         if (targets.isEmpty()) return
 
