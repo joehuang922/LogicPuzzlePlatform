@@ -23,9 +23,13 @@ val apiBaseUrl: String = System.getenv("API_BASE_URL")
 // base), so it has no committed default — set it via env or local.properties
 // (PARSER_URL=...). When left blank, the Admin image-parse step is disabled with
 // an in-app explanation; collection/question creation still work.
-val parserUrl: String = System.getenv("PARSER_URL")
+// All whitespace is stripped because the value flows verbatim into buildConfigField as
+// a Java string literal: a stray newline (easy to paste into a CI variable, even
+// mid-value via line-wrapping) would otherwise land inside the string and break
+// compilation. A URL never contains whitespace, so removing all of it is safe.
+val parserUrl: String = (System.getenv("PARSER_URL")
     ?: localProps.getProperty("PARSER_URL")
-    ?: ""
+    ?: "").filterNot { it.isWhitespace() }
 
 // Release signing. Values come from env vars in CI or local.properties on a dev machine.
 // If no keystore is configured, the release build stays unsigned (debug builds are unaffected),
