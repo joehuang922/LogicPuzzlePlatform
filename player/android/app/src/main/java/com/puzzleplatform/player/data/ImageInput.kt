@@ -49,9 +49,13 @@ object ImageInput {
     private fun decodeDownsampled(context: Context, uri: Uri): Bitmap? {
         val resolver = context.contentResolver
 
+        // Bounds-only pass: inJustDecodeBounds makes decodeStream return null by
+        // design (it only fills bounds.outWidth/outHeight), so guard the *stream*,
+        // not the decode result — otherwise this throws on every successful open.
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-            ?: throw IllegalArgumentException("Could not open the selected image")
+        (resolver.openInputStream(uri)
+            ?: throw IllegalArgumentException("Could not open the selected image"))
+            .use { BitmapFactory.decodeStream(it, null, bounds) }
 
         val longest = max(bounds.outWidth, bounds.outHeight)
         if (longest <= 0) return null
