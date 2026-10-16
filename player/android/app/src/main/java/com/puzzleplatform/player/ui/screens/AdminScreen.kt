@@ -50,7 +50,7 @@ fun AdminScreen(
         ) {
             Text(
                 "Create puzzle content directly on the device. Each question is validated " +
-                    "by the server as you create it — no batch, no ZIP.",
+                    "by the server as you create it.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -58,7 +58,7 @@ fun AdminScreen(
                 Text("Create collection")
             }
             Button(onClick = onCreateQuestion, modifier = Modifier.fillMaxWidth()) {
-                Text("Create question (Sudoku)")
+                Text("Create question(s) (Sudoku)")
             }
         }
     }
