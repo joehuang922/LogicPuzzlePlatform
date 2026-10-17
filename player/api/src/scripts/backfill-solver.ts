@@ -1,6 +1,6 @@
 /**
  * Backfill `validation_status` and `solution_repr` for existing puzzles whose type
- * has a registered solver plugin (currently Sudoku, type 1). See docs/auto-solve
+ * has a registered solver plugin (see player/solver/src/registry.ts). See docs/auto-solve
  * (D9): the backfill only *flags* puzzles — it never hides or deletes live ones.
  * Multiple/none verdicts are listed explicitly so editors can re-review them.
  *

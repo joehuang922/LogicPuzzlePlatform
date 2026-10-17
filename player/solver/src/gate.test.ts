@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { gate } from "./gate";
 import { parseGrid, isValidSolution, INKALA_HARDEST, SEVENTEEN_CLUE, CONTRADICTORY } from "./plugins/sudoku/fixtures";
+import * as nonogram from "./plugins/nonogram/fixtures";
 
 describe("registration gate — gate()", () => {
   it("returns null for an unsupported puzzle type (bypass)", () => {
@@ -41,5 +42,18 @@ describe("registration gate — gate()", () => {
     const result = gate(1, parseGrid(INKALA_HARDEST), { maxNodes: 1_000_000 });
     expect(result!.verdict).toBe("unique");
     expect(result!.solution).not.toBeNull();
+  });
+
+  it("stores a Nonogram solution in its answer shape { cells }", () => {
+    const result = gate(6, nonogram.SMALL);
+    expect(result!.verdict).toBe("unique");
+    const sol = result!.solution as { cells: number[][] };
+    expect(nonogram.isValidSolution(nonogram.SMALL, sol.cells)).toBe(true);
+  });
+
+  it("rejects an ambiguous Nonogram with no stored solution", () => {
+    const result = gate(6, nonogram.MULTIPLE);
+    expect(result!.verdict).toBe("multiple");
+    expect(result!.solution).toBeNull();
   });
 });

@@ -31,10 +31,11 @@ const NOOP = () => {};
 /**
  * Build a per-search "tick" closure called once at every node. Returns a no-op when no
  * budget (or an empty one) is given, so unbudgeted searches pay nothing. The deadline is
- * polled on the first node and every 2048 nodes thereafter — a `Date.now()` per node would
- * dominate the hot loop, 2048 nodes is well under a millisecond of slack against a
- * multi-second deadline, and the first-node check fast-fails an already-expired deadline.
- * (`n & 2047 === 1` is true at n = 1, 2049, 4097, …)
+ * polled at every node. A node's cost varies widely by type: a Sudoku node is microseconds,
+ * but a Nonogram node (line solving plus probing a 35x35 grid) can take hundreds of
+ * milliseconds, so polling only every N nodes let a search overrun its deadline by tens of
+ * seconds. A `Date.now()` is ~60ns, cheap next to even a Sudoku node, and polling every
+ * node bounds the overrun to a single node for any type.
  */
 function makeTicker(budget?: SearchBudget): () => void {
   if (!budget || (budget.deadline === undefined && budget.maxNodes === undefined)) {
@@ -45,7 +46,7 @@ function makeTicker(budget?: SearchBudget): () => void {
   return () => {
     nodes++;
     if (maxNodes !== undefined && nodes > maxNodes) throw new SearchBudgetExceeded(nodes);
-    if (deadline !== undefined && (nodes & 2047) === 1 && Date.now() >= deadline) {
+    if (deadline !== undefined && Date.now() >= deadline) {
       throw new SearchBudgetExceeded(nodes);
     }
   };
