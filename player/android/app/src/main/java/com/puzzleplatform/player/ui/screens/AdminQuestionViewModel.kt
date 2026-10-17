@@ -7,8 +7,11 @@ import com.puzzleplatform.player.data.AdminRepository
 import com.puzzleplatform.player.data.ServiceLocator
 import com.puzzleplatform.player.data.model.Collection
 import com.puzzleplatform.player.data.model.CreatePuzzleRequest
+import com.puzzleplatform.player.puzzle.AuthoringType
 import com.puzzleplatform.player.puzzle.BatchRules
 import com.puzzleplatform.player.puzzle.ItemStatus
+import com.puzzleplatform.player.puzzle.NonogramAuthoring
+import com.puzzleplatform.player.puzzle.NonogramDraft
 import com.puzzleplatform.player.puzzle.SudokuAuthoring
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,9 +23,11 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 
 /**
- * One tile in the batch: an image and everything derived from it. Parsed givens
- * ride in [userValues] ("col,row" -> digit) — the same map the player's SudokuBoard
- * renders and edits — so the review sheet reuses that board verbatim. Metadata is
+ * One tile in the batch: an image and everything derived from it. What the parse
+ * yields depends on the batch's [AuthoringType]: a sudoku's givens ride in
+ * [userValues] ("col,row" -> digit) — the same map the player's SudokuBoard renders
+ * and edits — so the review reuses that board verbatim; a nonogram's clue lists ride
+ * in [nonogram]. Metadata is
  * per-item except the shared source collection and the default difficulty (a null
  * [difficulty] inherits the batch default).
  */
@@ -31,6 +36,7 @@ data class BatchItem(
     val uri: Uri,
     val status: ItemStatus = ItemStatus.PENDING,
     val userValues: Map<String, Int> = emptyMap(),
+    val nonogram: NonogramDraft = NonogramDraft(),
     val title: String = "",
     val author: String = "",
     val difficulty: Int? = null,
@@ -39,6 +45,8 @@ data class BatchItem(
 )
 
 data class AdminQuestionUiState(
+    // What every tile in the batch is parsed and created as.
+    val type: AuthoringType = AuthoringType.SUDOKU,
     val items: List<BatchItem> = emptyList(),
     val parserConfigured: Boolean = true,
     // True while any tile is parsing (drives the "Parse all" spinner).
@@ -101,6 +109,23 @@ class AdminQuestionViewModel(
     }
 
     /**
+     * Switch the batch's puzzle type. Parsed grids are type-specific, so every tile
+     * goes back to un-parsed (the picked images are kept). Ignored mid-parse/create.
+     */
+    fun setType(type: AuthoringType) {
+        val s = _state.value
+        if (type == s.type || s.parsing || s.creating) return
+        _state.update {
+            it.copy(
+                type = type,
+                items = it.items.map { item -> BatchItem(id = item.id, uri = item.uri) },
+                reviewItemId = null,
+                selectedCell = null,
+            )
+        }
+    }
+
+    /**
      * Parse every not-yet-parsed tile concurrently, capped at [PARSE_CONCURRENCY] so a
      * big batch doesn't open a dozen slow (cold-start) parser calls at once. Tiles flip
      * to PARSED (grid seeded) or PARSE_FAILED individually as each lands, so the grid
@@ -121,7 +146,7 @@ class AdminQuestionViewModel(
                 coroutineScope {
                     for (item in targets) {
                         launch {
-                            gate.withPermit { parseOne(item.id, item.uri) }
+                            gate.withPermit { parseOne(item.id, item.uri, s.type) }
                         }
                     }
                 }
@@ -131,16 +156,15 @@ class AdminQuestionViewModel(
         }
     }
 
-    private suspend fun parseOne(id: String, uri: Uri) {
+    private suspend fun parseOne(id: String, uri: Uri, type: AuthoringType) {
         updateItem(id) { it.copy(status = ItemStatus.PARSING, error = null) }
         try {
-            val canon = repo.parseImage(uri, SudokuAuthoring.PUZZLE_TYPE)
+            val canon = repo.parseImage(uri, type.puzzleType)
             updateItem(id) {
-                it.copy(
-                    status = ItemStatus.PARSED,
-                    userValues = SudokuAuthoring.userValuesFromCanon(canon),
-                    error = null,
-                )
+                when (type) {
+                    AuthoringType.SUDOKU -> it.copy(userValues = SudokuAuthoring.userValuesFromCanon(canon))
+                    AuthoringType.NONOGRAM -> it.copy(nonogram = NonogramAuthoring.draftFromCanon(canon))
+                }.copy(status = ItemStatus.PARSED, error = null)
             }
         } catch (e: Exception) {
             updateItem(id) { it.copy(status = ItemStatus.PARSE_FAILED, error = repo.serverMessage(e)) }
@@ -171,10 +195,16 @@ class AdminQuestionViewModel(
     }
 
     /** Apply a grid edit and re-arm a previously create-failed tile (see BatchRules.afterEdit). */
-    private fun editGrid(id: String, transform: (Map<String, Int>) -> Map<String, Int>) {
+    private fun editGrid(id: String, transform: (Map<String, Int>) -> Map<String, Int>) =
+        editItem(id) { it.copy(userValues = transform(it.userValues)) }
+
+    /** Apply a nonogram clue edit (see [NonogramAuthoring]) to tile [id]. */
+    fun editNonogram(id: String, transform: (NonogramDraft) -> NonogramDraft) =
+        editItem(id) { it.copy(nonogram = transform(it.nonogram)) }
+
+    private fun editItem(id: String, transform: (BatchItem) -> BatchItem) {
         updateItem(id) {
-            it.copy(
-                userValues = transform(it.userValues),
+            transform(it).copy(
                 status = BatchRules.afterEdit(it.status),
                 error = if (it.status == ItemStatus.CREATE_FAILED) null else it.error,
             )
@@ -221,15 +251,27 @@ class AdminQuestionViewModel(
                 for (item in targets) {
                     updateItem(item.id) { it.copy(status = ItemStatus.CREATING, error = null) }
                     try {
+                        val (canon, width, height) = when (s.type) {
+                            AuthoringType.SUDOKU -> Triple(
+                                SudokuAuthoring.canonFromUserValues(item.userValues),
+                                SudokuAuthoring.SIZE,
+                                SudokuAuthoring.SIZE,
+                            )
+                            AuthoringType.NONOGRAM -> Triple(
+                                NonogramAuthoring.canonFromDraft(item.nonogram),
+                                item.nonogram.cols,
+                                item.nonogram.rows,
+                            )
+                        }
                         val id = repo.createPuzzle(
                             CreatePuzzleRequest(
-                                puzzleType = SudokuAuthoring.PUZZLE_TYPE,
+                                puzzleType = s.type.puzzleType,
                                 difficulty = BatchRules.resolveDifficulty(item.difficulty, s.defaultDifficulty),
-                                canonRepr = SudokuAuthoring.canonFromUserValues(item.userValues),
+                                canonRepr = canon,
                                 title = item.title.trim().ifBlank { null },
                                 author = item.author.trim().ifBlank { null },
-                                width = SudokuAuthoring.SIZE,
-                                height = SudokuAuthoring.SIZE,
+                                width = width,
+                                height = height,
                                 srcCollection = s.srcCollectionId,
                             )
                         )

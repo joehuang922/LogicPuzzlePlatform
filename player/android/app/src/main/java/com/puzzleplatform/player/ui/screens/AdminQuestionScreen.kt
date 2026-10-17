@@ -60,22 +60,27 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.puzzleplatform.player.puzzle.AuthoringType
 import com.puzzleplatform.player.puzzle.ItemStatus
+import com.puzzleplatform.player.puzzle.NonogramAuthoring
+import com.puzzleplatform.player.puzzle.NonogramDraft
 import com.puzzleplatform.player.puzzle.SudokuAuthoring
 import com.puzzleplatform.player.ui.DIFFICULTY_LABELS
 import com.puzzleplatform.player.ui.board.DigitBar
+import com.puzzleplatform.player.ui.board.NonogramMiniBoard
 import com.puzzleplatform.player.ui.board.SudokuBoard
 import com.puzzleplatform.player.ui.board.SudokuMiniBoard
 import com.puzzleplatform.player.ui.board.ZoomableImage
 
 /**
- * Create one *or many* sudoku questions from album photos (the pilot for in-app
- * authoring). A single pick is just a batch of one — same flow throughout. Steps:
- * pick images → Parse all (OCR each) → review/fix any tile on the real player board
- * (full-screen, with the source photo beside it) → Create all valid, which runs the
- * server's per-question solver gate on each. The create button is re-runnable:
- * created tiles drop out, so fixing a rejected board and pressing again sends only
- * the remainder.
+ * Create one *or many* questions from album photos. The puzzle type (sudoku or
+ * nonogram, see [AuthoringType]) is picked from a dropdown and applies to the whole
+ * batch. A single pick is just a batch of one — same flow throughout. Steps:
+ * pick images → Parse all (OCR each) → review/fix any tile (full-screen, with the
+ * source photo beside it: sudoku on the real player board, nonogram as editable clue
+ * lines) → Create all valid, which runs the server's per-question checks on each.
+ * The create button is re-runnable: created tiles drop out, so fixing a rejected
+ * board and pressing again sends only the remainder.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -90,6 +95,7 @@ fun AdminQuestionScreen(
     val reviewItem = state.reviewItem
     if (reviewItem != null) {
         ReviewScreen(
+            type = state.type,
             item = reviewItem,
             selectedCell = state.selectedCell,
             defaultDifficulty = state.defaultDifficulty,
@@ -101,6 +107,7 @@ fun AdminQuestionScreen(
             onAuthor = { vm.setItemAuthor(reviewItem.id, it) },
             onDifficulty = { vm.setItemDifficulty(reviewItem.id, it) },
             onRemove = { vm.removeItem(reviewItem.id) },
+            onEditNonogram = { vm.editNonogram(reviewItem.id, it) },
         )
         return
     }
@@ -118,7 +125,7 @@ fun AdminQuestionScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Create question(s) (Sudoku)") },
+                title = { Text("Create question(s)") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -152,6 +159,12 @@ fun AdminQuestionScreen(
             // scrolls with the tiles below it.
             item(span = { GridItemSpan(maxLineSpan) }) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    TypeDropdown(
+                        selected = state.type,
+                        enabled = !state.parsing && !state.creating,
+                        onSelect = vm::setType,
+                    )
+
                     OutlinedButton(
                         onClick = {
                             picker.launch(
@@ -165,8 +178,8 @@ fun AdminQuestionScreen(
 
                     if (state.items.isEmpty()) {
                         Text(
-                            "Pick one or several sudoku photos. Each becomes a tile you can parse, " +
-                                "review, and create.",
+                            "Pick one or several ${state.type.label.lowercase()} photos. Each becomes " +
+                                "a tile you can parse, review, and create.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -215,8 +228,15 @@ fun AdminQuestionScreen(
                             )
                         }
                         Text(
-                            "Tap a tile to review its photo and grid side by side, fix mis-read " +
-                                "digits, and set its title.",
+                            when (state.type) {
+                                AuthoringType.SUDOKU ->
+                                    "Tap a tile to review its photo and grid side by side, fix mis-read " +
+                                        "digits, and set its title."
+                                AuthoringType.NONOGRAM ->
+                                    "Tap a tile to review its photo and clues side by side, fix mis-read " +
+                                        "clues or phantom lines, and set its title. A red tile has clues " +
+                                        "the server will reject."
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -225,7 +245,7 @@ fun AdminQuestionScreen(
             }
 
             items(state.items, key = { it.id }) { item ->
-                BatchTile(item = item, onClick = { vm.openReview(item.id) })
+                BatchTile(type = state.type, item = item, onClick = { vm.openReview(item.id) })
             }
         }
     }
@@ -233,7 +253,7 @@ fun AdminQuestionScreen(
 
 /** One image in the grid: its mini-board (or picked photo while un-parsed) + a status badge. */
 @Composable
-private fun BatchTile(item: BatchItem, onClick: () -> Unit) {
+private fun BatchTile(type: AuthoringType, item: BatchItem, onClick: () -> Unit) {
     Column(
         modifier = Modifier.clickable(onClick = onClick),
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -241,7 +261,15 @@ private fun BatchTile(item: BatchItem, onClick: () -> Unit) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.size(120.dp)) {
             val hasGrid = item.status in GRID_STATUSES
             if (hasGrid) {
-                SudokuMiniBoard(givens = item.userValues, size = 120.dp)
+                when (type) {
+                    AuthoringType.SUDOKU -> SudokuMiniBoard(givens = item.userValues, size = 120.dp)
+                    AuthoringType.NONOGRAM -> NonogramMiniBoard(
+                        rows = item.nonogram.rows,
+                        cols = item.nonogram.cols,
+                        hasProblems = NonogramAuthoring.problems(item.nonogram).isNotEmpty(),
+                        size = 120.dp,
+                    )
+                }
             } else {
                 AsyncImage(
                     model = item.uri,
@@ -330,13 +358,15 @@ private fun CreateFooter(
 
 /**
  * Full-screen review for a single tile: the zoomable source photo on top (so the user
- * can read the original closely) and the interactive player board below, reused
- * verbatim from the player. A pinned top bar and a bottom button both say Done — every
- * edit is already saved to state as it's typed, so "Done" just returns to the grid.
+ * can read the original closely) and the editor below — for sudoku the interactive
+ * player board, reused verbatim from the player; for nonogram [NonogramClueEditor].
+ * A pinned top bar and a bottom button both say Done — every edit is already saved
+ * to state as it's typed, so "Done" just returns to the grid.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun ReviewScreen(
+    type: AuthoringType,
     item: BatchItem,
     selectedCell: String?,
     defaultDifficulty: Int,
@@ -348,6 +378,7 @@ private fun ReviewScreen(
     onAuthor: (String) -> Unit,
     onDifficulty: (Int?) -> Unit,
     onRemove: () -> Unit,
+    onEditNonogram: ((NonogramDraft) -> NonogramDraft) -> Unit,
 ) {
     // The review board reuses the player SudokuBoard verbatim; an all-zero-hints
     // puzzle keeps every cell editable (parsed givens ride in as userValues).
@@ -386,8 +417,14 @@ private fun ReviewScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                "Compare the photo with the grid — pinch to zoom the photo, tap a cell to fix a " +
-                    "mis-read digit. Conflicts show in red.",
+                when (type) {
+                    AuthoringType.SUDOKU ->
+                        "Compare the photo with the grid — pinch to zoom the photo, tap a cell to fix a " +
+                            "mis-read digit. Conflicts show in red."
+                    AuthoringType.NONOGRAM ->
+                        "Compare the photo with the clues — pinch to zoom the photo, edit a line's clue " +
+                            "as numbers separated by spaces, delete a phantom line, or add a missed one."
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -407,19 +444,24 @@ private fun ReviewScreen(
                 )
             }
 
-            SudokuBoard(
-                puzzle = reviewPuzzle,
-                userValues = item.userValues,
-                liveValidate = true,
-                selectedCell = selectedCell,
-                onSelectCell = onSelectCell,
-            )
-            if (selectedCell != null) {
-                DigitBar(
-                    onDigit = onDigit,
-                    onClear = onClear,
-                    onDismiss = { onSelectCell(null) },
-                )
+            when (type) {
+                AuthoringType.SUDOKU -> {
+                    SudokuBoard(
+                        puzzle = reviewPuzzle,
+                        userValues = item.userValues,
+                        liveValidate = true,
+                        selectedCell = selectedCell,
+                        onSelectCell = onSelectCell,
+                    )
+                    if (selectedCell != null) {
+                        DigitBar(
+                            onDigit = onDigit,
+                            onClear = onClear,
+                            onDismiss = { onSelectCell(null) },
+                        )
+                    }
+                }
+                AuthoringType.NONOGRAM -> NonogramClueEditor(draft = item.nonogram, onChange = onEditNonogram)
             }
 
             item.error?.let {
@@ -461,6 +503,48 @@ private fun ReviewScreen(
 
             Button(onClick = onDone, modifier = Modifier.fillMaxWidth()) {
                 Text("Done")
+            }
+        }
+    }
+}
+
+/**
+ * The batch's puzzle type. Switching resets every tile to un-parsed (see
+ * [AdminQuestionViewModel.setType]), so it's locked while a parse or create is running.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TypeDropdown(
+    selected: AuthoringType,
+    enabled: Boolean,
+    onSelect: (AuthoringType) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded && enabled,
+        onExpandedChange = { if (enabled) expanded = it },
+    ) {
+        OutlinedTextField(
+            value = selected.label,
+            onValueChange = {},
+            readOnly = true,
+            enabled = enabled,
+            label = { Text("Puzzle type") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded && enabled) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled),
+        )
+        ExposedDropdownMenu(
+            expanded = expanded && enabled,
+            onDismissRequest = { expanded = false },
+        ) {
+            for (t in AuthoringType.entries) {
+                DropdownMenuItem(
+                    text = { Text(t.label) },
+                    onClick = { onSelect(t); expanded = false },
+                )
             }
         }
     }

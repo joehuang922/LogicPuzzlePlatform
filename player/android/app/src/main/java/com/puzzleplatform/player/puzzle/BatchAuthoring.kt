@@ -60,3 +60,12 @@ object BatchRules {
     fun afterEdit(status: ItemStatus): ItemStatus =
         if (status == ItemStatus.CREATE_FAILED) ItemStatus.PARSED else status
 }
+
+/**
+ * The puzzle types the Admin batch flow can author from photos. [puzzleType] is what the
+ * parser is asked for and what the created question is stored as.
+ */
+enum class AuthoringType(val label: String, val puzzleType: Int) {
+    SUDOKU("Sudoku", SudokuAuthoring.PUZZLE_TYPE),
+    NONOGRAM("Nonogram", NonogramAuthoring.PUZZLE_TYPE),
+}
