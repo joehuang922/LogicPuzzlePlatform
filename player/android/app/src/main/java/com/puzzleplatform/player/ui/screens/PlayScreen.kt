@@ -66,6 +66,7 @@ import com.puzzleplatform.player.ui.board.NurikabeBoard
 import com.puzzleplatform.player.ui.board.NurimazeBoard
 import com.puzzleplatform.player.ui.board.NuritwinBoard
 import com.puzzleplatform.player.ui.board.RippleEffectBoard
+import com.puzzleplatform.player.ui.board.ShakashakaBoard
 import com.puzzleplatform.player.ui.board.ShikakuBoard
 import com.puzzleplatform.player.ui.board.SlalomBoard
 import com.puzzleplatform.player.ui.board.SlitherlinkBoard
@@ -347,6 +348,13 @@ fun PlayScreen(
                             // apply as an atomic batch (a 0 value drops the key), so a resize
                             // that moves the top-left can retire the old key in one update.
                             onApplyChanges = vm::putUserValues,
+                        )
+                        11 -> ShakashakaBoard(
+                            puzzle = puzzle,
+                            userValues = state.userValues,
+                            // Triangles/marks keyed "col,row" -> 1..5; the board picks the
+                            // next state from the tapped quadrant, putUserValue drops 0.
+                            onPutValue = vm::putUserValue,
                         )
                         24 -> NurikabeBoard(
                             puzzle = puzzle,
