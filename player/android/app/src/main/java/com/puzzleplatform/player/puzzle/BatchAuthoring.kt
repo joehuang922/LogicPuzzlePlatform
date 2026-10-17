@@ -68,4 +68,5 @@ object BatchRules {
 enum class AuthoringType(val label: String, val puzzleType: Int) {
     SUDOKU("Sudoku", SudokuAuthoring.PUZZLE_TYPE),
     NONOGRAM("Nonogram", NonogramAuthoring.PUZZLE_TYPE),
+    KAKURO("Kakuro", KakuroAuthoring.PUZZLE_TYPE),
 }

@@ -7,6 +7,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import com.puzzleplatform.player.data.model.Puzzle
@@ -22,6 +23,7 @@ private val USER_COLOR = Color(0xFF222222)
 private val CONFLICT_COLOR = Color(0xFFCC0000)
 private val SELECT_FILL = Color(0xFFE0E8FF)
 private val ERROR_FILL = Color(0xFFFFE0E0)
+private val SELECT_OUTLINE = Color(0xFF4A7BFF)
 
 /**
  * Compose Canvas renderer for Kakuro, the analog of
@@ -36,6 +38,9 @@ private val ERROR_FILL = Color(0xFFFFE0E0)
  * (possibly zoomed) cell size and handles pinch/pan — so big Kakuro grids stay
  * legible on a phone. Tapping an empty cell selects it; the caller renders a
  * [DigitBar] to enter values.
+ *
+ * With [selectAnyCell] (the Admin review editor) clue cells are selectable too, and
+ * the selected cell is outlined so a dark clue cell shows it.
  */
 @Composable
 fun KakuroBoard(
@@ -45,8 +50,10 @@ fun KakuroBoard(
     selectedCell: String?,
     onSelectCell: (String?) -> Unit,
     modifier: Modifier = Modifier,
+    selectAnyCell: Boolean = false,
 ) {
-    val cells = remember(puzzle.id) { KakuroEngine.parseCells(puzzle) }
+    // Keyed on the canon too: the Admin review editor changes it under a stable id.
+    val cells = remember(puzzle.id, puzzle.canonRepr) { KakuroEngine.parseCells(puzzle) }
     val rows = cells.size
     val cols = cells.maxOfOrNull { it.size } ?: 0
     if (rows == 0 || cols == 0) return
@@ -61,7 +68,8 @@ fun KakuroBoard(
         resetKey = puzzle.id,
         modifier = modifier,
         onTapCell = { col, row ->
-            if (cells.getOrNull(row)?.getOrNull(col) is KakuroEngine.Cell.Empty) {
+            val tapped = cells.getOrNull(row)?.getOrNull(col)
+            if (tapped is KakuroEngine.Cell.Empty || (selectAnyCell && tapped != null)) {
                 val key = "$col,$row"
                 onSelectCell(if (selectedCell == key) null else key)
             }
@@ -122,6 +130,18 @@ fun KakuroBoard(
         for (col in 0..cols) {
             val p = col * cell
             drawLine(LINE, Offset(p, 0f), Offset(p, boardH), if (col == 0 || col == cols) thick else thin)
+        }
+
+        if (selectAnyCell) {
+            selectedCell?.split(",")?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 2 }?.let { (c, r) ->
+                val inset = thick / 2
+                drawRect(
+                    SELECT_OUTLINE,
+                    topLeft = Offset(c * cell + inset, r * cell + inset),
+                    size = Size(cell - thick, cell - thick),
+                    style = Stroke(thick),
+                )
+            }
         }
     }
 }

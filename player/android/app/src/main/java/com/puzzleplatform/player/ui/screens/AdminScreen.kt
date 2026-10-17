@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.dp
 
 /**
  * Admin hub: entry point for in-app authoring. Links to the two pilot flows —
- * create a collection and create questions (sudoku, nonogram) from photos. A plain,
+ * create a collection and create questions (sudoku, nonogram, kakuro) from photos. A plain,
  * unguarded route (the API has no auth), reached from the always-visible build
  * icon in the Home top bar.
  */

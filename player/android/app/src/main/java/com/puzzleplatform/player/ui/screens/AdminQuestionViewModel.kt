@@ -10,6 +10,8 @@ import com.puzzleplatform.player.data.model.CreatePuzzleRequest
 import com.puzzleplatform.player.puzzle.AuthoringType
 import com.puzzleplatform.player.puzzle.BatchRules
 import com.puzzleplatform.player.puzzle.ItemStatus
+import com.puzzleplatform.player.puzzle.KakuroAuthoring
+import com.puzzleplatform.player.puzzle.KakuroDraft
 import com.puzzleplatform.player.puzzle.NonogramAuthoring
 import com.puzzleplatform.player.puzzle.NonogramDraft
 import com.puzzleplatform.player.puzzle.SudokuAuthoring
@@ -27,7 +29,7 @@ import kotlinx.coroutines.sync.withPermit
  * yields depends on the batch's [AuthoringType]: a sudoku's givens ride in
  * [userValues] ("col,row" -> digit) — the same map the player's SudokuBoard renders
  * and edits — so the review reuses that board verbatim; a nonogram's clue lists ride
- * in [nonogram]. Metadata is
+ * in [nonogram], a kakuro's cell grid in [kakuro]. Metadata is
  * per-item except the shared source collection and the default difficulty (a null
  * [difficulty] inherits the batch default).
  */
@@ -37,6 +39,7 @@ data class BatchItem(
     val status: ItemStatus = ItemStatus.PENDING,
     val userValues: Map<String, Int> = emptyMap(),
     val nonogram: NonogramDraft = NonogramDraft(),
+    val kakuro: KakuroDraft = KakuroDraft(),
     val title: String = "",
     val author: String = "",
     val difficulty: Int? = null,
@@ -164,6 +167,7 @@ class AdminQuestionViewModel(
                 when (type) {
                     AuthoringType.SUDOKU -> it.copy(userValues = SudokuAuthoring.userValuesFromCanon(canon))
                     AuthoringType.NONOGRAM -> it.copy(nonogram = NonogramAuthoring.draftFromCanon(canon))
+                    AuthoringType.KAKURO -> it.copy(kakuro = KakuroAuthoring.draftFromCanon(canon))
                 }.copy(status = ItemStatus.PARSED, error = null)
             }
         } catch (e: Exception) {
@@ -201,6 +205,10 @@ class AdminQuestionViewModel(
     /** Apply a nonogram clue edit (see [NonogramAuthoring]) to tile [id]. */
     fun editNonogram(id: String, transform: (NonogramDraft) -> NonogramDraft) =
         editItem(id) { it.copy(nonogram = transform(it.nonogram)) }
+
+    /** Apply a kakuro cell edit (see [KakuroAuthoring]) to tile [id]. */
+    fun editKakuro(id: String, transform: (KakuroDraft) -> KakuroDraft) =
+        editItem(id) { it.copy(kakuro = transform(it.kakuro)) }
 
     private fun editItem(id: String, transform: (BatchItem) -> BatchItem) {
         updateItem(id) {
@@ -261,6 +269,11 @@ class AdminQuestionViewModel(
                                 NonogramAuthoring.canonFromDraft(item.nonogram),
                                 item.nonogram.cols,
                                 item.nonogram.rows,
+                            )
+                            AuthoringType.KAKURO -> Triple(
+                                KakuroAuthoring.canonFromDraft(item.kakuro),
+                                item.kakuro.cols,
+                                item.kakuro.rows,
                             )
                         }
                         val id = repo.createPuzzle(
