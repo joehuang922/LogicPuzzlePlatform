@@ -162,13 +162,20 @@ class AdminQuestionViewModel(
     private suspend fun parseOne(id: String, uri: Uri, type: AuthoringType) {
         updateItem(id) { it.copy(status = ItemStatus.PARSING, error = null) }
         try {
-            val canon = repo.parseImage(uri, type.puzzleType)
+            val res = repo.parseImage(uri, type.puzzleType)
+            val canon = res.canon
             updateItem(id) {
                 when (type) {
                     AuthoringType.SUDOKU -> it.copy(userValues = SudokuAuthoring.userValuesFromCanon(canon))
                     AuthoringType.NONOGRAM -> it.copy(nonogram = NonogramAuthoring.draftFromCanon(canon))
                     AuthoringType.KAKURO -> it.copy(kakuro = KakuroAuthoring.draftFromCanon(canon))
-                }.copy(status = ItemStatus.PARSED, error = null)
+                }.copy(
+                    status = ItemStatus.PARSED,
+                    error = null,
+                    // Pre-fill from the scan, but never overwrite what the admin typed.
+                    title = it.title.ifBlank { res.metadata?.title.orEmpty() },
+                    author = it.author.ifBlank { res.metadata?.author.orEmpty() },
+                )
             }
         } catch (e: Exception) {
             updateItem(id) { it.copy(status = ItemStatus.PARSE_FAILED, error = repo.serverMessage(e)) }

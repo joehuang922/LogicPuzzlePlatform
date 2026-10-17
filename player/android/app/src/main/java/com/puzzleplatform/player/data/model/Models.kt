@@ -113,9 +113,16 @@ data class ParseImageRequest(
     val puzzleType: Int,
 )
 
-/** Parser response: { canon: <per-type puzzle JSON> } (sudoku: { hints: ... }). */
+/**
+ * Parser response: { canon: <per-type puzzle JSON>, metadata: { title, author } }
+ * (sudoku canon: { hints: ... }). [metadata] is absent from older parser builds.
+ */
 @Serializable
-data class ParseImageResponse(val canon: JsonObject)
+data class ParseImageResponse(val canon: JsonObject, val metadata: ParsedMetadata? = null)
+
+/** Best-effort title / author the parser read from around the board; either may be null. */
+@Serializable
+data class ParsedMetadata(val title: String? = null, val author: String? = null)
 
 @Serializable
 data class PuzzleType(

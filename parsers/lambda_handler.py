@@ -202,7 +202,15 @@ def handler(event, context):
         return {
             "statusCode": 200,
             "headers": HEADERS,
-            "body": json.dumps({"canon": result.grid}),
+            "body": json.dumps({
+                "canon": result.grid,
+                # Best-effort title/author read from around the board; either
+                # may be null. Clients only use it to pre-fill editable fields.
+                "metadata": {
+                    "title": result.metadata.title,
+                    "author": result.metadata.author,
+                },
+            }),
         }
 
     except Exception as e:

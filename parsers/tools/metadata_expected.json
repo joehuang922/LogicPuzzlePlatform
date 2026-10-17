@@ -1,0 +1,11 @@
+[
+  {"image": "docs/shakashaka/board-shakashaka.jpg", "type": "shakashaka", "title": "1", "author": "半袖愛好会の男"},
+  {"image": "docs/shakashaka/board-shakashaka-medium.jpg", "type": "shakashaka", "title": "5", "author": "オグランド"},
+  {"image": "docs/shakashaka/board-shakashaka-titled.jpg", "type": "shakashaka", "title": "4", "author": "セダム"},
+  {"image": "docs/nurikabe/board-nurikabe.png", "type": "nurikabe", "title": "1", "author": "みのり"},
+  {"image": "docs/nurikabe/board-nurikabe-medium.png", "type": "nurikabe", "title": "34", "author": "カタコリ"},
+  {"image": "docs/nonogram/board-nonogram.jpg", "type": "nonogram", "title": "1", "author": null},
+  {"image": "docs/nonogram/board-nonogram-medium.jpg", "type": "nonogram", "title": "23 準備はバッチリ?", "author": null},
+  {"image": "docs/nonogram/board-nonogram-big.jpg", "type": "nonogram", "title": "80 元気に遊ぼう!", "author": null},
+  {"image": "docs/nonogram/board-nonogram-titled.jpg", "type": "nonogram", "title": "30 ふわふわゆらり", "author": null}
+]

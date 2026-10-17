@@ -316,6 +316,12 @@ export function getProfile(player: number) {
 
 const PARSER_URL = import.meta.env.VITE_PARSER_URL ?? `${API_BASE}/parse`;
 
+export interface ParseImageResponse {
+  canon: Record<string, unknown>;
+  /** Best-effort title/author read from around the board; absent on older parsers. */
+  metadata?: { title: string | null; author: string | null };
+}
+
 export async function parseImage(image: string, puzzleType: number) {
   const res = await fetch(PARSER_URL, {
     method: "POST",
@@ -330,5 +336,5 @@ export async function parseImage(image: string, puzzleType: number) {
     } catch {}
     throw new Error(`Parse error ${res.status}: ${detail}`);
   }
-  return res.json() as Promise<{ canon: Record<string, unknown> }>;
+  return res.json() as Promise<ParseImageResponse>;
 }

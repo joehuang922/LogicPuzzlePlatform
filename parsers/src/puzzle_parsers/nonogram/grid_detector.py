@@ -28,6 +28,15 @@ class NonogramGeometry:
     cell_w: float
     cell_h: float
 
+    @property
+    def quad(self) -> NDArray:
+        """Corners of the whole puzzle (clue areas + playable grid)."""
+        x0 = self.row_clue_rect[0]
+        y0 = self.col_clue_rect[1]
+        gx, gy, gw, gh = self.grid_rect
+        x1, y1 = gx + gw, gy + gh
+        return np.array([[x0, y0], [x1, y0], [x1, y1], [x0, y1]], dtype=np.float32)
+
 
 def detect_nonogram_grid(
     image: NDArray,

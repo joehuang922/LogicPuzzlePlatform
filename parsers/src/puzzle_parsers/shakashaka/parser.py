@@ -46,6 +46,7 @@ class ShakashakaParser(PuzzleParser):
         self, img_array: np.ndarray, debug_dir: str | None = None
     ) -> ShakashakaBoard:
         geom = detect_shakashaka_grid(img_array, debug_dir=debug_dir)
+        self._board_located(img_array, geom.quad)
         warped_gray = cv2.cvtColor(geom.warped, cv2.COLOR_BGR2GRAY)
 
         cells = self._classify_cells(warped_gray, geom, debug_dir=debug_dir)

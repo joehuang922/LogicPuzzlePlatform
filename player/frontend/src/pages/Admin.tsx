@@ -317,6 +317,9 @@ function QuestionForm({
           timeout,
         ]);
         setCanonRepr(JSON.stringify(res.canon, null, 2));
+        // Pre-fill from the scan, but never overwrite what the admin typed.
+        setTitle((t) => t || res.metadata?.title || "");
+        setAuthor((a) => a || res.metadata?.author || "");
         setParseError(null);
       } catch (err: unknown) {
         setParseError(err instanceof Error ? err.message : "Parse failed");

@@ -362,12 +362,16 @@ export default function BatchUploadForm({
         timeout,
       ]);
 
-      updateItem(itemId, {
+      // Pre-fill title/author from the scan, but never overwrite what the admin typed.
+      setItems((prev) => prev.map((item) => item.id === itemId ? {
+        ...item,
         status: "success",
         canonRepr: JSON.stringify(res.canon, null, 2),
         dataUrl,
         error: undefined,
-      });
+        title: item.title || res.metadata?.title || "",
+        author: item.author || res.metadata?.author || "",
+      } : item));
     } catch (err: unknown) {
       updateItem(itemId, {
         status: "error",

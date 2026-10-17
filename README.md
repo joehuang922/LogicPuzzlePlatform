@@ -101,6 +101,21 @@ Or directly with the venv:
 parsers/.venv/bin/python -m puzzle_parsers.combo_sudoku <image> --backend <claude|easyocr> -o output.json
 ```
 
+### Title / author extraction
+
+Besides the canon, the parser response carries `metadata: { title, author }`,
+read by one Gemini call on a crop of the page around the board (header number,
+short title, `作●<name>`). It runs concurrently with cell recognition, is best
+effort (null on any failure), and only pre-fills the Admin title/author fields.
+
+- A parser opts in by calling `self._board_located(image, quad)` once grid
+  detection has the board's corners in `image` coordinates. Wired so far:
+  shakashaka, nurikabe, nonogram.
+- `PARSER_METADATA=0` turns it off.
+- `parsers/.venv/bin/python -m tools.eval_metadata` (from `parsers/`, needs
+  `GEMINI_API_KEY`) scores it against the labelled scans in
+  `parsers/tools/metadata_expected.json`.
+
 ### Player (Frontend)
 ```bash
 cd player

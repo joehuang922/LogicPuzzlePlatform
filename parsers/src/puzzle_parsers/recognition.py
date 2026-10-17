@@ -127,6 +127,19 @@ class CellRecognizer(ABC):
         """
         ...
 
+    def recognize_image(self, image: Image.Image, prompt: str) -> object:
+        """Like :meth:`recognize_full_image`, for an in-memory image."""
+        import os
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+            path = f.name
+        try:
+            image.save(path)
+            return self.recognize_full_image(path, prompt)
+        finally:
+            os.unlink(path)
+
     @property
     @abstractmethod
     def supports_full_image(self) -> bool:

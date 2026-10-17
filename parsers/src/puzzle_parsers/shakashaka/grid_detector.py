@@ -23,6 +23,7 @@ class ShakashakaGeometry:
     v_lines: list[int]
     cell_h: float
     cell_w: float
+    quad: NDArray | None = None  # board corners in the input image
 
 
 def detect_shakashaka_grid(
@@ -49,4 +50,5 @@ def detect_shakashaka_grid(
         v_lines=v_lines,
         cell_h=cell_h,
         cell_w=cell_w,
+        quad=quad,
     )

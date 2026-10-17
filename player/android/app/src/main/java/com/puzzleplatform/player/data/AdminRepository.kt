@@ -9,10 +9,10 @@ import com.puzzleplatform.player.data.model.Collection
 import com.puzzleplatform.player.data.model.CreateCollectionRequest
 import com.puzzleplatform.player.data.model.CreatePuzzleRequest
 import com.puzzleplatform.player.data.model.ParseImageRequest
+import com.puzzleplatform.player.data.model.ParseImageResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import retrofit2.HttpException
 
@@ -45,20 +45,20 @@ class AdminRepository(
 
     /**
      * Downscale + base64-encode [uri] off the main thread, POST it to the parser
-     * as [puzzleType], and return the parsed canon JSON (sudoku: `{ hints }`).
+     * as [puzzleType], and return the parsed canon JSON (sudoku: `{ hints }`) plus
+     * the best-effort title/author read from around the board.
      *
      * @throws IllegalStateException if no parser URL is configured.
      */
-    suspend fun parseImage(uri: Uri, puzzleType: Int): JsonObject {
+    suspend fun parseImage(uri: Uri, puzzleType: Int): ParseImageResponse {
         check(parserConfigured) { "No parser URL configured" }
         val base64 = withContext(Dispatchers.IO) {
             ImageInput.toBase64Jpeg(context, uri)
         }
-        val res = parserApi.parse(
+        return parserApi.parse(
             url = BuildConfig.PARSER_URL,
             body = ParseImageRequest(image = base64, puzzleType = puzzleType),
         )
-        return res.canon
     }
 
     /**

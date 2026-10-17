@@ -1,5 +1,6 @@
 package com.puzzleplatform.player.data
 
+import com.puzzleplatform.player.data.model.ParseImageResponse
 import com.puzzleplatform.player.data.model.Puzzle
 import com.puzzleplatform.player.data.model.PuzzleResponse
 import com.puzzleplatform.player.data.model.Snapshot
@@ -12,6 +13,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -190,5 +192,19 @@ class ModelsDeserializationTest {
         """.trimIndent()
         val p: Puzzle = json.decodeFromString<PuzzleResponse>(raw).puzzle
         assertEquals("abc", p.id)
+    }
+
+    @Test
+    fun parseResponse_readsMetadata() {
+        val raw = """{ "canon": { "hints": [] }, "metadata": { "title": "4", "author": null } }"""
+        val res = json.decodeFromString<ParseImageResponse>(raw)
+        assertEquals("4", res.metadata?.title)
+        assertNull(res.metadata?.author)
+    }
+
+    @Test
+    fun parseResponse_metadataOptional() {
+        val res = json.decodeFromString<ParseImageResponse>("""{ "canon": {} }""")
+        assertNull(res.metadata)
     }
 }

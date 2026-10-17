@@ -88,6 +88,7 @@ class NonogramParser(PuzzleParser):
         ocr: str = "gemini",
     ) -> NonogramBoard:
         geom = detect_nonogram_grid(img_array, debug_dir=debug_dir)
+        self._board_located(img_array, geom.quad)
 
         debug_path = Path(debug_dir) if debug_dir else None
 

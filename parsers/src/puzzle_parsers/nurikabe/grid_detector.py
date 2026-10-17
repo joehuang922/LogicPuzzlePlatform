@@ -37,6 +37,7 @@ class NurikabeGeometry:
     v_lines: list[int]
     cell_h: float
     cell_w: float
+    quad: NDArray | None = None  # board corners in the input image
 
 
 def detect_nurikabe_grid(
@@ -84,4 +85,5 @@ def detect_nurikabe_grid(
         warped=warped, rows=rows, cols=cols,
         h_lines=h_lines, v_lines=v_lines,
         cell_h=cell_h, cell_w=cell_w,
+        quad=border_pts,
     )
