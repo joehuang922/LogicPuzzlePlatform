@@ -24,6 +24,7 @@ import { computeShikakuProgress } from "./shikaku";
 import { computeNorinoriProgress } from "./norinori";
 import { computeNurikabeProgress } from "./nurikabe";
 import { computeRippleEffectProgress } from "./rippleEffect";
+import { computeHitoriProgress } from "./hitori";
 
 export interface ProgressCalculator {
   puzzleType: number;
@@ -61,6 +62,7 @@ register(computeShikakuProgress);
 register(computeNorinoriProgress);
 register(computeNurikabeProgress);
 register(computeRippleEffectProgress);
+register(computeHitoriProgress);
 
 export function computeProgress(
   puzzle: PuzzleDefinition,

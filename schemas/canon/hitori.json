@@ -1,0 +1,19 @@
+{
+  "title": "Hitori Canonical Representation",
+  "description": "Rectangular grid where every cell holds a positive integer. The solver shades cells so no number repeats among the unshaded cells of a row or column, shaded cells never touch orthogonally, and the unshaded cells stay orthogonally connected.",
+  "type": "object",
+  "required": ["cells"],
+  "additionalProperties": false,
+  "properties": {
+    "cells": {
+      "description": "m x n grid of positive integers. Every cell holds a number; there are no empty cells.",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": { "type": "integer", "minimum": 1 },
+        "minItems": 1
+      },
+      "minItems": 1
+    }
+  }
+}

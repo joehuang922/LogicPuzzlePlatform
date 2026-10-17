@@ -28,6 +28,7 @@ import { shikakuRenderer } from "./renderers/shikaku";
 import { norinoriRenderer } from "./renderers/norinori";
 import { nurikabeRenderer } from "./renderers/nurikabe";
 import { rippleEffectRenderer } from "./renderers/rippleEffect";
+import { hitoriRenderer } from "./renderers/hitori";
 
 registerRenderer(comboSudokuRenderer);
 registerRenderer(sudokuRenderer);
@@ -54,6 +55,7 @@ registerRenderer(shikakuRenderer);
 registerRenderer(norinoriRenderer);
 registerRenderer(nurikabeRenderer);
 registerRenderer(rippleEffectRenderer);
+registerRenderer(hitoriRenderer);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

@@ -320,6 +320,16 @@ export interface NurikabeAnswer {
   states: number[][];
 }
 
+export interface HitoriCanon {
+  // rows x cols; every cell holds a positive integer (no empty cells)
+  cells: number[][];
+}
+
+export interface HitoriAnswer {
+  // rows x cols; 0 = unset, 1 = shaded, 2 = marked (circled; stays unshaded)
+  states: number[][];
+}
+
 export interface RippleEffectCanon {
   // rows x cols; 0 = empty, positive integer = pre-filled clue
   cells: number[][];

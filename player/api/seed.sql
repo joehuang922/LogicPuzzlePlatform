@@ -94,7 +94,8 @@ INSERT INTO puzzle_types (id, name, jp_label, rule) VALUES
   (22, 'shikaku', '四角に切れ', 'Divide the grid into rectangles. Each rectangle contains exactly one number, and that number equals the rectangle''s area (its width times height in cells). Rectangles may not overlap, and every cell must belong to exactly one rectangle.'),
   (23, 'norinori', 'のりのり', 'Shade cells so every region contains exactly two shaded cells. All shaded cells must form dominoes: each shaded cell is orthogonally adjacent to exactly one other shaded cell. Dominoes may cross region boundaries.'),
   (24, 'nurikabe', 'ぬりかべ', 'Each number is an island of that many white cells, with exactly one number per island. Islands may not touch orthogonally. All remaining black cells form one connected sea, and no 2x2 area is entirely black.'),
-  (25, 'ripple-effect', '波及効果', 'The grid is divided into rooms. Fill every cell so each room of size N contains the numbers 1 to N exactly once. If the same number K appears more than once in a row or column, those equal numbers must be at least K cells apart.');
+  (25, 'ripple-effect', '波及効果', 'The grid is divided into rooms. Fill every cell so each room of size N contains the numbers 1 to N exactly once. If the same number K appears more than once in a row or column, those equal numbers must be at least K cells apart.'),
+  (26, 'hitori', 'ひとりにしてくれ', 'Shade some cells so that no number appears more than once among the unshaded cells of any row or column. Shaded cells may not touch each other orthogonally. All unshaded cells must form one orthogonally connected group.');
 
 -- Seed sample puzzle: sudoku (difficulty 4 = hard)
 INSERT INTO puzzle_questions (id, puzzle_type, title, difficulty, width, height, canon_repr) VALUES (

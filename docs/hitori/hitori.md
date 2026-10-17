@@ -79,7 +79,7 @@ Marking is never required. A board with every remaining cell left at `0` can sti
 - Left click cycles a cell forward: empty → shaded → marked → empty. Right click cycles backward: empty → marked → shaded → empty. There is no drag-paint, and each click changes one cell. This is the shared shade/mark interaction. On Android the engine implements `ShadeMarkEngine` and the board's `onTapCell` is wired to `vm::tapShadeCell`.
 - Every cell is playable. Unlike Nurikabe, there are no read-only clue cells.
 - **Appearance:**
-  - Shaded cells are filled with the shared `ROOM_SHADE` gray, with the number still drawn in black. Hitori has no rooms, but the number has to stay readable so the player can check remaining duplicates.
+  - Shaded cells are filled black, with the number drawn in white so the player can still check remaining duplicates. Hitori has no rooms, so the `ROOM_SHADE` rule does not apply.
   - Marked cells draw a circle around the number, as in the scanned worked example.
   - Unset cells show only the number.
   - Grid lines are thin and solid, with a thicker outer border.

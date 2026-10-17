@@ -16,6 +16,7 @@ from puzzle_parsers.tentaishow.models import TentaishowBoard
 from puzzle_parsers.heyawake.models import HeyawakeBoard
 from puzzle_parsers.shikaku.models import ShikakuBoard
 from puzzle_parsers.ripple_effect.models import RippleEffectBoard
+from puzzle_parsers.hitori.models import HitoriBoard
 from puzzle_parsers.validate import validate_canon
 
 SCHEMA_DIR = Path(__file__).parents[2] / "schemas" / "canon"
@@ -30,6 +31,7 @@ MODELS = {
     "heyawake": HeyawakeBoard,
     "shikaku": ShikakuBoard,
     "ripple-effect": RippleEffectBoard,
+    "hitori": HitoriBoard,
 }
 
 
@@ -203,3 +205,14 @@ def test_invalid_ripple_effect_fails():
     }
     with pytest.raises(Exception):
         validate_canon("ripple-effect", data)
+
+
+def test_valid_hitori_passes():
+    data = {"cells": [[1, 2, 1], [3, 3, 2], [2, 1, 3]]}
+    validate_canon("hitori", data)
+
+
+def test_invalid_hitori_fails():
+    data = {"cells": [[1, 2, 1], [3, 0, 2], [2, 1, 3]]}  # 0 not allowed: every cell holds a number
+    with pytest.raises(Exception):
+        validate_canon("hitori", data)

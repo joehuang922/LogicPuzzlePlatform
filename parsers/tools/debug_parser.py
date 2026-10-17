@@ -79,6 +79,7 @@ NAME_TO_TYPE: dict[str, int] = {
     "norinori": 23,
     "nurikabe": 24,
     "ripple_effect": 25,
+    "hitori": 26,
 }
 
 

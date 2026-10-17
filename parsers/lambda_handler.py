@@ -121,6 +121,9 @@ def _build_parser(puzzle_type: int):
     if puzzle_type == 25:
         from puzzle_parsers.ripple_effect.parser import RippleEffectParser
         return RippleEffectParser(ocr_backend=ocr)
+    if puzzle_type == 26:
+        from puzzle_parsers.hitori.parser import HitoriParser
+        return HitoriParser(ocr_backend=ocr)
     return None
 
 
