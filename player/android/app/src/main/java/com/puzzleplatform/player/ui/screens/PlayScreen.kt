@@ -3,6 +3,8 @@ package com.puzzleplatform.player.ui.screens
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -42,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -51,6 +54,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.puzzleplatform.player.data.model.Puzzle
 import com.puzzleplatform.player.ui.DIFFICULTY_LABELS
 import com.puzzleplatform.player.ui.board.DigitBar
 import com.puzzleplatform.player.ui.board.FillominoBoard
@@ -73,6 +77,7 @@ import com.puzzleplatform.player.ui.board.SlitherlinkBoard
 import com.puzzleplatform.player.ui.board.SudokuBoard
 import com.puzzleplatform.player.ui.board.TentaishowBoard
 import com.puzzleplatform.player.ui.board.YajilinBoard
+import com.puzzleplatform.player.puzzle.PuzzleEngines
 import com.puzzleplatform.player.puzzle.SudokuHinter
 import com.puzzleplatform.player.ui.formatElapsed
 
@@ -85,7 +90,7 @@ private class PlayViewModelFactory(
         PlayViewModel(puzzleId, attemptId) as T
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun PlayScreen(
     puzzleId: String,
@@ -366,9 +371,19 @@ fun PlayScreen(
                             // Reverse (undo/redo) controls sit ABOVE the board — the Nonogram
                             // pilot steps back and forth through the last 100 moves, and these
                             // are kept clear of the frequently-tapped Fill/Cross chips below.
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            // A FlowRow so the check chip wraps below on narrow phones.
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 OutlinedButton(onClick = vm::undo, enabled = state.canUndo) { Text("↶ Undo") }
                                 OutlinedButton(onClick = vm::redo, enabled = state.canRedo) { Text("↷ Redo") }
+                                // Sits with undo/redo on purpose: with it on, step back until it
+                                // reads "On track" to land on the move where a mistake began.
+                                SolutionCheckChip(
+                                    puzzle = puzzle,
+                                    userValues = state.userValues,
+                                    enabled = state.solutionCheck,
+                                    onToggle = vm::toggleSolutionCheck,
+                                    modifier = Modifier.align(Alignment.CenterVertically),
+                                )
                             }
                             NonogramBoard(
                                 puzzle = puzzle,
@@ -535,6 +550,41 @@ private fun HintControls(
         }
     }
 }
+
+/**
+ * Toggle for the "on track" check (PuzzleEngine.matchesSolution): when on, it reads
+ * whether every mark so far agrees with the stored solution, without saying where it
+ * doesn't. Hidden when the puzzle has no stored solution to check against.
+ */
+@Composable
+private fun SolutionCheckChip(
+    puzzle: Puzzle,
+    userValues: Map<String, Int>,
+    enabled: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val engine = PuzzleEngines.forType(puzzle.puzzleType) ?: return
+    // An empty board always agrees with a solution, so null here means "no check".
+    if (engine.matchesSolution(puzzle, emptyMap()) == null) return
+    // Computed only while the check is on, so an off toggle never peeks at the answer.
+    val onTrack = if (enabled) engine.matchesSolution(puzzle, userValues) else null
+    FilterChip(
+        selected = enabled,
+        onClick = onToggle,
+        modifier = modifier,
+        label = {
+            when (onTrack) {
+                true -> Text("✓ On track", color = ON_TRACK, fontWeight = FontWeight.Bold)
+                false -> Text("✗ Off track", color = OFF_TRACK, fontWeight = FontWeight.Bold)
+                null -> Text("Check: Off")
+            }
+        },
+    )
+}
+
+private val ON_TRACK = Color(0xFF2E7D32)
+private val OFF_TRACK = Color(0xFFC62828)
 
 @Composable
 private fun EditedPuzzleBanner(

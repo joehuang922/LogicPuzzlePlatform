@@ -89,6 +89,7 @@ Every row and every column satisfies its clue simultaneously.
   - Dragging over a cell that is already in the target state resets it to unset (no circular cycling). For example, left-dragging in black mode over an already-black cell makes it unset.
 - **Single click**: Behaves like a single-cell drag (same rules as above).
 - **Clue highlighting**: As rows/columns are completed, their clues dim or change color to indicate satisfaction.
+- **On-track check** (Android, off by default): a chip beside Undo/Redo. When on, it reads "✓ On track" while every filled cell is filled in the stored solution (`solutionRepr`) and every crossed cell is empty there, and "✗ Off track" otherwise. It never says *which* cell is wrong: to find a deep mistake, step back with Undo until it turns green. Hidden for puzzles with no stored solution.
 
 ### Progress calculation
 

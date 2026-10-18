@@ -231,4 +231,47 @@ class NonogramEngineTest {
     fun renderThumbnail_nullForEmptyClues() {
         assertNull(NonogramEngine.renderThumbnail(puzzle("""{}"""), JsonObject(emptyMap())))
     }
+
+    // -- matchesSolution ("on track" check) ----------------------------------
+
+    // The plus with its stored solution, as the auto-solve gate writes it.
+    private fun solvedPlus(): Puzzle = puzzle(plusCanon).copy(
+        solutionRepr = Json.parseToJsonElement(
+            """{"cells": [[0,1,0],[1,1,1],[0,1,0]]}"""
+        ) as JsonObject,
+    )
+
+    @Test
+    fun matchesSolution_nullWithoutStoredSolution() {
+        assertNull(NonogramEngine.matchesSolution(puzzle(plusCanon), plusSolved))
+    }
+
+    @Test
+    fun matchesSolution_nullWhenSolutionShapeDisagreesWithClues() {
+        val p = puzzle(plusCanon).copy(
+            solutionRepr = Json.parseToJsonElement("""{"cells": [[1,1],[1,1]]}""") as JsonObject,
+        )
+        assertNull(NonogramEngine.matchesSolution(p, emptyMap()))
+    }
+
+    @Test
+    fun matchesSolution_trueForEmptyAndPartialCorrectBoards() {
+        val p = solvedPlus()
+        assertEquals(true, NonogramEngine.matchesSolution(p, emptyMap()))
+        // A correct fill and a correct cross; the rest unmarked.
+        assertEquals(true, NonogramEngine.matchesSolution(p, mapOf("1,1" to 1, "0,0" to 2)))
+        assertEquals(true, NonogramEngine.matchesSolution(p, plusSolved))
+    }
+
+    @Test
+    fun matchesSolution_falseForAWrongFill() {
+        // (col0,row0) is empty in the solution.
+        assertEquals(false, NonogramEngine.matchesSolution(solvedPlus(), mapOf("1,1" to 1, "0,0" to 1)))
+    }
+
+    @Test
+    fun matchesSolution_falseForAWrongCross() {
+        // (col1,row0) is filled in the solution.
+        assertEquals(false, NonogramEngine.matchesSolution(solvedPlus(), mapOf("1,0" to 2)))
+    }
 }

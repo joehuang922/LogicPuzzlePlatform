@@ -37,6 +37,19 @@ interface PuzzleEngine {
      * Tentaishow colors each cell by its region's dot.
      */
     fun renderThumbnail(puzzle: Puzzle, answer: JsonObject): PuzzleThumbnail? = null
+
+    /**
+     * The "on track" check: true when every mark the player has made agrees with the
+     * puzzle's stored solution (auto-solve `solutionRepr`), false as soon as one does
+     * not. Unmarked cells never count against it, so a partial board can be on track.
+     * Unlike live validation it reports no *where*, only *whether*: a player who has
+     * gone wrong can step back through undo until it turns true again, finding the
+     * exact move that went wrong without the board being solved for them.
+     *
+     * Null when this type has no check (the default) or the puzzle has no stored
+     * solution (types without a solver, or puzzles not yet backfilled).
+     */
+    fun matchesSolution(puzzle: Puzzle, userValues: Map<String, Int>): Boolean? = null
 }
 
 /** Registry mapping puzzleType id -> engine. Add engines here as more types are ported. */

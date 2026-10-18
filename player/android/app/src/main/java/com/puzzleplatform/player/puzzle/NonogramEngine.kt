@@ -96,6 +96,39 @@ object NonogramEngine : PuzzleEngine {
         return result
     }
 
+    /**
+     * The stored solution (auto-solve `solutionRepr.cells`, rows x cols of 0/1), or null
+     * when the puzzle has none or its shape doesn't match the clues.
+     */
+    fun parseSolution(puzzle: Puzzle): Array<IntArray>? {
+        val clues = parseClues(puzzle)
+        val cells = puzzle.solutionRepr?.get("cells") as? JsonArray ?: return null
+        if (cells.size != clues.rows) return null
+        val grid = Array(clues.rows) { IntArray(clues.cols) }
+        for (r in 0 until clues.rows) {
+            val row = cells[r] as? JsonArray ?: return null
+            if (row.size != clues.cols) return null
+            for (c in 0 until clues.cols) {
+                grid[r][c] = (row[c] as? JsonPrimitive)?.intOrNull ?: return null
+            }
+        }
+        return grid
+    }
+
+    /** Every filled cell is filled in the solution, and every crossed cell is empty there. */
+    override fun matchesSolution(puzzle: Puzzle, userValues: Map<String, Int>): Boolean? {
+        val solution = parseSolution(puzzle) ?: return null
+        for ((r, row) in solution.withIndex()) {
+            for ((c, want) in row.withIndex()) {
+                when (userValues["$c,$r"]) {
+                    FILLED -> if (want != 1) return false
+                    CROSSED -> if (want != 0) return false
+                }
+            }
+        }
+        return true
+    }
+
     /** The filled/crossed/unset state of column [c], top to bottom. */
     private fun columnLine(userValues: Map<String, Int>, c: Int, rows: Int): List<Int> =
         List(rows) { r -> userValues["$c,$r"] ?: UNSET }

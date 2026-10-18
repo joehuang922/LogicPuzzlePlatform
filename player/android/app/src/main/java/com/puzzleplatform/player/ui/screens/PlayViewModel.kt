@@ -29,6 +29,9 @@ data class PlayUiState(
     val selectedCell: String? = null,
     val noteMode: Boolean = false,
     val liveValidate: Boolean = false,
+    // "On track" check against the stored solution (PuzzleEngine.matchesSolution).
+    // Off by default: it spoils the solve, so the player opts in when hunting a mistake.
+    val solutionCheck: Boolean = false,
     val progress: Double = 0.0,
     val elapsedSeconds: Int = 0,
     val saving: Boolean = false,
@@ -153,6 +156,8 @@ class PlayViewModel(
     }
 
     fun toggleLiveValidate() = _state.update { it.copy(liveValidate = !it.liveValidate) }
+
+    fun toggleSolutionCheck() = _state.update { it.copy(solutionCheck = !it.solutionCheck) }
 
     fun toggleNoteMode() = _state.update { it.copy(noteMode = !it.noteMode) }
 
