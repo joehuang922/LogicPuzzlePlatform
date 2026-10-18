@@ -56,6 +56,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.puzzleplatform.player.data.model.Puzzle
 import com.puzzleplatform.player.ui.DIFFICULTY_LABELS
+import com.puzzleplatform.player.ui.board.AkariBoard
 import com.puzzleplatform.player.ui.board.DigitBar
 import com.puzzleplatform.player.ui.board.FillominoBoard
 import com.puzzleplatform.player.ui.board.FillominoMode
@@ -364,6 +365,12 @@ fun PlayScreen(
                         24 -> NurikabeBoard(
                             puzzle = puzzle,
                             userValues = state.userValues,
+                            onTapCell = vm::tapShadeCell,
+                        )
+                        18 -> AkariBoard(
+                            puzzle = puzzle,
+                            userValues = state.userValues,
+                            liveValidate = state.liveValidate,
                             onTapCell = vm::tapShadeCell,
                         )
                         6 -> {

@@ -36,7 +36,7 @@ Legend: ✅ = implemented · 🟡 = partial · blank = not yet. In the **Parser*
 | 3  | nurimaze      |    | ✅ | ✅ | ✅ | ✅ |    |
 | 4  | double-choco  |    | ✅ | ✅ | ✅ |    |    |
 | 5  | slitherlink   |    | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 6  | nonogram      | ✅ | ✅ | ✅ | ✅★ | ✅ |    |
+| 6  | nonogram      | ✅ | ✅ | ✅ | ✅★ | ✅ | ✅ |
 | 7  | masyu         | ✅ | ✅ | ✅ | ✅ | ✅ |    |
 | 8  | pencils       |    | ✅ | ✅ | ✅ |    |    |
 | 9  | nuritwin      |    | ✅ | ✅ | ✅ | ✅ |    |
@@ -48,7 +48,7 @@ Legend: ✅ = implemented · 🟡 = partial · blank = not yet. In the **Parser*
 | 15 | lits          |    | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 16 | choco-banana  |    | ✅ | ✅ | ✅ |    |    |
 | 17 | number-link   |    | ✅ | ✅ | ✅ | ✅ |    |
-| 18 | akari         | 🟡 | ✅ | ✅ | ✅ |    |    |
+| 18 | akari         | 🟡 | ✅ | ✅ | ✅ | ✅ |    |
 | 19 | hell-golf     |    | ✅ | ✅ | ✅ | ✅ |    |
 | 20 | tentaishow    |    | ✅ | ✅ | ✅ | ✅ |    |
 | 21 | heyawake      |    | ✅ | ✅ | ✅ |    |    |
@@ -57,7 +57,7 @@ Legend: ✅ = implemented · 🟡 = partial · blank = not yet. In the **Parser*
 | 24 | nurikabe      |    | ✅ | ✅ | ✅ | ✅ |    |
 | 25 | ripple-effect |    | ✅ | ✅ | ✅ | ✅ |    |
 
-**Summary:** all 25 types are fully playable on the web, with editors, progress, and parsers complete across the board. The gaps are: **live conflict highlighting** (4 full — sudoku, nonogram, masyu, kakuro — plus a partial akari, which flags only mutually-illuminating bulbs); **parser accuracy** (2 ★ — sudoku and nonogram — parse cleanly enough to skip manual calibration; the other 23 need editorial correction); **Android** (18 — sudoku, slitherlink, nonogram, masyu, kakuro, hell-golf, fillomino, lits, nurimaze, nurikabe, nuritwin, number-link, tentaishow, shikaku, ripple-effect, yajilin, slalom, shakashaka); and the **solver/hint engine** (3 — sudoku, plus gate-only exact solvers for lits and slitherlink).
+**Summary:** all 25 types are fully playable on the web, with editors, progress, and parsers complete across the board. The gaps are: **live conflict highlighting** (4 full — sudoku, nonogram, masyu, kakuro — plus a partial akari, which flags only mutually-illuminating bulbs); **parser accuracy** (2 ★ — sudoku and nonogram — parse cleanly enough to skip manual calibration; the other 23 need editorial correction); **Android** (19 — sudoku, slitherlink, nonogram, masyu, kakuro, hell-golf, fillomino, lits, nurimaze, nurikabe, nuritwin, number-link, tentaishow, shikaku, ripple-effect, yajilin, slalom, shakashaka, akari); and the **solver/hint engine** (4 — sudoku, plus gate-only exact solvers for lits, slitherlink and nonogram).
 
 ## Tech Stack
 
