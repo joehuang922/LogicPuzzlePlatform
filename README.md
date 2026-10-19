@@ -16,7 +16,7 @@ Python package that converts scanned puzzle images into JSON representations. Ex
 
 ## Puzzle Type Completeness
 
-**Baseline (table stakes).** Every onboarded type ships these — all 25 have them, so they're omitted from the table below: **Doc** (`docs/<name>/`), **Schema** (`schemas/canon/<name>.json`), **Schema validator** (canon shape-check at ingest, `player/api/src/lib/schema.ts`), **DB** row (`player/api/seed.sql`), **Types** (`player/frontend/src/types/canon.ts`), **Board** (`<Name>Board.tsx`, incl. the completion check that fires `onComplete`), **Renderer** (registered in `player/frontend/src/main.tsx`), and **Extractor** (maps the player's in-progress board state into the canonical answer JSON for persistence, `player/frontend/src/extractors/<name>.ts`). Together these make a type parseable, storable, and playable on the web.
+**Baseline (table stakes).** Every onboarded type ships these — all 26 have them, so they're omitted from the table below: **Doc** (`docs/<name>/`), **Schema** (`schemas/canon/<name>.json`), **Schema validator** (canon shape-check at ingest, `player/api/src/lib/schema.ts`), **DB** row (`player/api/seed.sql`), **Types** (`player/frontend/src/types/canon.ts`), **Board** (`<Name>Board.tsx`, incl. the completion check that fires `onComplete`), **Renderer** (registered in `player/frontend/src/main.tsx`), and **Extractor** (maps the player's in-progress board state into the canonical answer JSON for persistence, `player/frontend/src/extractors/<name>.ts`). Together these make a type parseable, storable, and playable on the web.
 
 **Differentiating components.** These vary by type:
 
@@ -56,8 +56,9 @@ Legend: ✅ = implemented · 🟡 = partial · blank = not yet. In the **Parser*
 | 23 | norinori      |    | ✅ | ✅ | ✅ |    |    |
 | 24 | nurikabe      |    | ✅ | ✅ | ✅ | ✅ |    |
 | 25 | ripple-effect |    | ✅ | ✅ | ✅ | ✅ |    |
+| 26 | hitori        |    | ✅ | ✅ | ✅ | ✅ |    |
 
-**Summary:** all 25 types are fully playable on the web, with editors, progress, and parsers complete across the board. The gaps are: **live conflict highlighting** (4 full — sudoku, nonogram, masyu, kakuro — plus a partial akari, which flags only mutually-illuminating bulbs); **parser accuracy** (2 ★ — sudoku and nonogram — parse cleanly enough to skip manual calibration; the other 23 need editorial correction); **Android** (19 — sudoku, slitherlink, nonogram, masyu, kakuro, hell-golf, fillomino, lits, nurimaze, nurikabe, nuritwin, number-link, tentaishow, shikaku, ripple-effect, yajilin, slalom, shakashaka, akari); and the **solver/hint engine** (4 — sudoku, plus gate-only exact solvers for lits, slitherlink and nonogram).
+**Summary:** all 26 types are fully playable on the web, with editors, progress, and parsers complete across the board. The gaps are: **live conflict highlighting** (4 full — sudoku, nonogram, masyu, kakuro — plus a partial akari, which flags only mutually-illuminating bulbs); **parser accuracy** (2 ★ — sudoku and nonogram — parse cleanly enough to skip manual calibration; the other 24 need editorial correction); **Android** (20 — sudoku, slitherlink, nonogram, masyu, kakuro, hell-golf, fillomino, lits, nurimaze, nurikabe, nuritwin, number-link, tentaishow, shikaku, ripple-effect, yajilin, slalom, shakashaka, akari, hitori); and the **solver/hint engine** (4 — sudoku, plus gate-only exact solvers for lits, slitherlink and nonogram).
 
 ## Tech Stack
 

@@ -57,6 +57,7 @@ import coil.compose.AsyncImage
 import com.puzzleplatform.player.data.model.Puzzle
 import com.puzzleplatform.player.ui.DIFFICULTY_LABELS
 import com.puzzleplatform.player.ui.board.AkariBoard
+import com.puzzleplatform.player.ui.board.HitoriBoard
 import com.puzzleplatform.player.ui.board.DigitBar
 import com.puzzleplatform.player.ui.board.FillominoBoard
 import com.puzzleplatform.player.ui.board.FillominoMode
@@ -363,6 +364,11 @@ fun PlayScreen(
                             onPutValue = vm::putUserValue,
                         )
                         24 -> NurikabeBoard(
+                            puzzle = puzzle,
+                            userValues = state.userValues,
+                            onTapCell = vm::tapShadeCell,
+                        )
+                        26 -> HitoriBoard(
                             puzzle = puzzle,
                             userValues = state.userValues,
                             onTapCell = vm::tapShadeCell,
