@@ -69,6 +69,7 @@ import com.puzzleplatform.player.ui.board.NonogramBoard
 import com.puzzleplatform.player.ui.board.NonogramMode
 import com.puzzleplatform.player.ui.board.NumberLinkBoard
 import com.puzzleplatform.player.ui.board.NurikabeBoard
+import com.puzzleplatform.player.ui.board.NorinoriBoard
 import com.puzzleplatform.player.ui.board.NurimazeBoard
 import com.puzzleplatform.player.ui.board.NuritwinBoard
 import com.puzzleplatform.player.ui.board.RippleEffectBoard
@@ -287,6 +288,11 @@ fun PlayScreen(
                             onTapCell = vm::tapShadeCell,
                         )
                         9 -> NuritwinBoard(
+                            puzzle = puzzle,
+                            userValues = state.userValues,
+                            onTapCell = vm::tapShadeCell,
+                        )
+                        23 -> NorinoriBoard(
                             puzzle = puzzle,
                             userValues = state.userValues,
                             onTapCell = vm::tapShadeCell,

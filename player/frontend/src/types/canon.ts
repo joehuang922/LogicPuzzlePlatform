@@ -307,7 +307,12 @@ export interface NorinoriCanon {
 }
 
 export interface NorinoriAnswer {
-  shaded: number[][];
+  // rows x cols tri-state: 0 = empty, 1 = shaded, 2 = marked (a solver-aid dot that
+  // stays unshaded). Both shaded and marked cells are substantial player input, so the
+  // full grid round-trips. `shaded` is the legacy shape, still read on restore.
+  states?: number[][];
+  /** @deprecated legacy answers before marks were persisted; still accepted on restore. */
+  shaded?: number[][];
 }
 
 export interface NurikabeCanon {

@@ -3,12 +3,15 @@ import { NorinoriCanon, NorinoriAnswer } from "../types/canon";
 import NorinoriBoard from "../components/NorinoriBoard";
 
 function extractUserValues(savedAnswer: NorinoriAnswer | undefined): Record<string, number> {
-  if (!savedAnswer || !savedAnswer.shaded) return {};
+  if (!savedAnswer) return {};
+  // Prefer the tri-state `states` grid; fall back to the legacy `shaded` (shaded-only) shape.
+  const grid = savedAnswer.states ?? savedAnswer.shaded;
+  if (!grid) return {};
   const values: Record<string, number> = {};
-  const { shaded } = savedAnswer;
-  for (let r = 0; r < shaded.length; r++) {
-    for (let c = 0; c < shaded[r].length; c++) {
-      if (shaded[r][c] === 1) values[`c:${c},${r}`] = 1;
+  for (let r = 0; r < grid.length; r++) {
+    for (let c = 0; c < grid[r].length; c++) {
+      const state = grid[r][c];
+      if (state === 1 || state === 2) values[`c:${c},${r}`] = state;
     }
   }
   return values;

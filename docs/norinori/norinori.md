@@ -31,23 +31,24 @@ Rooms (regions) are defined by connected components of cells separated by thick 
 
 ## Answer structure description
 
-The answer is the shading state of every cell: which cells are filled black.
+The answer is the state of every cell: shaded (black), marked (a solver-aid dot), or empty. Marked cells are the player's "definitely stays white" notes; they are real player input and are persisted so they survive save/restore.
 
 ### Canonical JSON structure
 
 ```json
 {
-  "shaded": [
-    [1, 1, 0, 0, 1],
+  "states": [
+    [1, 1, 0, 2, 1],
     [0, 0, 0, 0, 1],
-    [1, 0, 1, 0, 0],
+    [1, 0, 1, 0, 2],
     [1, 0, 1, 0, 1],
-    [0, 0, 0, 0, 1]
+    [0, 0, 2, 0, 1]
   ]
 }
 ```
 
-- `shaded`: rows x cols array of integers. `1` = cell is shaded (black), `0` = cell is unshaded (white). (The example above is illustrative of the format, not a verified solution.)
+- `states`: rows x cols array of integers. `0` = empty (white), `1` = shaded (black), `2` = marked (a solver-aid dot that counts as not shaded). (The example above is illustrative of the format, not a verified solution.)
+- Legacy answers saved before marks were persisted use a `shaded` grid instead (`1` = shaded, `0` = not). Both platforms still read this shape on restore; only shaded cells are recovered from it.
 
 ## Rules
 
@@ -66,7 +67,8 @@ Every region contains exactly two shaded cells AND every shaded cell has exactly
 - Each cell has three states: unshaded (white), shaded (black), and marked (a centered dot). "Marked" is a solver aid that counts as **not** shaded — it lets the player note a cell they believe stays white.
 - Left click cycles a cell forward: empty → black → marked → empty. Right click cycles backward: empty → marked → black → empty. There is no drag-paint; each click flips a single cell.
 - Region boundaries are drawn as thick solid lines and are read-only. The thin internal grid lines remain visible so cells can be distinguished within a region.
-- Shaded cells are filled black; marked cells show a small centered dot; unshaded cells stay white. The mark is a player-only aid and is never persisted into the canonical `shaded` answer (marked cells serialize as `0`).
+- Shaded cells are filled black; marked cells show a small centered dot; unshaded cells stay white. Marks are a solver aid but are still real player input, so they are persisted in the `states` answer (`2`) and survive save/restore. They never count toward the shading rules or progress.
+- On Android the same three states are driven by a single tap that cycles empty → shaded → marked → empty (the shared shade/mark interaction); shaded cells use the shared room shade so region borders stay visible.
 
 ### Progress calculation
 
