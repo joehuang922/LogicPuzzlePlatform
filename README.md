@@ -25,40 +25,41 @@ Python package that converts scanned puzzle images into JSON representations. Ex
 - **Progress** — progress calculator returning 0–100 for a partial solution (`player/frontend/src/progress/<name>.ts`).
 - **Parser** — image parser (`parsers/src/puzzle_parsers/<name>/`) + lambda registration.
 - **Android** — Kotlin engine + Compose board (`player/android/.../puzzle` + `.../ui/board`).
-- **Solver** — solving/hint plugin (`player/solver/src/plugins/<name>/`; Android hinter).
+- **Solver** — exact solver plugin (`player/solver/src/plugins/<name>/`) that gates registration on a unique solution and stores it (backs reveal and the Android "on track" check).
+- **Hint** — in-game Hint button that suggests the next logical step (solver technique ladder on web; Kotlin `<Name>Hinter` on Android).
 
 Legend: ✅ = implemented · 🟡 = partial · blank = not yet. In the **Parser** column, **★** marks a parser whose extraction accuracy is high enough to need no manual calibration/editorial correction after parsing — a ✅ without a ★ works but still needs a human to verify/fix its output.
 
-| ID | Puzzle Type | Conflicts | Editor | Progress | Parser | Android | Solver |
-|----|-------------|:--------:|:------:|:--------:|:------:|:-------:|:------:|
-| 1  | sudoku        | ✅ | ✅ | ✅ | ✅★ | ✅ | ✅ |
-| 2  | combo-sudoku  |    | ✅ | ✅ | ✅ |    |    |
-| 3  | nurimaze      |    | ✅ | ✅ | ✅ | ✅ |    |
-| 4  | double-choco  |    | ✅ | ✅ | ✅ |    |    |
-| 5  | slitherlink   |    | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 6  | nonogram      | ✅ | ✅ | ✅ | ✅★ | ✅ | ✅ |
-| 7  | masyu         | ✅ | ✅ | ✅ | ✅ | ✅ |    |
-| 8  | pencils       |    | ✅ | ✅ | ✅ |    |    |
-| 9  | nuritwin      |    | ✅ | ✅ | ✅ | ✅ |    |
-| 10 | slalom        |    | ✅ | ✅ | ✅ | ✅ |    |
-| 11 | shakashaka    |    | ✅ | ✅ | ✅ | ✅ |    |
-| 12 | kakuro        | ✅ | ✅ | ✅ | ✅ | ✅ |    |
-| 13 | yajilin       |    | ✅ | ✅ | ✅ | ✅ |    |
-| 14 | fillomino     |    | ✅ | ✅ | ✅ | ✅ |    |
-| 15 | lits          |    | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 16 | choco-banana  |    | ✅ | ✅ | ✅ |    |    |
-| 17 | number-link   |    | ✅ | ✅ | ✅ | ✅ |    |
-| 18 | akari         | 🟡 | ✅ | ✅ | ✅ | ✅ |    |
-| 19 | hell-golf     |    | ✅ | ✅ | ✅ | ✅ |    |
-| 20 | tentaishow    |    | ✅ | ✅ | ✅ | ✅ |    |
-| 21 | heyawake      |    | ✅ | ✅ | ✅ |    |    |
-| 22 | shikaku       |    | ✅ | ✅ | ✅ | ✅ |    |
-| 23 | norinori      |    | ✅ | ✅ | ✅ |    |    |
-| 24 | nurikabe      |    | ✅ | ✅ | ✅ | ✅ |    |
-| 25 | ripple-effect |    | ✅ | ✅ | ✅ | ✅ |    |
-| 26 | hitori        |    | ✅ | ✅ | ✅ | ✅ |    |
+| ID | Puzzle Type | Conflicts | Editor | Progress | Parser | Android | Solver | Hint |
+|----|-------------|:--------:|:------:|:--------:|:------:|:-------:|:------:|:----:|
+| 1  | sudoku        | ✅ | ✅ | ✅ | ✅★ | ✅ | ✅ | ✅ |
+| 2  | combo-sudoku  |    | ✅ | ✅ | ✅ |    |    |    |
+| 3  | nurimaze      |    | ✅ | ✅ | ✅ | ✅ |    |    |
+| 4  | double-choco  |    | ✅ | ✅ | ✅ |    |    |    |
+| 5  | slitherlink   |    | ✅ | ✅ | ✅ | ✅ | ✅ |    |
+| 6  | nonogram      | ✅ | ✅ | ✅ | ✅★ | ✅ | ✅ | ✅ |
+| 7  | masyu         | ✅ | ✅ | ✅ | ✅ | ✅ |    |    |
+| 8  | pencils       |    | ✅ | ✅ | ✅ |    |    |    |
+| 9  | nuritwin      |    | ✅ | ✅ | ✅ | ✅ |    |    |
+| 10 | slalom        |    | ✅ | ✅ | ✅ | ✅ |    |    |
+| 11 | shakashaka    |    | ✅ | ✅ | ✅ | ✅ |    |    |
+| 12 | kakuro        | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |    |
+| 13 | yajilin       |    | ✅ | ✅ | ✅ | ✅ |    |    |
+| 14 | fillomino     |    | ✅ | ✅ | ✅ | ✅ |    |    |
+| 15 | lits          |    | ✅ | ✅ | ✅ | ✅ | ✅ |    |
+| 16 | choco-banana  |    | ✅ | ✅ | ✅ |    |    |    |
+| 17 | number-link   |    | ✅ | ✅ | ✅ | ✅ |    |    |
+| 18 | akari         | 🟡 | ✅ | ✅ | ✅ | ✅ |    |    |
+| 19 | hell-golf     |    | ✅ | ✅ | ✅ | ✅ |    |    |
+| 20 | tentaishow    |    | ✅ | ✅ | ✅ | ✅ |    |    |
+| 21 | heyawake      |    | ✅ | ✅ | ✅ |    |    |    |
+| 22 | shikaku       |    | ✅ | ✅ | ✅ | ✅ |    |    |
+| 23 | norinori      |    | ✅ | ✅ | ✅ | ✅ |    |    |
+| 24 | nurikabe      |    | ✅ | ✅ | ✅ | ✅ |    |    |
+| 25 | ripple-effect |    | ✅ | ✅ | ✅ | ✅ |    |    |
+| 26 | hitori        |    | ✅ | ✅ | ✅ | ✅ |    |    |
 
-**Summary:** all 26 types are fully playable on the web, with editors, progress, and parsers complete across the board. The gaps are: **live conflict highlighting** (4 full — sudoku, nonogram, masyu, kakuro — plus a partial akari, which flags only mutually-illuminating bulbs); **parser accuracy** (2 ★ — sudoku and nonogram — parse cleanly enough to skip manual calibration; the other 24 need editorial correction); **Android** (20 — sudoku, slitherlink, nonogram, masyu, kakuro, hell-golf, fillomino, lits, nurimaze, nurikabe, nuritwin, number-link, tentaishow, shikaku, ripple-effect, yajilin, slalom, shakashaka, akari, hitori); and the **solver/hint engine** (4 — sudoku, plus gate-only exact solvers for lits, slitherlink and nonogram).
+**Summary:** all 26 types are fully playable on the web, with editors, progress, and parsers complete across the board. The gaps are: **live conflict highlighting** (4 full — sudoku, nonogram, masyu, kakuro — plus a partial akari, which flags only mutually-illuminating bulbs); **parser accuracy** (2 ★ — sudoku and nonogram — parse cleanly enough to skip manual calibration; the other 24 need editorial correction); **Android** (21 — all but combo-sudoku, double-choco, pencils, choco-banana and heyawake); the **solver** gate (5 — sudoku, slitherlink, nonogram, kakuro, lits); and **hints** (2 — sudoku and nonogram, on both web and Android).
 
 ## Tech Stack
 
