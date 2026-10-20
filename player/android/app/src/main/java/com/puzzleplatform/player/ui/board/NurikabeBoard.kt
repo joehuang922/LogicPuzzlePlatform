@@ -24,6 +24,7 @@ private val LINE_THICK = Color.Black
 private val BLACK_FILL = Color(0xFF333333)
 private val MARK_COLOR = Color(0xFF888888)
 private val CLUE_COLOR = Color.Black
+private val SELECT_FILL = Color(0xFFE0E8FF)
 
 /**
  * Compose Canvas renderer for Nurikabe (puzzle type 24), the analog of
@@ -35,6 +36,9 @@ private val CLUE_COLOR = Color.Black
  * each tap advances a cell empty -> black sea -> white-island mark -> empty, and the caller
  * applies it via [onTapCell]. Clue cells ignore taps. Two fingers pan/zoom via
  * [ZoomableBoard].
+ *
+ * The Admin review editor passes [selectedCell] ("col,row") to highlight the cell its
+ * [onTapCell] selected.
  */
 @Composable
 fun NurikabeBoard(
@@ -42,8 +46,10 @@ fun NurikabeBoard(
     userValues: Map<String, Int>,
     onTapCell: (col: Int, row: Int) -> Unit,
     modifier: Modifier = Modifier,
+    selectedCell: String? = null,
 ) {
-    val cells = remember(puzzle.id) { NurikabeEngine.parseCells(puzzle) }
+    // Keyed on the canon too: the Admin review editor changes it under a stable id.
+    val cells = remember(puzzle.id, puzzle.canonRepr) { NurikabeEngine.parseCells(puzzle) }
     val rows = cells.size
     val cols = cells.maxOfOrNull { it.size } ?: 0
     if (rows == 0 || cols == 0) return
@@ -52,6 +58,7 @@ fun NurikabeBoard(
     // restart when these change), so read the freshest values/callback through state.
     val valuesState = rememberUpdatedState(userValues)
     val onTap = rememberUpdatedState(onTapCell)
+    val selectedState = rememberUpdatedState(selectedCell)
 
     ZoomableBoard(
         cols = cols,
@@ -63,6 +70,9 @@ fun NurikabeBoard(
         val boardW = cols * cell
         val boardH = rows * cell
         drawRect(GRID_BG, topLeft = Offset(0f, 0f), size = Size(boardW, boardH))
+        selectedState.value?.split(",")?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 2 }?.let { (c, r) ->
+            drawRect(SELECT_FILL, topLeft = Offset(c * cell, r * cell), size = Size(cell, cell))
+        }
 
         // Cell contents: a black sea fill or a centered white-island mark dot. Clue cells
         // stay on the light background (they're always white islands).

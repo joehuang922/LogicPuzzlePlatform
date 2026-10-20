@@ -70,4 +70,6 @@ enum class AuthoringType(val label: String, val puzzleType: Int) {
     NONOGRAM("Nonogram", NonogramAuthoring.PUZZLE_TYPE),
     KAKURO("Kakuro", KakuroAuthoring.PUZZLE_TYPE),
     SLITHERLINK("Slitherlink", SlitherlinkAuthoring.PUZZLE_TYPE),
+    NURIKABE("Nurikabe", NurikabeAuthoring.PUZZLE_TYPE),
+    HEYAWAKE("Heyawake", HeyawakeAuthoring.PUZZLE_TYPE),
 }

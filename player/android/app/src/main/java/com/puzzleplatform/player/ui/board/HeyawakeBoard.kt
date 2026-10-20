@@ -21,6 +21,7 @@ private val LINE_THIN = Color(0xFFBBBBBB)
 private val LINE_THICK = Color.Black
 private val MARK_COLOR = Color(0xFF444444)
 private val CLUE_COLOR = Color.Black
+private val SELECT_FILL = Color(0xFFE0E8FF)
 
 /**
  * Compose Canvas renderer for Heyawake (puzzle type 21), the analog of
@@ -33,6 +34,9 @@ private val CLUE_COLOR = Color.Black
  * cells render as [BoardColors.ROOM_SHADE] so the room borders stay visible, with the clue
  * staying black on top; marked cells draw a centered dot. Two fingers pan/zoom via
  * [ZoomableBoard].
+ *
+ * The Admin review editor passes [selectedCell] ("col,row") to highlight the cell its
+ * [onTapCell] selected.
  */
 @Composable
 fun HeyawakeBoard(
@@ -40,9 +44,11 @@ fun HeyawakeBoard(
     userValues: Map<String, Int>,
     onTapCell: (col: Int, row: Int) -> Unit,
     modifier: Modifier = Modifier,
+    selectedCell: String? = null,
 ) {
-    val board = remember(puzzle.id) { HeyawakeEngine.parseBoard(puzzle) }
-    val roomIds = remember(puzzle.id) { HeyawakeEngine.computeRoomIds(board) }
+    // Keyed on the canon too: the Admin review editor changes it under a stable id.
+    val board = remember(puzzle.id, puzzle.canonRepr) { HeyawakeEngine.parseBoard(puzzle) }
+    val roomIds = remember(puzzle.id, puzzle.canonRepr) { HeyawakeEngine.computeRoomIds(board) }
     val rows = board.height
     val cols = board.width
     if (rows <= 0 || cols <= 0) return
@@ -51,6 +57,7 @@ fun HeyawakeBoard(
     // restart when these change), so read the freshest values through state.
     val valuesState = rememberUpdatedState(userValues)
     val onTap = rememberUpdatedState(onTapCell)
+    val selectedState = rememberUpdatedState(selectedCell)
 
     ZoomableBoard(
         cols = cols,
@@ -62,6 +69,9 @@ fun HeyawakeBoard(
         val boardW = cols * cell
         val boardH = rows * cell
         drawRect(GRID_BG, topLeft = Offset(0f, 0f), size = Size(boardW, boardH))
+        selectedState.value?.split(",")?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 2 }?.let { (c, r) ->
+            drawRect(SELECT_FILL, topLeft = Offset(c * cell, r * cell), size = Size(cell, cell))
+        }
 
         // Cell contents: shaded fill or a centered mark dot.
         for (r in 0 until rows) {

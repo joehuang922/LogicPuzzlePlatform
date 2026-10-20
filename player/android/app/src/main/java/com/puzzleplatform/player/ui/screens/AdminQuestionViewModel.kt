@@ -9,11 +9,15 @@ import com.puzzleplatform.player.data.model.Collection
 import com.puzzleplatform.player.data.model.CreatePuzzleRequest
 import com.puzzleplatform.player.puzzle.AuthoringType
 import com.puzzleplatform.player.puzzle.BatchRules
+import com.puzzleplatform.player.puzzle.HeyawakeAuthoring
+import com.puzzleplatform.player.puzzle.HeyawakeDraft
 import com.puzzleplatform.player.puzzle.ItemStatus
 import com.puzzleplatform.player.puzzle.KakuroAuthoring
 import com.puzzleplatform.player.puzzle.KakuroDraft
 import com.puzzleplatform.player.puzzle.NonogramAuthoring
 import com.puzzleplatform.player.puzzle.NonogramDraft
+import com.puzzleplatform.player.puzzle.NurikabeAuthoring
+import com.puzzleplatform.player.puzzle.NurikabeDraft
 import com.puzzleplatform.player.puzzle.SlitherlinkAuthoring
 import com.puzzleplatform.player.puzzle.SlitherlinkDraft
 import com.puzzleplatform.player.puzzle.SudokuAuthoring
@@ -32,7 +36,7 @@ import kotlinx.coroutines.sync.withPermit
  * [userValues] ("col,row" -> digit) — the same map the player's SudokuBoard renders
  * and edits — so the review reuses that board verbatim; a nonogram's clue lists ride
  * in [nonogram], a kakuro's cell grid in [kakuro], a slitherlink's clue grid in
- * [slitherlink]. Metadata is
+ * [slitherlink], a nurikabe's in [nurikabe], a heyawake's rooms in [heyawake]. Metadata is
  * per-item except the shared source collection and the default difficulty (a null
  * [difficulty] inherits the batch default).
  */
@@ -44,6 +48,8 @@ data class BatchItem(
     val nonogram: NonogramDraft = NonogramDraft(),
     val kakuro: KakuroDraft = KakuroDraft(),
     val slitherlink: SlitherlinkDraft = SlitherlinkDraft(),
+    val nurikabe: NurikabeDraft = NurikabeDraft(),
+    val heyawake: HeyawakeDraft = HeyawakeDraft(),
     val title: String = "",
     val author: String = "",
     val difficulty: Int? = null,
@@ -174,6 +180,8 @@ class AdminQuestionViewModel(
                     AuthoringType.NONOGRAM -> it.copy(nonogram = NonogramAuthoring.draftFromCanon(canon))
                     AuthoringType.KAKURO -> it.copy(kakuro = KakuroAuthoring.draftFromCanon(canon))
                     AuthoringType.SLITHERLINK -> it.copy(slitherlink = SlitherlinkAuthoring.draftFromCanon(canon))
+                    AuthoringType.NURIKABE -> it.copy(nurikabe = NurikabeAuthoring.draftFromCanon(canon))
+                    AuthoringType.HEYAWAKE -> it.copy(heyawake = HeyawakeAuthoring.draftFromCanon(canon))
                 }.copy(
                     status = ItemStatus.PARSED,
                     error = null,
@@ -225,6 +233,14 @@ class AdminQuestionViewModel(
     /** Apply a slitherlink clue edit (see [SlitherlinkAuthoring]) to tile [id]. */
     fun editSlitherlink(id: String, transform: (SlitherlinkDraft) -> SlitherlinkDraft) =
         editItem(id) { it.copy(slitherlink = transform(it.slitherlink)) }
+
+    /** Apply a nurikabe clue edit (see [NurikabeAuthoring]) to tile [id]. */
+    fun editNurikabe(id: String, transform: (NurikabeDraft) -> NurikabeDraft) =
+        editItem(id) { it.copy(nurikabe = transform(it.nurikabe)) }
+
+    /** Apply a heyawake room edit (see [HeyawakeAuthoring]) to tile [id]. */
+    fun editHeyawake(id: String, transform: (HeyawakeDraft) -> HeyawakeDraft) =
+        editItem(id) { it.copy(heyawake = transform(it.heyawake)) }
 
     private fun editItem(id: String, transform: (BatchItem) -> BatchItem) {
         updateItem(id) {
@@ -295,6 +311,16 @@ class AdminQuestionViewModel(
                                 SlitherlinkAuthoring.canonFromDraft(item.slitherlink),
                                 item.slitherlink.cols,
                                 item.slitherlink.rows,
+                            )
+                            AuthoringType.NURIKABE -> Triple(
+                                NurikabeAuthoring.canonFromDraft(item.nurikabe),
+                                item.nurikabe.cols,
+                                item.nurikabe.rows,
+                            )
+                            AuthoringType.HEYAWAKE -> Triple(
+                                HeyawakeAuthoring.canonFromDraft(item.heyawake),
+                                item.heyawake.width,
+                                item.heyawake.height,
                             )
                         }
                         val id = repo.createPuzzle(
