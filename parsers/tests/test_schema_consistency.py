@@ -17,6 +17,7 @@ from puzzle_parsers.heyawake.models import HeyawakeBoard
 from puzzle_parsers.shikaku.models import ShikakuBoard
 from puzzle_parsers.ripple_effect.models import RippleEffectBoard
 from puzzle_parsers.hitori.models import HitoriBoard
+from puzzle_parsers.yajilin.models import YajilinBoard
 from puzzle_parsers.validate import validate_canon
 
 SCHEMA_DIR = Path(__file__).parents[2] / "schemas" / "canon"
@@ -32,6 +33,7 @@ MODELS = {
     "shikaku": ShikakuBoard,
     "ripple-effect": RippleEffectBoard,
     "hitori": HitoriBoard,
+    "yajilin": YajilinBoard,
 }
 
 
@@ -216,3 +218,19 @@ def test_invalid_hitori_fails():
     data = {"cells": [[1, 2, 1], [3, 0, 2], [2, 1, 3]]}  # 0 not allowed: every cell holds a number
     with pytest.raises(Exception):
         validate_canon("hitori", data)
+
+
+def test_valid_yajilin_passes():
+    data = {
+        "cells": [
+            [{"dir": "down", "num": 1}, None, None],
+            [None, None, {"dir": "left", "num": 0}],
+        ]
+    }
+    validate_canon("yajilin", data)
+
+
+def test_invalid_yajilin_fails():
+    data = {"cells": [[{"dir": "diagonal", "num": 1}, None]]}  # dir must be up/down/left/right
+    with pytest.raises(Exception):
+        validate_canon("yajilin", data)
