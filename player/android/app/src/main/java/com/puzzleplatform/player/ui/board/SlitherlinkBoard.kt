@@ -24,6 +24,7 @@ private val DOT = Color(0xFF333333)
 private val LINE_COLOR = Color(0xFF111111)
 private val CROSS_COLOR = Color(0xFFBBBBBB)
 private val CLUE_COLOR = Color(0xFF222222)
+private val SELECT_FILL = Color(0xFFE0E8FF)
 /** Margin around the grid, in cells, so border dots/edges are visible and easy to tap. */
 private const val PAD_CELLS = 0.5f
 
@@ -41,6 +42,9 @@ private const val PAD_CELLS = 0.5f
  * Dots are drawn at every intersection and clue numbers (0-3) centered in their cells.
  * Rendering and pan/zoom run through [ZoomableBoard], with a [PAD_CELLS] margin around
  * the grid; taps in the margin snap to the nearest border edge.
+ *
+ * With [onSelectCell] (the Admin review editor) taps select a cell instead of cycling an
+ * edge, and [selectedCell] ("col,row") is highlighted.
  */
 @Composable
 fun SlitherlinkBoard(
@@ -48,8 +52,11 @@ fun SlitherlinkBoard(
     userValues: Map<String, Int>,
     onCycleEdge: (key: String, next: Int) -> Unit,
     modifier: Modifier = Modifier,
+    selectedCell: String? = null,
+    onSelectCell: ((String?) -> Unit)? = null,
 ) {
-    val cells = remember(puzzle.id) { SlitherlinkEngine.parseCells(puzzle) }
+    // Keyed on the canon too: the Admin review editor changes it under a stable id.
+    val cells = remember(puzzle.id, puzzle.canonRepr) { SlitherlinkEngine.parseCells(puzzle) }
     val rows = cells.size
     val cols = cells.maxOfOrNull { it.size } ?: 0
     if (rows == 0 || cols == 0) return
@@ -58,6 +65,8 @@ fun SlitherlinkBoard(
     // when these change), so read the freshest values/callback through state.
     val valuesState = rememberUpdatedState(userValues)
     val onCycle = rememberUpdatedState(onCycleEdge)
+    val selectedState = rememberUpdatedState(selectedCell)
+    val onSelect = rememberUpdatedState(onSelectCell)
 
     ZoomableBoard(
         cols = cols,
@@ -65,8 +74,14 @@ fun SlitherlinkBoard(
         resetKey = puzzle.id,
         padCells = PAD_CELLS,
         modifier = modifier,
-        onTapCell = { _, _ -> }, // Slitherlink has no cell selection
+        onTapCell = { col, row ->
+            val select = onSelect.value ?: return@ZoomableBoard
+            if (row !in 0 until rows || col !in 0 until cols) return@ZoomableBoard
+            val key = "$col,$row"
+            select(if (selectedState.value == key) null else key)
+        },
         onTapPrecise = { fx, fy ->
+            if (onSelect.value != null) return@ZoomableBoard
             val key = edgeKeyAt(fx, fy, rows, cols) ?: return@ZoomableBoard
             val next = ((valuesState.value[key] ?: 0) + 1) % 3
             onCycle.value(key, next)
@@ -78,6 +93,9 @@ fun SlitherlinkBoard(
             topLeft = Offset(-pad, -pad),
             size = Size(cols * cell + 2 * pad, rows * cell + 2 * pad),
         )
+        selectedState.value?.split(",")?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 2 }?.let { (c, r) ->
+            drawRect(SELECT_FILL, topLeft = Offset(c * cell, r * cell), size = Size(cell, cell))
+        }
 
         val lineWidth = cell * 0.07f
         val crossArm = cell * 0.16f

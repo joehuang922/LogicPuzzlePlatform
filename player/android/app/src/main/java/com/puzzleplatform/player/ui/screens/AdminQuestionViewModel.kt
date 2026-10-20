@@ -14,6 +14,8 @@ import com.puzzleplatform.player.puzzle.KakuroAuthoring
 import com.puzzleplatform.player.puzzle.KakuroDraft
 import com.puzzleplatform.player.puzzle.NonogramAuthoring
 import com.puzzleplatform.player.puzzle.NonogramDraft
+import com.puzzleplatform.player.puzzle.SlitherlinkAuthoring
+import com.puzzleplatform.player.puzzle.SlitherlinkDraft
 import com.puzzleplatform.player.puzzle.SudokuAuthoring
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,7 +31,8 @@ import kotlinx.coroutines.sync.withPermit
  * yields depends on the batch's [AuthoringType]: a sudoku's givens ride in
  * [userValues] ("col,row" -> digit) — the same map the player's SudokuBoard renders
  * and edits — so the review reuses that board verbatim; a nonogram's clue lists ride
- * in [nonogram], a kakuro's cell grid in [kakuro]. Metadata is
+ * in [nonogram], a kakuro's cell grid in [kakuro], a slitherlink's clue grid in
+ * [slitherlink]. Metadata is
  * per-item except the shared source collection and the default difficulty (a null
  * [difficulty] inherits the batch default).
  */
@@ -40,6 +43,7 @@ data class BatchItem(
     val userValues: Map<String, Int> = emptyMap(),
     val nonogram: NonogramDraft = NonogramDraft(),
     val kakuro: KakuroDraft = KakuroDraft(),
+    val slitherlink: SlitherlinkDraft = SlitherlinkDraft(),
     val title: String = "",
     val author: String = "",
     val difficulty: Int? = null,
@@ -169,6 +173,7 @@ class AdminQuestionViewModel(
                     AuthoringType.SUDOKU -> it.copy(userValues = SudokuAuthoring.userValuesFromCanon(canon))
                     AuthoringType.NONOGRAM -> it.copy(nonogram = NonogramAuthoring.draftFromCanon(canon))
                     AuthoringType.KAKURO -> it.copy(kakuro = KakuroAuthoring.draftFromCanon(canon))
+                    AuthoringType.SLITHERLINK -> it.copy(slitherlink = SlitherlinkAuthoring.draftFromCanon(canon))
                 }.copy(
                     status = ItemStatus.PARSED,
                     error = null,
@@ -216,6 +221,10 @@ class AdminQuestionViewModel(
     /** Apply a kakuro cell edit (see [KakuroAuthoring]) to tile [id]. */
     fun editKakuro(id: String, transform: (KakuroDraft) -> KakuroDraft) =
         editItem(id) { it.copy(kakuro = transform(it.kakuro)) }
+
+    /** Apply a slitherlink clue edit (see [SlitherlinkAuthoring]) to tile [id]. */
+    fun editSlitherlink(id: String, transform: (SlitherlinkDraft) -> SlitherlinkDraft) =
+        editItem(id) { it.copy(slitherlink = transform(it.slitherlink)) }
 
     private fun editItem(id: String, transform: (BatchItem) -> BatchItem) {
         updateItem(id) {
@@ -281,6 +290,11 @@ class AdminQuestionViewModel(
                                 KakuroAuthoring.canonFromDraft(item.kakuro),
                                 item.kakuro.cols,
                                 item.kakuro.rows,
+                            )
+                            AuthoringType.SLITHERLINK -> Triple(
+                                SlitherlinkAuthoring.canonFromDraft(item.slitherlink),
+                                item.slitherlink.cols,
+                                item.slitherlink.rows,
                             )
                         }
                         val id = repo.createPuzzle(

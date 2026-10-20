@@ -66,22 +66,25 @@ import com.puzzleplatform.player.puzzle.KakuroAuthoring
 import com.puzzleplatform.player.puzzle.KakuroDraft
 import com.puzzleplatform.player.puzzle.NonogramAuthoring
 import com.puzzleplatform.player.puzzle.NonogramDraft
+import com.puzzleplatform.player.puzzle.SlitherlinkAuthoring
+import com.puzzleplatform.player.puzzle.SlitherlinkDraft
 import com.puzzleplatform.player.puzzle.SudokuAuthoring
 import com.puzzleplatform.player.ui.DIFFICULTY_LABELS
 import com.puzzleplatform.player.ui.board.DigitBar
 import com.puzzleplatform.player.ui.board.KakuroMiniBoard
 import com.puzzleplatform.player.ui.board.NonogramMiniBoard
+import com.puzzleplatform.player.ui.board.SlitherlinkMiniBoard
 import com.puzzleplatform.player.ui.board.SudokuBoard
 import com.puzzleplatform.player.ui.board.SudokuMiniBoard
 import com.puzzleplatform.player.ui.board.ZoomableImage
 
 /**
  * Create one *or many* questions from album photos. The puzzle type (sudoku,
- * nonogram or kakuro, see [AuthoringType]) is picked from a dropdown and applies to the whole
+ * nonogram, kakuro or slitherlink, see [AuthoringType]) is picked from a dropdown and applies to the whole
  * batch. A single pick is just a batch of one — same flow throughout. Steps:
  * pick images → Parse all (OCR each) → review/fix any tile (full-screen, with the
  * source photo beside it: sudoku on the real player board, nonogram as editable clue
- * lines, kakuro as a cell-by-cell editor on the player board) → Create all valid, which runs the server's per-question checks on each.
+ * lines, kakuro and slitherlink as a cell-by-cell editor on the player board) → Create all valid, which runs the server's per-question checks on each.
  * The create button is re-runnable: created tiles drop out, so fixing a rejected
  * board and pressing again sends only the remainder.
  */
@@ -112,6 +115,7 @@ fun AdminQuestionScreen(
             onRemove = { vm.removeItem(reviewItem.id) },
             onEditNonogram = { vm.editNonogram(reviewItem.id, it) },
             onEditKakuro = { vm.editKakuro(reviewItem.id, it) },
+            onEditSlitherlink = { vm.editSlitherlink(reviewItem.id, it) },
         )
         return
     }
@@ -244,6 +248,10 @@ fun AdminQuestionScreen(
                                     "Tap a tile to review its photo and grid side by side, fix mis-read " +
                                         "cells and sums, and set its title. A red tile has sums that " +
                                         "can't be right."
+                                AuthoringType.SLITHERLINK ->
+                                    "Tap a tile to review its photo and clues side by side, fix mis-read " +
+                                        "clues or phantom lines, and set its title. A red tile has clues " +
+                                        "that can't be right."
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -280,6 +288,11 @@ private fun BatchTile(type: AuthoringType, item: BatchItem, onClick: () -> Unit)
                     AuthoringType.KAKURO -> KakuroMiniBoard(
                         draft = item.kakuro,
                         hasProblems = KakuroAuthoring.problems(item.kakuro).isNotEmpty(),
+                        size = 120.dp,
+                    )
+                    AuthoringType.SLITHERLINK -> SlitherlinkMiniBoard(
+                        draft = item.slitherlink,
+                        hasProblems = SlitherlinkAuthoring.problems(item.slitherlink).isNotEmpty(),
                         size = 120.dp,
                     )
                 }
@@ -372,7 +385,8 @@ private fun CreateFooter(
 /**
  * Full-screen review for a single tile: the zoomable source photo on top (so the user
  * can read the original closely) and the editor below — for sudoku the interactive
- * player board, reused verbatim from the player; for nonogram [NonogramClueEditor]; for kakuro [KakuroCellEditor].
+ * player board, reused verbatim from the player; for nonogram [NonogramClueEditor]; for kakuro [KakuroCellEditor];
+ * for slitherlink [SlitherlinkClueEditor].
  * A pinned top bar and a bottom button both say Done — every edit is already saved
  * to state as it's typed, so "Done" just returns to the grid.
  */
@@ -393,6 +407,7 @@ private fun ReviewScreen(
     onRemove: () -> Unit,
     onEditNonogram: ((NonogramDraft) -> NonogramDraft) -> Unit,
     onEditKakuro: ((KakuroDraft) -> KakuroDraft) -> Unit,
+    onEditSlitherlink: ((SlitherlinkDraft) -> SlitherlinkDraft) -> Unit,
 ) {
     // The review board reuses the player SudokuBoard verbatim; an all-zero-hints
     // puzzle keeps every cell editable (parsed givens ride in as userValues).
@@ -441,6 +456,9 @@ private fun ReviewScreen(
                     AuthoringType.KAKURO ->
                         "Compare the photo with the grid — pinch to zoom the photo, tap a cell to switch " +
                             "it between clue and white or fix its sums."
+                    AuthoringType.SLITHERLINK ->
+                        "Compare the photo with the grid — pinch to zoom the photo, tap a cell to fix " +
+                            "its clue, delete a phantom line, or add a missed one."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -484,6 +502,12 @@ private fun ReviewScreen(
                     selectedCell = selectedCell,
                     onSelectCell = onSelectCell,
                     onChange = onEditKakuro,
+                )
+                AuthoringType.SLITHERLINK -> SlitherlinkClueEditor(
+                    draft = item.slitherlink,
+                    selectedCell = selectedCell,
+                    onSelectCell = onSelectCell,
+                    onChange = onEditSlitherlink,
                 )
             }
 
