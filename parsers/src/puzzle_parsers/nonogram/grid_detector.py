@@ -16,6 +16,8 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
+from puzzle_parsers.grid_utils import detect_grid_lines, reconcile_square_lines
+
 
 @dataclass
 class NonogramGeometry:
@@ -110,10 +112,15 @@ def detect_nonogram_grid(
     grid_w = outer_w - grid_x_start
     grid_h = outer_h - grid_y_start
 
-    # Determine rows/cols from grid lines within the playable area
-    playable_roi = thresh[grid_y : grid_y + grid_h, grid_x : grid_x + grid_w]
-    rows = _count_cells_in_axis(playable_roi, axis="horizontal", debug_path=debug_path)
-    cols = _count_cells_in_axis(playable_roi, axis="vertical", debug_path=debug_path)
+    # Determine rows/cols from grid lines within the playable area.
+    # Nonogram cells are square, so detect lines on both axes then reconcile:
+    # a soft-focus/faint scan can under-detect one axis (e.g. only the bold
+    # every-5 separators survive on the horizontal axis -> 5 rows), which
+    # inflates that axis's pitch. reconcile_square_lines spots the divergent
+    # pitch and re-derives both counts from the reliable (smaller) one. See
+    # [[grid-parser-robustness]].
+    playable_gray = gray[grid_y : grid_y + grid_h, grid_x : grid_x + grid_w]
+    rows, cols = _count_cells_square(playable_gray, grid_w, grid_h)
 
     cell_w = grid_w / cols
     cell_h = grid_h / rows
@@ -147,69 +154,31 @@ def detect_nonogram_grid(
     )
 
 
-def _count_cells_in_axis(
-    roi: NDArray,
-    axis: str,
-    debug_path: Path | None = None,
-) -> int:
-    """Count cells along an axis by detecting grid lines and inferring cell size.
+def _count_cells_square(
+    playable_gray: NDArray, grid_w: int, grid_h: int,
+) -> tuple[int, int]:
+    """Count (rows, cols) of the playable grid, assuming square cells.
 
-    Strategy:
-    1. Use a moderate kernel to detect lines spanning >=20% of the cross-axis.
-    2. Filter double-detections (lines too close together).
-    3. Compute median spacing between remaining lines = cell size.
-    4. Use total extent / cell size for the final count (handles missing lines).
+    Detects grid lines on both axes with the shared, kernel-sweeping
+    :func:`detect_grid_lines`, then repairs under-detection via
+    :func:`reconcile_square_lines`. On a soft-focus scan the thin interior
+    lines can blur below the detection threshold on one axis, leaving only the
+    bold every-5 separators — which collapses that axis's count (a 25-row board
+    reads as 5). Because missing lines only ever *inflate* an axis's pitch, the
+    reconcile step adopts the reliable (smaller) pitch for both axes and
+    re-derives both counts. When the two pitches already agree it is a no-op, so
+    sharp scans are unaffected. See [[grid-parser-robustness]].
     """
-    h, w = roi.shape[:2]
+    h_lines, v_lines = detect_grid_lines(playable_gray, grid_w, grid_h)
+    h_lines, v_lines = reconcile_square_lines(h_lines, v_lines, grid_h, grid_w)
 
-    if axis == "horizontal":
-        kernel_len = max(1, w // 5)
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_len, 1))
-        lines = cv2.morphologyEx(roi, cv2.MORPH_OPEN, kernel)
-        proj = np.sum(lines, axis=1)
-        threshold = w * 0.15 * 255
-        positions = _find_line_positions(proj, threshold)
-        extent = h
-    else:
-        kernel_len = max(1, h // 5)
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, kernel_len))
-        lines = cv2.morphologyEx(roi, cv2.MORPH_OPEN, kernel)
-        proj = np.sum(lines, axis=0)
-        threshold = h * 0.15 * 255
-        positions = _find_line_positions(proj, threshold)
-        extent = w
-
-    if len(positions) < 3:
-        return 10  # fallback default
-
-    # Compute raw gaps and find median to identify cell spacing
-    raw_gaps = [positions[i + 1] - positions[i] for i in range(len(positions) - 1)]
-    sorted_gaps = sorted(raw_gaps)
-    median_gap = sorted_gaps[len(sorted_gaps) // 2]
-
-    # Filter out double-detections: merge lines closer than 40% of median gap
-    min_gap = median_gap * 0.4
-    filtered = [positions[0]]
-    for p in positions[1:]:
-        if p - filtered[-1] >= min_gap:
-            filtered.append(p)
-
-    if len(filtered) < 2:
-        return 10
-
-    # Recompute gaps from filtered positions
-    gaps = [filtered[i + 1] - filtered[i] for i in range(len(filtered) - 1)]
-    # The cell size is the median of the smaller gaps (not the large ones from
-    # missing lines at edges). Take the 25th-percentile gap as cell size since
-    # most gaps should be exactly 1 cell width.
-    gaps_sorted = sorted(gaps)
-    cell_size = gaps_sorted[len(gaps_sorted) // 4] if len(gaps_sorted) > 3 else gaps_sorted[0]
-
-    # Total cells = total extent (first line to last line) / cell size
-    span = filtered[-1] - filtered[0]
-    count = max(1, round(span / cell_size))
-
-    return count
+    rows = len(h_lines) - 1
+    cols = len(v_lines) - 1
+    if rows < 2 or cols < 2:
+        # Degenerate detection: fall back to a square estimate from the aspect
+        # ratio and the median cell pitch, rather than returning nonsense.
+        return max(2, rows), max(2, cols)
+    return rows, cols
 
 
 def _find_line_positions(projection: NDArray, threshold: float) -> list[int]:
