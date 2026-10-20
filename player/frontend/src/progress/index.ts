@@ -25,6 +25,7 @@ import { computeNorinoriProgress } from "./norinori";
 import { computeNurikabeProgress } from "./nurikabe";
 import { computeRippleEffectProgress } from "./rippleEffect";
 import { computeHitoriProgress } from "./hitori";
+import { computePictoLinkProgress } from "./pictoLink";
 
 export interface ProgressCalculator {
   puzzleType: number;
@@ -63,6 +64,7 @@ register(computeNorinoriProgress);
 register(computeNurikabeProgress);
 register(computeRippleEffectProgress);
 register(computeHitoriProgress);
+register(computePictoLinkProgress);
 
 export function computeProgress(
   puzzle: PuzzleDefinition,

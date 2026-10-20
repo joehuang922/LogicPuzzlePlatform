@@ -349,3 +349,20 @@ export interface RippleEffectAnswer {
   // rows x cols; every cell filled with a positive integer
   numbers: number[][];
 }
+
+export interface PictoLinkCanon {
+  // rows x cols: 0 = empty, positive integer = clue whose value is the path length.
+  // values >= 2 come in matched pairs; 1 is a standalone single cell. No upper limit.
+  cells: number[][];
+}
+
+export interface PictoLinkAnswer {
+  edges: {
+    // h: rows x (cols-1) — segment between (r,c) and (r,c+1); 1 = drawn, 0 = none
+    h: number[][];
+    // v: (rows-1) x cols — segment between (r,c) and (r+1,c); 1 = drawn, 0 = none
+    v: number[][];
+  };
+  // standalone filled cells (only ever 1-clue cells); each [row, col]
+  singles: [number, number][];
+}

@@ -29,6 +29,7 @@ import { norinoriRenderer } from "./renderers/norinori";
 import { nurikabeRenderer } from "./renderers/nurikabe";
 import { rippleEffectRenderer } from "./renderers/rippleEffect";
 import { hitoriRenderer } from "./renderers/hitori";
+import { pictoLinkRenderer } from "./renderers/pictoLink";
 
 registerRenderer(comboSudokuRenderer);
 registerRenderer(sudokuRenderer);
@@ -56,6 +57,7 @@ registerRenderer(norinoriRenderer);
 registerRenderer(nurikabeRenderer);
 registerRenderer(rippleEffectRenderer);
 registerRenderer(hitoriRenderer);
+registerRenderer(pictoLinkRenderer);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

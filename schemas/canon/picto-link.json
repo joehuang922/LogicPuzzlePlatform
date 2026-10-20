@@ -1,0 +1,19 @@
+{
+  "title": "Picto Link Canonical Representation",
+  "description": "Black-and-white Link-a-Pix grid. Some cells contain a positive integer clue whose value is the length of the path linking its pair; a value of 1 is a single standalone cell. Players link each pair with a non-crossing path of exactly that many cells; the filled cells reveal a picture (the grid need not be fully filled).",
+  "type": "object",
+  "required": ["cells"],
+  "additionalProperties": false,
+  "properties": {
+    "cells": {
+      "description": "m x n grid of integers. 0 = empty cell, any positive integer = a clue whose value is the path length. Values >= 2 appear an even number of times (matched into pairs); 1 is a standalone single cell. No upper limit.",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": { "type": "integer", "minimum": 0 },
+        "minItems": 1
+      },
+      "minItems": 1
+    }
+  }
+}

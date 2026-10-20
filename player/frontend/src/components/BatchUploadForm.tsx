@@ -36,7 +36,7 @@ function computeDimensions(typeId: number, canon: Record<string, unknown>): { w?
       h: Math.max(...subs.map((b) => b.y)) + 9,
     };
   }
-  if ((typeId === 3 || typeId === 4 || typeId === 5 || typeId === 7 || typeId === 8 || typeId === 9 || typeId === 10 || typeId === 11 || typeId === 12 || typeId === 13 || typeId === 14 || typeId === 16 || typeId === 17 || typeId === 18 || typeId === 22 || typeId === 24 || typeId === 25 || typeId === 26) && canon.cells) {
+  if ((typeId === 3 || typeId === 4 || typeId === 5 || typeId === 7 || typeId === 8 || typeId === 9 || typeId === 10 || typeId === 11 || typeId === 12 || typeId === 13 || typeId === 14 || typeId === 16 || typeId === 17 || typeId === 18 || typeId === 22 || typeId === 24 || typeId === 25 || typeId === 26 || typeId === 27) && canon.cells) {
     const cells = canon.cells as unknown[][];
     return { h: cells.length, w: (cells[0] as unknown[]).length };
   }

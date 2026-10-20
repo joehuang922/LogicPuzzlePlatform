@@ -25,6 +25,7 @@ import norinoriSchema from "../../../../schemas/canon/norinori.json";
 import nurikabeSchema from "../../../../schemas/canon/nurikabe.json";
 import rippleEffectSchema from "../../../../schemas/canon/ripple-effect.json";
 import hitoriSchema from "../../../../schemas/canon/hitori.json";
+import pictoLinkSchema from "../../../../schemas/canon/picto-link.json";
 
 const ajv = new Ajv();
 
@@ -55,6 +56,7 @@ const validators: Record<number, ValidateFunction> = {
   24: ajv.compile(nurikabeSchema),
   25: ajv.compile(rippleEffectSchema),
   26: ajv.compile(hitoriSchema),
+  27: ajv.compile(pictoLinkSchema),
 };
 
 export function validateCanon(puzzleType: number, data: unknown): void {
