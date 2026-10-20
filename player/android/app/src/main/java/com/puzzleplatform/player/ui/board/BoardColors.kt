@@ -6,7 +6,7 @@ import androidx.compose.ui.graphics.Color
 object BoardColors {
     /**
      * Fill for a player-shaded cell on any board whose grid is divided into rooms by thick
-     * black borders (LITS, Nuritwin, Nurimaze, and Heyawake/Norinori when they're ported).
+     * black borders (LITS, Nuritwin, Nurimaze, Heyawake, Norinori).
      * A near-black fill like #333 swallows those borders wherever two shaded cells meet
      * across a room boundary, so the room layout disappears exactly where the player needs
      * it. A medium gray keeps the shade obvious while the black borders still read through.

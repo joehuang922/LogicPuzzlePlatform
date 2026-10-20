@@ -62,6 +62,7 @@ import com.puzzleplatform.player.ui.board.DigitBar
 import com.puzzleplatform.player.ui.board.FillominoBoard
 import com.puzzleplatform.player.ui.board.FillominoMode
 import com.puzzleplatform.player.ui.board.HellGolfBoard
+import com.puzzleplatform.player.ui.board.HeyawakeBoard
 import com.puzzleplatform.player.ui.board.KakuroBoard
 import com.puzzleplatform.player.ui.board.LitsBoard
 import com.puzzleplatform.player.ui.board.MasyuBoard
@@ -290,6 +291,11 @@ fun PlayScreen(
                             onTapCell = vm::tapShadeCell,
                         )
                         9 -> NuritwinBoard(
+                            puzzle = puzzle,
+                            userValues = state.userValues,
+                            onTapCell = vm::tapShadeCell,
+                        )
+                        21 -> HeyawakeBoard(
                             puzzle = puzzle,
                             userValues = state.userValues,
                             onTapCell = vm::tapShadeCell,

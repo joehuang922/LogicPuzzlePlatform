@@ -95,6 +95,9 @@ crosses three or more rooms — all satisfied simultaneously.
   dot (to distinguish a deliberate white from an untouched cell). Unset cells
   render as the plain board background.
 - Room borders render as thick lines; interior cell lines are thin.
+- On Android the same three states are driven by a single tap that cycles unset →
+  black → white-marked → unset (the shared shade/mark interaction); black cells use
+  the shared room shade so room borders stay visible, and clues stay black on top.
 - Clue numbers render in the top-left cell of their room and are not editable
   by the player.
 

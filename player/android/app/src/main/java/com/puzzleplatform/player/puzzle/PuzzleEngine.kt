@@ -76,6 +76,7 @@ object PuzzleEngines {
         AkariEngine,
         HitoriEngine,
         NorinoriEngine,
+        HeyawakeEngine,
     ).associateBy { it.puzzleType }
 
     fun forType(puzzleType: Int): PuzzleEngine? = engines[puzzleType]

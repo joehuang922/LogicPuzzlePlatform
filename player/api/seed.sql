@@ -177,5 +177,17 @@ INSERT INTO puzzle_questions (id, puzzle_type, title, difficulty, width, height,
   '{"grids":{"h":[[0,1,0,1,0,0],[0,1,0,1,1,1],[1,1,1,1,0,1],[0,1,0,0,1,0],[1,1,1,1,0,0]],"v":[[0,1,1,0,0],[1,0,0,1,0],[0,1,1,0,0],[0,1,0,1,1],[1,0,0,1,0],[0,0,0,1,0]]}}'
 );
 
+-- Seed sample puzzle: heyawake (difficulty 2 = easy-normal). A 6x6 board with 15 rectangular
+-- rooms (4 clued), generated and verified by brute-force search to have a unique solution.
+INSERT INTO puzzle_questions (id, puzzle_type, title, difficulty, width, height, canon_repr) VALUES (
+  'a0000000-0000-0000-0000-000000000021',
+  21,
+  'Sample Heyawake',
+  2,
+  6,
+  6,
+  '{"width":6,"height":6,"rooms":[{"r":0,"c":0,"w":2,"h":3,"clue":2},{"r":0,"c":2,"w":1,"h":2,"clue":null},{"r":0,"c":3,"w":1,"h":2,"clue":null},{"r":0,"c":4,"w":1,"h":3,"clue":null},{"r":0,"c":5,"w":1,"h":3,"clue":1},{"r":2,"c":2,"w":1,"h":2,"clue":null},{"r":2,"c":3,"w":1,"h":1,"clue":null},{"r":3,"c":0,"w":2,"h":2,"clue":null},{"r":3,"c":3,"w":2,"h":1,"clue":null},{"r":3,"c":5,"w":1,"h":3,"clue":null},{"r":4,"c":2,"w":2,"h":1,"clue":0},{"r":4,"c":4,"w":1,"h":1,"clue":null},{"r":5,"c":0,"w":3,"h":1,"clue":1},{"r":5,"c":3,"w":1,"h":1,"clue":null},{"r":5,"c":4,"w":1,"h":1,"clue":null}]}'
+);
+
 -- Seed default admin account
 INSERT INTO player_account (name, password, role) VALUES ('admin', 'admin', 'admin');
