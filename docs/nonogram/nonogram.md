@@ -91,6 +91,25 @@ Every row and every column satisfies its clue simultaneously.
 - **Clue highlighting**: As rows/columns are completed, their clues dim or change color to indicate satisfaction.
 - **On-track check** (Android, off by default): a chip beside Undo/Redo. When on, it reads "✓ On track" while every filled cell is filled in the stored solution (`solutionRepr`) and every crossed cell is empty there, and "✗ Off track" otherwise. It never says *which* cell is wrong: to find a deep mistake, step back with Undo until it turns green. Hidden for puzzles with no stored solution.
 
+### Hint
+
+A **Hint** button (web and Android, fully offline) points at the next line worth a look.
+It runs the solver's line solver over the player's marks (`player/solver/src/plugins/nonogram/techniques.ts`,
+ported to `NonogramHinter.kt`) and walks a ladder, easiest first:
+
+1. **A line doesn't fit its clue** — a row/column whose marks already contradict its clue.
+2. **Finish a line** — a line with only one arrangement left.
+3. **Overlapping blocks** — a line where every fitting arrangement agrees on some filled cells.
+4. **Cells no block can reach** — cells that can only be crossed out.
+5. **Where a row meets a column** — no single line moves, but assuming a value for one cell
+   and following its row and column runs into a contradiction.
+
+The hint highlights the line(s) and explains why, without giving the cells away; **Show cells**
+marks them on the board and **Fill them in** applies them (one undo step on Android). When
+nothing on the ladder fires, one cell is revealed from the stored solution. Hints take the
+player's marks as correct; if a step disagrees with the stored solution, the player is told
+a mark is wrong instead.
+
 ### Progress calculation
 
 `(cells whose state != empty / total cell count) * 100`. A cell is considered non-empty once the player has assigned it any state (filled = 1 or crossed = 2). Unset cells (state = 0) are not counted.

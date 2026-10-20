@@ -8,11 +8,14 @@ export const nonogramRenderer: PuzzleRenderer = {
   render(puzzle: PuzzleDefinition, state: PuzzleState, onValuesChange?: (values: Record<string, number>) => void, onComplete?: () => void, liveValidate?: boolean) {
     const canonRepr = (typeof puzzle.canonRepr === "string" ? JSON.parse(puzzle.canonRepr) : puzzle.canonRepr) as NonogramCanon;
     const savedAnswer = state.playerGrid as unknown as NonogramAnswer | undefined;
+    // Gate-computed solution for the reveal hint fallback. Stored as { cells: grid }.
+    const solutionRepr = (typeof puzzle.solutionRepr === "string" ? JSON.parse(puzzle.solutionRepr) : puzzle.solutionRepr) as { cells?: number[][] } | null | undefined;
 
     return (
       <NonogramBoard
         canon={canonRepr}
         initialAnswer={savedAnswer}
+        solution={solutionRepr?.cells ?? null}
         liveValidate={liveValidate}
         onAnswerChange={(answer) => {
           if (onValuesChange) {

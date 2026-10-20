@@ -13,5 +13,5 @@ export { litsPlugin, LitsModel } from "./plugins/lits";
 export type { LitsCanon } from "./plugins/lits";
 export { slitherlinkPlugin, SlitherlinkModel } from "./plugins/slitherlink";
 export type { SlitherlinkCanon, SlitherlinkEdges } from "./plugins/slitherlink";
-export { nonogramPlugin, NonogramModel } from "./plugins/nonogram";
+export { nonogramPlugin, NonogramModel, NonogramBoard, nonogramRevealStep } from "./plugins/nonogram";
 export type { NonogramCanon } from "./plugins/nonogram";

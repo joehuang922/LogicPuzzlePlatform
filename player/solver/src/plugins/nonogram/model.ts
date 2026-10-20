@@ -11,9 +11,9 @@ export interface NonogramCanon {
 }
 
 // Cell states. Cells are binary variables; UNKNOWN is "domain {EMPTY, FILLED}".
-const UNKNOWN = -1;
-const EMPTY = 0;
-const FILLED = 1;
+export const UNKNOWN = -1;
+export const EMPTY = 0;
+export const FILLED = 1;
 
 /**
  * Static per-puzzle metadata, shared by reference across all models of one puzzle so
@@ -21,14 +21,14 @@ const FILLED = 1;
  * and rows..rows+cols-1 for columns; `lineCells[l]` lists the cell ids (r * cols + c) of
  * line l in clue order, and `blocks[l]` its clue with `[0]` normalized to `[]`.
  */
-interface Spec {
+export interface Spec {
   rows: number;
   cols: number;
   lineCells: number[][];
   blocks: number[][];
 }
 
-function buildSpec(canon: NonogramCanon): Spec {
+export function buildSpec(canon: NonogramCanon): Spec {
   const rows = canon.rowClues.length;
   const cols = canon.colClues.length;
   const lineCells: number[][] = [];
@@ -181,7 +181,7 @@ export function solveLine(cells: ArrayLike<number>, blocks: number[]): number[] 
  * solver settles re-queues its crossing line, so deductions ripple across the grid.
  * Returns false on contradiction.
  */
-function propagate(state: Int8Array, spec: Spec, queue: number[]): boolean {
+export function propagate(state: Int8Array, spec: Spec, queue: number[]): boolean {
   const { rows, cols, lineCells, blocks } = spec;
   const queued = new Uint8Array(rows + cols);
   for (const l of queue) queued[l] = 1;

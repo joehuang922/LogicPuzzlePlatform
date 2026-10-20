@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { nextHint, nonogramRevealStep, Step } from "@puzzle/solver";
 import { NonogramCanon, NonogramAnswer } from "../types/canon";
 import { analyzeLineStatus, getColLine, ClueStatus, CellState } from "../liveValidators/nonogram";
 
@@ -9,7 +10,27 @@ interface NonogramBoardProps {
   onComplete?: () => void;
   readonly?: boolean;
   liveValidate?: boolean;
+  // The gate-computed solution grid (0/1), when stored. Backs the "reveal" hint
+  // fallback and the check that a hint doesn't build on a mistaken mark.
+  solution?: number[][] | null;
 }
+
+// The hint affordance's view model: a step (with its settled cells shown or not), or a
+// plain message.
+type HintView = { kind: "step"; step: Step; showCells: boolean } | { kind: "message"; text: string };
+
+const TECHNIQUE_LABELS: Record<string, string> = {
+  "line-contradiction": "A line doesn't fit its clue",
+  "line-complete": "Finish a line",
+  "line-overlap": "Overlapping blocks",
+  "line-empties": "Cells no block can reach",
+  "two-lines": "Where a row meets a column",
+  "inconsistent-marks": "Conflicting marks",
+  reveal: "Revealed cell",
+};
+
+const HINT_LINE_FILL = "rgba(255,193,7,0.3)";
+const HINT_CELL_COLOR = "#1976d2";
 
 const CELL_SIZE = 21;
 const PAD = 8;
@@ -66,6 +87,7 @@ export default function NonogramBoard({
   onComplete,
   readonly,
   liveValidate,
+  solution,
 }: NonogramBoardProps) {
   const { rowClues, colClues } = canon;
   const rows = rowClues.length;
@@ -171,6 +193,60 @@ export default function NonogramBoard({
     window.addEventListener("mouseup", handleMouseUp);
     return () => window.removeEventListener("mouseup", handleMouseUp);
   }, [endDrag]);
+
+  // --- Hint affordance (docs/auto-solve) ---------------------------------------
+  // Runs the client-side line solver on the player's marks and points at the next line
+  // (row or column) whose clue settles something; the settled cells stay hidden until
+  // asked for. Falls back to revealing one cell from the stored solution.
+  const [hint, setHint] = useState<HintView | null>(null);
+
+  const requestHint = useCallback(() => {
+    if (validateSolution(rowClues, colClues, cells)) {
+      setHint({ kind: "message", text: "The puzzle is already solved." });
+      return;
+    }
+    const values: Record<string, number> = {};
+    cells.forEach((row, r) => row.forEach((v, c) => {
+      if (v !== 0) values[`${c},${r}`] = v;
+    }));
+    const step = nextHint(6, canon, values) ?? nonogramRevealStep(canon, values, solution ?? null);
+    if (!step) {
+      setHint({ kind: "message", text: "No further hints are available for this puzzle." });
+      return;
+    }
+    // Hints take the player's marks as correct, so a wrong mark can yield a "deduction"
+    // that contradicts the real answer. Don't teach from it: flag the mistake instead.
+    const wrong = solution && step.placements?.some(
+      (p) => (solution[Math.floor(p.cell / cols)]?.[p.cell % cols] === 1 ? 1 : 2) !== p.value
+    );
+    if (wrong) {
+      setHint({
+        kind: "message",
+        text: "Your marks so far lead to a deduction that doesn't match the solution — one of them is a mistake. Check your recent marks.",
+      });
+      return;
+    }
+    setHint({ kind: "step", step, showCells: false });
+  }, [cells, canon, rowClues, colClues, cols, solution]);
+
+  // Commit the cells the hinted step settles, then dismiss it.
+  const applyHint = useCallback(() => {
+    if (hint?.kind !== "step" || !hint.step.placements) return;
+    const placements = hint.step.placements;
+    setCells((prev) => {
+      const next = prev.map((row) => [...row]);
+      for (const p of placements) next[Math.floor(p.cell / cols)][p.cell % cols] = p.value as CellState;
+      return next;
+    });
+    setHint(null);
+  }, [hint, cols]);
+
+  // A hint reflects a specific board; once the player changes it, drop the stale hint.
+  const cellsAtHint = useRef(cells);
+  useEffect(() => {
+    if (hint && cells !== cellsAtHint.current) setHint(null);
+    cellsAtHint.current = cells;
+  }, [cells, hint]);
 
   const MIN_THUMB_CELL = 2;
   const MAX_THUMB_CELL = 4;
@@ -444,6 +520,45 @@ export default function NonogramBoard({
     );
   }
 
+  // Hint highlights: the focus lines (clue + grid, like the hover band), and the settled
+  // cells once the player asks to see them.
+  const hintMarks: JSX.Element[] = [];
+  if (hint?.kind === "step") {
+    for (const { axis, index } of hint.step.focusLines ?? []) {
+      hintMarks.push(
+        axis === "row" ? (
+          <rect key={`hint-row-${index}`} x={PAD} y={gridY + index * CELL_SIZE} width={clueAreaWidth + gridWidth}
+            height={CELL_SIZE} fill={HINT_LINE_FILL} stroke="#f9a825" strokeWidth={1.5} pointerEvents="none" />
+        ) : (
+          <rect key={`hint-col-${index}`} x={gridX + index * CELL_SIZE} y={PAD} width={CELL_SIZE}
+            height={clueAreaHeight + gridHeight} fill={HINT_LINE_FILL} stroke="#f9a825" strokeWidth={1.5} pointerEvents="none" />
+        )
+      );
+    }
+    if (hint.showCells) {
+      for (const { cell, value } of hint.step.placements ?? []) {
+        const x = gridX + (cell % cols) * CELL_SIZE;
+        const y = gridY + Math.floor(cell / cols) * CELL_SIZE;
+        if (value === 1) {
+          hintMarks.push(
+            <rect key={`hint-cell-${cell}`} x={x + 3} y={y + 3} width={CELL_SIZE - 6} height={CELL_SIZE - 6}
+              fill={HINT_CELL_COLOR} opacity={0.6} pointerEvents="none" />
+          );
+        } else {
+          const cx = x + CELL_SIZE / 2;
+          const cy = y + CELL_SIZE / 2;
+          const s = CELL_SIZE * 0.25;
+          hintMarks.push(
+            <g key={`hint-cell-${cell}`} pointerEvents="none">
+              <line x1={cx - s} y1={cy - s} x2={cx + s} y2={cy + s} stroke={HINT_CELL_COLOR} strokeWidth={2} />
+              <line x1={cx + s} y1={cy - s} x2={cx - s} y2={cy + s} stroke={HINT_CELL_COLOR} strokeWidth={2} />
+            </g>
+          );
+        }
+      }
+    }
+  }
+
   // Coordinate tooltip
   const coordLabel: JSX.Element[] = [];
   if (!readonly && showCoords && hoverCell) {
@@ -518,6 +633,7 @@ export default function NonogramBoard({
         >
           {elements}
           {highlights}
+          {hintMarks}
           {targets}
           {coordLabel}
         </svg>
@@ -574,8 +690,67 @@ export default function NonogramBoard({
             />
             Coords
           </label>
+          <button
+            onClick={requestHint}
+            style={{ ...hintButtonStyle, marginLeft: 12, background: "#1976d2", color: "white", border: "none" }}
+            title="Point at the next line worth a look"
+          >
+            Hint
+          </button>
+          {hint && (
+            <button onClick={() => setHint(null)} style={hintButtonStyle}>
+              Clear hint
+            </button>
+          )}
+        </div>
+      )}
+      {!readonly && hint && (
+        <div
+          style={{
+            maxWidth: 480,
+            padding: "0.6rem 0.8rem",
+            background: hint.kind === "message" ? "#fff8e1" : "#e3f2fd",
+            border: `1px solid ${hint.kind === "message" ? "#ffe082" : "#90caf9"}`,
+            borderRadius: 6,
+            fontSize: "0.85rem",
+            lineHeight: 1.4,
+          }}
+        >
+          {hint.kind === "step" && (
+            <>
+              <div style={{ fontWeight: 600, marginBottom: "0.2rem" }}>
+                {TECHNIQUE_LABELS[hint.step.technique] ?? hint.step.technique}
+              </div>
+              <div style={{ color: "#333" }}>{hint.step.explanation}</div>
+              {hint.step.placements && (
+                <div style={{ display: "flex", gap: 8, marginTop: "0.5rem" }}>
+                  {!hint.showCells && (
+                    <button onClick={() => setHint({ ...hint, showCells: true })} style={hintButtonStyle}>
+                      Show cells
+                    </button>
+                  )}
+                  <button
+                    onClick={applyHint}
+                    style={{ ...hintButtonStyle, background: "#1976d2", color: "white", border: "none" }}
+                  >
+                    Fill them in
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+          {hint.kind === "message" && <div style={{ color: "#333" }}>{hint.text}</div>}
         </div>
       )}
     </div>
   );
 }
+
+const hintButtonStyle = {
+  fontSize: "0.8rem",
+  padding: "0.3rem 0.8rem",
+  background: "#f0f0f0",
+  border: "1px solid #ccc",
+  borderRadius: 4,
+  cursor: "pointer",
+};

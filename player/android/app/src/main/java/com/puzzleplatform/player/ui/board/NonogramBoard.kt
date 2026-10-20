@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import com.puzzleplatform.player.data.model.Puzzle
 import com.puzzleplatform.player.puzzle.NonogramEngine
 import com.puzzleplatform.player.puzzle.NonogramEngine.ClueStatus
+import com.puzzleplatform.player.puzzle.NonogramHinter
 
 private val GRID_BG = Color.White
 private val BAND_BG = Color(0xFFF2F2F2)
@@ -46,6 +47,9 @@ private val CLUE_NORMAL = Color(0xFF333333)
 private val CLUE_SATISFIED = Color(0xFFAAAAAA)
 private val CLUE_ERROR = Color(0xFFDD3333)
 private val ERROR_FILL = Color(0xFFDD3333)
+// Hint highlights (docs/auto-solve): amber focus lines, blue settled cells (matches web).
+private val HINT_LINE_FILL = Color(0x4DFFC107)
+private val HINT_CELL = Color(0xFF1976D2)
 
 /**
  * Clue-band depth adapts to the longest clue line so every number stays visible, however
@@ -91,6 +95,10 @@ fun NonogramBoard(
     // a single reverse step. Called at the start/end of a one-finger paint gesture.
     onStrokeStart: () -> Unit = {},
     onStrokeEnd: () -> Unit = {},
+    // Hint highlights: the lines a hint points at (tinted across clue band and grid), and
+    // the cells it settles once the player asks to see them ("col,row" -> 1 fill / 2 cross).
+    hintLines: List<NonogramHinter.Line> = emptyList(),
+    hintCells: Map<String, Int> = emptyMap(),
     modifier: Modifier = Modifier,
 ) {
     val clues = remember(puzzle.id) { NonogramEngine.parseClues(puzzle) }
@@ -195,12 +203,14 @@ fun NonogramBoard(
             clipRect(left = bandPx, top = bandPx, right = vpx, bottom = vpx) {
                 translate(bandPx + panX, bandPx + panY) {
                     drawNonogramGrid(cols, rows, cell, valuesState.value, cellErrors, liveValidate)
+                    drawHintGrid(cols, rows, cell, hintLines, hintCells)
                 }
             }
 
             // --- Column-clue band (pinned to top, pans horizontally) ---
             clipRect(left = bandPx, top = 0f, right = vpx, bottom = bandPx) {
                 translate(bandPx + panX, 0f) {
+                    for (line in hintLines) if (!line.isRow) drawRect(HINT_LINE_FILL, Offset(line.index * cell, 0f), Size(cell, bandPx))
                     drawColClues(clues, cell, bandPx, colStatus, colClueErrors, liveValidate)
                 }
             }
@@ -208,6 +218,7 @@ fun NonogramBoard(
             // --- Row-clue band (pinned to left, pans vertically) ---
             clipRect(left = 0f, top = bandPx, right = bandPx, bottom = vpx) {
                 translate(0f, bandPx + panY) {
+                    for (line in hintLines) if (line.isRow) drawRect(HINT_LINE_FILL, Offset(0f, line.index * cell), Size(bandPx, cell))
                     drawRowClues(clues, cell, bandPx, rowStatus, rowClueErrors, liveValidate)
                 }
             }
@@ -265,6 +276,35 @@ private fun DrawScope.drawNonogramGrid(
         val x = c * cell
         val major = c % 5 == 0
         drawLine(if (major) GRID_LINE_MAJOR else GRID_LINE, Offset(x, 0f), Offset(x, boardH), if (major) 2f else 1f)
+    }
+}
+
+/** Hint overlay in grid-local coordinates: tinted focus lines, then the settled cells. */
+private fun DrawScope.drawHintGrid(
+    cols: Int,
+    rows: Int,
+    cell: Float,
+    hintLines: List<NonogramHinter.Line>,
+    hintCells: Map<String, Int>,
+) {
+    for (line in hintLines) {
+        if (line.isRow) drawRect(HINT_LINE_FILL, Offset(0f, line.index * cell), Size(cols * cell, cell))
+        else drawRect(HINT_LINE_FILL, Offset(line.index * cell, 0f), Size(cell, rows * cell))
+    }
+    for ((key, value) in hintCells) {
+        val (c, r) = key.split(",").map { it.toInt() }
+        val x = c * cell
+        val y = r * cell
+        if (value == NonogramEngine.FILLED) {
+            drawRect(HINT_CELL.copy(alpha = 0.6f), Offset(x + cell * 0.12f, y + cell * 0.12f), Size(cell * 0.76f, cell * 0.76f))
+        } else {
+            val s = cell * 0.22f
+            val cx = x + cell / 2
+            val cy = y + cell / 2
+            val w = cell * 0.1f
+            drawLine(HINT_CELL, Offset(cx - s, cy - s), Offset(cx + s, cy + s), w, cap = StrokeCap.Round)
+            drawLine(HINT_CELL, Offset(cx + s, cy - s), Offset(cx - s, cy + s), w, cap = StrokeCap.Round)
+        }
     }
 }
 

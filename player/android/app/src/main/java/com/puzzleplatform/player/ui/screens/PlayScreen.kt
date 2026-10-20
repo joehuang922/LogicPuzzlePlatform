@@ -80,6 +80,8 @@ import com.puzzleplatform.player.ui.board.SlitherlinkBoard
 import com.puzzleplatform.player.ui.board.SudokuBoard
 import com.puzzleplatform.player.ui.board.TentaishowBoard
 import com.puzzleplatform.player.ui.board.YajilinBoard
+import com.puzzleplatform.player.puzzle.NonogramEngine
+import com.puzzleplatform.player.puzzle.NonogramHinter
 import com.puzzleplatform.player.puzzle.PuzzleEngines
 import com.puzzleplatform.player.puzzle.SudokuHinter
 import com.puzzleplatform.player.ui.formatElapsed
@@ -257,7 +259,7 @@ fun PlayScreen(
                                     ?.associate { SudokuHinter.cellKey(it.cell) to it.digits.toSet() }
                                     ?: emptyMap(),
                             )
-                            HintControls(hint = h, onRequest = vm::requestHint, onApply = vm::applyHint, onClear = vm::clearHint)
+                            HintControls(hint = h, onRequest = vm::requestHint, onApply = vm::applyHint, onClear = vm::clearHint, onShowCells = {})
                         }
                         12 -> KakuroBoard(
                             puzzle = puzzle,
@@ -404,11 +406,19 @@ fun PlayScreen(
                                     modifier = Modifier.align(Alignment.CenterVertically),
                                 )
                             }
+                            val lines = state.hint as? HintView.Lines
                             NonogramBoard(
                                 puzzle = puzzle,
                                 userValues = state.userValues,
                                 liveValidate = state.liveValidate,
                                 mode = nonogramMode,
+                                hintLines = lines?.step?.focusLines ?: emptyList(),
+                                hintCells = if (lines != null && lines.showCells) {
+                                    val cols = NonogramEngine.parseClues(puzzle).cols
+                                    lines.step.placements.associate { NonogramHinter.cellKey(it.cell, cols) to it.value }
+                                } else {
+                                    emptyMap()
+                                },
                                 onSetCell = vm::setCellState,
                                 // Group a whole drag into one reverse (undo/redo) step.
                                 onStrokeStart = vm::beginStroke,
@@ -428,6 +438,13 @@ fun PlayScreen(
                                     label = { Text("✕ Cross") },
                                 )
                             }
+                            HintControls(
+                                hint = state.hint,
+                                onRequest = vm::requestHint,
+                                onApply = vm::applyHint,
+                                onClear = vm::clearHint,
+                                onShowCells = vm::showHintCells,
+                            )
                         }
                         15 -> LitsBoard(
                             puzzle = puzzle,
@@ -519,9 +536,10 @@ fun PlayScreen(
 }
 
 /**
- * Offline Sudoku hint affordance (docs/auto-solve): a "Hint" button, and when a hint is
- * showing, an explanation card with an apply action for placements/reveals. Fully
- * client-side — works in airplane mode.
+ * Offline Sudoku / Nonogram hint affordance (docs/auto-solve): a "Hint" button, and when
+ * a hint is showing, an explanation card with an apply action for placements/reveals
+ * (and, for a Nonogram line hint, a "Show cells" step before it). Fully client-side —
+ * works in airplane mode.
  */
 @Composable
 private fun HintControls(
@@ -529,6 +547,7 @@ private fun HintControls(
     onRequest: () -> Unit,
     onApply: () -> Unit,
     onClear: () -> Unit,
+    onShowCells: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -550,11 +569,16 @@ private fun HintControls(
                 explanation = "No simple next step was found. The answer here is ${hint.value}."
                 applyLabel = "Fill it in"
             }
+            is HintView.Lines -> {
+                explanation = hint.step.explanation
+                applyLabel = if (hint.step.placements.isNotEmpty()) "Fill them in" else null
+            }
             is HintView.Message -> {
                 explanation = hint.text
                 applyLabel = null
             }
         }
+        val canShowCells = hint is HintView.Lines && !hint.showCells && hint.step.placements.isNotEmpty()
 
         Card(
             Modifier.fillMaxWidth(),
@@ -562,8 +586,13 @@ private fun HintControls(
         ) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(explanation, style = MaterialTheme.typography.bodyMedium)
-                if (applyLabel != null) {
-                    Button(onClick = onApply) { Text(applyLabel) }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (canShowCells) {
+                        OutlinedButton(onClick = onShowCells) { Text("Show cells") }
+                    }
+                    if (applyLabel != null) {
+                        Button(onClick = onApply) { Text(applyLabel) }
+                    }
                 }
             }
         }

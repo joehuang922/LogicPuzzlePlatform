@@ -7,6 +7,8 @@ import com.puzzleplatform.player.data.ServiceLocator
 import com.puzzleplatform.player.data.model.AchievementUnlock
 import com.puzzleplatform.player.data.model.Puzzle
 import com.puzzleplatform.player.data.model.SnapshotSummary
+import com.puzzleplatform.player.puzzle.NonogramEngine
+import com.puzzleplatform.player.puzzle.NonogramHinter
 import com.puzzleplatform.player.puzzle.PuzzleEngine
 import com.puzzleplatform.player.puzzle.PuzzleEngines
 import com.puzzleplatform.player.puzzle.ShadeCycle
@@ -48,7 +50,7 @@ data class PlayUiState(
     // attempt started. Current progress stays playable; reload is opt-in.
     val puzzleEdited: Boolean = false,
     val reloading: Boolean = false,
-    // Offline Sudoku hint (docs/auto-solve). Null when none is being shown.
+    // Offline Sudoku / Nonogram hint (docs/auto-solve). Null when none is being shown.
     val hint: HintView? = null,
     // Reverse (undo/redo) history — a pilot wired for Nonogram. These reflect
     // whether a move can be stepped backward / forward from the current state.
@@ -60,10 +62,13 @@ data class PlayUiState(
  * A hint surfaced to the player. Mirrors the web client's HintView:
  *  - [Step] a teachable technique (highlight focus cells, optional placement/eliminations),
  *  - [Reveal] the solution-backed "give up" fallback (one correct cell),
+ *  - [Lines] a Nonogram step: highlight its focus lines; the cells it settles stay hidden
+ *    until [Lines.showCells] (a reveal is a one-cell step here),
  *  - [Message] an informational note (e.g. conflicts present, or no step available).
  */
 sealed interface HintView {
     data class Step(val step: SudokuHinter.Step) : HintView
+    data class Lines(val step: NonogramHinter.Step, val showCells: Boolean = false) : HintView
     data class Reveal(val cell: Int, val value: Int) : HintView
     data class Message(val text: String) : HintView
 }
@@ -162,12 +167,16 @@ class PlayViewModel(
     fun toggleNoteMode() = _state.update { it.copy(noteMode = !it.noteMode) }
 
     /**
-     * Compute and show the next offline hint for Sudoku (type 1). Prefers a teachable
-     * technique; falls back to a solution-backed reveal of one correct cell; otherwise
-     * shows an informational message. No-op for types without a hinter.
+     * Compute and show the next offline hint for Sudoku (type 1) or Nonogram (type 6).
+     * Prefers a teachable technique; falls back to a solution-backed reveal of one correct
+     * cell; otherwise shows an informational message. No-op for types without a hinter.
      */
     fun requestHint() {
         val puzzle = _state.value.puzzle ?: return
+        if (puzzle.puzzleType == NonogramEngine.puzzleType) {
+            requestNonogramHint(puzzle)
+            return
+        }
         if (puzzle.puzzleType != SudokuEngine.puzzleType) return
         val values = _state.value.userValues
 
@@ -214,9 +223,61 @@ class PlayViewModel(
         return null
     }
 
+    /**
+     * Nonogram: point at the next line whose clue settles something. Hints take the marks
+     * as correct, so when the stored solution shows a step builds on a wrong mark, flag
+     * the mistake instead of teaching from it.
+     */
+    private fun requestNonogramHint(puzzle: Puzzle) {
+        val values = _state.value.userValues
+        if (NonogramEngine.isComplete(puzzle, values)) {
+            _state.update { it.copy(hint = HintView.Message("The puzzle is already solved.")) }
+            return
+        }
+        val step = NonogramHinter.nextHint(puzzle, values) ?: NonogramHinter.reveal(puzzle, values)
+        if (step == null) {
+            _state.update { it.copy(hint = HintView.Message("No further hints are available for this puzzle.")) }
+            return
+        }
+        val solution = NonogramEngine.parseSolution(puzzle)
+        val cols = NonogramEngine.parseClues(puzzle).cols
+        val wrong = solution != null && step.placements.any { p ->
+            val want = if (solution[p.cell / cols][p.cell % cols] == 1) NonogramEngine.FILLED else NonogramEngine.CROSSED
+            want != p.value
+        }
+        _state.update {
+            it.copy(
+                hint = if (wrong) {
+                    HintView.Message(
+                        "Your marks so far lead to a deduction that doesn't match the solution — one of them " +
+                            "is a mistake. Try stepping back with Undo.",
+                    )
+                } else {
+                    HintView.Lines(step)
+                },
+            )
+        }
+    }
+
+    /** Nonogram: reveal the cells the shown hint settles, on the board. */
+    fun showHintCells() = _state.update { s ->
+        val hint = s.hint as? HintView.Lines ?: return@update s
+        s.copy(hint = hint.copy(showCells = true))
+    }
+
     /** Commit a hint's placement (a step placement or a reveal) and dismiss the hint. */
     fun applyHint() {
-        val placement: SudokuHinter.Placement = when (val hint = _state.value.hint) {
+        val hint = _state.value.hint
+        if (hint is HintView.Lines) {
+            // Nonogram: commit every settled cell as one move (one undo step).
+            val cols = _state.value.puzzle?.let { NonogramEngine.parseClues(it).cols } ?: return
+            val next = _state.value.userValues +
+                hint.step.placements.associate { NonogramHinter.cellKey(it.cell, cols) to it.value }
+            _state.update { it.copy(hint = null) }
+            updateValues(next, clearSelection = false)
+            return
+        }
+        val placement: SudokuHinter.Placement = when (hint) {
             is HintView.Reveal -> SudokuHinter.Placement(hint.cell, hint.value)
             is HintView.Step -> hint.step.placement ?: return
             else -> return // Message or null: nothing to apply

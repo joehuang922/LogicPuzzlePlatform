@@ -57,6 +57,13 @@ export interface Step {
   eliminations?: { cell: number; digits: number[] }[];
   /** A forced placement, when the technique determines one. */
   placement?: { cell: number; value: number };
+  /**
+   * Several forced placements at once, for types where one deduction settles many cells
+   * (a Nonogram line deduction). Values use the client's cell-state convention.
+   */
+  placements?: { cell: number; value: number }[];
+  /** Whole lines the player should look at (line-clued types such as Nonogram). */
+  focusLines?: { axis: "row" | "col"; index: number }[];
   /** Human-readable "why", referencing the focus cells. */
   explanation: string;
   /** Ladder index: 0 = easiest. Also the difficulty signal. */

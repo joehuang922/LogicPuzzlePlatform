@@ -77,3 +77,22 @@ export const NONE_TOTALS: NonogramCanon = { rowClues: [[2], [1]], colClues: [[1]
  * column 0 holds a filled cell in row 0 — yet column 0's [2] then needs row 1, which is [0].
  */
 export const NONE_LINES: NonogramCanon = { rowClues: [[2], [0]], colClues: [[2], [0]] };
+
+/**
+ * PROBE. A unique 6x6 that line solving alone can't finish: after the line rungs run dry
+ * (marks in {@link PROBE_STALLED}), only the two-line rung moves on.
+ */
+export const PROBE_GRID = [
+  [0, 1, 1, 0, 1, 1],
+  [0, 0, 0, 1, 0, 1],
+  [1, 0, 0, 1, 0, 0],
+  [1, 0, 0, 1, 1, 0],
+  [1, 1, 0, 0, 1, 0],
+  [0, 1, 0, 1, 1, 1],
+];
+export const PROBE: NonogramCanon = canonFromGrid(PROBE_GRID);
+/** PROBE's marks once the line rungs stall ("col,row" -> 1 fill / 2 cross). */
+export const PROBE_STALLED: Record<string, number> = {
+  "1,0": 1, "4,0": 1, "4,1": 2, "4,3": 1, "4,4": 1, "1,4": 1, "3,4": 2, "5,4": 2, "3,1": 1,
+  "3,2": 1, "3,5": 1, "4,5": 1, "2,2": 2, "4,2": 2, "1,1": 2, "1,2": 2, "2,1": 2,
+};
