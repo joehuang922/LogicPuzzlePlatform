@@ -5,6 +5,12 @@ The sample images use *solid* grid rulings, so we use the uniform-grid detector
 (``detect_uniform_grid``): it lattice-fits the cell count from the ink projection
 and synthesises a perfectly uniform grid, which the square-cell fact makes more
 reliable than snapping to individually-detected (and jittery) line peaks.
+
+The rulings are printed in a single ink colour (red in the samples, but the
+pipeline must not assume any particular hue). We therefore drive every geometry
+step off :func:`ink_intensity` — the per-channel minimum — instead of luminance
+grayscale, which loses a faint coloured line because the un-absorbed channel
+pulls the weighted mean back toward paper-white. See ``ink_intensity`` for why.
 """
 from __future__ import annotations
 
@@ -17,6 +23,7 @@ from numpy.typing import NDArray
 from puzzle_parsers.grid_utils import (
     detect_uniform_grid,
     find_quadrilateral_border,
+    ink_intensity,
     warp_to_rectangle,
 )
 
@@ -40,8 +47,8 @@ def detect_picto_link_grid(
     if debug_path:
         debug_path.mkdir(parents=True, exist_ok=True)
 
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    border_pts = find_quadrilateral_border(gray)
+    ink = ink_intensity(image)
+    border_pts = find_quadrilateral_border(ink)
 
     if debug_path:
         vis = image.copy()
@@ -53,8 +60,8 @@ def detect_picto_link_grid(
     if debug_path:
         cv2.imwrite(str(debug_path / "02_warped.png"), warped)
 
-    warped_gray = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
-    h_lines, v_lines = detect_uniform_grid(warped_gray, warp_w, warp_h)
+    warped_ink = ink_intensity(warped)
+    h_lines, v_lines = detect_uniform_grid(warped_ink, warp_w, warp_h)
 
     if debug_path:
         vis = warped.copy()

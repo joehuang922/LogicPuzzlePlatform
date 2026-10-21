@@ -75,9 +75,11 @@ class PictoLinkParser(PuzzleParser):
         # Recognize clues via batch OCR. The shared INT_CELL_PROMPT returns -1
         # for empty cells; our canon convention uses 0 for empty, so normalize
         # any non-positive value to 0. Clue values have no upper bound (the
-        # samples go to 12), so we do not clamp the high end.
+        # samples go to 12), so we do not clamp the high end. ``multi_digit``
+        # keeps ``0`` in the allowlist and accepts two-character reads so clues
+        # like ``10`` survive — without it a ``10`` reads as a bare ``1``.
         if self._ocr is not None:
-            recognized = self._ocr.recognize_cells(cell_rois)
+            recognized = self._ocr.recognize_cells(cell_rois, multi_digit=True)
             cells = [[v if v > 0 else 0 for v in row] for row in recognized]
         else:
             cells = [[0] * cols for _ in range(rows)]

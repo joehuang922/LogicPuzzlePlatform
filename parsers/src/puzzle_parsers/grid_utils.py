@@ -21,6 +21,31 @@ from scipy.signal import find_peaks
 _BORDER_SUPPORT_MIN = 0.5
 
 
+def ink_intensity(image: NDArray) -> NDArray:
+    """Hue-agnostic "ink is dark" grayscale: the per-pixel channel minimum.
+
+    Luminance (``COLOR_BGR2GRAY``) is a weighted channel average, so a faint line
+    printed in a *single* colour nearly vanishes: a red ruling keeps its red
+    channel near paper-white, which drags the weighted mean back up toward white.
+    The grid border and rulings then fall below the detectors' contrast floor even
+    though a human reads them easily — the failure mode behind the picto-link
+    sample's lost border and collapsed cell count.
+
+    The channel *minimum* is immune to hue. Neutral paper is bright in every
+    channel, so ``min`` stays bright; ink of any colour absorbs in at least one
+    channel (red ink kills green+blue, blue ink kills red+green, black kills all),
+    so ``min`` goes dark. This recovers red/brown/blue/green rulings and plain
+    black ink alike. Pass the result anywhere a grayscale (ink-dark) image is
+    expected — border detection, warping geometry, and grid-line fitting.
+
+    Accepts a BGR image; returns a single-channel ``uint8`` array. A 2-D input is
+    already single-channel and is returned unchanged.
+    """
+    if image.ndim == 2:
+        return image
+    return image.min(axis=2)
+
+
 def find_quadrilateral_border(gray: NDArray) -> NDArray:
     """Find the 4 corners of the puzzle's outer border.
 
