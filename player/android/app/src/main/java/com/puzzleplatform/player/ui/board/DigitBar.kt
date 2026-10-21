@@ -27,9 +27,7 @@ import androidx.compose.ui.unit.sp
  * (note) entry; it's disabled via [noteModeDisabled] when the selected cell holds
  * a committed answer.
  *
- * [includeZero] adds a "0" key after the 9, for puzzles whose values can be
- * multi-digit (Fillomino room sizes like 10, 20); the caller is responsible for
- * rejecting a leading zero. Single-digit puzzles leave it off.
+ * Puzzles whose values can be multi-digit use [NumberPad] instead.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -41,7 +39,6 @@ fun DigitBar(
     noteMode: Boolean = false,
     onToggleNoteMode: (() -> Unit)? = null,
     noteModeDisabled: Boolean = false,
-    includeZero: Boolean = false,
 ) {
     FlowRow(
         modifier = modifier
@@ -66,15 +63,6 @@ fun DigitBar(
                 contentPadding = noPadding,
             ) {
                 Text(d.toString(), fontSize = 18.sp)
-            }
-        }
-        if (includeZero) {
-            OutlinedButton(
-                onClick = { onDigit(0) },
-                modifier = Modifier.size(46.dp),
-                contentPadding = noPadding,
-            ) {
-                Text("0", fontSize = 18.sp)
             }
         }
         if (onToggleNoteMode != null) {

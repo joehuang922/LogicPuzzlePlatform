@@ -56,6 +56,11 @@ data class PlayUiState(
     // whether a move can be stepped backward / forward from the current state.
     val canUndo: Boolean = false,
     val canRedo: Boolean = false,
+    // Multi-digit number entry (Fillomino room sizes, Ripple Effect values): when true,
+    // the next digit starts a new number (replacing the cell) rather than appending to
+    // the one already shown. Set when a cell is freshly selected; cleared after the first
+    // digit so 1 then 2 -> 12. In state so the number pad can show a typing cursor.
+    val freshDigitEntry: Boolean = true,
 )
 
 /**
@@ -93,12 +98,6 @@ class PlayViewModel(
 
     /** History is a pilot limited to Nonogram (type 6). */
     private fun historyEnabled(): Boolean = _state.value.puzzle?.puzzleType == 6
-
-    // Multi-digit number entry (Fillomino room sizes, Ripple Effect values): when true,
-    // the next digit starts a new number (replacing the cell) rather than appending to
-    // the one already shown. Set when a cell is freshly selected; cleared after the first
-    // digit so 1 then 2 -> 12.
-    private var freshDigitEntry = true
 
     private val engine: PuzzleEngine?
         get() = _state.value.puzzle?.let { PuzzleEngines.forType(it.puzzleType) }
@@ -156,8 +155,7 @@ class PlayViewModel(
 
     fun selectCell(key: String?) {
         // A freshly selected cell starts a new multi-digit number on the next digit.
-        freshDigitEntry = true
-        _state.update { it.copy(selectedCell = key) }
+        _state.update { it.copy(selectedCell = key, freshDigitEntry = true) }
     }
 
     fun toggleLiveValidate() = _state.update { it.copy(liveValidate = !it.liveValidate) }
@@ -326,7 +324,7 @@ class PlayViewModel(
         val cell = _state.value.selectedCell ?: return
         val values = _state.value.userValues
         val current = values[cell] ?: 0
-        val next = if (freshDigitEntry || current == 0) {
+        val next = if (_state.value.freshDigitEntry || current == 0) {
             if (digit == 0) return // can't start a number with 0
             digit
         } else {
@@ -334,14 +332,14 @@ class PlayViewModel(
             if (combined > maxCellValue(puzzle)) return // overshoot -> ignore
             combined
         }
-        freshDigitEntry = false
         updateValues(values + (cell to next), clearSelection = false)
+        _state.update { it.copy(freshDigitEntry = false) }
     }
 
     /** Clear the selected cell but keep it selected so the player can retype. */
     fun clearSelectedCellRetype() {
         val cell = _state.value.selectedCell ?: return
-        freshDigitEntry = true
+        _state.update { it.copy(freshDigitEntry = true) }
         updateValues(_state.value.userValues - cell, clearSelection = false)
     }
 

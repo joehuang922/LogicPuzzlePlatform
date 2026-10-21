@@ -61,6 +61,7 @@ import com.puzzleplatform.player.ui.board.HitoriBoard
 import com.puzzleplatform.player.ui.board.DigitBar
 import com.puzzleplatform.player.ui.board.FillominoBoard
 import com.puzzleplatform.player.ui.board.FillominoMode
+import com.puzzleplatform.player.ui.board.NumberPad
 import com.puzzleplatform.player.ui.board.HellGolfBoard
 import com.puzzleplatform.player.ui.board.HeyawakeBoard
 import com.puzzleplatform.player.ui.board.KakuroBoard
@@ -136,12 +137,14 @@ fun PlayScreen(
                 val type = state.puzzle?.puzzleType
                 if (type == 14 || type == 25) {
                     // Fillomino room numbers / Ripple Effect cell values: both are
-                    // multi-digit (so a "0" key is offered) with no pencil notes.
-                    DigitBar(
+                    // multi-digit, so they get a phone-style keypad with a 0 key and a
+                    // readout of the number being typed, and no pencil notes.
+                    NumberPad(
+                        value = state.userValues[selected] ?: 0,
+                        typing = !state.freshDigitEntry,
                         onDigit = vm::enterMultiDigit,
                         onClear = vm::clearSelectedCellRetype,
                         onDismiss = { vm.selectCell(null) },
-                        includeZero = true,
                     )
                 } else {
                     // Only Sudoku (type 1) offers pencil-mark notes; a cell that already
