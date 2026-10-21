@@ -129,7 +129,8 @@ export interface Collection {
 }
 
 export function listCollections() {
-  return request<{ collections: Collection[] }>("/collections");
+  // uncollectedCount: puzzles with no collection (Home shows them as collection 0).
+  return request<{ collections: Collection[]; uncollectedCount?: number }>("/collections");
 }
 
 export function createCollection(data: {

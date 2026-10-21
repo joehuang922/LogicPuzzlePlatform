@@ -212,7 +212,7 @@ class HomeViewModel(
         // "Latest" shows the puzzles the player most recently worked on
         // (by latest snapshot), capped at 3.
         val puzzles = repo.listRecentlyPlayed(limit = 3)
-        val collections = repo.listCollections()
+        val collections = repo.listHomeCollections()
         val types = repo.listPuzzleTypes()
         val progress = if (collections.isNotEmpty()) {
             repo.getCollectionProgress(collections.map { it.id }).associateBy { it.collectionId }

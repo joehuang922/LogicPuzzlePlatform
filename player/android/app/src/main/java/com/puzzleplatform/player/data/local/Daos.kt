@@ -22,6 +22,9 @@ interface CollectionDao {
 
     @Query("SELECT * FROM collections ORDER BY id")
     suspend fun getAll(): List<CollectionEntity>
+
+    @Query("DELETE FROM collections WHERE id = :id")
+    suspend fun deleteById(id: Int)
 }
 
 @Dao
@@ -56,10 +59,14 @@ interface PuzzleDao {
     )
     suspend fun listRecentlyPlayed(limit: Int): List<PuzzleEntity>
 
-    @Query("SELECT * FROM puzzles WHERE srcCollection = :collectionId AND deletedAt IS NULL ORDER BY id")
+    // Collection id 0 (DEFAULT_COLLECTION_ID) selects the puzzles with no collection.
+    @Query(
+        "SELECT * FROM puzzles WHERE (srcCollection = :collectionId OR (:collectionId = 0 AND srcCollection IS NULL)) " +
+            "AND deletedAt IS NULL ORDER BY id"
+    )
     suspend fun listByCollection(collectionId: Int): List<PuzzleEntity>
 
-    @Query("SELECT * FROM puzzles WHERE srcCollection = :collectionId")
+    @Query("SELECT * FROM puzzles WHERE srcCollection = :collectionId OR (:collectionId = 0 AND srcCollection IS NULL)")
     suspend fun listByCollectionIncludingDeleted(collectionId: Int): List<PuzzleEntity>
 
     @Query("UPDATE puzzles SET deletedAt = :deletedAt WHERE id = :id")

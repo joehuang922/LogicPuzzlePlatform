@@ -93,7 +93,8 @@ async function listPuzzles(
     });
   }
 
-  if (srcCollection === "none") {
+  // "0" is the clients' default collection id for puzzles with no collection.
+  if (srcCollection === "none" || srcCollection === "0") {
     conditions.push("pq.src_collection IS NULL");
   } else if (srcCollection) {
     conditions.push("pq.src_collection = :srcCollection");

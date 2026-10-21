@@ -33,7 +33,14 @@ async function listCollections(): Promise<APIGatewayProxyResult> {
      GROUP BY pc.id
      ORDER BY pc.id`
   );
-  return response(200, { collections: result.records.map(mapRecord) });
+  // Puzzles with no collection; clients show them as a default collection with
+  // id 0 (the "none" bucket the manifest, puzzle list and progress endpoints accept).
+  const uncollected = await executeStatement(
+    `SELECT COUNT(*) AS n FROM puzzle_questions
+     WHERE src_collection IS NULL AND deleted_at IS NULL`
+  );
+  const uncollectedCount = Number(uncollected.records[0]?.n ?? 0);
+  return response(200, { collections: result.records.map(mapRecord), uncollectedCount });
 }
 
 /**
@@ -49,12 +56,14 @@ async function collectionManifest(
   const id = event.pathParameters?.id;
   if (!id) return response(400, { error: "Missing collection id" });
 
+  // Id 0 is the default collection: puzzles with no collection.
+  const none = Number(id) === 0;
   const result = await executeStatement(
     `SELECT id, updated_at, deleted_at
      FROM puzzle_questions
-     WHERE src_collection = :id
+     WHERE ${none ? "src_collection IS NULL" : "src_collection = :id"}
      ORDER BY id`,
-    [{ name: "id", value: { longValue: Number(id) } }]
+    none ? [] : [{ name: "id", value: { longValue: Number(id) } }]
   );
 
   return response(200, { puzzles: result.records.map(mapRecord) });

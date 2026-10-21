@@ -118,18 +118,22 @@ async function listAttempts(
     const collectionIds = collectionProgress.split(",").map(Number).filter((n) => !isNaN(n));
     if (collectionIds.length === 0) return response(200, { collectionProgress: [] });
     const placeholders = collectionIds.map((_, i) => `:c${i}`).join(",");
+    // Id 0 is the default collection: puzzles with no collection.
+    const noneFilter = collectionIds.includes(0)
+      ? " OR (pq.src_collection IS NULL AND pq.deleted_at IS NULL)"
+      : "";
     const params = [
       { name: "player", value: { longValue: Number(player) } },
       ...collectionIds.map((id, i) => ({ name: `c${i}`, value: { longValue: id } })),
     ];
     const result = await executeStatement(
-      `SELECT pq.src_collection AS collection_id,
+      `SELECT COALESCE(pq.src_collection, 0) AS collection_id,
               COUNT(DISTINCT pq.id) AS total,
               COUNT(DISTINCT CASE WHEN pa.finished_at IS NOT NULL THEN pq.id END) AS solved
        FROM puzzle_questions pq
        LEFT JOIN player_attempt pa ON pa.question = pq.id AND pa.player = :player
-       WHERE pq.src_collection IN (${placeholders})
-       GROUP BY pq.src_collection`,
+       WHERE pq.src_collection IN (${placeholders})${noneFilter}
+       GROUP BY COALESCE(pq.src_collection, 0)`,
       params
     );
     const progress = result.records.map((r) => ({

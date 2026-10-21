@@ -67,6 +67,39 @@ function ProgressBar({ solved, total, style }: { solved: number; total: number; 
   );
 }
 
+// Puzzles with no collection are listed under this default collection. Id 0
+// is understood by the API as "no collection" (puzzle list, progress, manifest).
+const DEFAULT_COLLECTION_ID = 0;
+
+// Ascending, case-insensitive, missing values last. publishAt is an ISO date, so
+// comparing it as text orders it chronologically.
+function compareNullsLast(a: string | null, b: string | null): number {
+  if (!a && !b) return 0;
+  if (!a) return 1;
+  if (!b) return -1;
+  return a.localeCompare(b, undefined, { sensitivity: "base" });
+}
+
+/** Publisher, then name, then newest publish date first; the default collection last. */
+function sortCollections(collections: Collection[], uncollectedCount: number): Collection[] {
+  const sorted = [...collections].sort((a, b) =>
+    compareNullsLast(a.publisher, b.publisher) ||
+    compareNullsLast(a.name, b.name) ||
+    (a.publishAt && b.publishAt ? b.publishAt.localeCompare(a.publishAt) : compareNullsLast(a.publishAt, b.publishAt))
+  );
+  if (uncollectedCount > 0) {
+    sorted.push({
+      id: DEFAULT_COLLECTION_ID,
+      name: "Uncategorized",
+      publisher: null,
+      publishAt: null,
+      coverSrc: null,
+      puzzleCount: uncollectedCount,
+    });
+  }
+  return sorted;
+}
+
 function CollectionPuzzleList({
   puzzles,
   puzzleTypes,
@@ -175,10 +208,11 @@ export default function Home() {
     Promise.all([listPuzzles({ limit: 10 }), listCollections(), listPuzzleTypes()])
       .then(([puzzleRes, collectionRes, ptRes]) => {
         setPuzzles(puzzleRes.puzzles as PuzzleDefinition[]);
-        setCollections(collectionRes.collections);
+        const sortedCollections = sortCollections(collectionRes.collections, collectionRes.uncollectedCount ?? 0);
+        setCollections(sortedCollections);
         setPuzzleTypes(ptRes.puzzleTypes);
-        if (collectionRes.collections.length > 0) {
-          const ids = collectionRes.collections.map((c) => c.id);
+        if (sortedCollections.length > 0) {
+          const ids = sortedCollections.map((c) => c.id);
           getCollectionProgress(HARDCODED_PLAYER_ID, ids).then((res) => {
             setCollectionProgressMap(new Map(res.collectionProgress.map((p) => [p.collectionId, p])));
           });
@@ -316,12 +350,7 @@ export default function Home() {
               </tr>
             </thead>
             <tbody>
-              {[...collections].sort((a, b) => {
-                if (!a.publishAt && !b.publishAt) return 0;
-                if (!a.publishAt) return 1;
-                if (!b.publishAt) return -1;
-                return b.publishAt.localeCompare(a.publishAt);
-              }).map((c) => (
+              {collections.map((c) => (
                 <>
                   <tr
                     key={c.id}

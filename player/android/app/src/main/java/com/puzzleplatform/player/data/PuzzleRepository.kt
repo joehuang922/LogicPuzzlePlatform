@@ -12,6 +12,8 @@ import com.puzzleplatform.player.data.model.Attempt
 import com.puzzleplatform.player.data.model.Collection
 import com.puzzleplatform.player.data.model.CollectionProgress
 import com.puzzleplatform.player.data.model.CreateAttemptResponse
+import com.puzzleplatform.player.data.model.DEFAULT_COLLECTION_ID
+import com.puzzleplatform.player.data.model.defaultCollection
 import com.puzzleplatform.player.data.model.ProfileResponse
 import com.puzzleplatform.player.data.model.Puzzle
 import com.puzzleplatform.player.data.model.PuzzleType
@@ -19,6 +21,7 @@ import com.puzzleplatform.player.data.model.SaveSnapshotResponse
 import com.puzzleplatform.player.data.model.Snapshot
 import com.puzzleplatform.player.data.model.SnapshotSummary
 import com.puzzleplatform.player.data.model.SolvedQuestionsResponse
+import com.puzzleplatform.player.data.model.sortedForHome
 import com.puzzleplatform.player.data.sync.SyncClock
 import com.puzzleplatform.player.data.sync.SyncManager
 import com.puzzleplatform.player.data.sync.SyncWorker
@@ -105,8 +108,9 @@ class PuzzleRepository(
     suspend fun getCachedPuzzleTypes(): List<PuzzleType> =
         db.puzzleTypeDao().getAll().map { it.toModel() }
 
+    /** Home's cached collections, default collection included, in Home order. */
     suspend fun getCachedCollections(): List<Collection> =
-        db.collectionDao().getAll().map { it.toModel() }
+        db.collectionDao().getAll().map { it.toModel() }.sortedForHome()
 
     suspend fun listPuzzleTypes(): List<PuzzleType> {
         return try {
@@ -118,13 +122,26 @@ class PuzzleRepository(
         }
     }
 
-    suspend fun listCollections(): List<Collection> {
+    /** The real collections (no default collection), e.g. for assigning a puzzle. */
+    suspend fun listCollections(): List<Collection> =
+        listHomeCollections().filter { it.id != DEFAULT_COLLECTION_ID }
+
+    /**
+     * Collections for Home: the real ones plus, when any puzzle has no collection,
+     * the default collection holding them, in Home order. The default collection is
+     * cached in Room with the rest so it shows and plays offline too.
+     */
+    suspend fun listHomeCollections(): List<Collection> {
         return try {
-            val collections = api.listCollections().collections
+            val res = api.listCollections()
+            val collections = if (res.uncollectedCount > 0) {
+                res.collections + defaultCollection(res.uncollectedCount)
+            } else res.collections
             db.collectionDao().upsertAll(collections.map { it.toEntity() })
-            collections
+            if (res.uncollectedCount == 0) db.collectionDao().deleteById(DEFAULT_COLLECTION_ID)
+            collections.sortedForHome()
         } catch (e: Exception) {
-            db.collectionDao().getAll().takeIf { it.isNotEmpty() }?.map { it.toModel() } ?: throw e
+            getCachedCollections().takeIf { it.isNotEmpty() } ?: throw e
         }
     }
 

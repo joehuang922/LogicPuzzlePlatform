@@ -68,7 +68,11 @@ data class Collection(
 )
 
 @Serializable
-data class CollectionListResponse(val collections: List<Collection>)
+data class CollectionListResponse(
+    val collections: List<Collection>,
+    // Puzzles with no collection; Home lists them as the default collection.
+    val uncollectedCount: Int = 0,
+)
 
 // --- Admin authoring DTOs ---
 
