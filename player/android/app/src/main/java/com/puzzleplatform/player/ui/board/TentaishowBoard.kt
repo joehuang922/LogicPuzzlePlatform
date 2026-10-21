@@ -1,10 +1,7 @@
 package com.puzzleplatform.player.ui.board
 
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -18,16 +15,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import com.puzzleplatform.player.data.model.Puzzle
 import com.puzzleplatform.player.puzzle.TentaishowEngine
-import kotlin.math.round
 
 private val LINE = Color.Black
 private val DOT_DARK = Color(0xFF111111)
-// Preview palette, as in Nonogram's: the not-yet-enclosed ground is a mid grey so it
-// can't be mistaken for an enclosed white-dot region (drawn pure white).
-private val PREVIEW_BG = Color(0xFFD9D9D9)
-private val PREVIEW_BORDER = Color(0xFFAAAAAA)
-/** The web board's preview box is ~160px; cells there are 3..8px. */
-private val PREVIEW_MAX = 96.dp
 
 /**
  * Compose Canvas renderer for Tentai Show / Spiral Galaxies (puzzle type 20), the analog
@@ -69,7 +59,7 @@ fun TentaishowBoard(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        PicturePreview(picture, rows, cols)
+        PicturePreview(picture, rows, cols, TentaishowEngine.GROUND_ARGB)
 
         ZoomableBoard(
             cols = cols,
@@ -134,35 +124,6 @@ fun TentaishowBoard(
                 val filled = dot.color == 1
                 drawCircle(if (filled) DOT_DARK else Color.White, radius, center)
                 drawCircle(if (filled) Color.White else DOT_DARK, radius, center, style = Stroke(ring))
-            }
-        }
-    }
-}
-
-/** Small aspect-preserving preview of the emerging picture (web board's thumbnail). */
-@Composable
-private fun PicturePreview(picture: IntArray, rows: Int, cols: Int) {
-    val longest = maxOf(rows, cols)
-    Canvas(
-        Modifier
-            .size(PREVIEW_MAX * cols / longest, PREVIEW_MAX * rows / longest)
-            .border(1.dp, PREVIEW_BORDER),
-    ) {
-        val cell = minOf(size.width / cols, size.height / rows)
-        drawRect(PREVIEW_BG)
-        for (r in 0 until rows) {
-            for (c in 0 until cols) {
-                val argb = picture[r * cols + c]
-                if (argb == TentaishowEngine.GROUND_ARGB) continue
-                // Snap to whole pixels so adjacent same-color cells abut exactly; with
-                // fractional bounds their anti-aliased edges show up as faint gridlines.
-                val left = round(c * cell)
-                val top = round(r * cell)
-                drawRect(
-                    Color(argb),
-                    Offset(left, top),
-                    Size(round((c + 1) * cell) - left, round((r + 1) * cell) - top),
-                )
             }
         }
     }

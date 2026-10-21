@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { PictoLinkCanon, PictoLinkAnswer } from "../types/canon";
 
 interface PictoLinkBoardProps {
@@ -7,13 +7,23 @@ interface PictoLinkBoardProps {
   onAnswerChange?: (answer: PictoLinkAnswer) => void;
   onComplete?: () => void;
   readonly?: boolean;
+  liveValidate?: boolean;
 }
 
 const CELL_SIZE = 36;
 const PAD = 20;
-const TOKEN_RADIUS = 13;
-const PATH_COLOR = "#2563eb";
-const FILL_COLOR = "#dbeafe";
+// A linked pair (and its path) is filled black, the picture emerging as in a
+// solved Link-a-Pix; with live validation on, a wrongly linked pair is red.
+const LINKED_FILL = "#000";
+const ERROR_FILL = "#d33";
+// A path still being drawn (not yet ending on a clue) is a plain dark line.
+const OPEN_PATH_COLOR = "#222";
+// Over a filled path the route stays faintly visible, so it can be found to erase.
+const LINKED_PATH_COLOR = "#555";
+const CLUE_TEXT = "#222";
+const CLUE_TEXT_FILLED = "#fff";
+// Preview ground: a mid grey, as in the Nonogram / Tentaishow previews.
+const THUMB_BG = "#d9d9d9";
 
 type Cell = { r: number; c: number };
 
@@ -139,12 +149,69 @@ function validateSolution(
   return true;
 }
 
+// Per-cell link state: unlinked, linked (a pair joined end to end, or a filled
+// single), or wrongly linked (the path ends on a clue of another value, or its
+// length isn't the clue's value).
+const UNLINKED = 0;
+const LINKED = 1;
+const BAD_LINK = 2;
+
+function analyzeLinks(
+  cells: number[][],
+  hEdges: number[][],
+  vEdges: number[][],
+  singles: [number, number][]
+): number[][] {
+  const rows = cells.length;
+  const cols = cells[0].length;
+  const state: number[][] = Array.from({ length: rows }, () =>
+    Array(cols).fill(UNLINKED)
+  );
+  for (const [r, c] of singles) {
+    if (cells[r]?.[c] === 1) state[r][c] = LINKED;
+  }
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const startVal = cells[r][c];
+      if (startVal < 2 || state[r][c] !== UNLINKED) continue;
+      if (degreeOf(r, c, hEdges, vEdges, rows, cols) !== 1) continue;
+
+      // Walk the path until it reaches another clue or runs out.
+      const path: Cell[] = [{ r, c }];
+      let prev: Cell | null = null;
+      let cur: Cell = { r, c };
+      let endsOnClue = false;
+      while (path.length <= rows * cols) {
+        const ns = neighbors(cur.r, cur.c, hEdges, vEdges, rows, cols).filter(
+          (n) => !(prev && n.r === prev.r && n.c === prev.c)
+        );
+        if (ns.length === 0) break;
+        prev = cur;
+        cur = ns[0];
+        path.push(cur);
+        if (cells[cur.r][cur.c] >= 2) {
+          endsOnClue = true;
+          break;
+        }
+      }
+      if (!endsOnClue) continue;
+
+      const ok =
+        cells[cur.r][cur.c] === startVal && path.length === startVal;
+      for (const p of path) state[p.r][p.c] = ok ? LINKED : BAD_LINK;
+    }
+  }
+  return state;
+}
+
 export default function PictoLinkBoard({
   canon,
   initialAnswer,
   onAnswerChange,
   onComplete,
   readonly,
+  liveValidate,
 }: PictoLinkBoardProps) {
   const { cells } = canon;
   const rows = cells.length;
@@ -197,13 +264,21 @@ export default function PictoLinkBoard({
     }
   }, [hEdges, vEdges, singles, cells, onComplete]);
 
-  const isFilled = useCallback(
-    (r: number, c: number): boolean => {
-      if (degreeOf(r, c, hEdges, vEdges, rows, cols) > 0) return true;
-      return singles.some(([sr, sc]) => sr === r && sc === c);
-    },
-    [hEdges, vEdges, singles, rows, cols]
+  const links = useMemo(
+    () => analyzeLinks(cells, hEdges, vEdges, singles),
+    [cells, hEdges, vEdges, singles]
   );
+  // Fill for a cell, or null when it isn't part of a link. A wrong link only shows
+  // red with live validation on; otherwise it reads as any other link.
+  const linkFill = (r: number, c: number): string | null => {
+    const s = links[r][c];
+    if (s === UNLINKED) return null;
+    return s === BAD_LINK && liveValidate ? ERROR_FILL : LINKED_FILL;
+  };
+  const pathColor = (r1: number, c1: number, r2: number, c2: number) =>
+    links[r1][c1] !== UNLINKED && links[r2][c2] !== UNLINKED
+      ? LINKED_PATH_COLOR
+      : OPEN_PATH_COLOR;
 
   const getCellFromPoint = useCallback(
     (clientX: number, clientY: number): Cell | null => {
@@ -337,143 +412,169 @@ export default function PictoLinkBoard({
     }
   }, [cells]);
 
+  // Preview: the linked cells alone, black on grey, so the emerging picture
+  // reads at a glance (the same cells the Android collection thumbnail shows).
+  const THUMB_MAX = 160;
+  const thumbCell = Math.max(
+    3,
+    Math.min(8, Math.floor(THUMB_MAX / cols), Math.floor(THUMB_MAX / rows))
+  );
+  const thumbWidth = thumbCell * cols;
+  const thumbHeight = thumbCell * rows;
+
   return (
-    <div style={{ maxWidth: svgWidth, width: "100%" }}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
       <svg
-        ref={svgRef}
-        width="100%"
-        viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-        style={{
-          userSelect: "none",
-          display: "block",
-          touchAction: "none",
-        }}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
+        width={thumbWidth}
+        height={thumbHeight}
+        viewBox={`0 0 ${thumbWidth} ${thumbHeight}`}
+        style={{ border: "1px solid #aaa", background: THUMB_BG, display: "block" }}
+        shapeRendering="crispEdges"
       >
-        <g transform={`translate(${PAD},${PAD})`}>
-          {/* Shaded fill for every filled cell (the emerging picture) */}
-          {cells.flatMap((row, r) =>
-            row.map((_, c) =>
-              isFilled(r, c) ? (
-                <rect
-                  key={`fill-${r}-${c}`}
-                  x={c * CELL_SIZE}
-                  y={r * CELL_SIZE}
-                  width={CELL_SIZE}
-                  height={CELL_SIZE}
-                  fill={FILL_COLOR}
-                  pointerEvents="none"
-                />
-              ) : null
-            )
-          )}
+        {links.flatMap((row, r) =>
+          row.map((s, c) =>
+            s !== UNLINKED ? (
+              <rect
+                key={`tc-${r}-${c}`}
+                x={c * thumbCell}
+                y={r * thumbCell}
+                width={thumbCell}
+                height={thumbCell}
+                fill={LINKED_FILL}
+              />
+            ) : null
+          )
+        )}
+      </svg>
+      <div style={{ maxWidth: svgWidth, width: "100%" }}>
+        <svg
+          ref={svgRef}
+          width="100%"
+          viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+          style={{
+            userSelect: "none",
+            display: "block",
+            touchAction: "none",
+          }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+        >
+          <g transform={`translate(${PAD},${PAD})`}>
+            {/* Inner grid lines */}
+            {Array.from({ length: rows - 1 }, (_, i) => (
+              <line
+                key={`grid-h-${i}`}
+                x1={0}
+                y1={(i + 1) * CELL_SIZE}
+                x2={cols * CELL_SIZE}
+                y2={(i + 1) * CELL_SIZE}
+                stroke="#ccc"
+                strokeWidth={1}
+              />
+            ))}
+            {Array.from({ length: cols - 1 }, (_, i) => (
+              <line
+                key={`grid-v-${i}`}
+                x1={(i + 1) * CELL_SIZE}
+                y1={0}
+                x2={(i + 1) * CELL_SIZE}
+                y2={rows * CELL_SIZE}
+                stroke="#ccc"
+                strokeWidth={1}
+              />
+            ))}
 
-          {/* Outer border */}
-          <rect
-            x={0}
-            y={0}
-            width={cols * CELL_SIZE}
-            height={rows * CELL_SIZE}
-            fill="none"
-            stroke="#222"
-            strokeWidth={2}
-          />
-          {/* Inner grid lines */}
-          {Array.from({ length: rows - 1 }, (_, i) => (
-            <line
-              key={`grid-h-${i}`}
-              x1={0}
-              y1={(i + 1) * CELL_SIZE}
-              x2={cols * CELL_SIZE}
-              y2={(i + 1) * CELL_SIZE}
-              stroke="#ccc"
-              strokeWidth={1}
-            />
-          ))}
-          {Array.from({ length: cols - 1 }, (_, i) => (
-            <line
-              key={`grid-v-${i}`}
-              x1={(i + 1) * CELL_SIZE}
-              y1={0}
-              x2={(i + 1) * CELL_SIZE}
-              y2={rows * CELL_SIZE}
-              stroke="#ccc"
-              strokeWidth={1}
-            />
-          ))}
-
-          {/* Drawn path segments (under the clue tokens) */}
-          {hEdges.flatMap((row, r) =>
-            row.map((val, c) =>
-              val === 1 ? (
-                <line
-                  key={`hl-${r}-${c}`}
-                  x1={(c + 0.5) * CELL_SIZE}
-                  y1={(r + 0.5) * CELL_SIZE}
-                  x2={(c + 1.5) * CELL_SIZE}
-                  y2={(r + 0.5) * CELL_SIZE}
-                  stroke={PATH_COLOR}
-                  strokeWidth={5}
-                  strokeLinecap="round"
-                  pointerEvents="none"
-                />
-              ) : null
-            )
-          )}
-          {vEdges.flatMap((row, r) =>
-            row.map((val, c) =>
-              val === 1 ? (
-                <line
-                  key={`vl-${r}-${c}`}
-                  x1={(c + 0.5) * CELL_SIZE}
-                  y1={(r + 0.5) * CELL_SIZE}
-                  x2={(c + 0.5) * CELL_SIZE}
-                  y2={(r + 1.5) * CELL_SIZE}
-                  stroke={PATH_COLOR}
-                  strokeWidth={5}
-                  strokeLinecap="round"
-                  pointerEvents="none"
-                />
-              ) : null
-            )
-          )}
-
-          {/* Clue tokens (on top of paths) */}
-          {cells.flatMap((row, r) =>
-            row.map((val, c) => {
-              if (val === 0) return null;
-              const cx = (c + 0.5) * CELL_SIZE;
-              const cy = (r + 0.5) * CELL_SIZE;
-              return (
-                <g key={`tok-${r}-${c}`} pointerEvents="none">
-                  <circle
-                    cx={cx}
-                    cy={cy}
-                    r={TOKEN_RADIUS}
-                    fill="#fff"
-                    stroke="#222"
-                    strokeWidth={2}
+            {/* Linked cells, over the grid lines so a picture reads as solid */}
+            {cells.flatMap((row, r) =>
+              row.map((_, c) => {
+                const fill = linkFill(r, c);
+                return fill ? (
+                  <rect
+                    key={`fill-${r}-${c}`}
+                    x={c * CELL_SIZE}
+                    y={r * CELL_SIZE}
+                    width={CELL_SIZE}
+                    height={CELL_SIZE}
+                    fill={fill}
+                    pointerEvents="none"
                   />
+                ) : null;
+              })
+            )}
+
+            {/* Outer border */}
+            <rect
+              x={0}
+              y={0}
+              width={cols * CELL_SIZE}
+              height={rows * CELL_SIZE}
+              fill="none"
+              stroke="#222"
+              strokeWidth={2}
+            />
+
+            {/* Drawn path segments (under the clues) */}
+            {hEdges.flatMap((row, r) =>
+              row.map((val, c) =>
+                val === 1 ? (
+                  <line
+                    key={`hl-${r}-${c}`}
+                    x1={(c + 0.5) * CELL_SIZE}
+                    y1={(r + 0.5) * CELL_SIZE}
+                    x2={(c + 1.5) * CELL_SIZE}
+                    y2={(r + 0.5) * CELL_SIZE}
+                    stroke={pathColor(r, c, r, c + 1)}
+                    strokeWidth={5}
+                    strokeLinecap="round"
+                    pointerEvents="none"
+                  />
+                ) : null
+              )
+            )}
+            {vEdges.flatMap((row, r) =>
+              row.map((val, c) =>
+                val === 1 ? (
+                  <line
+                    key={`vl-${r}-${c}`}
+                    x1={(c + 0.5) * CELL_SIZE}
+                    y1={(r + 0.5) * CELL_SIZE}
+                    x2={(c + 0.5) * CELL_SIZE}
+                    y2={(r + 1.5) * CELL_SIZE}
+                    stroke={pathColor(r, c, r + 1, c)}
+                    strokeWidth={5}
+                    strokeLinecap="round"
+                    pointerEvents="none"
+                  />
+                ) : null
+              )
+            )}
+
+            {/* Clue numbers (on top of paths); white on a filled cell */}
+            {cells.flatMap((row, r) =>
+              row.map((val, c) => {
+                if (val === 0) return null;
+                return (
                   <text
-                    x={cx}
-                    y={cy}
+                    key={`clue-${r}-${c}`}
+                    x={(c + 0.5) * CELL_SIZE}
+                    y={(r + 0.5) * CELL_SIZE}
                     textAnchor="middle"
                     dominantBaseline="central"
-                    fontSize={val >= 10 ? 13 : 16}
+                    fontSize={val >= 10 ? 15 : 18}
                     fontWeight={700}
-                    fill="#222"
+                    fill={links[r][c] !== UNLINKED ? CLUE_TEXT_FILLED : CLUE_TEXT}
+                    pointerEvents="none"
                   >
                     {val}
                   </text>
-                </g>
-              );
-            })
-          )}
-        </g>
-      </svg>
+                );
+              })
+            )}
+          </g>
+        </svg>
+      </div>
     </div>
   );
 }

@@ -5,7 +5,7 @@ import PictoLinkBoard from "../components/PictoLinkBoard";
 export const pictoLinkRenderer: PuzzleRenderer = {
   puzzleType: 27,
 
-  render(puzzle: PuzzleDefinition, state: PuzzleState, onValuesChange?: (values: Record<string, number>) => void, onComplete?: () => void) {
+  render(puzzle: PuzzleDefinition, state: PuzzleState, onValuesChange?: (values: Record<string, number>) => void, onComplete?: () => void, liveValidate?: boolean) {
     const canonRepr = (typeof puzzle.canonRepr === "string" ? JSON.parse(puzzle.canonRepr) : puzzle.canonRepr) as PictoLinkCanon;
     const savedAnswer = state.playerGrid as unknown as PictoLinkAnswer | undefined;
 
@@ -13,6 +13,7 @@ export const pictoLinkRenderer: PuzzleRenderer = {
       <PictoLinkBoard
         canon={canonRepr}
         initialAnswer={savedAnswer}
+        liveValidate={liveValidate}
         onAnswerChange={(answer) => {
           if (onValuesChange) {
             const values: Record<string, number> = {};

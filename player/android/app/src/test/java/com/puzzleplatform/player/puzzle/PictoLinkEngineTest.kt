@@ -178,6 +178,48 @@ class PictoLinkEngineTest {
         assertEquals(1, PictoLinkEngine.maxDegree(7))
     }
 
+    // -- link states --------------------------------------------------------
+
+    private fun links(values: Map<String, Int>): IntArray {
+        val cells = PictoLinkEngine.parseCells(docPuzzle)
+        return PictoLinkEngine.linkStates(cells, PictoLinkEngine.edges(cells, values), PictoLinkEngine.singles(cells, values))
+    }
+
+    private fun IntArray.cellsWith(state: Int) = indices.filter { this[it] == state }.map { it / 5 to it % 5 }
+
+    @Test
+    fun linkStates_marksCorrectLinksAndSingles() {
+        val s = links(solved)
+        assertEquals(
+            listOf(0 to 0, 0 to 4, 1 to 0, 2 to 1, 2 to 2, 2 to 3, 2 to 4),
+            s.cellsWith(PictoLinkEngine.LINKED),
+        )
+        assertTrue(s.cellsWith(PictoLinkEngine.BAD_LINK).isEmpty())
+    }
+
+    @Test
+    fun linkStates_leavesAPathInProgressUnlinked() {
+        val s = links(mapOf("h:2,1" to 1, "h:2,2" to 1))
+        assertTrue(s.all { it == PictoLinkEngine.UNLINKED })
+    }
+
+    @Test
+    fun linkStates_flagsAMismatchedPartner() {
+        // 2 at (1,0) down, then right along row 2 to the 4 at (2,1): wrong value.
+        val s = links(mapOf("v:1,0" to 1, "h:2,0" to 1))
+        assertEquals(listOf(1 to 0, 2 to 0, 2 to 1), s.cellsWith(PictoLinkEngine.BAD_LINK))
+    }
+
+    @Test
+    fun linkStates_flagsAWrongLength() {
+        // The 4s joined by a detour through row 3: 6 cells, not 4.
+        val s = links(mapOf("v:2,1" to 1, "h:3,1" to 1, "h:3,2" to 1, "h:3,3" to 1, "v:2,4" to 1))
+        assertEquals(
+            listOf(2 to 1, 2 to 4, 3 to 1, 3 to 2, 3 to 3, 3 to 4),
+            s.cellsWith(PictoLinkEngine.BAD_LINK),
+        )
+    }
+
     // -- thumbnail ----------------------------------------------------------
 
     @Test

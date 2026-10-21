@@ -202,9 +202,59 @@ object PictoLinkEngine : PuzzleEngine {
         return keys.takeIf { it.isNotEmpty() }?.associateWith { EMPTY }
     }
 
-    /** True when cell (r,c) is part of the picture: on a drawn path, or a filled single. */
-    fun isFilled(e: Edges, singles: Set<Pair<Int, Int>>, r: Int, c: Int, rows: Int, cols: Int): Boolean =
-        degreeOf(e, r, c, rows, cols) > 0 || (r to c) in singles
+    /** [linkStates] values: off every link, on a correct link, on a wrong link. */
+    const val UNLINKED = 0
+    const val LINKED = 1
+    const val BAD_LINK = 2
+
+    /**
+     * Row-major link state per cell (web board's analyzeLinks). A filled 1-clue is
+     * [LINKED]; a path traced from a clue endpoint that ends on another clue marks every
+     * cell on it [LINKED] when the partner matches and the length is the clue's value,
+     * else [BAD_LINK]. A path still being drawn (no clue at its far end) stays [UNLINKED].
+     */
+    fun linkStates(cells: List<List<Int>>, e: Edges, singles: Set<Pair<Int, Int>>): IntArray {
+        val (rows, cols) = dims(cells)
+        val state = IntArray(rows * cols)
+        for ((r, c) in singles) if (clueAt(cells, r, c) == 1) state[r * cols + c] = LINKED
+        for (r in 0 until rows) {
+            for (c in 0 until cols) {
+                val startVal = clueAt(cells, r, c)
+                if (startVal < 2 || state[r * cols + c] != UNLINKED) continue
+                if (degreeOf(e, r, c, rows, cols) != 1) continue
+                val path = mutableListOf(r to c)
+                var prev: Pair<Int, Int>? = null
+                var cur = r to c
+                var endsOnClue = false
+                while (path.size <= rows * cols) {
+                    val next = neighbors(e, cur.first, cur.second, rows, cols).firstOrNull { it != prev } ?: break
+                    prev = cur
+                    cur = next
+                    path.add(cur)
+                    if (clueAt(cells, cur.first, cur.second) >= 2) { endsOnClue = true; break }
+                }
+                if (!endsOnClue) continue
+                val ok = clueAt(cells, cur.first, cur.second) == startVal && path.size == startVal
+                for ((pr, pc) in path) state[pr * cols + pc] = if (ok) LINKED else BAD_LINK
+            }
+        }
+        return state
+    }
+
+    /**
+     * Row-major packed-ARGB picture: every linked cell (right or wrong) black on a grey
+     * ground. Shared by the board's live preview and the solved collection thumbnail.
+     */
+    fun pictureCells(cells: List<List<Int>>, userValues: Map<String, Int>): IntArray =
+        linkStates(cells, edges(cells, userValues), singles(cells, userValues))
+            .map { if (it == UNLINKED) GROUND_ARGB else FILL_ARGB }
+            .toIntArray()
+
+    /** Opaque black for a linked cell of the picture. */
+    const val FILL_ARGB: Int = 0xFF000000.toInt()
+
+    /** Light-grey ground for cells off every link, matching the nonogram preview. */
+    const val GROUND_ARGB: Int = 0xFFD9D9D9.toInt()
 
     /**
      * "Clues correctly linked": the share of clue cells on a complete, correct path. A
@@ -322,23 +372,11 @@ object PictoLinkEngine : PuzzleEngine {
         return true
     }
 
-    /** The solved picture: filled cells black on a light ground. */
+    /** The solved picture: linked cells black on a light ground (the board's preview). */
     override fun renderThumbnail(puzzle: Puzzle, answer: JsonObject): PuzzleThumbnail? {
         val cells = parseCells(puzzle)
         val (rows, cols) = dims(cells)
         if (rows == 0 || cols == 0) return null
-        val values = restoreUserValues(puzzle, answer)
-        val e = edges(cells, values)
-        val singles = singles(cells, values)
-        val pixels = IntArray(rows * cols) { i ->
-            if (isFilled(e, singles, i / cols, i % cols, rows, cols)) THUMB_FILL_ARGB else THUMB_GROUND_ARGB
-        }
-        return PuzzleThumbnail(width = cols, height = rows, cells = pixels)
+        return PuzzleThumbnail(width = cols, height = rows, cells = pictureCells(cells, restoreUserValues(puzzle, answer)))
     }
 }
-
-/** Opaque black for a filled cell of the picture. */
-private const val THUMB_FILL_ARGB = 0xFF000000.toInt()
-
-/** Light-grey ground for cells off every path, matching the nonogram thumbnail. */
-private const val THUMB_GROUND_ARGB = 0xFFD9D9D9.toInt()

@@ -1,8 +1,11 @@
 package com.puzzleplatform.player.ui.board
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -19,12 +22,16 @@ import com.puzzleplatform.player.puzzle.PictoLinkEngine
 private val GRID_BG = Color.White
 private val BORDER = Color(0xFF222222)
 private val GRID_LINE = Color(0xFFCCCCCC)
-private val PATH_COLOR = Color(0xFF2563EB)
-private val FILL_COLOR = Color(0xFFDBEAFE)
+// A linked pair and its path fill black; a wrong link is red under live validation.
+private val LINKED_FILL = Color.Black
+private val ERROR_FILL = Color(0xFFDD3333)
+// A path still being drawn is a plain dark line; over a filled link the route stays
+// faintly visible so it can be found to erase.
+private val OPEN_PATH = Color(0xFF222222)
+private val LINKED_PATH = Color(0xFF555555)
 private val SELECT_FILL = Color(0xFFE0E8FF)
-private val TOKEN_FILL = Color.White
-private val TOKEN_STROKE = Color(0xFF222222)
-private val TOKEN_TEXT = Color(0xFF222222)
+private val CLUE_TEXT = Color(0xFF222222)
+private val CLUE_TEXT_FILLED = Color.White
 
 /**
  * Compose Canvas renderer for Picto Link (puzzle type 27), the analog of
@@ -37,11 +44,15 @@ private val TOKEN_TEXT = Color(0xFF222222)
  * the segments touching it, for quick correction. Every change goes out through
  * [onApplyChanges] (a 0 value drops the key). Two fingers pan/zoom via [ZoomableBoard].
  *
- * Filled cells (on a path, or a filled single) are tinted to show the emerging picture;
- * paths are thick blue lines between cell centers, clues white tokens on top.
+ * Once a path joins two clues, it and its endpoints fill black (a filled single too), so
+ * the picture emerges; with [liveValidate] on, a link whose partner or length is wrong
+ * fills red instead (see [PictoLinkEngine.linkStates]). A path still being drawn is a dark
+ * line. Clue numbers are bare (no token), white on a filled cell. Above the board sits a
+ * small live preview of the picture — the same cells the collection thumbnail shows once
+ * solved.
  *
  * The Admin review editor passes [onSelectCell]: taps then select a cell (highlighted via
- * [selectedCell], "col,row") and drags draw nothing.
+ * [selectedCell], "col,row") and drags draw nothing; the preview is left out there.
  */
 @Composable
 fun PictoLinkBoard(
@@ -49,6 +60,7 @@ fun PictoLinkBoard(
     userValues: Map<String, Int>,
     onApplyChanges: (Map<String, Int>) -> Unit,
     modifier: Modifier = Modifier,
+    liveValidate: Boolean = false,
     selectedCell: String? = null,
     onSelectCell: ((col: Int, row: Int) -> Unit)? = null,
 ) {
@@ -69,121 +81,138 @@ fun PictoLinkBoard(
     val drag = remember(puzzle.id, rows, cols) { PictoLinkDragState(rows, cols) }
     val drawEnabled = onSelectCell == null
 
-    ZoomableBoard(
-        cols = cols,
-        rows = rows,
-        resetKey = puzzle.id,
+    // One trace per input change, shared by the preview and the board fills.
+    val edges = remember(cells, userValues) { PictoLinkEngine.edges(cells, userValues) }
+    val links = remember(cells, userValues) {
+        PictoLinkEngine.linkStates(cells, edges, PictoLinkEngine.singles(cells, userValues))
+    }
+
+    Column(
         modifier = modifier,
-        onTapCell = { col, row ->
-            val select = onSelect.value
-            if (select != null) {
-                select(col, row)
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (drawEnabled) {
+            val picture = remember(links) {
+                IntArray(links.size) {
+                    if (links[it] == PictoLinkEngine.UNLINKED) PictoLinkEngine.GROUND_ARGB else PictoLinkEngine.FILL_ARGB
+                }
+            }
+            PicturePreview(picture, rows, cols, PictoLinkEngine.GROUND_ARGB)
+        }
+
+        ZoomableBoard(
+            cols = cols,
+            rows = rows,
+            resetKey = puzzle.id,
+            onTapCell = { col, row ->
+                val select = onSelect.value
+                if (select != null) {
+                    select(col, row)
+                } else {
+                    PictoLinkEngine.tapChanges(cellsState.value, valuesState.value, row, col)?.let { onApply.value(it) }
+                }
+            },
+            // ZoomableBoard reports cells as (col, row); the drag state works in (row, col) to
+            // match the "h:row,col"/"v:row,col" segment keys, so swap at the boundary.
+            onDrawStart = if (drawEnabled) {
+                { cell -> drag.start(cell?.let { (c, r) -> r to c }) }
             } else {
-                PictoLinkEngine.tapChanges(cellsState.value, valuesState.value, row, col)?.let { onApply.value(it) }
+                null
+            },
+            onDrawTo = if (drawEnabled) {
+                { cell ->
+                    drag.moveTo(cell?.let { (c, r) -> r to c }, cellsState.value, valuesState.value) {
+                        onApply.value(it)
+                    }
+                }
+            } else {
+                null
+            },
+            onDrawEnd = if (drawEnabled) {
+                { drag.end() }
+            } else {
+                null
+            },
+        ) { cell ->
+            val boardW = cols * cell
+            val boardH = rows * cell
+            drawRect(GRID_BG, topLeft = Offset(0f, 0f), size = Size(boardW, boardH))
+            fun linked(r: Int, c: Int) = links[r * cols + c] != PictoLinkEngine.UNLINKED
+
+            selectedState.value?.split(",")?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 2 }?.let { (c, r) ->
+                drawRect(SELECT_FILL, topLeft = Offset(c * cell, r * cell), size = Size(cell, cell))
             }
-        },
-        // ZoomableBoard reports cells as (col, row); the drag state works in (row, col) to
-        // match the "h:row,col"/"v:row,col" segment keys, so swap at the boundary.
-        onDrawStart = if (drawEnabled) {
-            { cell -> drag.start(cell?.let { (c, r) -> r to c }) }
-        } else {
-            null
-        },
-        onDrawTo = if (drawEnabled) {
-            { cell ->
-                drag.moveTo(cell?.let { (c, r) -> r to c }, cellsState.value, valuesState.value) {
-                    onApply.value(it)
+
+            val gridW = 1.dp.toPx()
+            for (r in 1 until rows) {
+                drawLine(GRID_LINE, Offset(0f, r * cell), Offset(boardW, r * cell), gridW)
+            }
+            for (c in 1 until cols) {
+                drawLine(GRID_LINE, Offset(c * cell, 0f), Offset(c * cell, boardH), gridW)
+            }
+
+            // Link fills over the grid lines, so a finished picture reads as solid.
+            for (r in 0 until rows) {
+                for (c in 0 until cols) {
+                    val fill = when (links[r * cols + c]) {
+                        PictoLinkEngine.UNLINKED -> continue
+                        PictoLinkEngine.BAD_LINK -> if (liveValidate) ERROR_FILL else LINKED_FILL
+                        else -> LINKED_FILL
+                    }
+                    drawRect(fill, topLeft = Offset(c * cell, r * cell), size = Size(cell, cell))
                 }
             }
-        } else {
-            null
-        },
-        onDrawEnd = if (drawEnabled) {
-            { drag.end() }
-        } else {
-            null
-        },
-    ) { cell ->
-        val boardW = cols * cell
-        val boardH = rows * cell
-        drawRect(GRID_BG, topLeft = Offset(0f, 0f), size = Size(boardW, boardH))
-        val values = valuesState.value
-        val e = PictoLinkEngine.edges(cells, values)
-        val singles = PictoLinkEngine.singles(cells, values)
 
-        // Picture fill under everything else.
-        for (r in 0 until rows) {
-            for (c in 0 until cols) {
-                if (PictoLinkEngine.isFilled(e, singles, r, c, rows, cols)) {
-                    drawRect(FILL_COLOR, topLeft = Offset(c * cell, r * cell), size = Size(cell, cell))
+            // Path segments between cell centers (under the clues).
+            val pathW = cell * 0.14f
+            for (r in 0 until rows) {
+                for (c in 0 until cols - 1) {
+                    if (edges.h[r][c] == PictoLinkEngine.SEGMENT) {
+                        drawLine(
+                            if (linked(r, c) && linked(r, c + 1)) LINKED_PATH else OPEN_PATH,
+                            Offset((c + 0.5f) * cell, (r + 0.5f) * cell),
+                            Offset((c + 1.5f) * cell, (r + 0.5f) * cell),
+                            pathW,
+                            cap = StrokeCap.Round,
+                        )
+                    }
                 }
             }
-        }
-        selectedState.value?.split(",")?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 2 }?.let { (c, r) ->
-            drawRect(SELECT_FILL, topLeft = Offset(c * cell, r * cell), size = Size(cell, cell))
-        }
-
-        val gridW = 1.dp.toPx()
-        for (r in 1 until rows) {
-            drawLine(GRID_LINE, Offset(0f, r * cell), Offset(boardW, r * cell), gridW)
-        }
-        for (c in 1 until cols) {
-            drawLine(GRID_LINE, Offset(c * cell, 0f), Offset(c * cell, boardH), gridW)
-        }
-
-        // Path segments between cell centers (under the tokens).
-        val pathW = cell * 0.14f
-        for (r in 0 until rows) {
-            for (c in 0 until cols - 1) {
-                if (e.h[r][c] == PictoLinkEngine.SEGMENT) {
-                    drawLine(
-                        PATH_COLOR,
-                        Offset((c + 0.5f) * cell, (r + 0.5f) * cell),
-                        Offset((c + 1.5f) * cell, (r + 0.5f) * cell),
-                        pathW,
-                        cap = StrokeCap.Round,
-                    )
+            for (r in 0 until rows - 1) {
+                for (c in 0 until cols) {
+                    if (edges.v[r][c] == PictoLinkEngine.SEGMENT) {
+                        drawLine(
+                            if (linked(r, c) && linked(r + 1, c)) LINKED_PATH else OPEN_PATH,
+                            Offset((c + 0.5f) * cell, (r + 0.5f) * cell),
+                            Offset((c + 0.5f) * cell, (r + 1.5f) * cell),
+                            pathW,
+                            cap = StrokeCap.Round,
+                        )
+                    }
                 }
             }
-        }
-        for (r in 0 until rows - 1) {
-            for (c in 0 until cols) {
-                if (e.v[r][c] == PictoLinkEngine.SEGMENT) {
-                    drawLine(
-                        PATH_COLOR,
-                        Offset((c + 0.5f) * cell, (r + 0.5f) * cell),
-                        Offset((c + 0.5f) * cell, (r + 1.5f) * cell),
-                        pathW,
-                        cap = StrokeCap.Round,
-                    )
+
+            val borderW = 2.dp.toPx()
+            drawRect(BORDER, topLeft = Offset(0f, 0f), size = Size(boardW, boardH), style = Stroke(borderW))
+
+            // Clue numbers on top of paths: bare, white on a filled cell.
+            for (r in 0 until rows) {
+                for (c in 0 until cells[r].size) {
+                    val v = cells[r][c]
+                    if (v <= 0) continue
+                    drawClue(v, (c + 0.5f) * cell, (r + 0.5f) * cell, cell, if (linked(r, c)) CLUE_TEXT_FILLED else CLUE_TEXT)
                 }
-            }
-        }
-
-        val borderW = 2.dp.toPx()
-        drawRect(BORDER, topLeft = Offset(0f, 0f), size = Size(boardW, boardH), style = Stroke(borderW))
-
-        // Clue tokens on top of paths.
-        val tokenRadius = cell * 0.36f
-        val tokenStrokeW = cell * 0.06f
-        for (r in 0 until rows) {
-            for (c in 0 until cells[r].size) {
-                val v = cells[r][c]
-                if (v <= 0) continue
-                val center = Offset((c + 0.5f) * cell, (r + 0.5f) * cell)
-                drawCircle(TOKEN_FILL, tokenRadius, center)
-                drawCircle(TOKEN_STROKE, tokenRadius, center, style = Stroke(tokenStrokeW))
-                drawClue(v, center.x, center.y, cell)
             }
         }
     }
 }
 
 /** Draw a (possibly multi-digit) clue centered at (cx, cy). */
-private fun DrawScope.drawClue(value: Int, cx: Float, cy: Float, cell: Float) {
+private fun DrawScope.drawClue(value: Int, cx: Float, cy: Float, cell: Float, color: Color) {
     val paint = android.graphics.Paint().apply {
-        color = TOKEN_TEXT.toArgb()
-        textSize = cell * (if (value >= 10) 0.36f else 0.44f)
+        this.color = color.toArgb()
+        textSize = cell * (if (value >= 10) 0.42f else 0.5f)
         textAlign = android.graphics.Paint.Align.CENTER
         isAntiAlias = true
         typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)

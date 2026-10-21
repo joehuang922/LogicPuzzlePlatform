@@ -351,6 +351,7 @@ fun PlayScreen(
                             // Segments "h:r,c"/"v:r,c" and filled 1-clues "s:r,c" -> 1; a tap
                             // that clears a path cell's segments lands as one batch.
                             onApplyChanges = vm::putUserValues,
+                            liveValidate = state.liveValidate,
                         )
                         19 -> HellGolfBoard(
                             puzzle = puzzle,
