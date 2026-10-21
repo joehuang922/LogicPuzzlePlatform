@@ -18,6 +18,8 @@ import com.puzzleplatform.player.puzzle.NonogramAuthoring
 import com.puzzleplatform.player.puzzle.NonogramDraft
 import com.puzzleplatform.player.puzzle.NurikabeAuthoring
 import com.puzzleplatform.player.puzzle.NurikabeDraft
+import com.puzzleplatform.player.puzzle.PictoLinkAuthoring
+import com.puzzleplatform.player.puzzle.PictoLinkDraft
 import com.puzzleplatform.player.puzzle.SlitherlinkAuthoring
 import com.puzzleplatform.player.puzzle.SlitherlinkDraft
 import com.puzzleplatform.player.puzzle.SudokuAuthoring
@@ -36,7 +38,8 @@ import kotlinx.coroutines.sync.withPermit
  * [userValues] ("col,row" -> digit) — the same map the player's SudokuBoard renders
  * and edits — so the review reuses that board verbatim; a nonogram's clue lists ride
  * in [nonogram], a kakuro's cell grid in [kakuro], a slitherlink's clue grid in
- * [slitherlink], a nurikabe's in [nurikabe], a heyawake's rooms in [heyawake]. Metadata is
+ * [slitherlink], a nurikabe's in [nurikabe], a heyawake's rooms in [heyawake], a picto link's
+ * clue grid in [pictoLink]. Metadata is
  * per-item except the shared source collection and the default difficulty (a null
  * [difficulty] inherits the batch default).
  */
@@ -50,6 +53,7 @@ data class BatchItem(
     val slitherlink: SlitherlinkDraft = SlitherlinkDraft(),
     val nurikabe: NurikabeDraft = NurikabeDraft(),
     val heyawake: HeyawakeDraft = HeyawakeDraft(),
+    val pictoLink: PictoLinkDraft = PictoLinkDraft(),
     val title: String = "",
     val author: String = "",
     val difficulty: Int? = null,
@@ -182,6 +186,7 @@ class AdminQuestionViewModel(
                     AuthoringType.SLITHERLINK -> it.copy(slitherlink = SlitherlinkAuthoring.draftFromCanon(canon))
                     AuthoringType.NURIKABE -> it.copy(nurikabe = NurikabeAuthoring.draftFromCanon(canon))
                     AuthoringType.HEYAWAKE -> it.copy(heyawake = HeyawakeAuthoring.draftFromCanon(canon))
+                    AuthoringType.PICTO_LINK -> it.copy(pictoLink = PictoLinkAuthoring.draftFromCanon(canon))
                 }.copy(
                     status = ItemStatus.PARSED,
                     error = null,
@@ -241,6 +246,10 @@ class AdminQuestionViewModel(
     /** Apply a heyawake room edit (see [HeyawakeAuthoring]) to tile [id]. */
     fun editHeyawake(id: String, transform: (HeyawakeDraft) -> HeyawakeDraft) =
         editItem(id) { it.copy(heyawake = transform(it.heyawake)) }
+
+    /** Apply a picto link clue edit (see [PictoLinkAuthoring]) to tile [id]. */
+    fun editPictoLink(id: String, transform: (PictoLinkDraft) -> PictoLinkDraft) =
+        editItem(id) { it.copy(pictoLink = transform(it.pictoLink)) }
 
     private fun editItem(id: String, transform: (BatchItem) -> BatchItem) {
         updateItem(id) {
@@ -321,6 +330,11 @@ class AdminQuestionViewModel(
                                 HeyawakeAuthoring.canonFromDraft(item.heyawake),
                                 item.heyawake.width,
                                 item.heyawake.height,
+                            )
+                            AuthoringType.PICTO_LINK -> Triple(
+                                PictoLinkAuthoring.canonFromDraft(item.pictoLink),
+                                item.pictoLink.cols,
+                                item.pictoLink.rows,
                             )
                         }
                         val id = repo.createPuzzle(

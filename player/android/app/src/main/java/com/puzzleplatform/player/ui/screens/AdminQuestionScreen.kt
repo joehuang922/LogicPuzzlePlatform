@@ -70,6 +70,8 @@ import com.puzzleplatform.player.puzzle.NonogramAuthoring
 import com.puzzleplatform.player.puzzle.NonogramDraft
 import com.puzzleplatform.player.puzzle.NurikabeAuthoring
 import com.puzzleplatform.player.puzzle.NurikabeDraft
+import com.puzzleplatform.player.puzzle.PictoLinkAuthoring
+import com.puzzleplatform.player.puzzle.PictoLinkDraft
 import com.puzzleplatform.player.puzzle.SlitherlinkAuthoring
 import com.puzzleplatform.player.puzzle.SlitherlinkDraft
 import com.puzzleplatform.player.puzzle.SudokuAuthoring
@@ -79,6 +81,7 @@ import com.puzzleplatform.player.ui.board.HeyawakeMiniBoard
 import com.puzzleplatform.player.ui.board.KakuroMiniBoard
 import com.puzzleplatform.player.ui.board.NonogramMiniBoard
 import com.puzzleplatform.player.ui.board.NurikabeMiniBoard
+import com.puzzleplatform.player.ui.board.PictoLinkMiniBoard
 import com.puzzleplatform.player.ui.board.SlitherlinkMiniBoard
 import com.puzzleplatform.player.ui.board.SudokuBoard
 import com.puzzleplatform.player.ui.board.SudokuMiniBoard
@@ -86,7 +89,7 @@ import com.puzzleplatform.player.ui.board.ZoomableImage
 
 /**
  * Create one *or many* questions from album photos. The puzzle type (sudoku,
- * nonogram, kakuro, slitherlink, nurikabe or heyawake, see [AuthoringType]) is picked from a dropdown and applies to the whole
+ * nonogram, kakuro, slitherlink, nurikabe, heyawake or picto link, see [AuthoringType]) is picked from a dropdown and applies to the whole
  * batch. A single pick is just a batch of one — same flow throughout. Steps:
  * pick images → Parse all (OCR each) → review/fix any tile (full-screen, with the
  * source photo beside it: sudoku on the real player board, nonogram as editable clue
@@ -124,6 +127,7 @@ fun AdminQuestionScreen(
             onEditSlitherlink = { vm.editSlitherlink(reviewItem.id, it) },
             onEditNurikabe = { vm.editNurikabe(reviewItem.id, it) },
             onEditHeyawake = { vm.editHeyawake(reviewItem.id, it) },
+            onEditPictoLink = { vm.editPictoLink(reviewItem.id, it) },
         )
         return
     }
@@ -268,6 +272,10 @@ fun AdminQuestionScreen(
                                     "Tap a tile to review its photo and rooms side by side, fix mis-read " +
                                         "clues, walls or phantom lines, and set its title. A red tile has " +
                                         "rooms or clues that can't be right."
+                                AuthoringType.PICTO_LINK ->
+                                    "Tap a tile to review its photo and clues side by side, fix mis-read " +
+                                        "clues or phantom lines, and set its title. A red tile has clues " +
+                                        "that can't all be paired."
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -319,6 +327,11 @@ private fun BatchTile(type: AuthoringType, item: BatchItem, onClick: () -> Unit)
                     AuthoringType.HEYAWAKE -> HeyawakeMiniBoard(
                         draft = item.heyawake,
                         hasProblems = HeyawakeAuthoring.problems(item.heyawake).isNotEmpty(),
+                        size = 120.dp,
+                    )
+                    AuthoringType.PICTO_LINK -> PictoLinkMiniBoard(
+                        draft = item.pictoLink,
+                        hasProblems = PictoLinkAuthoring.problems(item.pictoLink).isNotEmpty(),
                         size = 120.dp,
                     )
                 }
@@ -413,7 +426,7 @@ private fun CreateFooter(
  * can read the original closely) and the editor below — for sudoku the interactive
  * player board, reused verbatim from the player; for nonogram [NonogramClueEditor]; for kakuro [KakuroCellEditor];
  * for slitherlink [SlitherlinkClueEditor]; for nurikabe [NurikabeClueEditor]; for heyawake
- * [HeyawakeRoomEditor].
+ * [HeyawakeRoomEditor]; for picto link [PictoLinkClueEditor].
  * A pinned top bar and a bottom button both say Done — every edit is already saved
  * to state as it's typed, so "Done" just returns to the grid.
  */
@@ -437,6 +450,7 @@ private fun ReviewScreen(
     onEditSlitherlink: ((SlitherlinkDraft) -> SlitherlinkDraft) -> Unit,
     onEditNurikabe: ((NurikabeDraft) -> NurikabeDraft) -> Unit,
     onEditHeyawake: ((HeyawakeDraft) -> HeyawakeDraft) -> Unit,
+    onEditPictoLink: ((PictoLinkDraft) -> PictoLinkDraft) -> Unit,
 ) {
     // The review board reuses the player SudokuBoard verbatim; an all-zero-hints
     // puzzle keeps every cell editable (parsed givens ride in as userValues).
@@ -494,6 +508,9 @@ private fun ReviewScreen(
                     AuthoringType.HEYAWAKE ->
                         "Compare the photo with the rooms — pinch to zoom the photo, tap a cell to fix " +
                             "its room's clue or walls, delete a phantom line, or add a missed one."
+                    AuthoringType.PICTO_LINK ->
+                        "Compare the photo with the grid — pinch to zoom the photo, tap a cell to fix " +
+                            "its clue (10+ are often mis-read), delete a phantom line, or add a missed one."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -555,6 +572,12 @@ private fun ReviewScreen(
                     selectedCell = selectedCell,
                     onSelectCell = onSelectCell,
                     onChange = onEditHeyawake,
+                )
+                AuthoringType.PICTO_LINK -> PictoLinkClueEditor(
+                    draft = item.pictoLink,
+                    selectedCell = selectedCell,
+                    onSelectCell = onSelectCell,
+                    onChange = onEditPictoLink,
                 )
             }
 

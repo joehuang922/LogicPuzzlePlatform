@@ -138,6 +138,11 @@ cell, no two paths cross or share a cell, and no path passes through a foreign c
 - Clue values render as the digit at the cell center.
 - Tapping (a click with no drag) on a filled path cell that is not a clue endpoint
   clears the segments touching that cell, for quick correction.
+- On Android the same drag draws/erases paths (one finger; two fingers pan/zoom), a
+  tap on a `1` fills/clears it, and a tap on a non-clue path cell clears its segments.
+  Questions can also be authored from photos in the Android Admin screen: tiles parse
+  through this parser, and the review flags values `n ≥ 2` with an odd count and clues
+  no same-value partner is close enough for an `n`-cell path to reach.
 
 ### Progress calculation
 

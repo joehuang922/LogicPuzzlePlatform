@@ -71,6 +71,7 @@ import com.puzzleplatform.player.ui.board.NonogramBoard
 import com.puzzleplatform.player.ui.board.NonogramMode
 import com.puzzleplatform.player.ui.board.NumberLinkBoard
 import com.puzzleplatform.player.ui.board.NurikabeBoard
+import com.puzzleplatform.player.ui.board.PictoLinkBoard
 import com.puzzleplatform.player.ui.board.NorinoriBoard
 import com.puzzleplatform.player.ui.board.NurimazeBoard
 import com.puzzleplatform.player.ui.board.NuritwinBoard
@@ -343,6 +344,13 @@ fun PlayScreen(
                             // Edge-based paths keyed "h:r,c"/"v:r,c"; putUserValue writes the
                             // segment and drops the key when it's erased (0).
                             onSetEdge = { key, state -> vm.putUserValue(key, state) },
+                        )
+                        27 -> PictoLinkBoard(
+                            puzzle = puzzle,
+                            userValues = state.userValues,
+                            // Segments "h:r,c"/"v:r,c" and filled 1-clues "s:r,c" -> 1; a tap
+                            // that clears a path cell's segments lands as one batch.
+                            onApplyChanges = vm::putUserValues,
                         )
                         19 -> HellGolfBoard(
                             puzzle = puzzle,
