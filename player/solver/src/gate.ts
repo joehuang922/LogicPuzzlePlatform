@@ -1,4 +1,4 @@
-import { classify, solve, SearchBudget, Verdict } from "./drivers";
+import { classify, solve, SearchBudget, SearchBudgetExceeded, Verdict } from "./drivers";
 import { getPlugin } from "./registry";
 
 export interface GateResult {
@@ -40,8 +40,16 @@ export function gate(puzzleType: number, canon: unknown, budget?: SearchBudget):
   if (verdict !== "unique") return { verdict, solution: null };
 
   // Re-solve the unique puzzle to extract its full grid. The puzzle is already proven
-  // unique within budget, so this pass is fast; it reuses the same budget as a backstop.
-  const grid = solve(plugin.buildModel(canon), effective);
+  // unique within budget, so this pass is usually fast; it reuses the same budget as a
+  // backstop. If the proof used up the budget, report "unknown" rather than letting the
+  // budget error escape as if it were a verdict.
+  let grid: unknown;
+  try {
+    grid = solve(plugin.buildModel(canon), effective);
+  } catch (err) {
+    if (err instanceof SearchBudgetExceeded) return { verdict: "unknown", solution: null };
+    throw err;
+  }
   const solution = grid && plugin.serializeSolution ? plugin.serializeSolution(grid) : grid;
   return { verdict, solution };
 }

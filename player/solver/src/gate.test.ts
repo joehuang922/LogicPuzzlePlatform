@@ -1,7 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { gate } from "./gate";
 import { parseGrid, isValidSolution, INKALA_HARDEST, SEVENTEEN_CLUE, CONTRADICTORY } from "./plugins/sudoku/fixtures";
 import * as nonogram from "./plugins/nonogram/fixtures";
+import * as kakuro from "./plugins/kakuro/fixtures";
+import { kakuroPlugin } from "./plugins/kakuro";
 
 describe("registration gate — gate()", () => {
   it("returns null for an unsupported puzzle type (bypass)", () => {
@@ -55,5 +57,27 @@ describe("registration gate — gate()", () => {
     const result = gate(6, nonogram.MULTIPLE);
     expect(result!.verdict).toBe("multiple");
     expect(result!.solution).toBeNull();
+  });
+
+  describe("when the proof uses up the deadline", () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it("reports 'unknown' instead of letting the solve pass's budget error escape", () => {
+      // Freeze the clock for the uniqueness proof, then jump it past the deadline when the
+      // gate rebuilds the model for the solve pass: that pass must time out on its first
+      // node, as it did on a large Kakuro that took the whole budget to prove unique.
+      let now = 0;
+      vi.spyOn(Date, "now").mockImplementation(() => now);
+      const build = kakuroPlugin.buildModel;
+      let builds = 0;
+      vi.spyOn(kakuroPlugin, "buildModel").mockImplementation((canon) => {
+        if (++builds === 2) now = 1_000;
+        return build(canon);
+      });
+
+      const result = gate(12, kakuro.parseKakuro(kakuro.UNIQUE_2x2), { deadline: 500 });
+      expect(builds).toBe(2);
+      expect(result).toEqual({ verdict: "unknown", solution: null });
+    });
   });
 });

@@ -21,6 +21,12 @@ interface RunMeta {
   sum: number;
 }
 
+/** A puzzle's static run structure, shared by every model: `cellRuns[id]` indexes `runs`. */
+interface Shape {
+  runs: RunMeta[];
+  cellRuns: number[][];
+}
+
 const FULL = 0b1111111110; // bits 1..9 set (bit v = value v)
 const bit = (v: number) => 1 << v;
 const isSingle = (mask: number) => mask !== 0 && (mask & (mask - 1)) === 0;
@@ -37,81 +43,117 @@ function valuesOf(mask: number): number[] {
 }
 
 /**
- * Min and max sum obtainable from `n` distinct digits in 1..9 that are not in
- * `usedMask`, or null when fewer than `n` such digits remain. Used to prune the
- * per-run search: a partial assignment whose remaining target falls outside
- * [min, max] can never complete.
+ * The addition table: COMBOS[n][sum] lists, as digit masks, every set of `n` distinct
+ * digits 1..9 adding to `sum` — the "formulas" a solver memorises (2 cells: 3 = {1,2},
+ * 17 = {8,9}; 9 cells: 45 = {1..9}). Built once at load (512 subsets). A run can only
+ * use the digits of one of its combos, so runs with few combos collapse immediately.
  */
-function boundSum(usedMask: number, n: number): { min: number; max: number } | null {
-  const avail: number[] = [];
-  for (let v = 1; v <= 9; v++) if (!(usedMask & bit(v))) avail.push(v);
-  if (avail.length < n) return null;
-  let min = 0;
-  let max = 0;
-  for (let i = 0; i < n; i++) {
-    min += avail[i];
-    max += avail[avail.length - 1 - i];
+export const COMBOS: number[][][] = (() => {
+  const table: number[][][] = Array.from({ length: 10 }, () =>
+    Array.from({ length: 46 }, () => [] as number[])
+  );
+  for (let mask = FULL; mask > 0; mask = (mask - 1) & FULL) {
+    let n = 0;
+    let sum = 0;
+    for (let v = 1; v <= 9; v++) {
+      if (mask & bit(v)) {
+        n++;
+        sum += v;
+      }
+    }
+    table[n][sum].push(mask);
   }
-  return { min, max };
-}
+  return table;
+})();
+
+/** Memo for runSupports' completion search: one byte per (cell index, used digits). */
+const memo = new Int8Array(10 * 512);
 
 /**
  * Arc-consistency for one run: for each cell, the digits that participate in *some*
  * assignment of distinct digits (one per cell, within each cell's current domain)
  * summing to `sum`. A returned mask of 0 for any cell means the run is unsatisfiable
- * given these domains. Exact (not a heuristic), with sum-bound pruning so the search
- * stays cheap on long runs.
+ * given these domains. Exact (not a heuristic).
+ *
+ * Works per combo from {@link COMBOS} rather than per ordering: within a combo, the
+ * search state is just (cell index, digits used so far), so memoising it bounds the
+ * work at k * 2^k states instead of k! orderings — a 9-cell 45 run is 9 * 512 states,
+ * not 362,880 permutations.
  */
 function runSupports(domainList: number[], sum: number): number[] {
   const k = domainList.length;
   const supported = new Array<number>(k).fill(0);
-  const path = new Array<number>(k);
+  const combos = k <= 9 && sum <= 45 ? COMBOS[k][sum] : [];
 
-  function rec(i: number, usedMask: number, remaining: number): void {
-    if (i === k) {
-      if (remaining === 0) {
-        for (let j = 0; j < k; j++) supported[j] |= bit(path[j]);
+  let union = 0;
+  for (const d of domainList) union |= d;
+
+  for (const combo of combos) {
+    // Every combo digit needs a cell that can hold it, and every cell a combo digit.
+    if ((combo & union) !== combo) continue;
+    if (domainList.some((d) => (d & combo) === 0)) continue;
+
+    memo.fill(0, 0, k * 512); // 0 = unvisited, 1 = completes, 2 = dead end
+    // Explores every branch (no short-circuit) so each completable (i, used) state marks
+    // all of its digits as supported the first time it is visited.
+    const complete = (i: number, used: number): boolean => {
+      if (i === k) return true; // k distinct combo digits placed: used === combo
+      const key = i * 512 + (used >> 1);
+      if (memo[key] !== 0) return memo[key] === 1;
+      let ok = false;
+      let free = domainList[i] & combo & ~used;
+      while (free) {
+        const b = free & -free;
+        free ^= b;
+        if (complete(i + 1, used | b)) {
+          supported[i] |= b;
+          ok = true;
+        }
       }
-      return;
-    }
-    // Still need `left` distinct digits (this cell included) summing to `remaining`.
-    const left = k - i;
-    const b = boundSum(usedMask, left);
-    if (!b || remaining < b.min || remaining > b.max) return;
-    for (const v of valuesOf(domainList[i])) {
-      if (usedMask & bit(v)) continue; // distinctness within the run
-      const nr = remaining - v;
-      if (nr < 0) continue;
-      path[i] = v;
-      rec(i + 1, usedMask | bit(v), nr);
-    }
+      memo[key] = ok ? 1 : 2;
+      return ok;
+    };
+    complete(0, 0);
   }
-
-  rec(0, 0, sum);
   return supported;
 }
 
 /**
  * Propagate run constraints over `domains` to a fixed point, in place. Returns false
  * on contradiction (a cell's domain wiped out). Runs share cells, so a reduction in
- * one run can unlock another — hence the iterate-until-stable loop.
+ * one run can unlock another; only the runs crossing a changed cell are re-checked.
+ * `seed` lists the runs to start from (all of them at load, the assigned cell's after
+ * an assign).
  */
-function propagate(domains: number[], runs: RunMeta[]): boolean {
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const run of runs) {
-      const supports = runSupports(
-        run.cells.map((id) => domains[id]),
-        run.sum
-      );
-      for (let i = 0; i < run.cells.length; i++) {
-        const id = run.cells[i];
-        const nd = domains[id] & supports[i];
-        if (nd === 0) return false; // no digit survives -> dead
-        if (nd !== domains[id]) {
-          domains[id] = nd;
-          changed = true;
+function propagate(domains: number[], shape: Shape, seed: number[]): boolean {
+  const { runs, cellRuns } = shape;
+  const queued = new Uint8Array(runs.length);
+  const queue: number[] = [];
+  for (const r of seed) {
+    if (!queued[r]) {
+      queued[r] = 1;
+      queue.push(r);
+    }
+  }
+  while (queue.length > 0) {
+    const r = queue.pop()!;
+    queued[r] = 0;
+    const run = runs[r];
+    const supports = runSupports(
+      run.cells.map((id) => domains[id]),
+      run.sum
+    );
+    for (let i = 0; i < run.cells.length; i++) {
+      const id = run.cells[i];
+      const nd = domains[id] & supports[i];
+      if (nd === 0) return false; // no digit survives -> dead
+      if (nd !== domains[id]) {
+        domains[id] = nd;
+        for (const other of cellRuns[id]) {
+          if (other !== r && !queued[other]) {
+            queued[other] = 1;
+            queue.push(other);
+          }
         }
       }
     }
@@ -152,7 +194,7 @@ export class KakuroModel implements ConstraintModel {
     private readonly domains: number[],
     private readonly rows: number,
     private readonly cols: number,
-    private readonly runs: RunMeta[],
+    private readonly shape: Shape,
     private readonly emptyIds: number[],
     private readonly dead: boolean
   ) {}
@@ -173,8 +215,11 @@ export class KakuroModel implements ConstraintModel {
       }
     }
     const runs = buildRuns(cells);
-    const alive = propagate(domains, runs);
-    return new KakuroModel(domains, rows, cols, runs, emptyIds, !alive);
+    const cellRuns: number[][] = Array.from({ length: rows * cols }, () => []);
+    runs.forEach((run, r) => run.cells.forEach((id) => cellRuns[id].push(r)));
+    const shape = { runs, cellRuns };
+    const alive = propagate(domains, shape, runs.map((_, r) => r));
+    return new KakuroModel(domains, rows, cols, shape, emptyIds, !alive);
   }
 
   isDead(): boolean {
@@ -188,7 +233,7 @@ export class KakuroModel implements ConstraintModel {
     }
     // Every cell is a single digit; verify the two rules per run directly rather than
     // trusting propagation invariants.
-    for (const run of this.runs) {
+    for (const run of this.shape.runs) {
       let total = 0;
       let seen = 0;
       for (const id of run.cells) {
@@ -223,8 +268,8 @@ export class KakuroModel implements ConstraintModel {
   assign(id: number, value: number): ConstraintModel {
     const next = this.domains.slice();
     next[id] = bit(value);
-    const ok = propagate(next, this.runs);
-    return new KakuroModel(next, this.rows, this.cols, this.runs, this.emptyIds, !ok);
+    const ok = propagate(next, this.shape, this.shape.cellRuns[id]);
+    return new KakuroModel(next, this.rows, this.cols, this.shape, this.emptyIds, !ok);
   }
 
   solution(): number[][] {

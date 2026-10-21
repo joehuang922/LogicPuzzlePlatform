@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { classify, countSolutions, solve } from "../../drivers";
-import { KakuroModel } from "./model";
+import { COMBOS, KakuroModel } from "./model";
 import {
   parseKakuro,
   isValidSolution,
@@ -8,6 +8,8 @@ import {
   MULTIPLE_RUN,
   CONTRADICTORY,
   UNIQUE_MEDIUM,
+  NIKOLI_194_05,
+  fromSolution,
 } from "./fixtures";
 
 const model = (spec: string) => KakuroModel.fromCanon(parseKakuro(spec));
@@ -80,5 +82,59 @@ describe("serialized solution shape", () => {
         [0, 3, 4],
       ],
     });
+  });
+});
+
+describe("addition table — COMBOS", () => {
+  const digits = (mask: number) => [1, 2, 3, 4, 5, 6, 7, 8, 9].filter((v) => mask & (1 << v));
+
+  it("has exactly one combo for each single-formula sum", () => {
+    // The two lowest and two highest sums for each length have only one digit set.
+    for (let n = 1; n <= 8; n++) {
+      const min = (n * (n + 1)) / 2;
+      const max = 45 - ((9 - n) * (10 - n)) / 2;
+      for (const sum of [min, min + 1, max - 1, max]) expect(COMBOS[n][sum]).toHaveLength(1);
+    }
+    expect(COMBOS[9][45]).toHaveLength(1);
+  });
+
+  it("lists the familiar formulas", () => {
+    expect(COMBOS[2][3].map(digits)).toEqual([[1, 2]]);
+    expect(COMBOS[2][17].map(digits)).toEqual([[8, 9]]);
+    expect(COMBOS[3][7].map(digits)).toEqual([[1, 2, 4]]);
+    expect(COMBOS[4][29].map(digits)).toEqual([[5, 7, 8, 9]]);
+    expect(COMBOS[6][38].map(digits)).toEqual([[3, 5, 6, 7, 8, 9]]);
+    expect(COMBOS[2][10]).toHaveLength(4); // 1+9, 2+8, 3+7, 4+6
+  });
+
+  it("covers every set of distinct digits exactly once", () => {
+    let total = 0;
+    for (const bySum of COMBOS) for (const combos of bySum) total += combos.length;
+    expect(total).toBe(511);
+  });
+});
+
+describe("large boards", () => {
+  it("classifies a board of eighteen 45 runs quickly", () => {
+    // A filled Sudoku under a clue row and column: every row and column is a 9-cell 45 run.
+    // Enumerating orderings cost ~150ms per run per propagation and timed this out; the
+    // combo table makes each run a single digit set.
+    const rows = [
+      "534678912", "672195348", "198342567", "859761423", "426853791",
+      "713924856", "961537284", "287419635", "345286179",
+    ];
+    const grid = [new Array(10).fill(0), ...rows.map((r) => [0, ...r.split("").map(Number)])];
+    const start = Date.now();
+    expect(classify(KakuroModel.fromCanon(fromSolution(grid)))).toBe("multiple");
+    expect(Date.now() - start).toBeLessThan(2_000);
+  });
+
+  it("proves a real 22x32 board unique and solves it", () => {
+    const canon = parseKakuro(NIKOLI_194_05);
+    const start = Date.now();
+    expect(classify(KakuroModel.fromCanon(canon))).toBe("unique");
+    const grid = solve(KakuroModel.fromCanon(canon));
+    expect(Date.now() - start).toBeLessThan(1_000);
+    expect(isValidSolution(canon, grid!)).toBe(true);
   });
 });
