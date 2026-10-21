@@ -1,10 +1,20 @@
 """Picto Link grid detection — thin orchestrator over shared grid_utils.
 
 Picto Link boards are a plain rectangular grid of square cells with no regions.
-The sample images use *solid* grid rulings, so we use the uniform-grid detector
-(``detect_uniform_grid``): it lattice-fits the cell count from the ink projection
-and synthesises a perfectly uniform grid, which the square-cell fact makes more
-reliable than snapping to individually-detected (and jittery) line peaks.
+The sample images use *solid* grid rulings, so we detect the real line peaks and
+then :func:`reconcile_square_lines` them under the square-cell assumption.
+
+We deliberately do *not* use the perfectly-uniform synthesiser
+(``detect_uniform_grid``) here. A photographed magazine page bows, and the 4-corner
+warp only removes perspective — it cannot straighten a curved page. The synthesiser
+emits lines at an exactly even phase (``round(i*span/count)``) and discards the real
+peak positions, so on a bowed board its lines drift away from the actual rulings,
+worst in the centre (measured ~20% of a cell on the 25×25 sample). At the parser's
+0.15 cell-ROI margin that drift drags a ruling bar into the digit window — turning a
+``3`` into a ``5`` or clipping a digit — and corrupts OCR. ``reconcile_square_lines``
+instead *snaps* each line to the nearest real peak, so the grid follows the bow;
+this cut the sample's centre drift to 0 and its parity errors by more than half.
+See [[grid-parser-robustness]].
 
 The rulings are printed in a single ink colour (red in the samples, but the
 pipeline must not assume any particular hue). We therefore drive every geometry
@@ -21,9 +31,10 @@ import cv2
 from numpy.typing import NDArray
 
 from puzzle_parsers.grid_utils import (
-    detect_uniform_grid,
+    detect_grid_lines,
     find_quadrilateral_border,
     ink_intensity,
+    reconcile_square_lines,
     warp_to_rectangle,
 )
 
@@ -61,7 +72,8 @@ def detect_picto_link_grid(
         cv2.imwrite(str(debug_path / "02_warped.png"), warped)
 
     warped_ink = ink_intensity(warped)
-    h_lines, v_lines = detect_uniform_grid(warped_ink, warp_w, warp_h)
+    h_lines, v_lines = detect_grid_lines(warped_ink, warp_w, warp_h)
+    h_lines, v_lines = reconcile_square_lines(h_lines, v_lines, warp_h, warp_w)
 
     if debug_path:
         vis = warped.copy()
