@@ -1,8 +1,8 @@
 import type { CSSProperties } from "react";
 
 // Shown after the solver gate rejected a puzzle only because it timed out. Resubmits
-// with allowUnverified: the server still rejects a proven no/multiple solution, and an
-// overridden puzzle is stored as "unknown" so it stays in the flagged review list.
+// with allowUnverified: the server skips the gate and stores the puzzle as "unknown" so
+// it stays in the flagged review list.
 export default function OverrideGateButton({
   onClick,
   disabled,

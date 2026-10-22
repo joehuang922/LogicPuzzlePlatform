@@ -2,7 +2,7 @@ import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { v4 as uuidv4 } from "uuid";
 import { executeStatement } from "../lib/db";
 import { validateCanon } from "../lib/schema";
-import { gate } from "@puzzle/solver";
+import { gate, getPlugin } from "@puzzle/solver";
 import { CreatePuzzleRequest } from "../models/types";
 
 // Run the registration gate for supported puzzle types. Returns the validation status
@@ -15,14 +15,17 @@ import { CreatePuzzleRequest } from "../models/types";
 // create/edit path we reject it like none/multiple so a human fixes the canon rather than
 // registering an unproven puzzle; the backfill, which recomputes gates offline, records
 // "unknown" instead (see backfill-solver.ts) so the board surfaces in editorial review.
-// `allowUnverified` is the admin's override for a board the solver is too slow for: it
-// accepts "unknown" (recorded as such, so the board stays in the flagged review set) but
-// never a proven none/multiple.
+// `allowUnverified` is the admin's override ("the solver rejected it, create it anyway"),
+// offered after a timeout: the gate is skipped and the board is recorded as "unknown"
+// with no solution, so it stays in the flagged review set.
 function runGate(
   puzzleType: number,
   canon: unknown,
   allowUnverified = false
 ): { status: string | null; solution: string | null } {
+  if (allowUnverified) {
+    return { status: getPlugin(puzzleType) ? "unknown" : null, solution: null };
+  }
   const result = gate(puzzleType, canon);
   if (!result) return { status: null, solution: null };
   if (result.verdict === "none") {
@@ -32,7 +35,6 @@ function runGate(
     throw new Error("Puzzle has multiple solutions and cannot be registered");
   }
   if (result.verdict === "unknown") {
-    if (allowUnverified) return { status: "unknown", solution: null };
     throw new GateUnknownError();
   }
   return { status: "unique", solution: JSON.stringify(result.solution) };

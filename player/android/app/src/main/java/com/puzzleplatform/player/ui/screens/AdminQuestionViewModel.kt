@@ -330,8 +330,8 @@ class AdminQuestionViewModel(
 
     /**
      * Re-POST one tile the gate rejected only because the solver timed out, this time
-     * with allowUnverified. The server still rejects a proven no/multiple solution; an
-     * accepted board is stored as "unknown" so it stays in the flagged review list.
+     * with allowUnverified: the server skips the gate and stores the board as "unknown"
+     * so it stays in the flagged review list.
      */
     fun overrideGate(itemId: String) {
         val s = _state.value

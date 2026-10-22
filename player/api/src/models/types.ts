@@ -49,8 +49,7 @@ export interface CreatePuzzleRequest {
   canonRepr: Record<string, unknown>;
   srcCollection?: number;
   special?: boolean;
-  // Admin override: register even if the gate times out ("unknown"). Proven
-  // none/multiple are still rejected.
+  // Admin override: skip the solver gate and register as "unknown" (flagged for review).
   allowUnverified?: boolean;
 }
 

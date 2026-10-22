@@ -155,7 +155,7 @@ validation_status VARCHAR(16) NULL    -- 'unique' | 'multiple' | 'none' | 'unsup
 
 | Concern | File / anchor | Change |
 |---|---|---|
-| Gate at create | `player/api/src/handlers/puzzles.ts:115` (after `validateCanon`) | If a plugin is registered for `puzzleType`: `countSolutions`. `1` → compute + store `solution_repr`, `validation_status='unique'`. `0`/`2` → **reject** create (`400`). Search budget exhausted (`unknown`) → reject with `code: "gate_unknown"`, unless the admin resubmits with `allowUnverified: true` (the "Override solver timeout" button), which stores `validation_status='unknown'` and no solution so the board stays in the flagged review list. Proven `0`/`2` are never overridable. No plugin → skip (D8). |
+| Gate at create | `player/api/src/handlers/puzzles.ts:115` (after `validateCanon`) | If a plugin is registered for `puzzleType`: `countSolutions`. `1` → compute + store `solution_repr`, `validation_status='unique'`. `0`/`2` → **reject** create (`400`). Search budget exhausted (`unknown`) → reject with `code: "gate_unknown"`, unless the admin resubmits with `allowUnverified: true` (the "Override solver timeout" button), which skips the gate and stores `validation_status='unknown'` and no solution so the board stays in the flagged review list. Clients only offer the override after a timeout. No plugin → skip (D8). |
 | Gate on edit | `puzzles.ts:177` (update path, after `validateCanon`) | Same check when `canonRepr` changes; recompute `solution_repr`. |
 | Solver registry | new `player/solver/` package | Mirrors `progress/index.ts` registry idiom. |
 | Ship solution | `PUZZLE_SELECT` + `mapRecord` in `puzzles.ts` | Include `solution_repr`, `validation_status` in the puzzle payload. |
