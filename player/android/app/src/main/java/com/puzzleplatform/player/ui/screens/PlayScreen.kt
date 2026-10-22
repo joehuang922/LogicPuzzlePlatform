@@ -59,6 +59,7 @@ import com.puzzleplatform.player.ui.DIFFICULTY_LABELS
 import com.puzzleplatform.player.ui.board.AkariBoard
 import com.puzzleplatform.player.ui.board.HitoriBoard
 import com.puzzleplatform.player.ui.board.DigitBar
+import com.puzzleplatform.player.ui.board.DoubleChocoBoard
 import com.puzzleplatform.player.ui.board.FillominoBoard
 import com.puzzleplatform.player.ui.board.FillominoMode
 import com.puzzleplatform.player.ui.board.NumberPad
@@ -363,6 +364,13 @@ fun PlayScreen(
                             userValues = state.userValues,
                             // Walls keyed "h:r,c"/"v:r,c" -> 1 (web convention); setUserValue
                             // drops the key when a wall is toggled off.
+                            onSetEdge = vm::setUserValue,
+                        )
+                        4 -> DoubleChocoBoard(
+                            puzzle = puzzle,
+                            userValues = state.userValues,
+                            // Borders keyed "h:r,c"/"v:r,c" -> 1 (web convention); setUserValue
+                            // drops the key when a border is toggled off.
                             onSetEdge = vm::setUserValue,
                         )
                         25 -> RippleEffectBoard(

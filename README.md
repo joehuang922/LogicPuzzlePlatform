@@ -35,7 +35,7 @@ Legend: ✅ = implemented · 🟡 = partial · blank = not yet. In the **Parser*
 | 1  | sudoku        | ✅ | ✅ | ✅ | ✅★ | ✅ | ✅ | ✅ |
 | 2  | combo-sudoku  |    | ✅ | ✅ | ✅ |    |    |    |
 | 3  | nurimaze      |    | ✅ | ✅ | ✅ | ✅ |    |    |
-| 4  | double-choco  |    | ✅ | ✅ | ✅ |    |    |    |
+| 4  | double-choco  |    | ✅ | ✅ | ✅ | ✅ |    |    |
 | 5  | slitherlink   |    | ✅ | ✅ | ✅ | ✅ | ✅ |    |
 | 6  | nonogram      | ✅ | ✅ | ✅ | ✅★ | ✅ | ✅ | ✅ |
 | 7  | masyu         | ✅ | ✅ | ✅ | ✅ | ✅ |    |    |
@@ -60,7 +60,7 @@ Legend: ✅ = implemented · 🟡 = partial · blank = not yet. In the **Parser*
 | 26 | hitori        |    | ✅ | ✅ | ✅ | ✅ |    |    |
 | 27 | picto-link    |    | ✅ | ✅ | ✅ | ✅ |    |    |
 
-**Summary:** all 27 types are fully playable on the web, with editors, progress, and parsers complete across the board. The gaps are: **live conflict highlighting** (4 full — sudoku, nonogram, masyu, kakuro — plus a partial akari, which flags only mutually-illuminating bulbs); **parser accuracy** (2 ★ — sudoku and nonogram — parse cleanly enough to skip manual calibration; the other 25 need editorial correction); **Android** (23 — all but combo-sudoku, double-choco, pencils and choco-banana); the **solver** gate (5 — sudoku, slitherlink, nonogram, kakuro, lits); and **hints** (2 — sudoku and nonogram, on both web and Android).
+**Summary:** all 27 types are fully playable on the web, with editors, progress, and parsers complete across the board. The gaps are: **live conflict highlighting** (4 full — sudoku, nonogram, masyu, kakuro — plus a partial akari, which flags only mutually-illuminating bulbs); **parser accuracy** (2 ★ — sudoku and nonogram — parse cleanly enough to skip manual calibration; the other 25 need editorial correction); **Android** (24 — all but combo-sudoku, pencils and choco-banana); the **solver** gate (5 — sudoku, slitherlink, nonogram, kakuro, lits); and **hints** (2 — sudoku and nonogram, on both web and Android).
 
 ## Tech Stack
 

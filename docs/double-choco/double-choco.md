@@ -66,6 +66,7 @@ At least one thick border exists AND all rules above are satisfied for every roo
 - Click an internal edge (horizontal or vertical border between two cells) to toggle it between thin (dashed) and thick (solid).
 - Thick borders are drawn as solid bold lines; thin borders remain dashed.
 - Cell colors (white/gray) and number clues are displayed as read-only.
+- On Android a tap snaps to the nearest interior grid line and toggles the border there (the same wall tap as Tentaishow and Fillomino's wall mode); two fingers pan/zoom. Borders use the same `"h:r,c"`/`"v:r,c"` keys and `{grids: {h, v}}` answer as web, so saves sync both ways.
 
 ### Progress calculation
 
