@@ -181,6 +181,7 @@ fun AdminQuestionScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     TypeDropdown(
                         selected = state.type,
+                        labels = state.typeLabels,
                         enabled = !state.parsing && !state.creating,
                         onSelect = vm::setType,
                     )
@@ -628,22 +629,26 @@ private fun ReviewScreen(
 /**
  * The batch's puzzle type. Switching resets every tile to un-parsed (see
  * [AdminQuestionViewModel.setType]), so it's locked while a parse or create is running.
+ * Types show their Japanese name from [labels] (keyed by server puzzle-type id), like
+ * the web admin, falling back to the English label until the types load.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TypeDropdown(
     selected: AuthoringType,
+    labels: Map<Int, String>,
     enabled: Boolean,
     onSelect: (AuthoringType) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    fun labelOf(t: AuthoringType) = labels[t.puzzleType] ?: t.label
 
     ExposedDropdownMenuBox(
         expanded = expanded && enabled,
         onExpandedChange = { if (enabled) expanded = it },
     ) {
         OutlinedTextField(
-            value = selected.label,
+            value = labelOf(selected),
             onValueChange = {},
             readOnly = true,
             enabled = enabled,
@@ -659,7 +664,7 @@ private fun TypeDropdown(
         ) {
             for (t in AuthoringType.entries) {
                 DropdownMenuItem(
-                    text = { Text(t.label) },
+                    text = { Text(labelOf(t)) },
                     onClick = { onSelect(t); expanded = false },
                 )
             }

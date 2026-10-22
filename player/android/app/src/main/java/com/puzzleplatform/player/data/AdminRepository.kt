@@ -10,6 +10,7 @@ import com.puzzleplatform.player.data.model.CreateCollectionRequest
 import com.puzzleplatform.player.data.model.CreatePuzzleRequest
 import com.puzzleplatform.player.data.model.ParseImageRequest
 import com.puzzleplatform.player.data.model.ParseImageResponse
+import com.puzzleplatform.player.data.model.PuzzleType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -36,6 +37,9 @@ class AdminRepository(
 
     suspend fun listCollections(): List<Collection> =
         api.listCollections().collections
+
+    suspend fun listPuzzleTypes(): List<PuzzleType> =
+        api.listPuzzleTypes().puzzleTypes
 
     suspend fun createCollection(req: CreateCollectionRequest): Int =
         api.createCollection(req).id
