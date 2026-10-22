@@ -132,6 +132,8 @@ fun AdminQuestionScreen(
             onEditHeyawake = { vm.editHeyawake(reviewItem.id, it) },
             onEditPictoLink = { vm.editPictoLink(reviewItem.id, it) },
             onEditYajilin = { vm.editYajilin(reviewItem.id, it) },
+            onOverrideGate = { vm.overrideGate(reviewItem.id) },
+            overrideEnabled = !state.creating,
         )
         return
     }
@@ -466,6 +468,8 @@ private fun ReviewScreen(
     onEditHeyawake: ((HeyawakeDraft) -> HeyawakeDraft) -> Unit,
     onEditPictoLink: ((PictoLinkDraft) -> PictoLinkDraft) -> Unit,
     onEditYajilin: ((YajilinDraft) -> YajilinDraft) -> Unit,
+    onOverrideGate: () -> Unit,
+    overrideEnabled: Boolean,
 ) {
     // The review board reuses the player SudokuBoard verbatim; an all-zero-hints
     // puzzle keeps every cell editable (parsed givens ride in as userValues).
@@ -607,6 +611,13 @@ private fun ReviewScreen(
 
             item.error?.let {
                 Text("Rejected: $it", color = MaterialTheme.colorScheme.error)
+            }
+            // The solver only timed out (it couldn't prove or disprove uniqueness):
+            // let the admin register the board anyway; it stays flagged for review.
+            if (item.status == ItemStatus.CREATE_FAILED && item.gateTimedOut) {
+                OutlinedButton(onClick = onOverrideGate, enabled = overrideEnabled) {
+                    Text("Override solver timeout")
+                }
             }
 
             HorizontalDivider()

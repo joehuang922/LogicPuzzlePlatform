@@ -105,6 +105,9 @@ data class CreatePuzzleRequest(
     val height: Int? = null,
     val srcCollection: Int? = null,
     val special: Boolean? = null,
+    // Admin override: register even if the gate times out (stored as "unknown").
+    // Proven no/multiple solutions are still rejected.
+    val allowUnverified: Boolean? = null,
 )
 
 @Serializable

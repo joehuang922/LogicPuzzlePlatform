@@ -12,10 +12,12 @@ import {
   PuzzleType,
   Collection,
   Puzzle,
+  isGateTimeout,
 } from "../api/client";
 import PuzzleEditorModal, { hasVisualEditor } from "../components/PuzzleEditorModal";
 import CanonPreview from "../components/CanonPreview";
 import BatchUploadForm from "../components/BatchUploadForm";
+import OverrideGateButton from "../components/OverrideGateButton";
 import { extractBase64 } from "../utils/image";
 import { cardStyle, fieldStyle, inputStyle, errorStyle } from "../styles/admin";
 import { DIFFICULTY_OPTIONS, DIFFICULTY_LABELS } from "../constants";
@@ -147,6 +149,8 @@ function QuestionForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
+  // The last create was rejected only because the solver timed out: offer the override.
+  const [gateTimedOut, setGateTimedOut] = useState(false);
 
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [parsing, setParsing] = useState(false);
@@ -176,7 +180,12 @@ function QuestionForm({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    await submit(false);
+  }
+
+  async function submit(allowUnverified: boolean) {
     setSuccess(null);
+    setGateTimedOut(false);
     if (!validate()) return;
 
     setSubmitting(true);
@@ -277,8 +286,13 @@ function QuestionForm({
         height: h,
         ...(srcCollection ? { srcCollection: Number(srcCollection) } : {}),
         special,
+        ...(allowUnverified ? { allowUnverified: true } : {}),
       });
-      setSuccess(`Puzzle created (id: ${res.id})`);
+      setSuccess(
+        allowUnverified
+          ? `Puzzle created unverified (id: ${res.id}) — listed under flagged puzzles`
+          : `Puzzle created (id: ${res.id})`
+      );
       setTitle("");
       setAuthor("");
       setCanonRepr("");
@@ -287,6 +301,7 @@ function QuestionForm({
       setErrors({});
     } catch (err: unknown) {
       setErrors({ form: err instanceof Error ? err.message : "Failed to create" });
+      setGateTimedOut(isGateTimeout(err));
     } finally {
       setSubmitting(false);
     }
@@ -470,9 +485,14 @@ function QuestionForm({
 
         {errors.form && <span style={errorStyle}>{errors.form}</span>}
         {success && <span style={{ color: "green", fontSize: "0.85rem" }}>{success}</span>}
-        <button type="submit" disabled={submitting || parsing} style={{ alignSelf: "flex-start", padding: "0.5rem 1rem" }}>
-          {submitting ? "Creating..." : "Create Question"}
-        </button>
+        <div style={{ display: "flex", gap: "0.5rem" }}>
+          <button type="submit" disabled={submitting || parsing} style={{ padding: "0.5rem 1rem" }}>
+            {submitting ? "Creating..." : "Create Question"}
+          </button>
+          {gateTimedOut && (
+            <OverrideGateButton disabled={submitting || parsing} onClick={() => submit(true)} style={{ padding: "0.5rem 1rem" }} />
+          )}
+        </div>
       </form>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
@@ -503,12 +523,13 @@ function PuzzleEditRow({
   const [editorOpen, setEditorOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [gateTimedOut, setGateTimedOut] = useState(false);
   const showCollectionPicker = collections && !puzzle.srcCollection;
 
   const typeName = puzzleTypes.find((pt) => pt.id === puzzle.puzzleType)?.name;
   const hasEditor = hasVisualEditor(typeName);
 
-  async function handleConfirm() {
+  async function handleConfirm(allowUnverified = false) {
     let parsedCanon: Record<string, unknown>;
     try {
       parsedCanon = JSON.parse(canonRepr);
@@ -519,6 +540,7 @@ function PuzzleEditRow({
 
     setSaving(true);
     setError(null);
+    setGateTimedOut(false);
     try {
       const updateData: Parameters<typeof updatePuzzle>[1] = {
         title: title.trim() || null,
@@ -526,6 +548,7 @@ function PuzzleEditRow({
         difficulty: Number(difficulty),
         canonRepr: parsedCanon,
         special,
+        ...(allowUnverified ? { allowUnverified: true } : {}),
       };
       if (showCollectionPicker) {
         updateData.srcCollection = srcCollection ? Number(srcCollection) : null;
@@ -534,6 +557,7 @@ function PuzzleEditRow({
       onSaved(res.puzzle as unknown as Puzzle);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to save");
+      setGateTimedOut(isGateTimeout(err));
     } finally {
       setSaving(false);
     }
@@ -632,12 +656,19 @@ function PuzzleEditRow({
           {error && <span style={errorStyle}>{error}</span>}
           <div style={{ display: "flex", gap: "0.5rem" }}>
             <button
-              onClick={handleConfirm}
+              onClick={() => handleConfirm()}
               disabled={saving}
               style={{ padding: "0.3rem 0.75rem", fontSize: "0.8rem", background: "#4a90d9", color: "#fff", border: "none", borderRadius: 4, cursor: "pointer" }}
             >
               {saving ? "Saving..." : "Confirm"}
             </button>
+            {gateTimedOut && (
+              <OverrideGateButton
+                disabled={saving}
+                onClick={() => handleConfirm(true)}
+                style={{ padding: "0.3rem 0.75rem", fontSize: "0.8rem", borderRadius: 4 }}
+              />
+            )}
             <button
               onClick={onCancel}
               disabled={saving}

@@ -15,9 +15,13 @@ import { CreatePuzzleRequest } from "../models/types";
 // create/edit path we reject it like none/multiple so a human fixes the canon rather than
 // registering an unproven puzzle; the backfill, which recomputes gates offline, records
 // "unknown" instead (see backfill-solver.ts) so the board surfaces in editorial review.
+// `allowUnverified` is the admin's override for a board the solver is too slow for: it
+// accepts "unknown" (recorded as such, so the board stays in the flagged review set) but
+// never a proven none/multiple.
 function runGate(
   puzzleType: number,
-  canon: unknown
+  canon: unknown,
+  allowUnverified = false
 ): { status: string | null; solution: string | null } {
   const result = gate(puzzleType, canon);
   if (!result) return { status: null, solution: null };
@@ -28,9 +32,25 @@ function runGate(
     throw new Error("Puzzle has multiple solutions and cannot be registered");
   }
   if (result.verdict === "unknown") {
-    throw new Error("Puzzle could not be solved within the time limit; check the clues");
+    if (allowUnverified) return { status: "unknown", solution: null };
+    throw new GateUnknownError();
   }
   return { status: "unique", solution: JSON.stringify(result.solution) };
+}
+
+// Error code on the 400 for an "unknown" verdict, so clients can offer the override
+// (resubmit with allowUnverified) for exactly this rejection.
+const GATE_UNKNOWN_CODE = "gate_unknown";
+
+class GateUnknownError extends Error {
+  constructor() {
+    super("Puzzle could not be solved within the time limit; check the clues");
+  }
+}
+
+function gateErrorResponse(err: unknown): APIGatewayProxyResult {
+  const message = err instanceof Error ? err.message : "Invalid canonRepr";
+  return response(400, err instanceof GateUnknownError ? { error: message, code: GATE_UNKNOWN_CODE } : { error: message });
 }
 
 function toCamelCase(str: string): string {
@@ -151,10 +171,9 @@ async function createPuzzle(
   let gateResult: { status: string | null; solution: string | null };
   try {
     validateCanon(body.puzzleType, body.canonRepr);
-    gateResult = runGate(body.puzzleType, body.canonRepr);
+    gateResult = runGate(body.puzzleType, body.canonRepr, !!body.allowUnverified);
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Invalid canonRepr";
-    return response(400, { error: message });
+    return gateErrorResponse(err);
   }
 
   const id = uuidv4();
@@ -217,10 +236,9 @@ async function updatePuzzle(
     let gateResult: { status: string | null; solution: string | null };
     try {
       validateCanon(puzzleType, body.canonRepr);
-      gateResult = runGate(puzzleType, body.canonRepr);
+      gateResult = runGate(puzzleType, body.canonRepr, !!body.allowUnverified);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Invalid canonRepr";
-      return response(400, { error: message });
+      return gateErrorResponse(err);
     }
 
     sets.push("canon_repr = :canonRepr");

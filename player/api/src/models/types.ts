@@ -36,7 +36,7 @@ export interface PuzzleQuestion {
   updatedAt: string;
   // Auto-solve gate (docs/auto-solve). Null on unchecked rows or unsupported types.
   solutionRepr: Record<string, unknown> | null;
-  validationStatus: "unique" | "multiple" | "none" | null;
+  validationStatus: "unique" | "multiple" | "none" | "unknown" | null;
 }
 
 export interface CreatePuzzleRequest {
@@ -49,6 +49,9 @@ export interface CreatePuzzleRequest {
   canonRepr: Record<string, unknown>;
   srcCollection?: number;
   special?: boolean;
+  // Admin override: register even if the gate times out ("unknown"). Proven
+  // none/multiple are still rejected.
+  allowUnverified?: boolean;
 }
 
 export interface ListPuzzlesQuery {

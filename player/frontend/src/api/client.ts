@@ -5,6 +5,22 @@ const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 const RETRYABLE_STATUS = new Set([502, 503, 504]);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// A non-2xx API response. `code` is the API's machine-readable error code when it
+// sent one (e.g. GATE_UNKNOWN_CODE).
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number, readonly code?: string) {
+    super(message);
+  }
+}
+
+// 400 code for a puzzle the solver gate timed out on; resubmitting with
+// allowUnverified registers it anyway (as "unknown", so it stays flagged for review).
+export const GATE_UNKNOWN_CODE = "gate_unknown";
+
+export function isGateTimeout(err: unknown): boolean {
+  return err instanceof ApiError && err.code === GATE_UNKNOWN_CODE;
+}
+
 async function request<T>(
   path: string,
   options?: RequestInit,
@@ -30,11 +46,13 @@ async function request<T>(
         continue;
       }
       let detail = res.statusText;
+      let code: string | undefined;
       try {
         const body = await res.json();
         if (body.error) detail = body.error;
+        if (typeof body.code === "string") code = body.code;
       } catch {}
-      throw new Error(`API error ${res.status}: ${detail}`);
+      throw new ApiError(`API error ${res.status}: ${detail}`, res.status, code);
     }
     if (res.status === 204) return null as T;
     return res.json();
@@ -94,6 +112,7 @@ export function createPuzzle(data: {
   height?: number;
   srcCollection?: number;
   special?: boolean;
+  allowUnverified?: boolean;
 }) {
   return request<{ id: string }>("/puzzles", {
     method: "POST",
@@ -108,6 +127,7 @@ export function updatePuzzle(id: string, data: {
   canonRepr?: Record<string, unknown>;
   srcCollection?: number | null;
   special?: boolean;
+  allowUnverified?: boolean;
 }) {
   return request<{ puzzle: Puzzle }>(`/puzzles/${id}`, {
     method: "PATCH",

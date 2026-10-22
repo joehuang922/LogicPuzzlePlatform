@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { unzip } from "fflate";
-import { parseImage, createPuzzle, PuzzleType, Collection } from "../api/client";
+import { parseImage, createPuzzle, isGateTimeout, PuzzleType, Collection } from "../api/client";
+import OverrideGateButton from "./OverrideGateButton";
 import { extractBase64, blobToDataUrl } from "../utils/image";
 import { cardStyle, fieldStyle, inputStyle, errorStyle } from "../styles/admin";
 import { DIFFICULTY_OPTIONS } from "../constants";
@@ -25,6 +26,11 @@ interface BatchItem {
   difficulty: number;
   checked: boolean;
   editorOpen: boolean;
+  // Outcome of "Create All" for this item: the new puzzle id, or the API's rejection
+  // (gateTimedOut when it was only the solver timing out, which can be overridden).
+  createdId?: string;
+  createError?: string;
+  gateTimedOut?: boolean;
 }
 
 function computeDimensions(typeId: number, canon: Record<string, unknown>): { w?: number; h?: number } {
@@ -74,6 +80,8 @@ function BatchItemRow({
   onDifficultyChange,
   onCanonChange,
   onToggleEditor,
+  onOverrideGate,
+  overrideDisabled,
 }: {
   item: BatchItem;
   puzzleType: number;
@@ -86,6 +94,8 @@ function BatchItemRow({
   onDifficultyChange: (d: number) => void;
   onCanonChange: (json: string) => void;
   onToggleEditor: () => void;
+  onOverrideGate: () => void;
+  overrideDisabled: boolean;
 }) {
   const typeName = puzzleTypes.find((pt) => pt.id === puzzleType)?.name;
   const hasEditor = hasVisualEditor(typeName);
@@ -117,6 +127,9 @@ function BatchItemRow({
         )}
         {item.status === "success" && (
           <span style={{ color: "green", fontSize: "0.85rem", fontWeight: "bold" }}>✓</span>
+        )}
+        {item.createdId && (
+          <span style={{ color: "green", fontSize: "0.8rem" }}>Created</span>
         )}
         {item.status === "error" && (
           <span style={{ color: "red", fontSize: "0.8rem", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={item.error}>
@@ -179,6 +192,19 @@ function BatchItemRow({
           </button>
         </div>
       </div>
+
+      {item.createError && (
+        <div style={{ marginTop: "0.5rem", marginLeft: 80, display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <span style={{ color: "red", fontSize: "0.8rem" }}>✗ {item.createError}</span>
+          {item.gateTimedOut && (
+            <OverrideGateButton
+              onClick={onOverrideGate}
+              disabled={overrideDisabled}
+              style={{ padding: "0.2rem 0.5rem", fontSize: "0.7rem", borderRadius: 3 }}
+            />
+          )}
+        </div>
+      )}
 
       {item.status === "success" && !item.editorOpen && item.canonRepr && (
         <div style={{ marginTop: "0.5rem", marginLeft: 80 }}>
@@ -400,8 +426,49 @@ export default function BatchUploadForm({
     }
   }
 
+  // POST one item and record the outcome on it. A created item is unchecked so a
+  // second "Create All" doesn't register it twice. Returns whether it was created.
+  async function createItem(item: BatchItem, allowUnverified: boolean): Promise<boolean> {
+    try {
+      const canon = JSON.parse(item.canonRepr!);
+      const typeId = Number(puzzleType);
+      const { w, h } = computeDimensions(typeId, canon);
+
+      const res = await createPuzzle({
+        puzzleType: typeId,
+        difficulty: item.difficulty,
+        canonRepr: canon,
+        title: item.title.trim() || undefined,
+        author: item.author.trim() || undefined,
+        width: w,
+        height: h,
+        ...(srcCollection ? { srcCollection: Number(srcCollection) } : {}),
+        ...(allowUnverified ? { allowUnverified: true } : {}),
+      });
+      updateItem(item.id, { createdId: res.id, createError: undefined, gateTimedOut: false, checked: false });
+      return true;
+    } catch (err: unknown) {
+      updateItem(item.id, {
+        createError: err instanceof Error ? err.message : "Create failed",
+        gateTimedOut: isGateTimeout(err),
+      });
+      return false;
+    }
+  }
+
+  async function handleOverrideGate(itemId: string) {
+    const item = items.find((i) => i.id === itemId);
+    if (!item || creating) return;
+    setCreating(true);
+    try {
+      await createItem(item, true);
+    } finally {
+      setCreating(false);
+    }
+  }
+
   async function handleCreateAll() {
-    const toCreate = items.filter((i) => i.checked && i.status === "success" && i.canonRepr);
+    const toCreate = items.filter((i) => i.checked && i.status === "success" && i.canonRepr && !i.createdId);
     if (toCreate.length === 0) return;
 
     setCreating(true);
@@ -412,25 +479,8 @@ export default function BatchUploadForm({
     let failed = 0;
 
     for (const item of toCreate) {
-      try {
-        const canon = JSON.parse(item.canonRepr!);
-        const typeId = Number(puzzleType);
-        const { w, h } = computeDimensions(typeId, canon);
-
-        await createPuzzle({
-          puzzleType: typeId,
-          difficulty: item.difficulty,
-          canonRepr: canon,
-          title: item.title.trim() || undefined,
-          author: item.author.trim() || undefined,
-          width: w,
-          height: h,
-          ...(srcCollection ? { srcCollection: Number(srcCollection) } : {}),
-        });
-        created++;
-      } catch {
-        failed++;
-      }
+      if (await createItem(item, false)) created++;
+      else failed++;
       setCreateProgress({ done: created + failed, total: toCreate.length });
     }
 
@@ -553,6 +603,8 @@ export default function BatchUploadForm({
                 onToggleCheck={() => updateItem(item.id, { checked: !item.checked })}
                 onRemove={() => setItems((prev) => prev.filter((i) => i.id !== item.id))}
                 onRetry={() => handleRetry(item.id)}
+                onOverrideGate={() => handleOverrideGate(item.id)}
+                overrideDisabled={creating}
                 onTitleChange={(t) => updateItem(item.id, { title: t })}
                 onAuthorChange={(a) => updateItem(item.id, { author: a })}
                 onDifficultyChange={(d) => updateItem(item.id, { difficulty: d })}

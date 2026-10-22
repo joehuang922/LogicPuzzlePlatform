@@ -65,23 +65,36 @@ class AdminRepository(
         )
     }
 
+    /** A failed call's message plus the API's machine-readable `code`, if it sent one. */
+    data class ServerError(val message: String, val code: String?) {
+        /** The gate rejected the board only because the solver timed out; overridable. */
+        val isGateTimeout: Boolean get() = code == GATE_UNKNOWN_CODE
+    }
+
     /**
-     * Best-effort extraction of the API's `{ error }` message from a failed
-     * call. Returns the HTTP error body's error field when present, else the
-     * exception's own message.
+     * Best-effort extraction of the API's `{ error, code }` from a failed call.
+     * The message is the HTTP error body's error field when present, else the
+     * exception's own message. (The error body can only be read once, so read
+     * both fields here.)
      */
-    fun serverMessage(e: Throwable): String {
+    fun serverError(e: Throwable): ServerError {
         if (e is HttpException) {
             val raw = runCatching { e.response()?.errorBody()?.string() }.getOrNull()
             if (!raw.isNullOrBlank()) {
-                val parsed = runCatching {
-                    json.parseToJsonElement(raw).jsonObject["error"]?.let { el ->
-                        (el as? kotlinx.serialization.json.JsonPrimitive)?.content
-                    }
-                }.getOrNull()
-                if (!parsed.isNullOrBlank()) return parsed
+                val body = runCatching { json.parseToJsonElement(raw).jsonObject }.getOrNull()
+                fun field(name: String) =
+                    (body?.get(name) as? kotlinx.serialization.json.JsonPrimitive)?.content
+                val message = field("error")
+                if (!message.isNullOrBlank()) return ServerError(message, field("code"))
             }
         }
-        return e.message ?: "Something went wrong"
+        return ServerError(e.message ?: "Something went wrong", null)
+    }
+
+    fun serverMessage(e: Throwable): String = serverError(e).message
+
+    companion object {
+        /** API error code for a create the solver gate timed out on. */
+        const val GATE_UNKNOWN_CODE = "gate_unknown"
     }
 }

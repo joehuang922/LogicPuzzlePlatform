@@ -62,6 +62,9 @@ data class BatchItem(
     val difficulty: Int? = null,
     val createdId: String? = null,
     val error: String? = null,
+    // The create was rejected only because the solver timed out; the review screen
+    // offers an override (re-POST with allowUnverified).
+    val gateTimedOut: Boolean = false,
 )
 
 data class AdminQuestionUiState(
@@ -318,74 +321,104 @@ class AdminQuestionViewModel(
         _state.update { it.copy(creating = true) }
         viewModelScope.launch {
             try {
-                for (item in targets) {
-                    updateItem(item.id) { it.copy(status = ItemStatus.CREATING, error = null) }
-                    try {
-                        val (canon, width, height) = when (s.type) {
-                            AuthoringType.SUDOKU -> Triple(
-                                SudokuAuthoring.canonFromUserValues(item.userValues),
-                                SudokuAuthoring.SIZE,
-                                SudokuAuthoring.SIZE,
-                            )
-                            AuthoringType.NONOGRAM -> Triple(
-                                NonogramAuthoring.canonFromDraft(item.nonogram),
-                                item.nonogram.cols,
-                                item.nonogram.rows,
-                            )
-                            AuthoringType.KAKURO -> Triple(
-                                KakuroAuthoring.canonFromDraft(item.kakuro),
-                                item.kakuro.cols,
-                                item.kakuro.rows,
-                            )
-                            AuthoringType.SLITHERLINK -> Triple(
-                                SlitherlinkAuthoring.canonFromDraft(item.slitherlink),
-                                item.slitherlink.cols,
-                                item.slitherlink.rows,
-                            )
-                            AuthoringType.NURIKABE -> Triple(
-                                NurikabeAuthoring.canonFromDraft(item.nurikabe),
-                                item.nurikabe.cols,
-                                item.nurikabe.rows,
-                            )
-                            AuthoringType.HEYAWAKE -> Triple(
-                                HeyawakeAuthoring.canonFromDraft(item.heyawake),
-                                item.heyawake.width,
-                                item.heyawake.height,
-                            )
-                            AuthoringType.PICTO_LINK -> Triple(
-                                PictoLinkAuthoring.canonFromDraft(item.pictoLink),
-                                item.pictoLink.cols,
-                                item.pictoLink.rows,
-                            )
-                            AuthoringType.YAJILIN -> Triple(
-                                YajilinAuthoring.canonFromDraft(item.yajilin),
-                                item.yajilin.cols,
-                                item.yajilin.rows,
-                            )
-                        }
-                        val id = repo.createPuzzle(
-                            CreatePuzzleRequest(
-                                puzzleType = s.type.puzzleType,
-                                difficulty = BatchRules.resolveDifficulty(item.difficulty, s.defaultDifficulty),
-                                canonRepr = canon,
-                                title = item.title.trim().ifBlank { null },
-                                author = item.author.trim().ifBlank { null },
-                                width = width,
-                                height = height,
-                                srcCollection = s.srcCollectionId,
-                            )
-                        )
-                        updateItem(item.id) {
-                            it.copy(status = ItemStatus.CREATED, createdId = id, error = null)
-                        }
-                    } catch (e: Exception) {
-                        updateItem(item.id) {
-                            it.copy(status = ItemStatus.CREATE_FAILED, error = repo.serverMessage(e))
-                        }
-                    }
-                }
+                for (item in targets) createItem(s, item, allowUnverified = false)
             } finally {
                 _state.update { it.copy(creating = false) }
+            }
+        }
+    }
+
+    /**
+     * Re-POST one tile the gate rejected only because the solver timed out, this time
+     * with allowUnverified. The server still rejects a proven no/multiple solution; an
+     * accepted board is stored as "unknown" so it stays in the flagged review list.
+     */
+    fun overrideGate(itemId: String) {
+        val s = _state.value
+        if (s.creating) return
+        val item = s.items.firstOrNull { it.id == itemId } ?: return
+        if (item.status != ItemStatus.CREATE_FAILED || !item.gateTimedOut) return
+
+        _state.update { it.copy(creating = true) }
+        viewModelScope.launch {
+            try {
+                createItem(s, item, allowUnverified = true)
+            } finally {
+                _state.update { it.copy(creating = false) }
+            }
+        }
+    }
+
+    /** POST one tile through the gate; it flips to CREATED or CREATE_FAILED. */
+    private suspend fun createItem(s: AdminQuestionUiState, item: BatchItem, allowUnverified: Boolean) {
+        updateItem(item.id) { it.copy(status = ItemStatus.CREATING, error = null, gateTimedOut = false) }
+        try {
+            val (canon, width, height) = when (s.type) {
+                AuthoringType.SUDOKU -> Triple(
+                    SudokuAuthoring.canonFromUserValues(item.userValues),
+                    SudokuAuthoring.SIZE,
+                    SudokuAuthoring.SIZE,
+                )
+                AuthoringType.NONOGRAM -> Triple(
+                    NonogramAuthoring.canonFromDraft(item.nonogram),
+                    item.nonogram.cols,
+                    item.nonogram.rows,
+                )
+                AuthoringType.KAKURO -> Triple(
+                    KakuroAuthoring.canonFromDraft(item.kakuro),
+                    item.kakuro.cols,
+                    item.kakuro.rows,
+                )
+                AuthoringType.SLITHERLINK -> Triple(
+                    SlitherlinkAuthoring.canonFromDraft(item.slitherlink),
+                    item.slitherlink.cols,
+                    item.slitherlink.rows,
+                )
+                AuthoringType.NURIKABE -> Triple(
+                    NurikabeAuthoring.canonFromDraft(item.nurikabe),
+                    item.nurikabe.cols,
+                    item.nurikabe.rows,
+                )
+                AuthoringType.HEYAWAKE -> Triple(
+                    HeyawakeAuthoring.canonFromDraft(item.heyawake),
+                    item.heyawake.width,
+                    item.heyawake.height,
+                )
+                AuthoringType.PICTO_LINK -> Triple(
+                    PictoLinkAuthoring.canonFromDraft(item.pictoLink),
+                    item.pictoLink.cols,
+                    item.pictoLink.rows,
+                )
+                AuthoringType.YAJILIN -> Triple(
+                    YajilinAuthoring.canonFromDraft(item.yajilin),
+                    item.yajilin.cols,
+                    item.yajilin.rows,
+                )
+            }
+            val id = repo.createPuzzle(
+                CreatePuzzleRequest(
+                    puzzleType = s.type.puzzleType,
+                    difficulty = BatchRules.resolveDifficulty(item.difficulty, s.defaultDifficulty),
+                    canonRepr = canon,
+                    title = item.title.trim().ifBlank { null },
+                    author = item.author.trim().ifBlank { null },
+                    width = width,
+                    height = height,
+                    srcCollection = s.srcCollectionId,
+                    allowUnverified = if (allowUnverified) true else null,
+                )
+            )
+            updateItem(item.id) {
+                it.copy(status = ItemStatus.CREATED, createdId = id, error = null)
+            }
+        } catch (e: Exception) {
+            val err = repo.serverError(e)
+            updateItem(item.id) {
+                it.copy(
+                    status = ItemStatus.CREATE_FAILED,
+                    error = err.message,
+                    gateTimedOut = err.isGateTimeout,
+                )
             }
         }
     }
