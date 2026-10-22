@@ -21,6 +21,15 @@ if TYPE_CHECKING:
 class DoubleChocoParser(PuzzleParser):
     puzzle_type = "double-choco"
 
+    # Fraction of the cell cropped away on each side before OCR. The color
+    # classifier uses a tight 0.2 crop (below), but Double Choco clues can be
+    # two digits ("11", "12", ...) that sit side by side and nearly span the
+    # cell width; a 0.2 crop slices the outer "1"s and the detector misses the
+    # whole glyph. 0.08 keeps the digits intact while still excluding the grid
+    # lines. (Measured: 0.2 reads 0/13 "11" clues, 0.08 reads 13/13.)
+    _OCR_MARGIN = 0.08
+    _COLOR_MARGIN = 0.2
+
     def __init__(self, ocr_backend: OcrBackend | None = None) -> None:
         self._ocr = ocr_backend
 
@@ -54,23 +63,28 @@ class DoubleChocoParser(PuzzleParser):
 
         debug_path = _Path(debug_dir) if debug_dir else None
 
-        # First pass: collect all cell ROIs and their mean intensities
-        cell_rois: list[list[np.ndarray]] = []
+        # First pass: for each cell compute the mean intensity over a tight crop
+        # (for color classification) and collect a wider OCR crop, so two-digit
+        # clues that nearly span the cell width aren't sliced before OCR.
+        ocr_rois: list[list[np.ndarray]] = []
         cell_means: list[float] = []
         for r in range(rows):
-            row_rois: list[np.ndarray] = []
+            row_ocr: list[np.ndarray] = []
             for c in range(cols):
                 y1 = h_lines[r]
                 y2 = h_lines[r + 1]
                 x1 = v_lines[c]
                 x2 = v_lines[c + 1]
 
-                margin_y = int((y2 - y1) * 0.2)
-                margin_x = int((x2 - x1) * 0.2)
-                cell_roi = warped_gray[y1 + margin_y : y2 - margin_y, x1 + margin_x : x2 - margin_x]
-                row_rois.append(cell_roi)
-                cell_means.append(float(np.mean(cell_roi)))
-            cell_rois.append(row_rois)
+                margin_y = int((y2 - y1) * self._COLOR_MARGIN)
+                margin_x = int((x2 - x1) * self._COLOR_MARGIN)
+                color_roi = warped_gray[y1 + margin_y : y2 - margin_y, x1 + margin_x : x2 - margin_x]
+                cell_means.append(float(np.mean(color_roi)))
+
+                omy = int((y2 - y1) * self._OCR_MARGIN)
+                omx = int((x2 - x1) * self._OCR_MARGIN)
+                row_ocr.append(warped_gray[y1 + omy : y2 - omy, x1 + omx : x2 - omx])
+            ocr_rois.append(row_ocr)
 
         # Adaptive color threshold using Otsu on cell mean intensities
         means_arr = np.array(cell_means)
@@ -85,7 +99,7 @@ class DoubleChocoParser(PuzzleParser):
             row: list[list[int]] = []
             for c in range(cols):
                 color = 1 if cell_means[idx] < color_threshold else 0
-                number = self._recognize_number(cell_rois[r][c])
+                number = self._recognize_number(ocr_rois[r][c])
                 row.append([color, number])
                 idx += 1
             cells.append(row)
@@ -127,8 +141,18 @@ class DoubleChocoParser(PuzzleParser):
         return self._contour_estimate(cell_roi, significant)
 
     def _ocr_single_cell(self, cell_roi: np.ndarray) -> int:
-        """Use EasyOCR to read a number from a single cell."""
-        val = ocr_read_digit(cell_roi, self._ocr._reader, allowlist="0123456789", empty_val=0)
+        """Use EasyOCR to read a number from a single cell.
+
+        Double Choco clues can exceed 9, so read the full digit run
+        (multi_digit) rather than just the first digit.
+        """
+        val = ocr_read_digit(
+            cell_roi,
+            self._ocr._reader,
+            allowlist="0123456789",
+            empty_val=0,
+            multi_digit=True,
+        )
         return val if val > 0 else 0
 
     def _contour_estimate(self, cell_roi: np.ndarray, contours: list) -> int:
