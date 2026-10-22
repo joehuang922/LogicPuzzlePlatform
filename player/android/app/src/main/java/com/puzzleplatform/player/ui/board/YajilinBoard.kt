@@ -26,6 +26,7 @@ private val BLACK_FILL = Color(0xFF333333)
 private val MARK_COLOR = Color(0xFF999999)
 private val LOOP_COLOR = Color(0xFF888888)
 private val CLUE_TEXT = Color(0xFF222222)
+private val SELECT_FILL = Color(0xFFE0E8FF)
 
 /**
  * Compose Canvas renderer for Yajilin (puzzle type 13), the analog of
@@ -39,6 +40,9 @@ private val CLUE_TEXT = Color(0xFF222222)
  *    Drawing onto a marked cell clears its mark (in the same batch as the segment), and a
  *    segment is refused when either end is a clue, blackened, or already has two segments.
  * Two fingers pan/zoom via [ZoomableBoard].
+ *
+ * The Admin review editor passes [selectedCell] ("col,row") to highlight the cell its
+ * [onTapCell] selected.
  */
 @Composable
 fun YajilinBoard(
@@ -47,8 +51,10 @@ fun YajilinBoard(
     onTapCell: (col: Int, row: Int) -> Unit,
     onApplyChanges: (Map<String, Int>) -> Unit,
     modifier: Modifier = Modifier,
+    selectedCell: String? = null,
 ) {
-    val cells = remember(puzzle.id) { YajilinEngine.parseCells(puzzle) }
+    // Keyed on the canon too: the Admin review editor changes it under a stable id.
+    val cells = remember(puzzle.id, puzzle.canonRepr) { YajilinEngine.parseCells(puzzle) }
     val rows = cells.size
     val cols = cells.maxOfOrNull { it.size } ?: 0
     if (rows == 0 || cols == 0) return
@@ -58,6 +64,7 @@ fun YajilinBoard(
     val valuesState = rememberUpdatedState(userValues)
     val onTap = rememberUpdatedState(onTapCell)
     val onApply = rememberUpdatedState(onApplyChanges)
+    val selectedState = rememberUpdatedState(selectedCell)
     val drag = remember(puzzle.id) {
         LoopStroke { from, to, key, current ->
             val g = YajilinEngine.grids(rows, cols, current)
@@ -95,6 +102,9 @@ fun YajilinBoard(
         val boardH = rows * cell
         val values = valuesState.value
         drawRect(GRID_BG, topLeft = Offset(0f, 0f), size = Size(boardW, boardH))
+        selectedState.value?.split(",")?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 2 }?.let { (c, r) ->
+            drawRect(SELECT_FILL, topLeft = Offset(c * cell, r * cell), size = Size(cell, cell))
+        }
 
         val gridW = 1.dp.toPx()
         for (r in 1 until rows) drawLine(GRID_LINE, Offset(0f, r * cell), Offset(boardW, r * cell), gridW)

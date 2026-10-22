@@ -73,4 +73,5 @@ enum class AuthoringType(val label: String, val puzzleType: Int) {
     NURIKABE("Nurikabe", NurikabeAuthoring.PUZZLE_TYPE),
     HEYAWAKE("Heyawake", HeyawakeAuthoring.PUZZLE_TYPE),
     PICTO_LINK("Picto Link", PictoLinkAuthoring.PUZZLE_TYPE),
+    YAJILIN("Yajilin", YajilinAuthoring.PUZZLE_TYPE),
 }

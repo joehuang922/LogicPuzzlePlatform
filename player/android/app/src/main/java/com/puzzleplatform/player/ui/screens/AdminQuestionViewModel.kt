@@ -20,6 +20,8 @@ import com.puzzleplatform.player.puzzle.NurikabeAuthoring
 import com.puzzleplatform.player.puzzle.NurikabeDraft
 import com.puzzleplatform.player.puzzle.PictoLinkAuthoring
 import com.puzzleplatform.player.puzzle.PictoLinkDraft
+import com.puzzleplatform.player.puzzle.YajilinAuthoring
+import com.puzzleplatform.player.puzzle.YajilinDraft
 import com.puzzleplatform.player.puzzle.SlitherlinkAuthoring
 import com.puzzleplatform.player.puzzle.SlitherlinkDraft
 import com.puzzleplatform.player.puzzle.SudokuAuthoring
@@ -39,7 +41,7 @@ import kotlinx.coroutines.sync.withPermit
  * and edits — so the review reuses that board verbatim; a nonogram's clue lists ride
  * in [nonogram], a kakuro's cell grid in [kakuro], a slitherlink's clue grid in
  * [slitherlink], a nurikabe's in [nurikabe], a heyawake's rooms in [heyawake], a picto link's
- * clue grid in [pictoLink]. Metadata is
+ * clue grid in [pictoLink], a yajilin's arrow clues in [yajilin]. Metadata is
  * per-item except the shared source collection and the default difficulty (a null
  * [difficulty] inherits the batch default).
  */
@@ -54,6 +56,7 @@ data class BatchItem(
     val nurikabe: NurikabeDraft = NurikabeDraft(),
     val heyawake: HeyawakeDraft = HeyawakeDraft(),
     val pictoLink: PictoLinkDraft = PictoLinkDraft(),
+    val yajilin: YajilinDraft = YajilinDraft(),
     val title: String = "",
     val author: String = "",
     val difficulty: Int? = null,
@@ -200,6 +203,7 @@ class AdminQuestionViewModel(
                     AuthoringType.NURIKABE -> it.copy(nurikabe = NurikabeAuthoring.draftFromCanon(canon))
                     AuthoringType.HEYAWAKE -> it.copy(heyawake = HeyawakeAuthoring.draftFromCanon(canon))
                     AuthoringType.PICTO_LINK -> it.copy(pictoLink = PictoLinkAuthoring.draftFromCanon(canon))
+                    AuthoringType.YAJILIN -> it.copy(yajilin = YajilinAuthoring.draftFromCanon(canon))
                 }.copy(
                     status = ItemStatus.PARSED,
                     error = null,
@@ -263,6 +267,10 @@ class AdminQuestionViewModel(
     /** Apply a picto link clue edit (see [PictoLinkAuthoring]) to tile [id]. */
     fun editPictoLink(id: String, transform: (PictoLinkDraft) -> PictoLinkDraft) =
         editItem(id) { it.copy(pictoLink = transform(it.pictoLink)) }
+
+    /** Apply a yajilin clue edit (see [YajilinAuthoring]) to tile [id]. */
+    fun editYajilin(id: String, transform: (YajilinDraft) -> YajilinDraft) =
+        editItem(id) { it.copy(yajilin = transform(it.yajilin)) }
 
     private fun editItem(id: String, transform: (BatchItem) -> BatchItem) {
         updateItem(id) {
@@ -348,6 +356,11 @@ class AdminQuestionViewModel(
                                 PictoLinkAuthoring.canonFromDraft(item.pictoLink),
                                 item.pictoLink.cols,
                                 item.pictoLink.rows,
+                            )
+                            AuthoringType.YAJILIN -> Triple(
+                                YajilinAuthoring.canonFromDraft(item.yajilin),
+                                item.yajilin.cols,
+                                item.yajilin.rows,
                             )
                         }
                         val id = repo.createPuzzle(
