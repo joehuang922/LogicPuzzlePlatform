@@ -2,7 +2,7 @@ package com.puzzleplatform.player.data
 
 import com.puzzleplatform.player.data.model.Collection
 import com.puzzleplatform.player.data.model.defaultCollection
-import com.puzzleplatform.player.data.model.sortedForHome
+import com.puzzleplatform.player.data.model.sortedForDisplay
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -21,6 +21,6 @@ class CollectionOrderTest {
             c(5, "Alpha", "Nikoli", null),
             c(6, "Zeta", "Conceptis", "2020-01-01"),
         )
-        assertEquals(listOf(6, 4, 3, 5, 2, 1, 0), input.sortedForHome().map { it.id })
+        assertEquals(listOf(6, 4, 3, 5, 2, 1, 0), input.sortedForDisplay().map { it.id })
     }
 }

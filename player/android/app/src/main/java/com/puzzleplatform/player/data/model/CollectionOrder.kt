@@ -14,11 +14,12 @@ fun defaultCollection(puzzleCount: Int) = Collection(
 )
 
 /**
- * Home's collection order: publisher, then name (both case-insensitive, missing
- * last), then newest publish date first; the default collection always last.
- * Mirrors sortCollections in frontend/src/pages/Home.tsx.
+ * The order every collection list shows (Home, admin pickers): publisher, then
+ * name (both case-insensitive, missing last), then newest publish date first;
+ * the default collection always last. Mirrors sortCollections in
+ * frontend/src/api/client.ts.
  */
-fun List<Collection>.sortedForHome(): List<Collection> {
+fun List<Collection>.sortedForDisplay(): List<Collection> {
     val (defaults, real) = partition { it.id == DEFAULT_COLLECTION_ID }
     return real.sortedWith(
         compareBy<Collection, String?>(nullsLast()) { it.publisher?.lowercase() }

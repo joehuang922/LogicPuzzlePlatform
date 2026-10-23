@@ -148,6 +148,27 @@ export interface Collection {
   puzzleCount: number;
 }
 
+// Ascending, case-insensitive, missing values last. publishAt is an ISO date, so
+// comparing it as text orders it chronologically.
+function compareNullsLast(a: string | null, b: string | null): number {
+  if (!a && !b) return 0;
+  if (!a) return 1;
+  if (!b) return -1;
+  return a.localeCompare(b, undefined, { sensitivity: "base" });
+}
+
+/**
+ * The order every collection list shows (Home, admin pickers and browser):
+ * publisher, then name, then newest publish date first.
+ */
+export function sortCollections(collections: Collection[]): Collection[] {
+  return [...collections].sort((a, b) =>
+    compareNullsLast(a.publisher, b.publisher) ||
+    compareNullsLast(a.name, b.name) ||
+    (a.publishAt && b.publishAt ? b.publishAt.localeCompare(a.publishAt) : compareNullsLast(a.publishAt, b.publishAt))
+  );
+}
+
 export function listCollections() {
   // uncollectedCount: puzzles with no collection (Home shows them as collection 0).
   return request<{ collections: Collection[]; uncollectedCount?: number }>("/collections");

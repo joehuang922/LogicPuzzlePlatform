@@ -10,6 +10,7 @@ import com.puzzleplatform.player.data.model.CreateCollectionRequest
 import com.puzzleplatform.player.data.model.CreatePuzzleRequest
 import com.puzzleplatform.player.data.model.ParseImageRequest
 import com.puzzleplatform.player.data.model.ParseImageResponse
+import com.puzzleplatform.player.data.model.sortedForDisplay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -35,7 +36,7 @@ class AdminRepository(
     val parserConfigured: Boolean = BuildConfig.PARSER_URL.isNotBlank()
 
     suspend fun listCollections(): List<Collection> =
-        api.listCollections().collections
+        api.listCollections().collections.sortedForDisplay()
 
     suspend fun createCollection(req: CreateCollectionRequest): Int =
         api.createCollection(req).id

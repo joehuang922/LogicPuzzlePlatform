@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, FormEvent } from "react";
 import {
   listPuzzleTypes,
   listCollections,
+  sortCollections,
   listPuzzles,
   createCollection,
   createPuzzle,
@@ -886,12 +887,6 @@ function CollectionBrowser({
   puzzleTypes: PuzzleType[];
   onDataChanged: () => void;
 }) {
-  const sorted = [...collections].sort((a, b) => {
-    if (!a.publishAt && !b.publishAt) return 0;
-    if (!a.publishAt) return 1;
-    if (!b.publishAt) return -1;
-    return b.publishAt.localeCompare(a.publishAt);
-  });
 
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [puzzles, setPuzzles] = useState<Puzzle[]>([]);
@@ -1077,7 +1072,7 @@ function CollectionBrowser({
               </td>
             </tr>
           )}
-          {sorted.map((c) => (
+          {collections.map((c) => (
             <>
               <tr
                 key={c.id}
@@ -1183,7 +1178,7 @@ export default function Admin() {
     Promise.all([listPuzzleTypes(), listCollections()])
       .then(([ptRes, cRes]) => {
         setPuzzleTypes(ptRes.puzzleTypes);
-        setCollections(cRes.collections);
+        setCollections(sortCollections(cRes.collections));
       })
       .finally(() => setLoading(false));
   }

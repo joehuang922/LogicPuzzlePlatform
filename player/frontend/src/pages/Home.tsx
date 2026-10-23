@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { listPuzzles, listCollections, listPuzzleTypes, listAttempts, getSolvedQuestions, getCollectionProgress, createAttempt, getAttemptSnapshot, Collection, CollectionProgress, Attempt, PuzzleType, Puzzle } from "../api/client";
+import { listPuzzles, listCollections, listPuzzleTypes, listAttempts, getSolvedQuestions, getCollectionProgress, createAttempt, sortCollections, getAttemptSnapshot, Collection, CollectionProgress, Attempt, PuzzleType, Puzzle } from "../api/client";
 import { PuzzleDefinition } from "../types/puzzle";
 import { DIFFICULTY_LABELS } from "../constants";
 import { extractAnswer } from "../extractors";
@@ -71,22 +71,9 @@ function ProgressBar({ solved, total, style }: { solved: number; total: number; 
 // is understood by the API as "no collection" (puzzle list, progress, manifest).
 const DEFAULT_COLLECTION_ID = 0;
 
-// Ascending, case-insensitive, missing values last. publishAt is an ISO date, so
-// comparing it as text orders it chronologically.
-function compareNullsLast(a: string | null, b: string | null): number {
-  if (!a && !b) return 0;
-  if (!a) return 1;
-  if (!b) return -1;
-  return a.localeCompare(b, undefined, { sensitivity: "base" });
-}
-
-/** Publisher, then name, then newest publish date first; the default collection last. */
-function sortCollections(collections: Collection[], uncollectedCount: number): Collection[] {
-  const sorted = [...collections].sort((a, b) =>
-    compareNullsLast(a.publisher, b.publisher) ||
-    compareNullsLast(a.name, b.name) ||
-    (a.publishAt && b.publishAt ? b.publishAt.localeCompare(a.publishAt) : compareNullsLast(a.publishAt, b.publishAt))
-  );
+/** Collections in display order, with the default collection last. */
+function withDefaultCollection(collections: Collection[], uncollectedCount: number): Collection[] {
+  const sorted = sortCollections(collections);
   if (uncollectedCount > 0) {
     sorted.push({
       id: DEFAULT_COLLECTION_ID,
@@ -208,7 +195,7 @@ export default function Home() {
     Promise.all([listPuzzles({ limit: 10 }), listCollections(), listPuzzleTypes()])
       .then(([puzzleRes, collectionRes, ptRes]) => {
         setPuzzles(puzzleRes.puzzles as PuzzleDefinition[]);
-        const sortedCollections = sortCollections(collectionRes.collections, collectionRes.uncollectedCount ?? 0);
+        const sortedCollections = withDefaultCollection(collectionRes.collections, collectionRes.uncollectedCount ?? 0);
         setCollections(sortedCollections);
         setPuzzleTypes(ptRes.puzzleTypes);
         if (sortedCollections.length > 0) {

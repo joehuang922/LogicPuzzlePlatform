@@ -21,7 +21,7 @@ import com.puzzleplatform.player.data.model.SaveSnapshotResponse
 import com.puzzleplatform.player.data.model.Snapshot
 import com.puzzleplatform.player.data.model.SnapshotSummary
 import com.puzzleplatform.player.data.model.SolvedQuestionsResponse
-import com.puzzleplatform.player.data.model.sortedForHome
+import com.puzzleplatform.player.data.model.sortedForDisplay
 import com.puzzleplatform.player.data.sync.SyncClock
 import com.puzzleplatform.player.data.sync.SyncManager
 import com.puzzleplatform.player.data.sync.SyncWorker
@@ -108,9 +108,9 @@ class PuzzleRepository(
     suspend fun getCachedPuzzleTypes(): List<PuzzleType> =
         db.puzzleTypeDao().getAll().map { it.toModel() }
 
-    /** Home's cached collections, default collection included, in Home order. */
+    /** Home's cached collections, default collection included, in display order. */
     suspend fun getCachedCollections(): List<Collection> =
-        db.collectionDao().getAll().map { it.toModel() }.sortedForHome()
+        db.collectionDao().getAll().map { it.toModel() }.sortedForDisplay()
 
     suspend fun listPuzzleTypes(): List<PuzzleType> {
         return try {
@@ -128,7 +128,7 @@ class PuzzleRepository(
 
     /**
      * Collections for Home: the real ones plus, when any puzzle has no collection,
-     * the default collection holding them, in Home order. The default collection is
+     * the default collection holding them, in display order. The default collection is
      * cached in Room with the rest so it shows and plays offline too.
      */
     suspend fun listHomeCollections(): List<Collection> {
@@ -139,7 +139,7 @@ class PuzzleRepository(
             } else res.collections
             db.collectionDao().upsertAll(collections.map { it.toEntity() })
             if (res.uncollectedCount == 0) db.collectionDao().deleteById(DEFAULT_COLLECTION_ID)
-            collections.sortedForHome()
+            collections.sortedForDisplay()
         } catch (e: Exception) {
             getCachedCollections().takeIf { it.isNotEmpty() } ?: throw e
         }
