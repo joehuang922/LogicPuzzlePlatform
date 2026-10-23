@@ -111,9 +111,14 @@ read by one Gemini call on a crop of the page around the board (header number,
 short title, `作●<name>`). It runs concurrently with cell recognition, is best
 effort (null on any failure), and only pre-fills the Admin title/author fields.
 
-- A parser opts in by calling `self._board_located(image, quad)` once grid
-  detection has the board's corners in `image` coordinates. Wired so far:
-  shakashaka, nurikabe, nonogram.
+- Every parser gets it with no wiring: `PuzzleParser.parse()` finds the board
+  with the shared border detector (`find_quadrilateral_border`) off-thread and
+  crops around it. A parser whose own detector knows the board better (e.g.
+  nonogram, whose clue area sits outside the grid) sets `locates_board = True`
+  and calls `self._board_located(image, quad)` with the corners in `image`
+  coordinates. Currently: shakashaka, nurikabe, nonogram.
+- The prompt assumes Japanese headers (occasionally with Latin letters),
+  including vertical `作●<name>` lines in the margin.
 - `PARSER_METADATA=0` turns it off.
 - `parsers/.venv/bin/python -m tools.eval_metadata` (from `parsers/`, needs
   `GEMINI_API_KEY`) scores it against the labelled scans in

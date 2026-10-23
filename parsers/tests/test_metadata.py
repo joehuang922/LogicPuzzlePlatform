@@ -1,9 +1,12 @@
 """Tests for best-effort title/author extraction around the board."""
 from __future__ import annotations
 
+import inspect
+import sys
 import threading
 from unittest.mock import patch
 
+import cv2
 import numpy as np
 import pytest
 from PIL import Image
@@ -46,6 +49,7 @@ class _FakeRecognizer(CellRecognizer):
 
 class _BoardParser(PuzzleParser):
     puzzle_type = "dummy"
+    locates_board = True
 
     def __init__(self, extractor=None, title: str | None = None) -> None:
         self.metadata_extractor = extractor
@@ -175,6 +179,81 @@ def test_only_first_board_located_counts():
 
     Twice(MetadataExtractor(rec)).parse(_page())
     assert len(rec.images) == 1
+
+
+class _PlainParser(PuzzleParser):
+    """A parser that never reports its board, like most parsers."""
+
+    puzzle_type = "plain"
+
+    def __init__(self, extractor) -> None:
+        self.metadata_extractor = extractor
+
+    def _parse(self, image: Image.Image) -> PuzzleData:
+        return PuzzleData(puzzle_type=self.puzzle_type)
+
+    def validate(self, data: PuzzleData) -> bool:
+        return True
+
+
+def test_parser_without_quad_gets_generic_board():
+    rec = _FakeRecognizer({"number": "5", "author": "四代目久方七"})
+    page = np.full((1400, 1400, 3), 255, np.uint8)
+    cv2.rectangle(page, (500, 500), (900, 900), (0, 0, 0), 6)
+    data = _PlainParser(MetadataExtractor(rec)).parse(Image.fromarray(page))
+    assert data.metadata.title == "5"
+    assert data.metadata.author == "四代目久方七"
+    # Crop is the detected 400px board plus a 240px margin each side.
+    w, h = rec.images[0].size
+    assert 860 <= w <= 900 and 860 <= h <= 900
+    assert rec.threads[0].startswith("metadata")
+
+
+def test_parser_with_quad_skips_generic_board():
+    rec = _FakeRecognizer({"number": "1"})
+    with patch("puzzle_parsers.base.locate_board") as generic:
+        _BoardParser(MetadataExtractor(rec)).parse(_page())
+    generic.assert_not_called()
+    assert len(rec.images) == 1
+
+
+def test_generic_board_failure_does_not_fail_parse():
+    rec = _FakeRecognizer({"number": "1"})
+    with patch("puzzle_parsers.base.locate_board", side_effect=RuntimeError("boom")):
+        data = _PlainParser(MetadataExtractor(rec)).parse(_page())
+    assert data.metadata.title is None
+    assert rec.images == []
+
+
+def test_parsers_that_skip_generic_board_report_their_own():
+    # Every other parser falls back to the generic board; one that opts out
+    # must report a quad itself, or it would silently lose title/author.
+    for cls in _all_parser_classes():
+        if cls.locates_board:
+            assert "_board_located" in inspect.getsource(sys.modules[cls.__module__]), cls
+
+
+def _all_parser_classes():
+    import importlib
+    import pkgutil
+
+    import puzzle_parsers
+
+    for mod in pkgutil.iter_modules(puzzle_parsers.__path__):
+        if mod.ispkg:
+            try:
+                importlib.import_module(f"puzzle_parsers.{mod.name}.parser")
+            except ModuleNotFoundError:
+                continue
+    stack = list(PuzzleParser.__subclasses__())
+    seen = []
+    while stack:
+        cls = stack.pop()
+        if cls.__module__.startswith("puzzle_parsers.") and cls not in seen:
+            seen.append(cls)
+        stack.extend(cls.__subclasses__())
+    assert seen
+    return seen
 
 
 def test_board_located_outside_parse_is_noop():

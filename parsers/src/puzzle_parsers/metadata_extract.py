@@ -25,6 +25,7 @@ import numpy as np
 from numpy.typing import NDArray
 from PIL import Image
 
+from puzzle_parsers.grid_utils import find_quadrilateral_border, ink_intensity
 from puzzle_parsers.recognition import CellRecognizer
 
 # Context kept around the board's bounding box on each side, as a fraction of
@@ -52,7 +53,13 @@ Return JSON only, with exactly these keys:
 - "title_text": a short title printed as the puzzle's name, if any \
 (e.g. "ふわふわゆらり"). Not the number, not the puzzle genre name.
 - "author": the puzzle setter's name. It usually follows a 作 marker \
-("作●セダム" -> "セダム", "作・…", "作者 …") or "by …". Japanese or English.
+("作●セダム" -> "セダム", "作●四代目久方七" -> "四代目久方七", "作・…", \
+"作者 …") or "by …". Leave out the marker itself.
+
+The page is Japanese: kanji, hiragana and katakana, sometimes mixed with Latin \
+letters and digits (a pen name may be partly or wholly romaji). The header may be \
+printed vertically (top to bottom) in the margin beside the board, e.g. a black \
+box with the number, a difficulty face, then "作●<name>" running down the side.
 
 Rules:
 - Transcribe exactly as printed. Do not translate or romanize.
@@ -65,6 +72,15 @@ red box usually belongs to the next puzzle.
 page numbers, difficulty stars or faces, and reader comment signatures such as \
 "(ジサシキシンゴウ 金沢市)" at the bottom of a page.
 """
+
+
+def locate_board(image: NDArray) -> NDArray:
+    """Board corners via the shared border detector, for any puzzle type.
+
+    Used when a parser doesn't report its own quad. The detector falls back to
+    the whole image when it finds no border, which still yields a usable crop.
+    """
+    return find_quadrilateral_border(ink_intensity(image))
 
 
 def context_crop(image: NDArray, quad: NDArray) -> NDArray:

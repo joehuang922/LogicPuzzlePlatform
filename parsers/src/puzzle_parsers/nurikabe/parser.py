@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 
 class NurikabeParser(PuzzleParser):
     puzzle_type = "nurikabe"
+    locates_board = True
 
     def __init__(self, ocr_backend: OcrBackend | None = None) -> None:
         self._ocr = ocr_backend

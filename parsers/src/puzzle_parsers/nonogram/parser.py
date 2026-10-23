@@ -44,6 +44,7 @@ COL_CLUE_PROMPT = (
 
 class NonogramParser(PuzzleParser):
     puzzle_type = "nonogram"
+    locates_board = True
 
     def __init__(
         self,

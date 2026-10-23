@@ -20,14 +20,18 @@ from pathlib import Path
 
 import cv2
 
-from puzzle_parsers.metadata_extract import context_crop, default_metadata_extractor
+from puzzle_parsers.metadata_extract import (
+    context_crop,
+    default_metadata_extractor,
+    locate_board,
+)
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _EXPECTED = Path(__file__).with_name("metadata_expected.json")
 
 
 def _detect_quad(puzzle_type: str, image):
-    """Board corners from the type's own detector (parsers that expose a quad)."""
+    """Board corners as parse() would get them: the type's own quad, else generic."""
     if puzzle_type == "shakashaka":
         from puzzle_parsers.shakashaka.grid_detector import detect_shakashaka_grid
         return detect_shakashaka_grid(image).quad
@@ -37,7 +41,7 @@ def _detect_quad(puzzle_type: str, image):
     if puzzle_type == "nonogram":
         from puzzle_parsers.nonogram.grid_detector import detect_nonogram_grid
         return detect_nonogram_grid(image).quad
-    raise SystemExit(f"No quad detector wired for {puzzle_type!r}")
+    return locate_board(image)
 
 
 def _norm(value: str | None) -> str | None:

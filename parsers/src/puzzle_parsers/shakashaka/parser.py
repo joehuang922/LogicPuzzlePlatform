@@ -23,6 +23,7 @@ BLACK_THRESHOLD = 100
 
 class ShakashakaParser(PuzzleParser):
     puzzle_type = "shakashaka"
+    locates_board = True
 
     def __init__(self, recognizer: CellRecognizer | None = None, **kwargs) -> None:
         self._recognizer = recognizer or GeminiRecognizer(**kwargs)
