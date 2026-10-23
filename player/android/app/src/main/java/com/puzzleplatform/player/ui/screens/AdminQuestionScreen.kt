@@ -133,6 +133,8 @@ fun AdminQuestionScreen(
             onEditPictoLink = { vm.editPictoLink(reviewItem.id, it) },
             onEditYajilin = { vm.editYajilin(reviewItem.id, it) },
             onOverrideGate = { vm.overrideGate(reviewItem.id) },
+            canCreateAnyway = state.canCreateAnyway(reviewItem),
+            onCreateAnyway = { vm.createAnyway(reviewItem.id) },
             overrideEnabled = !state.creating,
         )
         return
@@ -469,6 +471,8 @@ private fun ReviewScreen(
     onEditPictoLink: ((PictoLinkDraft) -> PictoLinkDraft) -> Unit,
     onEditYajilin: ((YajilinDraft) -> YajilinDraft) -> Unit,
     onOverrideGate: () -> Unit,
+    canCreateAnyway: Boolean,
+    onCreateAnyway: () -> Unit,
     overrideEnabled: Boolean,
 ) {
     // The review board reuses the player SudokuBoard verbatim; an all-zero-hints
@@ -617,6 +621,18 @@ private fun ReviewScreen(
             if (item.status == ItemStatus.CREATE_FAILED && item.gateTimedOut) {
                 OutlinedButton(onClick = onOverrideGate, enabled = overrideEnabled) {
                     Text("Override solver timeout")
+                }
+            }
+            // "Create all valid" skips a red tile; if its problems are a false alarm, the
+            // admin can send this one on purpose.
+            if (canCreateAnyway) {
+                Text(
+                    "Create all valid skips this tile because of the problems above.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedButton(onClick = onCreateAnyway, enabled = overrideEnabled) {
+                    Text("Create anyway")
                 }
             }
 
@@ -776,11 +792,12 @@ private fun tileCaption(item: BatchItem): String {
     }
 }
 
-/** "8 created · 1 failed" — null when nothing noteworthy has happened yet. */
+/** "8 created · 1 failed · 2 skipped (red)" — null when nothing noteworthy has happened yet. */
 private fun batchSummary(state: AdminQuestionUiState): String? {
     val parts = buildList {
         if (state.createdCount > 0) add("${state.createdCount} created")
         if (state.failedCount > 0) add("${state.failedCount} failed")
+        if (state.skippedCount > 0) add("${state.skippedCount} skipped (red)")
     }
     return parts.takeIf { it.isNotEmpty() }?.joinToString(" · ")
 }

@@ -83,6 +83,26 @@ class HeyawakeAuthoringTest {
     }
 
     @Test
+    fun wallEditsWorkOnABoardWithGapsOrOverlaps() {
+        // A parse that left R2C2, R3C2 and R3C3 in no room: an L-shaped gap, which used
+        // to make every wall chip on the board a no-op.
+        val gappy = HeyawakeDraft(
+            3, 3,
+            listOf(Room(0, 0, 3, 1, 1), Room(1, 0, 1, 2, null), Room(1, 2, 1, 1, null)),
+        )
+        assertFalse(HeyawakeAuthoring.problems(gappy).isEmpty())
+        assertTrue(HeyawakeAuthoring.canToggleWall(gappy, 0, 0, WallSide.RIGHT))
+        val split = HeyawakeAuthoring.toggleWall(gappy, 0, 0, WallSide.RIGHT)
+        assertTrue(HeyawakeAuthoring.problems(split).isEmpty())
+        assertEquals(1, split.rooms.first { it.r == 0 && it.c == 0 }.clue)
+
+        // A 3x3 room with a phantom 1x1 room over its centre: the big room is notched.
+        val notched = HeyawakeDraft(3, 3, listOf(Room(0, 0, 3, 3, 2), Room(1, 1, 1, 1, null)))
+        assertTrue(HeyawakeAuthoring.canToggleWall(notched, 1, 1, WallSide.TOP))
+        assertTrue(HeyawakeAuthoring.problems(HeyawakeAuthoring.toggleWall(notched, 1, 1, WallSide.TOP)).isEmpty())
+    }
+
+    @Test
     fun borderSidesCantToggle() {
         assertFalse(HeyawakeAuthoring.canToggleWall(small, 0, 0, WallSide.TOP))
         assertFalse(HeyawakeAuthoring.canToggleWall(small, 2, 1, WallSide.RIGHT))

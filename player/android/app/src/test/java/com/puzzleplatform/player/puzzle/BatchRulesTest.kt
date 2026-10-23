@@ -14,13 +14,13 @@ class BatchRulesTest {
 
     @Test
     fun `only a parsed, not-created tile is eligible`() {
-        assertTrue(BatchRules.isEligibleToCreate(ItemStatus.PARSED, createdId = null))
+        assertTrue(BatchRules.isEligibleToCreate(ItemStatus.PARSED, createdId = null, hasProblems = false))
     }
 
     @Test
     fun `already-created tile drops out of the eligible set`() {
         // This is the idempotency guarantee: pressing Create again won't re-POST it.
-        assertFalse(BatchRules.isEligibleToCreate(ItemStatus.CREATED, createdId = "42"))
+        assertFalse(BatchRules.isEligibleToCreate(ItemStatus.CREATED, createdId = "42", hasProblems = false))
     }
 
     @Test
@@ -34,20 +34,31 @@ class BatchRulesTest {
         )) {
             assertFalse(
                 "status $status should not be eligible",
-                BatchRules.isEligibleToCreate(status, createdId = null),
+                BatchRules.isEligibleToCreate(status, createdId = null, hasProblems = false),
             )
         }
     }
 
     @Test
+    fun `a red tile is skipped by create-all but can be created anyway`() {
+        assertFalse(BatchRules.isEligibleToCreate(ItemStatus.PARSED, createdId = null, hasProblems = true))
+        assertTrue(BatchRules.canCreateAnyway(ItemStatus.PARSED, createdId = null, hasProblems = true))
+        // A clean tile goes through create-all; there's nothing to override.
+        assertFalse(BatchRules.canCreateAnyway(ItemStatus.PARSED, createdId = null, hasProblems = false))
+        // Created or in-flight tiles can't be sent again.
+        assertFalse(BatchRules.canCreateAnyway(ItemStatus.CREATED, createdId = "42", hasProblems = true))
+        assertFalse(BatchRules.canCreateAnyway(ItemStatus.CREATING, createdId = null, hasProblems = true))
+    }
+
+    @Test
     fun `a create-failed tile is only re-armed by an edit`() {
         // Pressing Create again changes nothing (gate just rejected it)...
-        assertFalse(BatchRules.isEligibleToCreate(ItemStatus.CREATE_FAILED, createdId = null))
+        assertFalse(BatchRules.isEligibleToCreate(ItemStatus.CREATE_FAILED, createdId = null, hasProblems = false))
         // ...until the user edits the grid, which resets it to PARSED...
         val reArmed = BatchRules.afterEdit(ItemStatus.CREATE_FAILED)
         assertEquals(ItemStatus.PARSED, reArmed)
         // ...and now it's eligible again.
-        assertTrue(BatchRules.isEligibleToCreate(reArmed, createdId = null))
+        assertTrue(BatchRules.isEligibleToCreate(reArmed, createdId = null, hasProblems = false))
     }
 
     @Test

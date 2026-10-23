@@ -134,6 +134,7 @@ object HeyawakeAuthoring {
         toggleWall(draft, col, row, side) != draft
 
     private fun merge(draft: HeyawakeDraft, ids: Array<IntArray>, a: Int, b: Int): HeyawakeDraft {
+        if (!unionIsRectangle(ids, a, b)) return draft
         val merged = Array(draft.height) { r -> IntArray(draft.width) { c -> if (ids[r][c] == b) a else ids[r][c] } }
         val clues = cluesByTopLeft(draft).toMutableMap()
         // The merged room keeps whichever clue the two had (the top-left one's first).
@@ -143,7 +144,19 @@ object HeyawakeAuthoring {
             .firstNotNullOfOrNull { it.clue }
         val topLeft = listOfNotNull(roomA, roomB).minWithOrNull(compareBy({ it.r }, { it.c }))
         if (topLeft != null) clues[topLeft.r to topLeft.c] = keep
-        return rebuild(draft, merged, clues) ?: draft
+        return rebuild(draft, merged, clues)
+    }
+
+    /** True when the cells of rooms [a] and [b] together fill their bounding box. */
+    private fun unionIsRectangle(ids: Array<IntArray>, a: Int, b: Int): Boolean {
+        var minR = Int.MAX_VALUE; var maxR = -1; var minC = Int.MAX_VALUE; var maxC = -1; var count = 0
+        for (r in ids.indices) for (c in ids[r].indices) {
+            if (ids[r][c] != a && ids[r][c] != b) continue
+            count++
+            minR = minOf(minR, r); maxR = maxOf(maxR, r)
+            minC = minOf(minC, c); maxC = maxOf(maxC, c)
+        }
+        return count > 0 && count == (maxR - minR + 1) * (maxC - minC + 1)
     }
 
     private fun split(draft: HeyawakeDraft, ids: Array<IntArray>, col: Int, row: Int, side: WallSide): HeyawakeDraft {
@@ -165,46 +178,35 @@ object HeyawakeAuthoring {
                 if (beyond != farHalfHoldsTopLeft) next[r][c] = fresh
             }
         }
-        return rebuild(draft, next, cluesByTopLeft(draft)) ?: draft
+        return rebuild(draft, next, cluesByTopLeft(draft))
     }
 
     /**
-     * Turn a cell -> id grid into rooms (one per connected id, in reading order of its
-     * top-left cell), each taking the clue keyed at its top-left. Null if any room isn't a
-     * rectangle.
+     * Turn a cell -> id grid into rectangular rooms, in reading order of their top-left
+     * cells, each taking the clue keyed at its top-left. Same-id cells are cut greedily
+     * into rectangles (widest run from the top-left, then as many rows as fit), so a
+     * rectangular region stays one room and anything else — the uncovered gaps or the
+     * overlap-notched rooms a bad parse leaves — is tiled rather than rejected. Refusing
+     * those used to make every wall edit a no-op until the grid was clean.
      */
     private fun rebuild(
         draft: HeyawakeDraft,
         ids: Array<IntArray>,
         clues: Map<Pair<Int, Int>, Int?>,
-    ): HeyawakeDraft? {
-        val seen = Array(draft.height) { BooleanArray(draft.width) }
+    ): HeyawakeDraft {
+        val taken = Array(draft.height) { BooleanArray(draft.width) }
+        fun free(r: Int, c: Int, id: Int) = !taken[r][c] && ids[r][c] == id
         val rooms = mutableListOf<Room>()
         for (r in 0 until draft.height) {
             for (c in 0 until draft.width) {
-                if (seen[r][c]) continue
+                if (taken[r][c]) continue
                 val id = ids[r][c]
-                var minR = r; var maxR = r; var minC = c; var maxC = c; var count = 0
-                val stack = ArrayDeque(listOf(r to c))
-                seen[r][c] = true
-                while (stack.isNotEmpty()) {
-                    val (cr, cc) = stack.removeLast()
-                    count++
-                    minR = minOf(minR, cr); maxR = maxOf(maxR, cr)
-                    minC = minOf(minC, cc); maxC = maxOf(maxC, cc)
-                    for (s in WallSide.entries) {
-                        val nr = cr + s.dr
-                        val nc = cc + s.dc
-                        if (nr in 0 until draft.height && nc in 0 until draft.width && !seen[nr][nc] && ids[nr][nc] == id) {
-                            seen[nr][nc] = true
-                            stack.addLast(nr to nc)
-                        }
-                    }
-                }
-                val w = maxC - minC + 1
-                val h = maxR - minR + 1
-                if (count != w * h) return null
-                rooms += Room(minR, minC, w, h, clues[minR to minC])
+                var w = 1
+                while (c + w < draft.width && free(r, c + w, id)) w++
+                var h = 1
+                while (r + h < draft.height && (c until c + w).all { free(r + h, it, id) }) h++
+                for (rr in r until r + h) for (cc in c until c + w) taken[rr][cc] = true
+                rooms += Room(r, c, w, h, clues[r to c])
             }
         }
         return draft.copy(rooms = rooms)

@@ -67,6 +67,21 @@ data class BatchItem(
     val gateTimedOut: Boolean = false,
 )
 
+/**
+ * What the type's misread check finds wrong with this tile's grid — the same list that
+ * turns its tile red and shows in its review. Sudoku has no such check.
+ */
+fun BatchItem.problems(type: AuthoringType): List<String> = when (type) {
+    AuthoringType.SUDOKU -> emptyList()
+    AuthoringType.NONOGRAM -> NonogramAuthoring.problems(nonogram)
+    AuthoringType.KAKURO -> KakuroAuthoring.problems(kakuro)
+    AuthoringType.SLITHERLINK -> SlitherlinkAuthoring.problems(slitherlink)
+    AuthoringType.NURIKABE -> NurikabeAuthoring.problems(nurikabe)
+    AuthoringType.HEYAWAKE -> HeyawakeAuthoring.problems(heyawake)
+    AuthoringType.PICTO_LINK -> PictoLinkAuthoring.problems(pictoLink)
+    AuthoringType.YAJILIN -> YajilinAuthoring.problems(yajilin)
+}
+
 data class AdminQuestionUiState(
     // What every tile in the batch is parsed and created as.
     val type: AuthoringType = AuthoringType.SUDOKU,
@@ -87,7 +102,17 @@ data class AdminQuestionUiState(
 ) {
     /** Tiles that the next "Create all valid" press would send. */
     val eligibleCount: Int
-        get() = items.count { BatchRules.isEligibleToCreate(it.status, it.createdId) }
+        get() = items.count { isEligible(it) }
+
+    /** Parsed red tiles that "Create all valid" skips (each can be created anyway from its review). */
+    val skippedCount: Int
+        get() = items.count { canCreateAnyway(it) }
+
+    fun isEligible(item: BatchItem): Boolean =
+        BatchRules.isEligibleToCreate(item.status, item.createdId, item.problems(type).isNotEmpty())
+
+    fun canCreateAnyway(item: BatchItem): Boolean =
+        BatchRules.canCreateAnyway(item.status, item.createdId, item.problems(type).isNotEmpty())
 
     val createdCount: Int get() = items.count { it.status == ItemStatus.CREATED }
     val failedCount: Int
@@ -303,7 +328,7 @@ class AdminQuestionViewModel(
     fun setSrcCollection(id: Int?) = _state.update { it.copy(srcCollectionId = id) }
 
     /**
-     * Create every eligible tile (parsed, not already created). Each is
+     * Create every eligible tile (parsed, not already created, not red). Each is
      * POSTed on its own through the server's solver gate; a tile flips to CREATED (with
      * its id) or CREATE_FAILED (with the gate's message). Already-created tiles are
      * skipped, so the button can be pressed again after fixing the failures and sends
@@ -313,15 +338,34 @@ class AdminQuestionViewModel(
     fun createAllValid() {
         val s = _state.value
         if (s.creating) return
-        val targets = s.items.filter {
-            BatchRules.isEligibleToCreate(it.status, it.createdId)
-        }
+        val targets = s.items.filter(s::isEligible)
         if (targets.isEmpty()) return
 
         _state.update { it.copy(creating = true) }
         viewModelScope.launch {
             try {
                 for (item in targets) createItem(s, item, allowUnverified = false)
+            } finally {
+                _state.update { it.copy(creating = false) }
+            }
+        }
+    }
+
+    /**
+     * Create one red tile that "Create all valid" skipped, because the admin judged its
+     * problems a false alarm. The server's checks (and solver gate, where the type has
+     * one) still run.
+     */
+    fun createAnyway(itemId: String) {
+        val s = _state.value
+        if (s.creating) return
+        val item = s.items.firstOrNull { it.id == itemId } ?: return
+        if (!s.canCreateAnyway(item)) return
+
+        _state.update { it.copy(creating = true) }
+        viewModelScope.launch {
+            try {
+                createItem(s, item, allowUnverified = false)
             } finally {
                 _state.update { it.copy(creating = false) }
             }

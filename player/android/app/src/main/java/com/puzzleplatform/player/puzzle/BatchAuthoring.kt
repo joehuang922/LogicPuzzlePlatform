@@ -35,17 +35,27 @@ enum class ItemStatus {
 object BatchRules {
 
     /**
-     * A tile is sent on "Create all valid" only when it has a parsed grid and isn't
-     * already created. This is what makes the button re-runnable: created tiles drop
-     * out, so a second press sends only the rest. A tile the user doesn't want is
-     * removed from the batch outright, so there's no "excluded but present" state.
+     * A tile is sent on "Create all valid" only when it has a parsed grid, isn't
+     * already created, and [hasProblems] is false (the red tiles — the type's
+     * `problems()` check found something that can't be right). This is what makes the
+     * button re-runnable: created tiles drop out, so a second press sends only the rest.
+     * A tile the user doesn't want is removed from the batch outright, so there's no
+     * "excluded but present" state.
+     *
+     * A red tile is held back because not every type has a solver gate behind it
+     * (heyawake only checks the schema), so sending it would store a broken board. The
+     * review screen's "Create anyway" sends one on purpose ([canCreateAnyway]).
      *
      * CREATE_FAILED is intentionally *not* eligible on its own — editing the tile
      * (which resets it to PARSED, see [afterEdit]) is what re-arms it, so a press that
      * changes nothing doesn't blindly re-POST a board the gate just rejected.
      */
-    fun isEligibleToCreate(status: ItemStatus, createdId: String?): Boolean =
-        status == ItemStatus.PARSED && createdId == null
+    fun isEligibleToCreate(status: ItemStatus, createdId: String?, hasProblems: Boolean): Boolean =
+        status == ItemStatus.PARSED && createdId == null && !hasProblems
+
+    /** A red tile that "Create all valid" skips but the admin may still send by hand. */
+    fun canCreateAnyway(status: ItemStatus, createdId: String?, hasProblems: Boolean): Boolean =
+        status == ItemStatus.PARSED && createdId == null && hasProblems
 
     /** A tile's effective difficulty: its own override, else the shared batch default. */
     fun resolveDifficulty(itemDifficulty: Int?, defaultDifficulty: Int): Int =
