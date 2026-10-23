@@ -107,6 +107,6 @@ object ServiceLocator {
     }
 
     val adminRepository: AdminRepository by lazy {
-        AdminRepository(api, parserApi, json, appContext)
+        AdminRepository(api, parserApi, database, json, appContext)
     }
 }

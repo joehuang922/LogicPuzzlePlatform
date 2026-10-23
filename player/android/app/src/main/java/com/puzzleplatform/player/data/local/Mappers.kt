@@ -2,6 +2,7 @@ package com.puzzleplatform.player.data.local
 
 import com.puzzleplatform.player.data.model.Attempt
 import com.puzzleplatform.player.data.model.Collection
+import com.puzzleplatform.player.data.model.CreatePuzzleRequest
 import com.puzzleplatform.player.data.model.Puzzle
 import com.puzzleplatform.player.data.model.PuzzleType
 import com.puzzleplatform.player.data.model.Snapshot
@@ -42,6 +43,37 @@ fun Puzzle.toEntity(json: Json, updatedAt: String?, deletedAt: String?) = Puzzle
     solutionRepr = solutionRepr?.let { json.encodeToString(JsonObject.serializer(), it) },
     updatedAt = updatedAt,
     deletedAt = deletedAt,
+)
+
+/**
+ * A just-created question as a local row, for the write-through when the server's
+ * copy can't be read back. Labels come from the cached [type] / [collection] rows
+ * (blank / null when not cached); there's no stored solution, so offline "reveal"
+ * waits for the next sync. Null updatedAt, so a manifest refresh re-fetches it.
+ */
+fun CreatePuzzleRequest.toLocalEntity(
+    id: String,
+    json: Json,
+    type: PuzzleTypeEntity?,
+    collection: CollectionEntity?,
+) = PuzzleEntity(
+    id = id,
+    puzzleType = puzzleType,
+    puzzleTypeName = type?.name ?: "",
+    puzzleTypeJpLabel = type?.jpLabel ?: "",
+    title = title,
+    author = author,
+    difficulty = difficulty,
+    width = width,
+    height = height,
+    canonRepr = json.encodeToString(JsonObject.serializer(), canonRepr),
+    srcCollection = srcCollection,
+    srcCollectionName = collection?.name,
+    srcCollectionCoverSrc = collection?.coverSrc,
+    special = special ?: false,
+    solutionRepr = null,
+    updatedAt = null,
+    deletedAt = null,
 )
 
 fun PuzzleEntity.toModel(json: Json) = Puzzle(

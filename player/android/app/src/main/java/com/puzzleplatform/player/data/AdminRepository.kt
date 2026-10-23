@@ -5,9 +5,13 @@ import android.net.Uri
 import com.puzzleplatform.player.BuildConfig
 import com.puzzleplatform.player.data.api.ParserApi
 import com.puzzleplatform.player.data.api.PuzzleApi
+import com.puzzleplatform.player.data.local.AppDatabase
+import com.puzzleplatform.player.data.local.toEntity
+import com.puzzleplatform.player.data.local.toLocalEntity
 import com.puzzleplatform.player.data.model.Collection
 import com.puzzleplatform.player.data.model.CreateCollectionRequest
 import com.puzzleplatform.player.data.model.CreatePuzzleRequest
+import com.puzzleplatform.player.data.model.DEFAULT_COLLECTION_ID
 import com.puzzleplatform.player.data.model.ParseImageRequest
 import com.puzzleplatform.player.data.model.ParseImageResponse
 import com.puzzleplatform.player.data.model.sortedForDisplay
@@ -25,10 +29,14 @@ import retrofit2.HttpException
  * Create endpoints run the server's solver gate and answer 400 with a JSON
  * `{ error }` on a bad board; [serverMessage] surfaces that text so the UI can
  * show the real reason ("multiple solutions", …) instead of "HTTP 400".
+ *
+ * Creating a question writes through to Room (see [createPuzzle]), so the new
+ * puzzle is playable and listed on this device without another pull-sync.
  */
 class AdminRepository(
     private val api: PuzzleApi,
     private val parserApi: ParserApi,
+    private val db: AppDatabase,
     private val json: Json,
     private val context: Context,
 ) {
@@ -41,8 +49,39 @@ class AdminRepository(
     suspend fun createCollection(req: CreateCollectionRequest): Int =
         api.createCollection(req).id
 
-    suspend fun createPuzzle(req: CreatePuzzleRequest): String =
-        api.createPuzzle(req).id
+    /**
+     * POST the question, then write it through to Room so local-first reads see it
+     * at once. The server's row is preferred (it carries the gate's stored solution
+     * and the joined type/collection labels); if that read fails, the row is built
+     * from [req] and the cached lookups instead. The cached collection's count is
+     * bumped too. The local write is best-effort: the server already has the
+     * puzzle, so a failure here never fails the create — the next sync fills it in.
+     */
+    suspend fun createPuzzle(req: CreatePuzzleRequest): String {
+        val id = api.createPuzzle(req).id
+        runCatching { writeThrough(id, req) }
+        return id
+    }
+
+    private suspend fun writeThrough(id: String, req: CreatePuzzleRequest) {
+        val entity = runCatching {
+            api.getPuzzle(id).puzzle.toEntity(json, updatedAt = null, deletedAt = null)
+        }.getOrElse {
+            req.toLocalEntity(
+                id = id,
+                json = json,
+                type = db.puzzleTypeDao().getAll().firstOrNull { it.id == req.puzzleType },
+                collection = req.srcCollection?.let { cid ->
+                    db.collectionDao().getAll().firstOrNull { it.id == cid }
+                },
+            )
+        }
+        db.puzzleDao().upsert(entity)
+        val collectionId = req.srcCollection ?: DEFAULT_COLLECTION_ID
+        db.collectionDao().getAll().firstOrNull { it.id == collectionId }?.let {
+            db.collectionDao().upsertAll(listOf(it.copy(puzzleCount = it.puzzleCount + 1)))
+        }
+    }
 
     /**
      * Downscale + base64-encode [uri] off the main thread, POST it to the parser
