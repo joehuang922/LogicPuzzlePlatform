@@ -23,3 +23,14 @@ This is a solo project. Do not create pull requests or feature branches.
   one, make its engine implement `ShadeMarkEngine` (`puzzle/ShadeCycle.kt`) —
   override `shadeGroup` when a tap covers a room or some cells take no input — and
   wire its board's `onTapCell` to `vm::tapShadeCell`. Don't hand-roll a cycle.
+
+# Authoring room-based puzzles
+
+- A room-based editor (web or Android admin) may hold layouts that aren't valid
+  rooms mid-edit — an L-shaped room, a half-drawn wall, two clues in one room.
+  Edit walls freely; never refuse or silently "fix" an edit because of the shape
+  it leaves. List these format problems and mark them on the board.
+- Format problems are a hard block on creating or saving the question: no
+  "Create anyway". The API enforces it too, in `semanticChecks`
+  (`player/api/src/lib/schema.ts`). Misread warnings (a clue too big for its
+  room) stay overridable.

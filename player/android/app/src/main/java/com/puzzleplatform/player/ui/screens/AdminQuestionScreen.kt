@@ -134,6 +134,7 @@ fun AdminQuestionScreen(
             onEditYajilin = { vm.editYajilin(reviewItem.id, it) },
             onOverrideGate = { vm.overrideGate(reviewItem.id) },
             canCreateAnyway = state.canCreateAnyway(reviewItem),
+            hasFormatProblems = reviewItem.formatProblems(state.type).isNotEmpty(),
             onCreateAnyway = { vm.createAnyway(reviewItem.id) },
             overrideEnabled = !state.creating,
         )
@@ -472,6 +473,7 @@ private fun ReviewScreen(
     onEditYajilin: ((YajilinDraft) -> YajilinDraft) -> Unit,
     onOverrideGate: () -> Unit,
     canCreateAnyway: Boolean,
+    hasFormatProblems: Boolean,
     onCreateAnyway: () -> Unit,
     overrideEnabled: Boolean,
 ) {
@@ -624,8 +626,14 @@ private fun ReviewScreen(
                 }
             }
             // "Create all valid" skips a red tile; if its problems are a false alarm, the
-            // admin can send this one on purpose.
-            if (canCreateAnyway) {
+            // admin can send this one on purpose. Format problems can't be overridden.
+            if (hasFormatProblems) {
+                Text(
+                    "This grid can't be created until its format problems above are fixed.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            } else if (canCreateAnyway) {
                 Text(
                     "Create all valid skips this tile because of the problems above.",
                     style = MaterialTheme.typography.bodySmall,

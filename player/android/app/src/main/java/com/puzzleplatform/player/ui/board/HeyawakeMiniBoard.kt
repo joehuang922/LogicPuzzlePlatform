@@ -21,8 +21,8 @@ private val MINI_CLUE = Color(0xFF222222)
 private val MINI_PROBLEM = Color(0xFFDD3333)
 
 /**
- * A tiny, non-interactive heyawake preview for an Admin batch tile: the parsed rooms'
- * walls and clues, framed in red when [hasProblems].
+ * A tiny, non-interactive heyawake preview for an Admin batch tile: the draft's walls
+ * and clues, framed in red when [hasProblems].
  */
 @Composable
 fun HeyawakeMiniBoard(
@@ -39,21 +39,20 @@ fun HeyawakeMiniBoard(
         val cell = box / maxOf(rows, cols)
         val left = (box - cell * cols) / 2
         val top = (box - cell * rows) / 2
-        val ids = draft.roomIds()
 
         drawRect(MINI_BG, Offset(left, top), Size(cols * cell, rows * cell))
         val thin = 0.5.dp.toPx()
         val wall = 1.5.dp.toPx()
         for (r in 0..rows) {
             for (c in 0 until cols) {
-                val isWall = r == 0 || r == rows || ids[r - 1][c] != ids[r][c]
+                val isWall = r == 0 || r == rows || draft.hWalls[r - 1][c]
                 val y = top + r * cell
                 drawLine(if (isWall) MINI_WALL else MINI_LINE, Offset(left + c * cell, y), Offset(left + (c + 1) * cell, y), if (isWall) wall else thin)
             }
         }
         for (c in 0..cols) {
             for (r in 0 until rows) {
-                val isWall = c == 0 || c == cols || ids[r][c - 1] != ids[r][c]
+                val isWall = c == 0 || c == cols || draft.vWalls[r][c - 1]
                 val x = left + c * cell
                 drawLine(if (isWall) MINI_WALL else MINI_LINE, Offset(x, top + r * cell), Offset(x, top + (r + 1) * cell), if (isWall) wall else thin)
             }
@@ -66,13 +65,13 @@ fun HeyawakeMiniBoard(
             isAntiAlias = true
         }
         val baseline = -(paint.fontMetrics.ascent + paint.fontMetrics.descent) / 2
-        for (room in draft.rooms) {
-            val clue = room.clue ?: continue
-            if (room.r !in 0 until rows || room.c !in 0 until cols) continue
+        for ((at, clue) in draft.clues) {
+            val (r, c) = at
+            if (r !in 0 until rows || c !in 0 until cols) continue
             drawContext.canvas.nativeCanvas.drawText(
                 clue.toString(),
-                left + (room.c + 0.5f) * cell,
-                top + (room.r + 0.5f) * cell + baseline,
+                left + (c + 0.5f) * cell,
+                top + (r + 0.5f) * cell + baseline,
                 paint,
             )
         }

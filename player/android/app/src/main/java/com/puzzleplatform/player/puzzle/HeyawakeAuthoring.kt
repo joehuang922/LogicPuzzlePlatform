@@ -8,23 +8,89 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
- * The editable layout of a heyawake being authored: a [width] x [height] grid tiled by
- * rectangular [rooms], each with an optional clue (how many of its cells are shaded).
+ * The editable layout of a heyawake being authored, stored as its walls rather than its
+ * rooms so the editor can hold any interim shape: [hWalls] (`height - 1` rows of `width`)
+ * is the wall under each cell, [vWalls] (`height` rows of `width - 1`) the wall to its
+ * right. A room is whatever the walls enclose (see [regions]), and [clues] pins each clue
+ * to a cell, keyed (row, col).
+ *
+ * Mid-edit the rooms may be L-shaped, hold two clues, or have a wall that stops halfway
+ * through them. That is fine here; [HeyawakeAuthoring.formatProblems] lists it and the
+ * question can't be created until it's gone.
  */
 data class HeyawakeDraft(
     val width: Int = 0,
     val height: Int = 0,
-    val rooms: List<Room> = emptyList(),
+    val hWalls: List<List<Boolean>> = emptyList(),
+    val vWalls: List<List<Boolean>> = emptyList(),
+    val clues: Map<Pair<Int, Int>, Int> = emptyMap(),
 ) {
-    /** Index into [rooms] of the room covering (col, row), or null off-grid / uncovered. */
-    fun roomAt(col: Int, row: Int): Int? {
-        if (row !in 0 until height || col !in 0 until width) return null
-        return roomIds()[row][col].takeIf { it >= 0 }
+    /** Region index per cell (rows of columns), numbered in reading order of each region's first cell. */
+    fun regionIds(): Array<IntArray> {
+        val ids = Array(height) { IntArray(width) { -1 } }
+        var next = 0
+        for (r in 0 until height) {
+            for (c in 0 until width) {
+                if (ids[r][c] >= 0) continue
+                val id = next++
+                ids[r][c] = id
+                val stack = ArrayDeque(listOf(r to c))
+                while (stack.isNotEmpty()) {
+                    val (cr, cc) = stack.removeLast()
+                    for (side in WallSide.entries) {
+                        val nr = cr + side.dr
+                        val nc = cc + side.dc
+                        if (nr !in 0 until height || nc !in 0 until width || ids[nr][nc] >= 0) continue
+                        if (wallBetween(cr, cc, side)) continue
+                        ids[nr][nc] = id
+                        stack.addLast(nr to nc)
+                    }
+                }
+            }
+        }
+        return ids
     }
 
-    /** Room index per cell, -1 where no room covers it; a later room wins an overlap. */
-    fun roomIds(): Array<IntArray> =
-        HeyawakeEngine.computeRoomIds(HeyawakeEngine.Board(width, height, rooms))
+    /** The rooms the walls currently enclose, in [regionIds] order. */
+    fun regions(): List<HeyawakeRegion> {
+        val ids = regionIds()
+        val cells = mutableMapOf<Int, MutableList<Pair<Int, Int>>>()
+        for (r in 0 until height) for (c in 0 until width) cells.getOrPut(ids[r][c]) { mutableListOf() } += r to c
+        return cells.keys.sorted().map { id -> HeyawakeRegion(cells.getValue(id), clues) }
+    }
+
+    /** The room covering (col, row), or null off-grid. */
+    fun regionAt(col: Int, row: Int): HeyawakeRegion? {
+        if (row !in 0 until height || col !in 0 until width) return null
+        return regions()[regionIds()[row][col]]
+    }
+
+    /** True when a wall sits on [side] of (row, col); false on the outer border. */
+    fun wallBetween(row: Int, col: Int, side: WallSide): Boolean = when (side) {
+        WallSide.TOP -> row > 0 && hWalls[row - 1][col]
+        WallSide.BOTTOM -> row < height - 1 && hWalls[row][col]
+        WallSide.LEFT -> col > 0 && vWalls[row][col - 1]
+        WallSide.RIGHT -> col < width - 1 && vWalls[row][col]
+    }
+}
+
+/**
+ * One room as the walls enclose it: its [cells] (row, col) in reading order and its
+ * bounding box. Only a [isRectangle] room can go in the canon.
+ */
+class HeyawakeRegion(val cells: List<Pair<Int, Int>>, allClues: Map<Pair<Int, Int>, Int>) {
+    val r: Int = cells.minOf { it.first }
+    val c: Int = cells.minOf { it.second }
+    val w: Int = cells.maxOf { it.second } - c + 1
+    val h: Int = cells.maxOf { it.first } - r + 1
+    val isRectangle: Boolean get() = cells.size == w * h
+
+    /** The clue-bearing cells; more than one is a format problem. */
+    val clueCells: List<Pair<Int, Int>> = cells.filter { it in allClues }
+    val clue: Int? = clueCells.firstOrNull()?.let { allClues[it] }
+
+    /** "R3C5" of the first cell, for messages. */
+    val label: String get() = "R${cells[0].first + 1}C${cells[0].second + 1}"
 }
 
 /** A side of a cell, for wall edits. */
@@ -33,17 +99,15 @@ enum class WallSide(val dc: Int, val dr: Int) { TOP(0, -1), BOTTOM(0, 1), LEFT(-
 /**
  * Pure helpers for authoring a heyawake question in the Admin screen, the analog of
  * frontend/src/components/HeyawakeEditor.tsx. The parser returns the canon
- * `{ width, height, rooms }` directly; the review step fixes mis-read clues, room
- * walls, and phantom/missed lines.
+ * `{ width, height, rooms }`; the review step fixes mis-read clues, room walls, and
+ * phantom/missed lines.
  *
- * Walls are edited a side of a cell at a time. Adding a wall inside a room splits the
- * room along that whole line (so it stays a rectangle); removing the wall between two
- * rooms merges them, allowed only when the union is a rectangle. Every edit rebuilds the
- * rooms from the cell grid, which also heals a parse that left gaps or overlaps.
- *
- * Heyawake has no solver gate, so the server only checks the schema. [problems] catches
- * what can't be right on its face: rooms that don't tile the grid, and a clue too big
- * for its room (shaded cells can't touch, so at most half the cells, rounded up).
+ * Every wall toggles freely, one side of a cell at a time, so the rooms can pass through
+ * shapes the canon can't hold (an L, a half-drawn split line, two clues after a merge).
+ * Those are [formatProblems]: shown while editing, and a hard block on creating the
+ * question, which the server enforces too (rooms must tile the grid). [problems] adds
+ * what is merely implausible — a clue too big for its room — which the admin may
+ * override.
  *
  * Kept free of Android/Compose types so it's unit-testable.
  */
@@ -53,16 +117,53 @@ object HeyawakeAuthoring {
 
     /** Read a parser canon into a draft. */
     fun draftFromCanon(canon: JsonObject): HeyawakeDraft {
-        val board = HeyawakeEngine.parseBoard(previewPuzzle(HeyawakeDraft()).copy(canonRepr = canon))
-        return HeyawakeDraft(board.width, board.height, board.rooms)
+        val board = HeyawakeEngine.parseBoard(
+            Puzzle(
+                id = "admin-heyawake-draft",
+                puzzleType = PUZZLE_TYPE,
+                puzzleTypeName = "heyawake",
+                puzzleTypeJpLabel = "へやわけ",
+                difficulty = 1,
+                width = 0,
+                height = 0,
+                canonRepr = canon,
+            )
+        )
+        return draftFromRooms(board.width, board.height, board.rooms)
     }
 
-    /** The canon `{ width, height, rooms }` to POST; an unclued room sends `clue: null`. */
+    /**
+     * Walls wherever two cells fall in different rooms (a later room wins an overlap, a
+     * cell no room covers counts as its own "room"), and each clue on its room's
+     * top-left cell. A parse that left gaps or overlaps shows up as format problems.
+     */
+    fun draftFromRooms(width: Int, height: Int, rooms: List<Room>): HeyawakeDraft {
+        if (width <= 0 || height <= 0) return HeyawakeDraft()
+        val ids = HeyawakeEngine.computeRoomIds(HeyawakeEngine.Board(width, height, rooms))
+        val clues = mutableMapOf<Pair<Int, Int>, Int>()
+        for (room in rooms) {
+            val clue = room.clue ?: continue
+            if (room.r in 0 until height && room.c in 0 until width) clues[room.r to room.c] = clue
+        }
+        return HeyawakeDraft(
+            width = width,
+            height = height,
+            hWalls = List(height - 1) { r -> List(width) { c -> ids[r][c] != ids[r + 1][c] } },
+            vWalls = List(height) { r -> List(width - 1) { c -> ids[r][c] != ids[r][c + 1] } },
+            clues = clues,
+        )
+    }
+
+    /**
+     * The canon `{ width, height, rooms }` to POST; an unclued room sends `clue: null`.
+     * Only meaningful once [formatProblems] is empty — each room is its region's bounding
+     * box, so an L-shaped region would come out as overlapping rooms.
+     */
     fun canonFromDraft(draft: HeyawakeDraft): JsonObject = JsonObject(
         mapOf(
             "width" to JsonPrimitive(draft.width),
             "height" to JsonPrimitive(draft.height),
-            "rooms" to JsonArray(draft.rooms.map { room ->
+            "rooms" to JsonArray(draft.regions().map { room ->
                 JsonObject(
                     mapOf(
                         "r" to JsonPrimitive(room.r),
@@ -76,28 +177,19 @@ object HeyawakeAuthoring {
         )
     )
 
-    /**
-     * A throwaway puzzle carrying [draft] as its canon, for the review board. Its id
-     * keys the board's zoom, so it changes only with the grid size.
-     */
-    fun previewPuzzle(draft: HeyawakeDraft): Puzzle = Puzzle(
-        id = "admin-heyawake-draft-${draft.height}x${draft.width}",
-        puzzleType = PUZZLE_TYPE,
-        puzzleTypeName = "heyawake",
-        puzzleTypeJpLabel = "へやわけ",
-        difficulty = 1,
-        width = draft.width,
-        height = draft.height,
-        canonRepr = canonFromDraft(draft),
-    )
-
     /** Most shaded cells a [w] x [h] room can hold with no two touching (a checkerboard). */
     fun maxClue(w: Int, h: Int): Int = (w * h + 1) / 2
 
-    /** Set the clue of the room covering (col, row); null clears it. */
+    /**
+     * Set the clue of the room covering (col, row); null clears it. The room ends up with
+     * exactly one clue (or none), on the cell that already held one, else its first cell.
+     */
     fun setClue(draft: HeyawakeDraft, col: Int, row: Int, clue: Int?): HeyawakeDraft {
-        val id = draft.roomAt(col, row) ?: return draft
-        return draft.copy(rooms = draft.rooms.mapIndexed { i, room -> if (i == id) room.copy(clue = clue) else room })
+        val room = draft.regionAt(col, row) ?: return draft
+        val clues = draft.clues - room.cells.toSet()
+        if (clue == null) return draft.copy(clues = clues)
+        val at = room.clueCells.firstOrNull() ?: room.cells.first()
+        return draft.copy(clues = clues + (at to clue))
     }
 
     /** Parse a typed clue: digits only; blank -> null (unclued). */
@@ -105,184 +197,120 @@ object HeyawakeAuthoring {
 
     /** True when a wall separates (col, row) from its neighbour on [side]; false on the outer border. */
     fun hasWall(draft: HeyawakeDraft, col: Int, row: Int, side: WallSide): Boolean {
-        val ids = draft.roomIds()
-        val nc = col + side.dc
-        val nr = row + side.dr
-        if (nr !in 0 until draft.height || nc !in 0 until draft.width) return false
         if (row !in 0 until draft.height || col !in 0 until draft.width) return false
-        return ids[row][col] != ids[nr][nc]
+        return draft.wallBetween(row, col, side)
     }
 
-    /**
-     * Toggle the wall on [side] of (col, row). Adding one splits the room along that
-     * line; removing one merges the two rooms. Returns [draft] unchanged when there's no
-     * neighbour on that side or the merge wouldn't be a rectangle.
-     */
-    fun toggleWall(draft: HeyawakeDraft, col: Int, row: Int, side: WallSide): HeyawakeDraft {
-        val nc = col + side.dc
-        val nr = row + side.dr
-        if (nr !in 0 until draft.height || nc !in 0 until draft.width) return draft
-        if (row !in 0 until draft.height || col !in 0 until draft.width) return draft
-        val ids = draft.roomIds()
-        val a = ids[row][col]
-        val b = ids[nr][nc]
-        return if (a != b) merge(draft, ids, a, b) else split(draft, ids, col, row, side)
-    }
-
-    /** True when [toggleWall] on that side would change something. */
+    /** True when [side] of (col, row) is an interior edge, i.e. a wall can go there. */
     fun canToggleWall(draft: HeyawakeDraft, col: Int, row: Int, side: WallSide): Boolean =
-        toggleWall(draft, col, row, side) != draft
+        row in 0 until draft.height && col in 0 until draft.width &&
+            row + side.dr in 0 until draft.height && col + side.dc in 0 until draft.width
 
-    private fun merge(draft: HeyawakeDraft, ids: Array<IntArray>, a: Int, b: Int): HeyawakeDraft {
-        if (!unionIsRectangle(ids, a, b)) return draft
-        val merged = Array(draft.height) { r -> IntArray(draft.width) { c -> if (ids[r][c] == b) a else ids[r][c] } }
-        val clues = cluesByTopLeft(draft).toMutableMap()
-        // The merged room keeps whichever clue the two had (the top-left one's first).
-        val roomA = draft.rooms.getOrNull(a)
-        val roomB = draft.rooms.getOrNull(b)
-        val keep = listOf(roomA, roomB).filterNotNull().sortedWith(compareBy({ it.r }, { it.c }))
-            .firstNotNullOfOrNull { it.clue }
-        val topLeft = listOfNotNull(roomA, roomB).minWithOrNull(compareBy({ it.r }, { it.c }))
-        if (topLeft != null) clues[topLeft.r to topLeft.c] = keep
-        return rebuild(draft, merged, clues)
-    }
-
-    /** True when the cells of rooms [a] and [b] together fill their bounding box. */
-    private fun unionIsRectangle(ids: Array<IntArray>, a: Int, b: Int): Boolean {
-        var minR = Int.MAX_VALUE; var maxR = -1; var minC = Int.MAX_VALUE; var maxC = -1; var count = 0
-        for (r in ids.indices) for (c in ids[r].indices) {
-            if (ids[r][c] != a && ids[r][c] != b) continue
-            count++
-            minR = minOf(minR, r); maxR = maxOf(maxR, r)
-            minC = minOf(minC, c); maxC = maxOf(maxC, c)
+    /** Flip the wall on [side] of (col, row). Clues stay on their cells. */
+    fun toggleWall(draft: HeyawakeDraft, col: Int, row: Int, side: WallSide): HeyawakeDraft {
+        if (!canToggleWall(draft, col, row, side)) return draft
+        return when (side) {
+            WallSide.TOP -> draft.copy(hWalls = draft.hWalls.flip(row - 1, col))
+            WallSide.BOTTOM -> draft.copy(hWalls = draft.hWalls.flip(row, col))
+            WallSide.LEFT -> draft.copy(vWalls = draft.vWalls.flip(row, col - 1))
+            WallSide.RIGHT -> draft.copy(vWalls = draft.vWalls.flip(row, col))
         }
-        return count > 0 && count == (maxR - minR + 1) * (maxC - minC + 1)
     }
 
-    private fun split(draft: HeyawakeDraft, ids: Array<IntArray>, col: Int, row: Int, side: WallSide): HeyawakeDraft {
-        val id = ids[row][col]
-        val fresh = (ids.maxOfOrNull { it.maxOrNull() ?: -1 } ?: -1) + 1
-        val next = Array(draft.height) { r -> ids[r].copyOf() }
-        for (r in 0 until draft.height) {
-            for (c in 0 until draft.width) {
-                if (ids[r][c] != id) continue
-                // The far side of the new line gets a new id; the side holding the room's
-                // top-left keeps the old one (and its clue).
-                val beyond = when (side) {
-                    WallSide.TOP -> r < row
-                    WallSide.BOTTOM -> r > row
-                    WallSide.LEFT -> c < col
-                    WallSide.RIGHT -> c > col
-                }
-                val farHalfHoldsTopLeft = side == WallSide.TOP || side == WallSide.LEFT
-                if (beyond != farHalfHoldsTopLeft) next[r][c] = fresh
-            }
-        }
-        return rebuild(draft, next, cluesByTopLeft(draft))
-    }
-
-    /**
-     * Turn a cell -> id grid into rectangular rooms, in reading order of their top-left
-     * cells, each taking the clue keyed at its top-left. Same-id cells are cut greedily
-     * into rectangles (widest run from the top-left, then as many rows as fit), so a
-     * rectangular region stays one room and anything else — the uncovered gaps or the
-     * overlap-notched rooms a bad parse leaves — is tiled rather than rejected. Refusing
-     * those used to make every wall edit a no-op until the grid was clean.
-     */
-    private fun rebuild(
-        draft: HeyawakeDraft,
-        ids: Array<IntArray>,
-        clues: Map<Pair<Int, Int>, Int?>,
-    ): HeyawakeDraft {
-        val taken = Array(draft.height) { BooleanArray(draft.width) }
-        fun free(r: Int, c: Int, id: Int) = !taken[r][c] && ids[r][c] == id
-        val rooms = mutableListOf<Room>()
-        for (r in 0 until draft.height) {
-            for (c in 0 until draft.width) {
-                if (taken[r][c]) continue
-                val id = ids[r][c]
-                var w = 1
-                while (c + w < draft.width && free(r, c + w, id)) w++
-                var h = 1
-                while (r + h < draft.height && (c until c + w).all { free(r + h, it, id) }) h++
-                for (rr in r until r + h) for (cc in c until c + w) taken[rr][cc] = true
-                rooms += Room(r, c, w, h, clues[r to c])
-            }
-        }
-        return draft.copy(rooms = rooms)
-    }
-
-    private fun cluesByTopLeft(draft: HeyawakeDraft): Map<Pair<Int, Int>, Int?> =
-        draft.rooms.associate { (it.r to it.c) to it.clue }
+    private fun List<List<Boolean>>.flip(r: Int, c: Int) =
+        mapIndexed { i, line -> if (i == r) line.mapIndexed { j, v -> if (j == c) !v else v } else line }
 
     /** Append a row at the bottom as one unclued room — the fix for a row the parser missed. */
-    fun addRow(draft: HeyawakeDraft): HeyawakeDraft =
-        draft.copy(height = draft.height + 1, rooms = draft.rooms + Room(draft.height, 0, draft.width, 1, null))
+    fun addRow(draft: HeyawakeDraft): HeyawakeDraft {
+        if (draft.width <= 0 || draft.height <= 0) return draft
+        return draft.copy(
+            height = draft.height + 1,
+            hWalls = draft.hWalls + listOf(List(draft.width) { true }),
+            vWalls = draft.vWalls + listOf(List(draft.width - 1) { false }),
+        )
+    }
 
     /** Append a column at the right as one unclued room. */
-    fun addCol(draft: HeyawakeDraft): HeyawakeDraft =
-        draft.copy(width = draft.width + 1, rooms = draft.rooms + Room(0, draft.width, 1, draft.height, null))
+    fun addCol(draft: HeyawakeDraft): HeyawakeDraft = transpose(addRow(transpose(draft)))
 
     /**
-     * Drop row [row] — the fix for a parser's phantom line. Rooms crossing it lose a row,
-     * rooms only in it disappear, rooms below move up. Keeps at least one row.
+     * Drop row [row] — the fix for a parser's phantom line. The cells above and below it
+     * meet with a wall where either of its two lines had one, so a room crossing it just
+     * loses a row and a room only in it disappears. A clue in the row moves into the rest
+     * of its room when there is any. Keeps at least one row.
      */
     fun removeRow(draft: HeyawakeDraft, row: Int): HeyawakeDraft {
         if (draft.height <= 1 || row !in 0 until draft.height) return draft
-        val rooms = draft.rooms.mapNotNull { room ->
-            when {
-                row in room.r until room.r + room.h -> room.copy(h = room.h - 1).takeIf { it.h > 0 }
-                room.r > row -> room.copy(r = room.r - 1)
-                else -> room
-            }
+        val h = draft.hWalls
+        val hWalls = when (row) {
+            0 -> h.drop(1)
+            draft.height - 1 -> h.dropLast(1)
+            else -> h.take(row - 1) + listOf(h[row - 1].zip(h[row]) { a, b -> a || b }) + h.drop(row + 1)
         }
-        return draft.copy(height = draft.height - 1, rooms = rooms)
+        val clues = mutableMapOf<Pair<Int, Int>, Int>()
+        for ((cell, clue) in draft.clues) {
+            val (r, c) = cell
+            val moved = when {
+                r != row -> cell
+                r + 1 < draft.height && !draft.wallBetween(r, c, WallSide.BOTTOM) -> r + 1 to c
+                r > 0 && !draft.wallBetween(r, c, WallSide.TOP) -> r - 1 to c
+                else -> continue
+            }
+            val shifted = if (moved.first > row) moved.first - 1 to moved.second else moved
+            clues.putIfAbsent(shifted, clue)
+        }
+        return draft.copy(
+            height = draft.height - 1,
+            hWalls = hWalls,
+            vWalls = draft.vWalls.filterIndexed { i, _ -> i != row },
+            clues = clues,
+        )
     }
 
-    fun removeCol(draft: HeyawakeDraft, col: Int): HeyawakeDraft {
-        if (draft.width <= 1 || col !in 0 until draft.width) return draft
-        val rooms = draft.rooms.mapNotNull { room ->
-            when {
-                col in room.c until room.c + room.w -> room.copy(w = room.w - 1).takeIf { it.w > 0 }
-                room.c > col -> room.copy(c = room.c - 1)
-                else -> room
-            }
-        }
-        return draft.copy(width = draft.width - 1, rooms = rooms)
-    }
+    fun removeCol(draft: HeyawakeDraft, col: Int): HeyawakeDraft = transpose(removeRow(transpose(draft), col))
 
-    /** Blocking issues; empty when clean. Positions are 1-based "R3C5". */
-    fun problems(draft: HeyawakeDraft): List<String> = buildList {
+    /** The same draft with rows and columns swapped, so column edits can reuse the row ones. */
+    private fun transpose(draft: HeyawakeDraft): HeyawakeDraft = if (draft.width <= 0 || draft.height <= 0) draft else HeyawakeDraft(
+        width = draft.height,
+        height = draft.width,
+        hWalls = List(draft.width - 1) { c -> List(draft.height) { r -> draft.vWalls[r][c] } },
+        vWalls = List(draft.width) { c -> List(draft.height - 1) { r -> draft.hWalls[r][c] } },
+        clues = draft.clues.mapKeys { (cell, _) -> cell.second to cell.first },
+    )
+
+    /**
+     * What keeps the draft from being a heyawake canon at all: rooms that aren't
+     * rectangles, rooms with more than one clue, and walls that end inside a room
+     * (the canon has no way to say them). Empty when the walls tile the grid into
+     * rectangles. Creating the question is refused while any remain.
+     */
+    fun formatProblems(draft: HeyawakeDraft): List<String> = buildList {
         if (draft.width <= 0 || draft.height <= 0) {
             add("No cells")
             return@buildList
         }
-        if (draft.rooms.isEmpty()) {
-            add("No rooms")
-            return@buildList
-        }
-        val cover = Array(draft.height) { IntArray(draft.width) }
-        for (room in draft.rooms) {
-            if (room.r < 0 || room.c < 0 || room.r + room.h > draft.height || room.c + room.w > draft.width) {
-                add("Room at R${room.r + 1}C${room.c + 1} runs off the grid")
-            }
-            for (r in room.r until room.r + room.h) {
-                for (c in room.c until room.c + room.w) {
-                    if (r in 0 until draft.height && c in 0 until draft.width) cover[r][c]++
-                }
-            }
-            val clue = room.clue
-            if (clue != null) {
-                val max = maxClue(room.w, room.h)
-                if (clue > max) add("Room at R${room.r + 1}C${room.c + 1}: clue $clue can't fit in ${room.w}×${room.h} (at most $max)")
+        val ids = draft.regionIds()
+        val innerWall = mutableSetOf<Int>()
+        for (r in 0 until draft.height) {
+            for (c in 0 until draft.width) {
+                if (r + 1 < draft.height && draft.hWalls[r][c] && ids[r][c] == ids[r + 1][c]) innerWall += ids[r][c]
+                if (c + 1 < draft.width && draft.vWalls[r][c] && ids[r][c] == ids[r][c + 1]) innerWall += ids[r][c]
             }
         }
-        firstCell(cover) { it == 0 }?.let { (r, c) -> add("R${r + 1}C${c + 1} is in no room") }
-        firstCell(cover) { it > 1 }?.let { (r, c) -> add("Rooms overlap at R${r + 1}C${c + 1}") }
+        draft.regions().forEachIndexed { id, room ->
+            if (!room.isRectangle) add("Room at ${room.label} isn't a rectangle")
+            if (room.clueCells.size > 1) add("Room at ${room.label} has ${room.clueCells.size} clues")
+            if (id in innerWall) add("Room at ${room.label} has a wall that doesn't close off a room")
+        }
     }
 
-    private fun firstCell(grid: Array<IntArray>, pred: (Int) -> Boolean): Pair<Int, Int>? {
-        for (r in grid.indices) for (c in grid[r].indices) if (pred(grid[r][c])) return r to c
-        return null
+    /** Every issue: the [formatProblems], then clues too big for their room. Empty when clean. */
+    fun problems(draft: HeyawakeDraft): List<String> = formatProblems(draft) + buildList {
+        for (room in draft.regions()) {
+            val clue = room.clue ?: continue
+            if (!room.isRectangle) continue
+            val max = maxClue(room.w, room.h)
+            if (clue > max) add("Room at ${room.label}: clue $clue can't fit in ${room.w}×${room.h} (at most $max)")
+        }
     }
 }

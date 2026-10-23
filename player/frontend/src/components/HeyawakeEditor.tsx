@@ -10,6 +10,30 @@ const CELL_SIZE = 36;
 const PAD = 12;
 const EDGE_HIT = 10;
 
+// The editor works on walls, not rooms, so a layout can pass through shapes the canon
+// can't hold (an L-shaped room, a half-drawn split, two clues after a merge). Rooms are
+// whatever the walls enclose; such format problems are listed and tinted, and the
+// server refuses to store a canon whose rooms don't tile the grid.
+interface Layout {
+  width: number;
+  height: number;
+  // hWall[r][c]: wall under (r,c); (height-1) x width.
+  hWall: boolean[][];
+  // vWall[r][c]: wall right of (r,c); height x (width-1).
+  vWall: boolean[][];
+  // Clue per cell, keyed "r,c".
+  clues: Record<string, number>;
+}
+
+interface Region {
+  cells: [number, number][]; // reading order
+  r: number;
+  c: number;
+  w: number;
+  h: number;
+  clueCells: string[];
+}
+
 function parseCanon(json: string): HeyawakeCanon | null {
   try {
     const parsed = JSON.parse(json);
@@ -25,216 +49,236 @@ function parseCanon(json: string): HeyawakeCanon | null {
 }
 
 // One room covering the whole grid.
-function makeEmptyCanon(width: number, height: number): HeyawakeCanon {
-  return { width, height, rooms: [{ r: 0, c: 0, w: width, h: height, clue: null }] };
+function makeEmptyLayout(width: number, height: number): Layout {
+  return {
+    width,
+    height,
+    hWall: Array.from({ length: height - 1 }, () => Array(width).fill(false)),
+    vWall: Array.from({ length: height }, () => Array(width - 1).fill(false)),
+    clues: {},
+  };
 }
 
-function computeRoomIds(canon: HeyawakeCanon): number[][] {
-  const ids = Array.from({ length: canon.height }, () =>
-    Array(canon.width).fill(-1)
-  );
+// Walls wherever two cells fall in different rooms (a later room wins an overlap; cells
+// no room covers group together), each clue on its room's top-left cell.
+function layoutFromCanon(canon: HeyawakeCanon): Layout {
+  const { width, height } = canon;
+  const ids = Array.from({ length: height }, () => Array(width).fill(-1));
   canon.rooms.forEach((room, id) => {
     for (let r = room.r; r < room.r + room.h; r++) {
       for (let c = room.c; c < room.c + room.w; c++) {
-        if (r >= 0 && r < canon.height && c >= 0 && c < canon.width) ids[r][c] = id;
+        if (r >= 0 && r < height && c >= 0 && c < width) ids[r][c] = id;
       }
     }
   });
-  return ids;
+  const clues: Record<string, number> = {};
+  for (const room of canon.rooms) {
+    if (room.clue === null || room.clue === undefined) continue;
+    if (room.r >= 0 && room.r < height && room.c >= 0 && room.c < width) clues[`${room.r},${room.c}`] = room.clue;
+  }
+  return {
+    width,
+    height,
+    hWall: Array.from({ length: height - 1 }, (_, r) => Array.from({ length: width }, (_, c) => ids[r][c] !== ids[r + 1][c])),
+    vWall: Array.from({ length: height }, (_, r) => Array.from({ length: width - 1 }, (_, c) => ids[r][c] !== ids[r][c + 1])),
+    clues,
+  };
 }
 
-// Flood-fill cells into components across edges without a wall, then fit each
-// component to its bounding-box rectangle. Returns null if any component is
-// not a perfect rectangle (partition rejected).
-function partitionToRooms(
-  rows: number,
-  cols: number,
-  hWall: boolean[][],
-  vWall: boolean[][],
-  clueAtCell: Map<string, number>
-): HeyawakeRoom[] | null {
-  const comp = Array.from({ length: rows }, () => Array(cols).fill(-1));
-  let next = 0;
-  const rooms: HeyawakeRoom[] = [];
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      if (comp[r][c] >= 0) continue;
-      const id = next++;
-      const cells: [number, number][] = [[r, c]];
-      comp[r][c] = id;
-      let minR = r, maxR = r, minC = c, maxC = c;
-      let count = 0;
+// Flood-fill cells into regions across edges without a wall, numbered in reading order.
+function analyze(layout: Layout) {
+  const { width, height, hWall, vWall, clues } = layout;
+  const ids = Array.from({ length: height }, () => Array<number>(width).fill(-1));
+  const regions: Region[] = [];
+  for (let r = 0; r < height; r++) {
+    for (let c = 0; c < width; c++) {
+      if (ids[r][c] >= 0) continue;
+      const id = regions.length;
+      ids[r][c] = id;
+      const cells: [number, number][] = [];
       const stack: [number, number][] = [[r, c]];
       while (stack.length) {
         const [cr, cc] = stack.pop()!;
-        count++;
-        minR = Math.min(minR, cr); maxR = Math.max(maxR, cr);
-        minC = Math.min(minC, cc); maxC = Math.max(maxC, cc);
-        // up
-        if (cr > 0 && comp[cr - 1][cc] < 0 && !hWall[cr - 1][cc]) {
-          comp[cr - 1][cc] = id; stack.push([cr - 1, cc]); cells.push([cr - 1, cc]);
-        }
-        if (cr < rows - 1 && comp[cr + 1][cc] < 0 && !hWall[cr][cc]) {
-          comp[cr + 1][cc] = id; stack.push([cr + 1, cc]); cells.push([cr + 1, cc]);
-        }
-        if (cc > 0 && comp[cr][cc - 1] < 0 && !vWall[cr][cc - 1]) {
-          comp[cr][cc - 1] = id; stack.push([cr, cc - 1]); cells.push([cr, cc - 1]);
-        }
-        if (cc < cols - 1 && comp[cr][cc + 1] < 0 && !vWall[cr][cc]) {
-          comp[cr][cc + 1] = id; stack.push([cr, cc + 1]); cells.push([cr, cc + 1]);
-        }
+        cells.push([cr, cc]);
+        const visit = (nr: number, nc: number, open: boolean) => {
+          if (open && ids[nr][nc] < 0) { ids[nr][nc] = id; stack.push([nr, nc]); }
+        };
+        if (cr > 0) visit(cr - 1, cc, !hWall[cr - 1][cc]);
+        if (cr < height - 1) visit(cr + 1, cc, !hWall[cr][cc]);
+        if (cc > 0) visit(cr, cc - 1, !vWall[cr][cc - 1]);
+        if (cc < width - 1) visit(cr, cc + 1, !vWall[cr][cc]);
       }
-      const w = maxC - minC + 1;
-      const h = maxR - minR + 1;
-      // Reject non-rectangular components.
-      if (count !== w * h) return null;
-      const clue = clueAtCell.get(`${minR},${minC}`);
-      rooms.push({ r: minR, c: minC, w, h, clue: clue ?? null });
+      cells.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+      const rs = cells.map((x) => x[0]);
+      const cs = cells.map((x) => x[1]);
+      const minR = Math.min(...rs), minC = Math.min(...cs);
+      regions.push({
+        cells,
+        r: minR,
+        c: minC,
+        w: Math.max(...cs) - minC + 1,
+        h: Math.max(...rs) - minR + 1,
+        clueCells: cells.map(([cr, cc]) => `${cr},${cc}`).filter((k) => k in clues),
+      });
     }
   }
-  return rooms;
+
+  // A wall with the same region on both sides closes nothing off.
+  const dangling = new Set<number>();
+  for (let r = 0; r < height; r++) {
+    for (let c = 0; c < width; c++) {
+      if (r < height - 1 && hWall[r][c] && ids[r][c] === ids[r + 1][c]) dangling.add(ids[r][c]);
+      if (c < width - 1 && vWall[r][c] && ids[r][c] === ids[r][c + 1]) dangling.add(ids[r][c]);
+    }
+  }
+
+  const problems: string[] = [];
+  const bad = new Set<number>();
+  regions.forEach((room, id) => {
+    const at = `R${room.cells[0][0] + 1}C${room.cells[0][1] + 1}`;
+    if (room.cells.length !== room.w * room.h) { problems.push(`Room at ${at} isn't a rectangle`); bad.add(id); }
+    if (room.clueCells.length > 1) { problems.push(`Room at ${at} has ${room.clueCells.length} clues`); bad.add(id); }
+    if (dangling.has(id)) { problems.push(`Room at ${at} has a wall that doesn't close off a room`); bad.add(id); }
+  });
+  return { ids, regions, bad, problems };
+}
+
+// Each room as its region's bounding box. Only right when there are no problems: an
+// L-shaped region comes out as overlapping rooms, which the server rejects.
+function canonFromLayout(layout: Layout, regions: Region[]): HeyawakeCanon {
+  const rooms: HeyawakeRoom[] = regions.map((room) => ({
+    r: room.r,
+    c: room.c,
+    w: room.w,
+    h: room.h,
+    clue: room.clueCells.length ? layout.clues[room.clueCells[0]] : null,
+  }));
+  return { width: layout.width, height: layout.height, rooms };
 }
 
 export default function HeyawakeEditor({
   initialJson,
   onChange,
 }: HeyawakeEditorProps) {
+  // The raw text only matters while it doesn't parse (the fallback textarea).
   const [jsonText, setJsonText] = useState(initialJson);
-  const canon = useMemo(() => parseCanon(jsonText), [jsonText]);
+  const [layout, setLayout] = useState<Layout | null>(() => {
+    const canon = parseCanon(initialJson);
+    return canon ? layoutFromCanon(canon) : null;
+  });
+  const analysis = useMemo(() => (layout ? analyze(layout) : null), [layout]);
 
   useEffect(() => {
-    onChange(jsonText);
-  }, [jsonText, onChange]);
-
-  const width = canon ? canon.width : 0;
-  const height = canon ? canon.height : 0;
-  const roomIds = useMemo(() => (canon ? computeRoomIds(canon) : []), [canon]);
-
-  const updateJson = useCallback((c: HeyawakeCanon) => {
-    setJsonText(JSON.stringify(c, null, 2));
-  }, []);
-
-  // Clue map keyed by "r,c" of each room's top-left cell.
-  const clueByTopLeft = useMemo(() => {
-    const m = new Map<string, number>();
-    if (canon) {
-      for (const room of canon.rooms) {
-        if (room.clue !== null && room.clue !== undefined) {
-          m.set(`${room.r},${room.c}`, room.clue);
-        }
-      }
-    }
-    return m;
-  }, [canon]);
+    if (layout && analysis) onChange(JSON.stringify(canonFromLayout(layout, analysis.regions), null, 2));
+    else onChange(jsonText);
+  }, [layout, analysis, jsonText, onChange]);
 
   // Cycle the clue of the room containing (r,c): none -> 0 -> 1 -> ... -> area -> none.
+  // The room keeps one clue, on the cell that held one, else its first cell.
   const cycleClue = useCallback(
     (r: number, c: number) => {
-      if (!canon) return;
-      const rid = roomIds[r][c];
-      if (rid < 0) return;
-      const rooms = canon.rooms.map((room) => ({ ...room }));
-      const room = rooms[rid];
-      const area = room.w * room.h;
-      const cur = room.clue ?? null;
-      let nextClue: number | null;
-      if (cur === null) nextClue = 0;
-      else if (cur >= area) nextClue = null;
-      else nextClue = cur + 1;
-      room.clue = nextClue;
-      updateJson({ width, height, rooms });
+      if (!layout || !analysis) return;
+      const room = analysis.regions[analysis.ids[r][c]];
+      const cur = room.clueCells.length ? layout.clues[room.clueCells[0]] : null;
+      const area = room.cells.length;
+      const next = cur === null ? 0 : cur >= area ? null : cur + 1;
+      const clues = { ...layout.clues };
+      for (const k of room.clueCells) delete clues[k];
+      if (next !== null) clues[room.clueCells[0] ?? `${room.cells[0][0]},${room.cells[0][1]}`] = next;
+      setLayout({ ...layout, clues });
     },
-    [canon, roomIds, width, height, updateJson]
+    [layout, analysis]
   );
 
-  // Toggle a wall and re-partition into rectangles; ignore if result is
-  // non-rectangular.
+  // Flip one wall segment; any interim shape is allowed.
   const toggleWall = useCallback(
     (kind: "h" | "v", r: number, c: number) => {
-      if (!canon) return;
-      const hWall = Array.from({ length: height - 1 }, (_, rr) =>
-        Array.from({ length: width }, (_, cc) => roomIds[rr][cc] !== roomIds[rr + 1][cc])
-      );
-      const vWall = Array.from({ length: height }, (_, rr) =>
-        Array.from({ length: width - 1 }, (_, cc) => roomIds[rr][cc] !== roomIds[rr][cc + 1])
-      );
-      if (kind === "h") hWall[r][c] = !hWall[r][c];
-      else vWall[r][c] = !vWall[r][c];
-      const rooms = partitionToRooms(height, width, hWall, vWall, clueByTopLeft);
-      if (!rooms) return; // non-rectangular partition rejected
-      updateJson({ width, height, rooms });
+      if (!layout) return;
+      const flip = (grid: boolean[][]) => grid.map((row, rr) => (rr === r ? row.map((v, cc) => (cc === c ? !v : v)) : row));
+      setLayout(kind === "h" ? { ...layout, hWall: flip(layout.hWall) } : { ...layout, vWall: flip(layout.vWall) });
     },
-    [canon, roomIds, width, height, clueByTopLeft, updateJson]
+    [layout]
   );
 
   function handleResize(newWidth: number, newHeight: number) {
     if (newWidth < 1 || newHeight < 1) return;
-    updateJson(makeEmptyCanon(newWidth, newHeight));
+    setLayout(makeEmptyLayout(newWidth, newHeight));
   }
 
-  if (!canon) {
+  if (!layout || !analysis) {
     return (
       <div style={{ border: "2px solid #c33", borderRadius: 8, padding: "1rem", background: "#fff8f8" }}>
         <p style={{ color: "#c33", margin: "0 0 1rem" }}>
           Invalid heyawake JSON. Fix the textarea below or create a new grid.
         </p>
         <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
-          <button onClick={() => updateJson(makeEmptyCanon(10, 10))}>Create 10x10 grid</button>
+          <button onClick={() => setLayout(makeEmptyLayout(10, 10))}>Create 10x10 grid</button>
         </div>
         <textarea
           style={{ width: "100%", minHeight: 200, fontFamily: "monospace", fontSize: "0.8rem", padding: "0.5rem" }}
           value={jsonText}
-          onChange={(e) => setJsonText(e.target.value)}
+          onChange={(e) => {
+            setJsonText(e.target.value);
+            const canon = parseCanon(e.target.value);
+            if (canon) setLayout(layoutFromCanon(canon));
+          }}
         />
       </div>
     );
   }
 
+  const { width, height, hWall, vWall, clues } = layout;
+  const { ids, bad, problems } = analysis;
   const svgWidth = width * CELL_SIZE + PAD * 2;
   const svgHeight = height * CELL_SIZE + PAD * 2;
 
   const elements: JSX.Element[] = [];
 
-  // Cell backgrounds.
+  // Cell backgrounds; rooms with a format problem tinted red.
   for (let r = 0; r < height; r++) {
     for (let c = 0; c < width; c++) {
       elements.push(
-        <rect key={`bg-${r}-${c}`} x={c * CELL_SIZE} y={r * CELL_SIZE} width={CELL_SIZE} height={CELL_SIZE} fill="#eee" />
+        <rect key={`bg-${r}-${c}`} x={c * CELL_SIZE} y={r * CELL_SIZE} width={CELL_SIZE} height={CELL_SIZE}
+          fill={bad.has(ids[r][c]) ? "#fdd" : "#eee"} />
       );
     }
   }
 
-  // Grid lines: thick at room borders / perimeter, thin otherwise.
+  // Grid lines: thick at walls / perimeter, thin otherwise; a wall inside one room is red.
+  const stroke = (wall: boolean, dangling: boolean) => (dangling ? "#d33" : wall ? "#333" : "#999");
   for (let r = 0; r <= height; r++) {
     for (let c = 0; c < width; c++) {
       const isBorder = r === 0 || r === height;
-      const isThick = isBorder || roomIds[r - 1][c] !== roomIds[r][c];
+      const wall = isBorder || hWall[r - 1][c];
+      const dangling = !isBorder && wall && ids[r - 1][c] === ids[r][c];
       elements.push(
         <line key={`hl-${r}-${c}`} x1={c * CELL_SIZE} y1={r * CELL_SIZE} x2={(c + 1) * CELL_SIZE} y2={r * CELL_SIZE}
-          stroke={isThick ? "#333" : "#999"} strokeWidth={isThick ? 3 : 0.75} />
+          stroke={stroke(wall, dangling)} strokeWidth={wall ? 3 : 0.75} />
       );
     }
   }
   for (let r = 0; r < height; r++) {
     for (let c = 0; c <= width; c++) {
       const isBorder = c === 0 || c === width;
-      const isThick = isBorder || roomIds[r][c - 1] !== roomIds[r][c];
+      const wall = isBorder || vWall[r][c - 1];
+      const dangling = !isBorder && wall && ids[r][c - 1] === ids[r][c];
       elements.push(
         <line key={`vl-${r}-${c}`} x1={c * CELL_SIZE} y1={r * CELL_SIZE} x2={c * CELL_SIZE} y2={(r + 1) * CELL_SIZE}
-          stroke={isThick ? "#333" : "#999"} strokeWidth={isThick ? 3 : 0.75} />
+          stroke={stroke(wall, dangling)} strokeWidth={wall ? 3 : 0.75} />
       );
     }
   }
 
-  // Clue numbers in each room's top-left cell.
-  for (const room of canon.rooms) {
-    if (room.clue === null || room.clue === undefined) continue;
+  // Clue numbers on the cells they're pinned to.
+  for (const [key, clue] of Object.entries(clues)) {
+    const [r, c] = key.split(",").map(Number);
+    if (r >= height || c >= width) continue;
     elements.push(
-      <text key={`clue-${room.r}-${room.c}`}
-        x={room.c * CELL_SIZE + CELL_SIZE / 2} y={room.r * CELL_SIZE + CELL_SIZE / 2}
+      <text key={`clue-${key}`}
+        x={c * CELL_SIZE + CELL_SIZE / 2} y={r * CELL_SIZE + CELL_SIZE / 2}
         textAnchor="middle" dominantBaseline="central" fontSize={CELL_SIZE * 0.5}
         fontFamily="sans-serif" fontWeight="bold" fill="black" pointerEvents="none">
-        {room.clue}
+        {clue}
       </text>
     );
   }
@@ -291,6 +335,15 @@ export default function HeyawakeEditor({
           Click a cell to cycle its room clue; click an edge to toggle a wall (resizing resets rooms).
         </span>
       </div>
+
+      {problems.length > 0 && (
+        <div style={{ color: "#c33", fontSize: "0.8rem", marginBottom: "0.75rem" }}>
+          <strong>Fix before saving — rooms must be rectangles with at most one clue:</strong>
+          <ul style={{ margin: "0.25rem 0 0", paddingLeft: "1.25rem" }}>
+            {problems.map((p) => <li key={p}>{p}</li>)}
+          </ul>
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
         <div style={{ flexShrink: 0 }}>

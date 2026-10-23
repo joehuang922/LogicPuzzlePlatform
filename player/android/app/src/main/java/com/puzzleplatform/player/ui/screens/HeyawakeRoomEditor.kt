@@ -21,16 +21,19 @@ import androidx.compose.ui.unit.dp
 import com.puzzleplatform.player.puzzle.HeyawakeAuthoring
 import com.puzzleplatform.player.puzzle.HeyawakeDraft
 import com.puzzleplatform.player.puzzle.WallSide
-import com.puzzleplatform.player.ui.board.HeyawakeBoard
+import com.puzzleplatform.player.ui.board.HeyawakeDraftBoard
 
 /**
  * Review body for a parsed heyawake, the Android analog of the web HeyawakeEditor: the
- * rooms on the player board (tap a cell to select it), any problems that can't be right,
- * and a panel for the selected cell — type its room's clue (blank for none), toggle the
- * wall on each side (adding one splits the room along that line; removing one merges the
- * two rooms when the result is a rectangle), or delete its row/column (a parser's
- * phantom line). Add row/column append a one-room line for one the parser missed. Every
- * edit goes straight to [onChange]; [selectedCell] is "col,row".
+ * draft's walls on [HeyawakeDraftBoard] (tap a cell to select it), any problems, and a
+ * panel for the selected cell — type its room's clue (blank for none), toggle the wall
+ * on each side, or delete its row/column (a parser's phantom line). Add row/column
+ * append a one-room line for one the parser missed. Every edit goes straight to
+ * [onChange]; [selectedCell] is "col,row".
+ *
+ * Walls toggle one cell side at a time with no checks, so a room can be L-shaped or
+ * half-split on the way to the right layout. Those format problems are listed (and
+ * tinted on the board) and block creating the question until they're fixed.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -43,23 +46,30 @@ fun HeyawakeRoomEditor(
     val selected = selectedCell?.split(",")?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 2 }
     val selCol = selected?.get(0)
     val selRow = selected?.get(1)
-    val roomId = if (selCol != null && selRow != null) draft.roomAt(selCol, selRow) else null
-    val room = roomId?.let { draft.rooms.getOrNull(it) }
+    val room = if (selCol != null && selRow != null) draft.regionAt(selCol, selRow) else null
+    val formatProblems = HeyawakeAuthoring.formatProblems(draft)
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-            "${draft.height} rows × ${draft.width} columns, ${draft.rooms.size} rooms",
+            "${draft.height} rows × ${draft.width} columns, ${draft.regions().size} rooms",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        if (formatProblems.isNotEmpty()) {
+            Text(
+                "Fix before creating — rooms must be rectangles with at most one clue:",
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
         for (problem in HeyawakeAuthoring.problems(draft)) {
             Text(problem, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         }
 
         if (draft.width > 0 && draft.height > 0) {
-            HeyawakeBoard(
-                puzzle = HeyawakeAuthoring.previewPuzzle(draft),
-                userValues = emptyMap(),
+            HeyawakeDraftBoard(
+                draft = draft,
                 onTapCell = { col, row ->
                     val key = "$col,$row"
                     onSelectCell(if (selectedCell == key) null else key)
@@ -78,14 +88,15 @@ fun HeyawakeRoomEditor(
             Text("Row ${selRow + 1}, column ${selCol + 1}", fontWeight = FontWeight.Medium)
             if (room != null) {
                 val max = HeyawakeAuthoring.maxClue(room.w, room.h)
+                val size = if (room.isRectangle) "${room.w}×${room.h}" else "${room.cells.size} cells, not a rectangle"
                 // Re-key per room so each selection starts its field from that room's clue.
-                key(room.r, room.c) {
+                key(room.cells.first()) {
                     ClueNumberField(
-                        label = "Room clue (${room.w}×${room.h}, blank for none)",
+                        label = "Room clue ($size, blank for none)",
                         clue = room.clue,
                         parse = HeyawakeAuthoring::parseClue,
                         onClue = { v -> onChange { HeyawakeAuthoring.setClue(it, selCol, selRow, v) } },
-                        isError = (room.clue ?: 0) > max,
+                        isError = room.clueCells.size > 1 || (room.isRectangle && (room.clue ?: 0) > max),
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }

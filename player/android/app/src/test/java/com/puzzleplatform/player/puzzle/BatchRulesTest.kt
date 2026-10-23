@@ -42,12 +42,18 @@ class BatchRulesTest {
     @Test
     fun `a red tile is skipped by create-all but can be created anyway`() {
         assertFalse(BatchRules.isEligibleToCreate(ItemStatus.PARSED, createdId = null, hasProblems = true))
-        assertTrue(BatchRules.canCreateAnyway(ItemStatus.PARSED, createdId = null, hasProblems = true))
+        assertTrue(BatchRules.canCreateAnyway(ItemStatus.PARSED, null, hasProblems = true, hasFormatProblems = false))
         // A clean tile goes through create-all; there's nothing to override.
-        assertFalse(BatchRules.canCreateAnyway(ItemStatus.PARSED, createdId = null, hasProblems = false))
+        assertFalse(BatchRules.canCreateAnyway(ItemStatus.PARSED, null, hasProblems = false, hasFormatProblems = false))
         // Created or in-flight tiles can't be sent again.
-        assertFalse(BatchRules.canCreateAnyway(ItemStatus.CREATED, createdId = "42", hasProblems = true))
-        assertFalse(BatchRules.canCreateAnyway(ItemStatus.CREATING, createdId = null, hasProblems = true))
+        assertFalse(BatchRules.canCreateAnyway(ItemStatus.CREATED, "42", hasProblems = true, hasFormatProblems = false))
+        assertFalse(BatchRules.canCreateAnyway(ItemStatus.CREATING, null, hasProblems = true, hasFormatProblems = false))
+    }
+
+    @Test
+    fun `a format problem can't be overridden`() {
+        assertFalse(BatchRules.isEligibleToCreate(ItemStatus.PARSED, createdId = null, hasProblems = true))
+        assertFalse(BatchRules.canCreateAnyway(ItemStatus.PARSED, null, hasProblems = true, hasFormatProblems = true))
     }
 
     @Test

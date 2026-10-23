@@ -10,37 +10,45 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Pure logic behind the Admin heyawake flow: parser canon -> editable draft -> canon
- * round-trips, clue edits, wall split/merge, line edits, and the misread checks.
+ * Pure logic behind the Admin heyawake flow: parser canon -> wall draft -> canon
+ * round-trips, clue edits, free wall toggles through interim shapes, line edits, and
+ * the format / misread checks.
  */
 class HeyawakeAuthoringTest {
 
     // 3 wide x 2 tall: a 2x2 room (clue 1) on the left, a 1x2 strip on the right.
-    private val small = HeyawakeDraft(
-        width = 3,
-        height = 2,
-        rooms = listOf(Room(0, 0, 2, 2, 1), Room(0, 2, 1, 2, null)),
+    private val small = HeyawakeAuthoring.draftFromRooms(
+        3, 2, listOf(Room(0, 0, 2, 2, 1), Room(0, 2, 1, 2, null)),
     )
 
     private fun json(s: String): JsonObject = Json.parseToJsonElement(s).jsonObject
+
+    private fun roomsOf(d: HeyawakeDraft): Set<Room> =
+        HeyawakeAuthoring.draftFromCanon(HeyawakeAuthoring.canonFromDraft(d)).regions()
+            .map { Room(it.r, it.c, it.w, it.h, it.clue) }.toSet()
 
     @Test
     fun canonRoundTrips() {
         val canon = HeyawakeAuthoring.canonFromDraft(small)
         assertEquals(small, HeyawakeAuthoring.draftFromCanon(canon))
+        assertEquals(setOf(Room(0, 0, 2, 2, 1), Room(0, 2, 1, 2, null)), roomsOf(small))
     }
 
     @Test
     fun missingClueReadsAsUnclued() {
         val d = HeyawakeAuthoring.draftFromCanon(json("""{"width":1,"height":1,"rooms":[{"r":0,"c":0,"w":1,"h":1}]}"""))
-        assertEquals(listOf(Room(0, 0, 1, 1, null)), d.rooms)
+        assertEquals(emptyMap<Pair<Int, Int>, Int>(), d.clues)
+        assertEquals(1, d.regions().size)
     }
 
     @Test
     fun setClueTargetsTheRoomUnderTheCell() {
         val d = HeyawakeAuthoring.setClue(small, col = 1, row = 1, clue = 2)
-        assertEquals(2, d.rooms[0].clue)
-        assertEquals(null, HeyawakeAuthoring.setClue(d, col = 0, row = 0, clue = null).rooms[0].clue)
+        // The room's existing clue cell keeps the clue.
+        assertEquals(mapOf((0 to 0) to 2), d.clues)
+        assertEquals(emptyMap<Pair<Int, Int>, Int>(), HeyawakeAuthoring.setClue(d, col = 0, row = 0, clue = null).clues)
+        // An unclued room gets it on its first cell.
+        assertEquals(3, HeyawakeAuthoring.setClue(small, col = 2, row = 1, clue = 3).clues[0 to 2])
     }
 
     @Test
@@ -51,61 +59,70 @@ class HeyawakeAuthoringTest {
     }
 
     @Test
-    fun addingAWallSplitsTheRoomAlongTheLine() {
-        // Wall under (0,0) splits the 2x2 room into two 2x1 rooms; the top keeps the clue.
-        val d = HeyawakeAuthoring.toggleWall(small, 0, 0, WallSide.BOTTOM)
-        assertEquals(
-            setOf(Room(0, 0, 2, 1, 1), Room(1, 0, 2, 1, null), Room(0, 2, 1, 2, null)),
-            d.rooms.toSet(),
-        )
-        // The same split from the lower cell's top side.
-        assertEquals(d.rooms.toSet(), HeyawakeAuthoring.toggleWall(small, 1, 1, WallSide.TOP).rooms.toSet())
-        // A vertical split from the right-hand cell's left side.
-        assertEquals(
-            setOf(Room(0, 0, 1, 2, 1), Room(0, 1, 1, 2, null), Room(0, 2, 1, 2, null)),
-            HeyawakeAuthoring.toggleWall(small, 1, 0, WallSide.LEFT).rooms.toSet(),
-        )
+    fun aFullSplitLineMakesTwoRooms() {
+        // Walls under both cells of the 2x2 room split it into two 2x1 rooms; the top one
+        // holds the clue cell.
+        val half = HeyawakeAuthoring.toggleWall(small, 0, 0, WallSide.BOTTOM)
+        val d = HeyawakeAuthoring.toggleWall(half, 1, 1, WallSide.TOP)
+        assertTrue(HeyawakeAuthoring.formatProblems(d).isEmpty())
+        assertEquals(setOf(Room(0, 0, 2, 1, 1), Room(1, 0, 2, 1, null), Room(0, 2, 1, 2, null)), roomsOf(d))
     }
 
     @Test
-    fun removingAWallMergesWhenTheUnionIsARectangle() {
-        val merged = HeyawakeAuthoring.toggleWall(small, 1, 0, WallSide.RIGHT)
-        assertEquals(listOf(Room(0, 0, 3, 2, 1)), merged.rooms)
-
-        // An L-shaped union is refused.
-        val split = HeyawakeAuthoring.toggleWall(small, 0, 0, WallSide.BOTTOM) // 2x1 top, 2x1 bottom, 1x2 right
-        assertFalse(HeyawakeAuthoring.canToggleWall(split, 1, 0, WallSide.RIGHT))
-        assertEquals(split, HeyawakeAuthoring.toggleWall(split, 1, 0, WallSide.RIGHT))
-
-        // Merging an unclued room above into a clued one below keeps the clue.
-        val d = HeyawakeDraft(1, 2, listOf(Room(0, 0, 1, 1, null), Room(1, 0, 1, 1, 1)))
-        assertEquals(listOf(Room(0, 0, 1, 2, 1)), HeyawakeAuthoring.toggleWall(d, 0, 0, WallSide.BOTTOM).rooms)
+    fun aHalfDrawnSplitIsAnInterimFormatProblem() {
+        val half = HeyawakeAuthoring.toggleWall(small, 0, 0, WallSide.BOTTOM)
+        assertEquals(listOf("Room at R1C1 has a wall that doesn't close off a room"), HeyawakeAuthoring.formatProblems(half))
+        // Toggling it back restores the original exactly.
+        assertEquals(small, HeyawakeAuthoring.toggleWall(half, 0, 0, WallSide.BOTTOM))
     }
 
     @Test
-    fun wallEditsWorkOnABoardWithGapsOrOverlaps() {
-        // A parse that left R2C2, R3C2 and R3C3 in no room: an L-shaped gap, which used
-        // to make every wall chip on the board a no-op.
-        val gappy = HeyawakeDraft(
-            3, 3,
-            listOf(Room(0, 0, 3, 1, 1), Room(1, 0, 1, 2, null), Room(1, 2, 1, 1, null)),
-        )
-        assertFalse(HeyawakeAuthoring.problems(gappy).isEmpty())
-        assertTrue(HeyawakeAuthoring.canToggleWall(gappy, 0, 0, WallSide.RIGHT))
-        val split = HeyawakeAuthoring.toggleWall(gappy, 0, 0, WallSide.RIGHT)
-        assertTrue(HeyawakeAuthoring.problems(split).isEmpty())
-        assertEquals(1, split.rooms.first { it.r == 0 && it.c == 0 }.clue)
+    fun removingWallsCanPassThroughAnLShape() {
+        // Split the left room into a top and bottom strip, then remove the wall between
+        // the top strip and the right column: an L, allowed mid-edit but flagged.
+        val split = HeyawakeAuthoring.toggleWall(HeyawakeAuthoring.toggleWall(small, 0, 0, WallSide.BOTTOM), 1, 0, WallSide.BOTTOM)
+        val l = HeyawakeAuthoring.toggleWall(split, 1, 0, WallSide.RIGHT)
+        assertTrue(HeyawakeAuthoring.canToggleWall(split, 1, 0, WallSide.RIGHT))
+        assertTrue(HeyawakeAuthoring.formatProblems(l).contains("Room at R1C1 isn't a rectangle"))
+        // Removing the remaining walls on the right merges everything into one rectangle.
+        val whole = HeyawakeAuthoring.toggleWall(HeyawakeAuthoring.toggleWall(l, 1, 1, WallSide.RIGHT), 0, 0, WallSide.BOTTOM)
+        val done = HeyawakeAuthoring.toggleWall(whole, 1, 0, WallSide.BOTTOM)
+        assertTrue(HeyawakeAuthoring.formatProblems(done).isEmpty())
+        assertEquals(setOf(Room(0, 0, 3, 2, 1)), roomsOf(done))
+    }
 
-        // A 3x3 room with a phantom 1x1 room over its centre: the big room is notched.
-        val notched = HeyawakeDraft(3, 3, listOf(Room(0, 0, 3, 3, 2), Room(1, 1, 1, 1, null)))
-        assertTrue(HeyawakeAuthoring.canToggleWall(notched, 1, 1, WallSide.TOP))
-        assertTrue(HeyawakeAuthoring.problems(HeyawakeAuthoring.toggleWall(notched, 1, 1, WallSide.TOP)).isEmpty())
+    @Test
+    fun mergingTwoCluedRoomsFlagsTheExtraClue() {
+        val d = HeyawakeAuthoring.draftFromRooms(1, 2, listOf(Room(0, 0, 1, 1, 1), Room(1, 0, 1, 1, 0)))
+        val merged = HeyawakeAuthoring.toggleWall(d, 0, 0, WallSide.BOTTOM)
+        assertEquals(listOf("Room at R1C1 has 2 clues"), HeyawakeAuthoring.formatProblems(merged))
+        // Setting the room's clue leaves just one.
+        assertTrue(HeyawakeAuthoring.formatProblems(HeyawakeAuthoring.setClue(merged, 0, 1, 1)).isEmpty())
+    }
+
+    @Test
+    fun aParseWithGapsOrOverlapsLoadsAndIsEditable() {
+        // R2C2, R3C2 and R3C3 in no room: an L-shaped "room" of its own.
+        val gappy = HeyawakeAuthoring.draftFromRooms(
+            3, 3, listOf(Room(0, 0, 3, 1, 1), Room(1, 0, 1, 2, null), Room(1, 2, 1, 1, null)),
+        )
+        assertEquals(listOf("Room at R2C2 isn't a rectangle"), HeyawakeAuthoring.formatProblems(gappy))
+        val fixed = HeyawakeAuthoring.toggleWall(gappy, 1, 1, WallSide.BOTTOM)
+        assertTrue(HeyawakeAuthoring.formatProblems(fixed).isEmpty())
+
+        // A phantom 1x1 room over the centre of a 3x3 room notches it into a ring.
+        val notched = HeyawakeAuthoring.draftFromRooms(3, 3, listOf(Room(0, 0, 3, 3, 2), Room(1, 1, 1, 1, null)))
+        assertEquals(listOf("Room at R1C1 isn't a rectangle"), HeyawakeAuthoring.formatProblems(notched))
+        var healed = notched
+        for (side in WallSide.entries) healed = HeyawakeAuthoring.toggleWall(healed, 1, 1, side)
+        assertEquals(setOf(Room(0, 0, 3, 3, 2)), roomsOf(healed))
     }
 
     @Test
     fun borderSidesCantToggle() {
         assertFalse(HeyawakeAuthoring.canToggleWall(small, 0, 0, WallSide.TOP))
         assertFalse(HeyawakeAuthoring.canToggleWall(small, 2, 1, WallSide.RIGHT))
+        assertEquals(small, HeyawakeAuthoring.toggleWall(small, 0, 0, WallSide.TOP))
     }
 
     @Test
@@ -114,27 +131,26 @@ class HeyawakeAuthoringTest {
         assertEquals(4, grown.width)
         assertEquals(3, grown.height)
         assertTrue(HeyawakeAuthoring.problems(grown).isEmpty())
+        assertEquals(
+            setOf(Room(0, 0, 2, 2, 1), Room(0, 2, 1, 2, null), Room(2, 0, 3, 1, null), Room(0, 3, 1, 3, null)),
+            roomsOf(grown),
+        )
 
-        // Dropping row 0 shrinks both rooms; dropping column 2 then removes the strip.
+        // Dropping row 0 shrinks both rooms (the clue moves down with its room);
+        // dropping column 2 then removes the strip.
         val shrunk = HeyawakeAuthoring.removeCol(HeyawakeAuthoring.removeRow(small, 0), 2)
-        assertEquals(HeyawakeDraft(2, 1, listOf(Room(0, 0, 2, 1, 1))), shrunk)
+        assertEquals(2, shrunk.width)
+        assertEquals(1, shrunk.height)
+        assertEquals(setOf(Room(0, 0, 2, 1, 1)), roomsOf(shrunk))
     }
 
     @Test
     fun problems() {
         assertTrue(HeyawakeAuthoring.problems(small).isEmpty())
         assertEquals(listOf("No cells"), HeyawakeAuthoring.problems(HeyawakeDraft()))
-        assertEquals(
-            listOf("Room at R1C1: clue 3 can't fit in 2×2 (at most 2)"),
-            HeyawakeAuthoring.problems(HeyawakeAuthoring.setClue(small, 0, 0, 3)),
-        )
-        assertEquals(
-            listOf("R1C3 is in no room"),
-            HeyawakeAuthoring.problems(small.copy(rooms = small.rooms.take(1))),
-        )
-        assertEquals(
-            listOf("Room at R1C2 runs off the grid", "Rooms overlap at R1C2"),
-            HeyawakeAuthoring.problems(small.copy(rooms = small.rooms + Room(0, 1, 3, 1, null))),
-        )
+        val tooBig = HeyawakeAuthoring.setClue(small, 0, 0, 3)
+        assertEquals(listOf("Room at R1C1: clue 3 can't fit in 2×2 (at most 2)"), HeyawakeAuthoring.problems(tooBig))
+        // A clue too big is a misread, not a format problem: it may be overridden.
+        assertTrue(HeyawakeAuthoring.formatProblems(tooBig).isEmpty())
     }
 }

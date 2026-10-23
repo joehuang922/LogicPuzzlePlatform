@@ -42,9 +42,9 @@ object BatchRules {
      * A tile the user doesn't want is removed from the batch outright, so there's no
      * "excluded but present" state.
      *
-     * A red tile is held back because not every type has a solver gate behind it
-     * (heyawake only checks the schema), so sending it would store a broken board. The
-     * review screen's "Create anyway" sends one on purpose ([canCreateAnyway]).
+     * A red tile is held back because not every type has a solver gate behind it, so
+     * sending it could store a broken board. The review screen's "Create anyway" sends
+     * one on purpose ([canCreateAnyway]) unless the problem is a format problem.
      *
      * CREATE_FAILED is intentionally *not* eligible on its own — editing the tile
      * (which resets it to PARSED, see [afterEdit]) is what re-arms it, so a press that
@@ -53,9 +53,17 @@ object BatchRules {
     fun isEligibleToCreate(status: ItemStatus, createdId: String?, hasProblems: Boolean): Boolean =
         status == ItemStatus.PARSED && createdId == null && !hasProblems
 
-    /** A red tile that "Create all valid" skips but the admin may still send by hand. */
-    fun canCreateAnyway(status: ItemStatus, createdId: String?, hasProblems: Boolean): Boolean =
-        status == ItemStatus.PARSED && createdId == null && hasProblems
+    /**
+     * A red tile that "Create all valid" skips but the admin may still send by hand —
+     * not when [hasFormatProblems] (the grid can't be expressed as its canon, e.g. a
+     * non-rectangular heyawake room), which only fixing the grid clears.
+     */
+    fun canCreateAnyway(
+        status: ItemStatus,
+        createdId: String?,
+        hasProblems: Boolean,
+        hasFormatProblems: Boolean,
+    ): Boolean = status == ItemStatus.PARSED && createdId == null && hasProblems && !hasFormatProblems
 
     /** A tile's effective difficulty: its own override, else the shared batch default. */
     fun resolveDifficulty(itemDifficulty: Int?, defaultDifficulty: Int): Int =

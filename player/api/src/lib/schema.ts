@@ -104,4 +104,30 @@ const semanticChecks: Record<number, (data: any) => void> = {
       );
     }
   },
+  // Heyawake: the rooms are the board's format, so they must tile the grid exactly —
+  // every cell in exactly one room. Editors may hold interim layouts that don't; this
+  // keeps one from ever being stored.
+  21: (data: { width: number; height: number; rooms: { r: number; c: number; w: number; h: number }[] }) => {
+    const { width, height, rooms } = data;
+    const cover = Array.from({ length: height }, () => Array<number>(width).fill(0));
+    for (const room of rooms) {
+      if (room.r + room.h > height || room.c + room.w > width) {
+        throw new Error(
+          `Invalid heyawake: room at R${room.r + 1}C${room.c + 1} (${room.w}x${room.h}) runs off the ${width}x${height} grid`
+        );
+      }
+      for (let r = room.r; r < room.r + room.h; r++) {
+        for (let c = room.c; c < room.c + room.w; c++) {
+          if (cover[r][c]++ > 0) {
+            throw new Error(`Invalid heyawake: rooms overlap at R${r + 1}C${c + 1}`);
+          }
+        }
+      }
+    }
+    for (let r = 0; r < height; r++) {
+      for (let c = 0; c < width; c++) {
+        if (cover[r][c] === 0) throw new Error(`Invalid heyawake: R${r + 1}C${c + 1} is in no room`);
+      }
+    }
+  },
 };

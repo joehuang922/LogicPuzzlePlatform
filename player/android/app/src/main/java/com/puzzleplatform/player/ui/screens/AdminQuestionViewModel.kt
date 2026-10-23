@@ -82,6 +82,16 @@ fun BatchItem.problems(type: AuthoringType): List<String> = when (type) {
     AuthoringType.YAJILIN -> YajilinAuthoring.problems(yajilin)
 }
 
+/**
+ * The part of [problems] that makes the grid unrepresentable as its type's canon (only
+ * room-based types have any: heyawake rooms that aren't rectangles). Unlike the rest,
+ * these can't be overridden: the tile can't be created until they're fixed.
+ */
+fun BatchItem.formatProblems(type: AuthoringType): List<String> = when (type) {
+    AuthoringType.HEYAWAKE -> HeyawakeAuthoring.formatProblems(heyawake)
+    else -> emptyList()
+}
+
 data class AdminQuestionUiState(
     // What every tile in the batch is parsed and created as.
     val type: AuthoringType = AuthoringType.SUDOKU,
@@ -104,15 +114,21 @@ data class AdminQuestionUiState(
     val eligibleCount: Int
         get() = items.count { isEligible(it) }
 
-    /** Parsed red tiles that "Create all valid" skips (each can be created anyway from its review). */
+    /** Parsed, uncreated red tiles that "Create all valid" skips. */
     val skippedCount: Int
-        get() = items.count { canCreateAnyway(it) }
+        get() = items.count {
+            it.status == ItemStatus.PARSED && it.createdId == null && it.problems(type).isNotEmpty()
+        }
 
     fun isEligible(item: BatchItem): Boolean =
         BatchRules.isEligibleToCreate(item.status, item.createdId, item.problems(type).isNotEmpty())
 
-    fun canCreateAnyway(item: BatchItem): Boolean =
-        BatchRules.canCreateAnyway(item.status, item.createdId, item.problems(type).isNotEmpty())
+    fun canCreateAnyway(item: BatchItem): Boolean = BatchRules.canCreateAnyway(
+        item.status,
+        item.createdId,
+        hasProblems = item.problems(type).isNotEmpty(),
+        hasFormatProblems = item.formatProblems(type).isNotEmpty(),
+    )
 
     val createdCount: Int get() = items.count { it.status == ItemStatus.CREATED }
     val failedCount: Int
@@ -353,8 +369,8 @@ class AdminQuestionViewModel(
 
     /**
      * Create one red tile that "Create all valid" skipped, because the admin judged its
-     * problems a false alarm. The server's checks (and solver gate, where the type has
-     * one) still run.
+     * problems a false alarm. Not offered for format problems. The server's checks (and
+     * solver gate, where the type has one) still run.
      */
     fun createAnyway(itemId: String) {
         val s = _state.value
@@ -393,10 +409,14 @@ class AdminQuestionViewModel(
         }
     }
 
-    /** POST one tile through the gate; it flips to CREATED or CREATE_FAILED. */
+    /**
+     * POST one tile through the gate; it flips to CREATED or CREATE_FAILED. A grid with
+     * format problems is refused here without a request, whatever path got it here.
+     */
     private suspend fun createItem(s: AdminQuestionUiState, item: BatchItem, allowUnverified: Boolean) {
         updateItem(item.id) { it.copy(status = ItemStatus.CREATING, error = null, gateTimedOut = false) }
         try {
+            item.formatProblems(s.type).firstOrNull()?.let { error("Fix the grid first: $it") }
             val (canon, width, height) = when (s.type) {
                 AuthoringType.SUDOKU -> Triple(
                     SudokuAuthoring.canonFromUserValues(item.userValues),
