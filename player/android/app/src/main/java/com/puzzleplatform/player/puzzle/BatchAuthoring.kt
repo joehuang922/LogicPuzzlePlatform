@@ -83,13 +83,18 @@ object BatchRules {
  * The puzzle types the Admin batch flow can author from photos. [puzzleType] is what the
  * parser is asked for and what the created question is stored as.
  */
-enum class AuthoringType(val label: String, val puzzleType: Int) {
-    SUDOKU("Sudoku", SudokuAuthoring.PUZZLE_TYPE),
-    NONOGRAM("Nonogram", NonogramAuthoring.PUZZLE_TYPE),
-    KAKURO("Kakuro", KakuroAuthoring.PUZZLE_TYPE),
-    SLITHERLINK("Slitherlink", SlitherlinkAuthoring.PUZZLE_TYPE),
-    NURIKABE("Nurikabe", NurikabeAuthoring.PUZZLE_TYPE),
-    HEYAWAKE("Heyawake", HeyawakeAuthoring.PUZZLE_TYPE),
-    PICTO_LINK("Picto Link", PictoLinkAuthoring.PUZZLE_TYPE),
-    YAJILIN("Yajilin", YajilinAuthoring.PUZZLE_TYPE),
+/**
+ * [jpLabel] is the type's Japanese name, as the web admin's type dropdown shows it.
+ * Predefined so the dropdown never waits on the network; it must match `jp_label` in
+ * `player/api/seed.sql` (checked by `AuthoringTypeTest`).
+ */
+enum class AuthoringType(val label: String, val jpLabel: String, val puzzleType: Int) {
+    SUDOKU("Sudoku", "数独", SudokuAuthoring.PUZZLE_TYPE),
+    NONOGRAM("Nonogram", "お絵かきロジック", NonogramAuthoring.PUZZLE_TYPE),
+    KAKURO("Kakuro", "カックロ", KakuroAuthoring.PUZZLE_TYPE),
+    SLITHERLINK("Slitherlink", "スリザーリンク", SlitherlinkAuthoring.PUZZLE_TYPE),
+    NURIKABE("Nurikabe", "ぬりかべ", NurikabeAuthoring.PUZZLE_TYPE),
+    HEYAWAKE("Heyawake", "へやわけ", HeyawakeAuthoring.PUZZLE_TYPE),
+    PICTO_LINK("Picto Link", "ピクトリンク", PictoLinkAuthoring.PUZZLE_TYPE),
+    YAJILIN("Yajilin", "ヤジリン", YajilinAuthoring.PUZZLE_TYPE),
 }

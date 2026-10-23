@@ -104,8 +104,6 @@ data class AdminQuestionUiState(
     val defaultDifficulty: Int = 3,
     val collections: List<Collection> = emptyList(),
     val srcCollectionId: Int? = null,
-    // Server puzzle-type id -> Japanese name, as the web admin's type dropdown shows.
-    val typeLabels: Map<Int, String> = emptyMap(),
     // The tile whose review sheet is open, and the selected cell within it.
     val reviewItemId: String? = null,
     val selectedCell: String? = null,
@@ -154,17 +152,6 @@ class AdminQuestionViewModel(
             try {
                 val collections = repo.listCollections()
                 _state.update { it.copy(collections = collections) }
-            } catch (_: Exception) {
-            }
-        }
-        // Japanese names for the type dropdown; silent on failure (falls back to
-        // the English labels).
-        viewModelScope.launch {
-            try {
-                val labels = repo.listPuzzleTypes()
-                    .filter { it.jpLabel.isNotBlank() }
-                    .associate { it.id to it.jpLabel }
-                _state.update { it.copy(typeLabels = labels) }
             } catch (_: Exception) {
             }
         }
