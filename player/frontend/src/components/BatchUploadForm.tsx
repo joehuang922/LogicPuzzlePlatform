@@ -31,6 +31,9 @@ interface BatchItem {
   createdId?: string;
   createError?: string;
   gateTimedOut?: boolean;
+  // The admin overrode that timeout: the next "Create All" sends allowUnverified.
+  // Cleared by a canon edit, so changed clues get checked again.
+  allowUnverified?: boolean;
 }
 
 function computeDimensions(typeId: number, canon: Record<string, unknown>): { w?: number; h?: number } {
@@ -203,6 +206,12 @@ function BatchItemRow({
               style={{ padding: "0.2rem 0.5rem", fontSize: "0.7rem", borderRadius: 3 }}
             />
           )}
+        </div>
+      )}
+
+      {item.allowUnverified && !item.createdId && (
+        <div style={{ marginTop: "0.5rem", marginLeft: 80, color: "#b26a00", fontSize: "0.8rem" }}>
+          Solver check overridden: "Create All" will create it unverified.
         </div>
       )}
 
@@ -456,15 +465,10 @@ export default function BatchUploadForm({
     }
   }
 
-  async function handleOverrideGate(itemId: string) {
-    const item = items.find((i) => i.id === itemId);
-    if (!item || creating) return;
-    setCreating(true);
-    try {
-      await createItem(item, true);
-    } finally {
-      setCreating(false);
-    }
+  // Dismiss a rejection that was only the solver timing out. Nothing is sent: the next
+  // "Create All" POSTs the item with allowUnverified (stored as "unknown", flagged).
+  function handleOverrideGate(itemId: string) {
+    updateItem(itemId, { createError: undefined, gateTimedOut: false, allowUnverified: true, checked: true });
   }
 
   async function handleCreateAll() {
@@ -479,7 +483,7 @@ export default function BatchUploadForm({
     let failed = 0;
 
     for (const item of toCreate) {
-      if (await createItem(item, false)) created++;
+      if (await createItem(item, !!item.allowUnverified)) created++;
       else failed++;
       setCreateProgress({ done: created + failed, total: toCreate.length });
     }
@@ -608,7 +612,7 @@ export default function BatchUploadForm({
                 onTitleChange={(t) => updateItem(item.id, { title: t })}
                 onAuthorChange={(a) => updateItem(item.id, { author: a })}
                 onDifficultyChange={(d) => updateItem(item.id, { difficulty: d })}
-                onCanonChange={(json) => updateItem(item.id, { canonRepr: json })}
+                onCanonChange={(json) => updateItem(item.id, { canonRepr: json, allowUnverified: false })}
                 onToggleEditor={() => updateItem(item.id, { editorOpen: !item.editorOpen })}
               />
             ))}

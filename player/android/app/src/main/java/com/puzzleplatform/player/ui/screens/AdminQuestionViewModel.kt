@@ -66,8 +66,11 @@ data class BatchItem(
     val createdId: String? = null,
     val error: String? = null,
     // The create was rejected only because the solver timed out; the review screen
-    // offers an override (re-POST with allowUnverified).
+    // offers an override.
     val gateTimedOut: Boolean = false,
+    // The admin overrode that timeout: the next create sends allowUnverified (skips the
+    // solver gate). Cleared by a grid edit, so changed clues get checked again.
+    val allowUnverified: Boolean = false,
 )
 
 /**
@@ -319,6 +322,7 @@ class AdminQuestionViewModel(
             transform(it).copy(
                 status = BatchRules.afterEdit(it.status),
                 error = if (it.status == ItemStatus.CREATE_FAILED) null else it.error,
+                allowUnverified = false,
             )
         }
     }
@@ -358,7 +362,7 @@ class AdminQuestionViewModel(
         _state.update { it.copy(creating = true) }
         viewModelScope.launch {
             try {
-                for (item in targets) createItem(s, item, allowUnverified = false)
+                for (item in targets) createItem(s, item, allowUnverified = item.allowUnverified)
             } finally {
                 _state.update { it.copy(creating = false) }
             }
@@ -379,7 +383,7 @@ class AdminQuestionViewModel(
         _state.update { it.copy(creating = true) }
         viewModelScope.launch {
             try {
-                createItem(s, item, allowUnverified = false)
+                createItem(s, item, allowUnverified = item.allowUnverified)
             } finally {
                 _state.update { it.copy(creating = false) }
             }
@@ -387,24 +391,14 @@ class AdminQuestionViewModel(
     }
 
     /**
-     * Re-POST one tile the gate rejected only because the solver timed out, this time
-     * with allowUnverified: the server skips the gate and stores the board as "unknown"
-     * so it stays in the flagged review list.
+     * Dismiss a rejection that was only the solver timing out. Nothing is sent: the tile
+     * goes back to PARSED (eligible again), and "Create all valid" then POSTs it with
+     * allowUnverified, so the server skips the gate and stores it as "unknown" (it stays
+     * in the flagged review list).
      */
-    fun overrideGate(itemId: String) {
-        val s = _state.value
-        if (s.creating) return
-        val item = s.items.firstOrNull { it.id == itemId } ?: return
-        if (item.status != ItemStatus.CREATE_FAILED || !item.gateTimedOut) return
-
-        _state.update { it.copy(creating = true) }
-        viewModelScope.launch {
-            try {
-                createItem(s, item, allowUnverified = true)
-            } finally {
-                _state.update { it.copy(creating = false) }
-            }
-        }
+    fun overrideGate(itemId: String) = updateItem(itemId) {
+        if (it.status != ItemStatus.CREATE_FAILED || !it.gateTimedOut) it
+        else it.copy(status = ItemStatus.PARSED, error = null, gateTimedOut = false, allowUnverified = true)
     }
 
     /**

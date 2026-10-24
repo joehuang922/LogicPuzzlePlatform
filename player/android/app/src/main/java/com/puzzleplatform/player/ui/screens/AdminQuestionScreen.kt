@@ -648,6 +648,12 @@ private fun ReviewScreen(
                     Text("Override solver timeout")
                 }
             }
+            if (item.allowUnverified && item.createdId == null) {
+                Text(
+                    "Solver check overridden: \"Create all valid\" will create it unverified.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
             // "Create all valid" skips a red tile; if its problems are a false alarm, the
             // admin can send this one on purpose. Format problems can't be overridden.
             if (hasFormatProblems) {
