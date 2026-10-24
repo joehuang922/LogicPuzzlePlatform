@@ -130,4 +130,53 @@ const semanticChecks: Record<number, (data: any) => void> = {
       }
     }
   },
+  // Ripple Effect: the edge grids must fit the cell grid, and every border must separate
+  // two rooms. Editors may hold a wall that stops halfway through a room; this keeps one
+  // from ever being stored.
+  25: (data: { cells: number[][]; edges: { h: number[][]; v: number[][] } }) => {
+    const { cells, edges } = data;
+    const rows = cells.length;
+    const cols = cells[0].length;
+    const fits = (grid: number[][], height: number, width: number) =>
+      grid.length === height && grid.every((line) => line.length === width);
+    if (!fits(cells, rows, cols)) throw new Error("Invalid ripple effect: cells rows differ in length");
+    if (!fits(edges.h, rows - 1, cols) || !fits(edges.v, rows, cols - 1)) {
+      throw new Error(`Invalid ripple effect: edges don't match the ${cols}x${rows} grid`);
+    }
+    const room = Array.from({ length: rows }, () => Array<number>(cols).fill(-1));
+    let next = 0;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (room[r][c] >= 0) continue;
+        room[r][c] = next;
+        const stack: [number, number][] = [[r, c]];
+        while (stack.length > 0) {
+          const [cr, cc] = stack.pop()!;
+          const open: [number, number, boolean][] = [
+            [cr - 1, cc, cr > 0 && edges.h[cr - 1][cc] === 0],
+            [cr + 1, cc, cr < rows - 1 && edges.h[cr][cc] === 0],
+            [cr, cc - 1, cc > 0 && edges.v[cr][cc - 1] === 0],
+            [cr, cc + 1, cc < cols - 1 && edges.v[cr][cc] === 0],
+          ];
+          for (const [nr, nc, passable] of open) {
+            if (passable && room[nr][nc] < 0) {
+              room[nr][nc] = next;
+              stack.push([nr, nc]);
+            }
+          }
+        }
+        next++;
+      }
+    }
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const inside =
+          (r < rows - 1 && edges.h[r][c] === 1 && room[r][c] === room[r + 1][c]) ||
+          (c < cols - 1 && edges.v[r][c] === 1 && room[r][c] === room[r][c + 1]);
+        if (inside) {
+          throw new Error(`Invalid ripple effect: a wall at R${r + 1}C${c + 1} doesn't close off a room`);
+        }
+      }
+    }
+  },
 };

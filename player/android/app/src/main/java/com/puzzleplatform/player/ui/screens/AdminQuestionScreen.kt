@@ -72,6 +72,8 @@ import com.puzzleplatform.player.puzzle.NurikabeAuthoring
 import com.puzzleplatform.player.puzzle.NurikabeDraft
 import com.puzzleplatform.player.puzzle.PictoLinkAuthoring
 import com.puzzleplatform.player.puzzle.PictoLinkDraft
+import com.puzzleplatform.player.puzzle.RippleEffectAuthoring
+import com.puzzleplatform.player.puzzle.RippleEffectDraft
 import com.puzzleplatform.player.puzzle.YajilinAuthoring
 import com.puzzleplatform.player.puzzle.YajilinDraft
 import com.puzzleplatform.player.puzzle.SlitherlinkAuthoring
@@ -84,6 +86,7 @@ import com.puzzleplatform.player.ui.board.KakuroMiniBoard
 import com.puzzleplatform.player.ui.board.NonogramMiniBoard
 import com.puzzleplatform.player.ui.board.NurikabeMiniBoard
 import com.puzzleplatform.player.ui.board.PictoLinkMiniBoard
+import com.puzzleplatform.player.ui.board.RippleEffectMiniBoard
 import com.puzzleplatform.player.ui.board.YajilinMiniBoard
 import com.puzzleplatform.player.ui.board.SlitherlinkMiniBoard
 import com.puzzleplatform.player.ui.board.SudokuBoard
@@ -92,7 +95,7 @@ import com.puzzleplatform.player.ui.board.ZoomableImage
 
 /**
  * Create one *or many* questions from album photos. The puzzle type (sudoku,
- * nonogram, kakuro, slitherlink, nurikabe, heyawake, picto link or yajilin, see [AuthoringType]) is picked from a dropdown and applies to the whole
+ * nonogram, kakuro, slitherlink, nurikabe, heyawake, picto link, yajilin or ripple effect, see [AuthoringType]) is picked from a dropdown and applies to the whole
  * batch. A single pick is just a batch of one — same flow throughout. Steps:
  * pick images → Parse all (OCR each) → review/fix any tile (full-screen, with the
  * source photo beside it: sudoku on the real player board, nonogram as editable clue
@@ -132,6 +135,7 @@ fun AdminQuestionScreen(
             onEditHeyawake = { vm.editHeyawake(reviewItem.id, it) },
             onEditPictoLink = { vm.editPictoLink(reviewItem.id, it) },
             onEditYajilin = { vm.editYajilin(reviewItem.id, it) },
+            onEditRippleEffect = { vm.editRippleEffect(reviewItem.id, it) },
             onOverrideGate = { vm.overrideGate(reviewItem.id) },
             canCreateAnyway = state.canCreateAnyway(reviewItem),
             hasFormatProblems = reviewItem.formatProblems(state.type).isNotEmpty(),
@@ -289,6 +293,10 @@ fun AdminQuestionScreen(
                                     "Tap a tile to review its photo and clues side by side, fix mis-read " +
                                         "arrows, counts or phantom lines, and set its title. A red tile has " +
                                         "clues that can't be right."
+                                AuthoringType.RIPPLE_EFFECT ->
+                                    "Tap a tile to review its photo and rooms side by side, fix mis-read " +
+                                        "numbers, walls or phantom lines, and set its title. A red tile has " +
+                                        "walls or numbers that can't be right."
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -350,6 +358,11 @@ private fun BatchTile(type: AuthoringType, item: BatchItem, onClick: () -> Unit)
                     AuthoringType.YAJILIN -> YajilinMiniBoard(
                         draft = item.yajilin,
                         hasProblems = YajilinAuthoring.problems(item.yajilin).isNotEmpty(),
+                        size = 120.dp,
+                    )
+                    AuthoringType.RIPPLE_EFFECT -> RippleEffectMiniBoard(
+                        draft = item.rippleEffect,
+                        hasProblems = RippleEffectAuthoring.problems(item.rippleEffect).isNotEmpty(),
                         size = 120.dp,
                     )
                 }
@@ -444,7 +457,8 @@ private fun CreateFooter(
  * can read the original closely) and the editor below — for sudoku the interactive
  * player board, reused verbatim from the player; for nonogram [NonogramClueEditor]; for kakuro [KakuroCellEditor];
  * for slitherlink [SlitherlinkClueEditor]; for nurikabe [NurikabeClueEditor]; for heyawake
- * [HeyawakeRoomEditor]; for picto link [PictoLinkClueEditor]; for yajilin [YajilinClueEditor].
+ * [HeyawakeRoomEditor]; for picto link [PictoLinkClueEditor]; for yajilin [YajilinClueEditor];
+ * for ripple effect [RippleEffectRoomEditor].
  * A pinned top bar and a bottom button both say Done — every edit is already saved
  * to state as it's typed, so "Done" just returns to the grid.
  */
@@ -470,6 +484,7 @@ private fun ReviewScreen(
     onEditHeyawake: ((HeyawakeDraft) -> HeyawakeDraft) -> Unit,
     onEditPictoLink: ((PictoLinkDraft) -> PictoLinkDraft) -> Unit,
     onEditYajilin: ((YajilinDraft) -> YajilinDraft) -> Unit,
+    onEditRippleEffect: ((RippleEffectDraft) -> RippleEffectDraft) -> Unit,
     onOverrideGate: () -> Unit,
     canCreateAnyway: Boolean,
     hasFormatProblems: Boolean,
@@ -538,6 +553,9 @@ private fun ReviewScreen(
                     AuthoringType.YAJILIN ->
                         "Compare the photo with the grid — pinch to zoom the photo, tap a cell to fix " +
                             "its arrow or count, delete a phantom line, or add a missed one."
+                    AuthoringType.RIPPLE_EFFECT ->
+                        "Compare the photo with the rooms — pinch to zoom the photo, tap a cell to fix " +
+                            "its number or walls, delete a phantom line, or add a missed one."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -611,6 +629,12 @@ private fun ReviewScreen(
                     selectedCell = selectedCell,
                     onSelectCell = onSelectCell,
                     onChange = onEditYajilin,
+                )
+                AuthoringType.RIPPLE_EFFECT -> RippleEffectRoomEditor(
+                    draft = item.rippleEffect,
+                    selectedCell = selectedCell,
+                    onSelectCell = onSelectCell,
+                    onChange = onEditRippleEffect,
                 )
             }
 

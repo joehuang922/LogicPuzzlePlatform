@@ -7,11 +7,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import com.puzzleplatform.player.data.model.Puzzle
+import com.puzzleplatform.player.puzzle.RippleEffectDraft
 import com.puzzleplatform.player.puzzle.RippleEffectEngine
 
 private val GRID_BG = Color.White
@@ -129,6 +132,90 @@ fun RippleEffectBoard(
                 }
                 drawNumber(value, c, r, cell, color, bold)
             }
+        }
+    }
+}
+
+private val PROBLEM_FILL = Color(0xFFFFE0E0)
+private val PROBLEM_WALL = Color(0xFFDD3333)
+
+/**
+ * The Admin review editor's board for a [RippleEffectDraft] being authored. It draws the
+ * draft's walls as they are, so an interim layout shows faithfully: a room a wall runs
+ * into without closing it off is tinted red and that wall drawn red. Given numbers sit on
+ * grey cells as on the player board; every cell is tappable. [selectedCell] is "col,row".
+ */
+@Composable
+fun RippleEffectDraftBoard(
+    draft: RippleEffectDraft,
+    onTapCell: (col: Int, row: Int) -> Unit,
+    modifier: Modifier = Modifier,
+    selectedCell: String? = null,
+) {
+    val rows = draft.height
+    val cols = draft.width
+    if (rows <= 0 || cols <= 0) return
+    val ids = remember(draft) { draft.regionIds() }
+    val badRegions = remember(draft) { draft.roomsWithDanglingWalls(ids) }
+
+    val draftState = rememberUpdatedState(draft)
+    val idsState = rememberUpdatedState(ids)
+    val badState = rememberUpdatedState(badRegions)
+    val onTap = rememberUpdatedState(onTapCell)
+    val selectedState = rememberUpdatedState(selectedCell)
+
+    ZoomableBoard(
+        cols = cols,
+        rows = rows,
+        resetKey = "admin-ripple-effect-draft-${rows}x$cols",
+        modifier = modifier,
+        onTapCell = { col, row -> onTap.value(col, row) },
+    ) { cell ->
+        val d = draftState.value
+        val roomIds = idsState.value
+        val bad = badState.value
+        if (d.height != rows || d.width != cols) return@ZoomableBoard
+
+        drawRect(GRID_BG, topLeft = Offset(0f, 0f), size = Size(cols * cell, rows * cell))
+        for (r in 0 until rows) for (c in 0 until cols) {
+            val fill = when {
+                roomIds[r][c] in bad -> PROBLEM_FILL
+                (r to c) in d.clues -> CLUE_BG
+                else -> continue
+            }
+            drawRect(fill, Offset(c * cell, r * cell), Size(cell, cell))
+        }
+        selectedState.value?.toCellColRow()?.let { (c, r) ->
+            drawRect(SELECT_FILL, topLeft = Offset(c * cell, r * cell), size = Size(cell, cell))
+        }
+
+        val thin = 1.dp.toPx()
+        val thick = 3.dp.toPx()
+        fun edge(from: Offset, to: Offset, wall: Boolean, dangling: Boolean) = drawLine(
+            when {
+                dangling -> PROBLEM_WALL
+                wall -> LINE
+                else -> THIN_LINE
+            },
+            from,
+            to,
+            strokeWidth = if (wall) thick else thin,
+            cap = StrokeCap.Square,
+        )
+        // Interior lines first so the thick ones paint over the thin ones they meet.
+        for (r in 0 until rows - 1) for (c in 0 until cols) {
+            val wall = d.hWalls[r][c]
+            edge(Offset(c * cell, (r + 1) * cell), Offset((c + 1) * cell, (r + 1) * cell), wall, wall && roomIds[r][c] == roomIds[r + 1][c])
+        }
+        for (r in 0 until rows) for (c in 0 until cols - 1) {
+            val wall = d.vWalls[r][c]
+            edge(Offset((c + 1) * cell, r * cell), Offset((c + 1) * cell, (r + 1) * cell), wall, wall && roomIds[r][c] == roomIds[r][c + 1])
+        }
+        drawRect(LINE, Offset(0f, 0f), Size(cols * cell, rows * cell), style = Stroke(thick))
+
+        for ((at, clue) in d.clues) {
+            val (r, c) = at
+            if (r in 0 until rows && c in 0 until cols) drawNumber(clue, c, r, cell, CLUE_COLOR, bold = true)
         }
     }
 }

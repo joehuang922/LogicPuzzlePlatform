@@ -20,6 +20,8 @@ import com.puzzleplatform.player.puzzle.NurikabeAuthoring
 import com.puzzleplatform.player.puzzle.NurikabeDraft
 import com.puzzleplatform.player.puzzle.PictoLinkAuthoring
 import com.puzzleplatform.player.puzzle.PictoLinkDraft
+import com.puzzleplatform.player.puzzle.RippleEffectAuthoring
+import com.puzzleplatform.player.puzzle.RippleEffectDraft
 import com.puzzleplatform.player.puzzle.YajilinAuthoring
 import com.puzzleplatform.player.puzzle.YajilinDraft
 import com.puzzleplatform.player.puzzle.SlitherlinkAuthoring
@@ -41,9 +43,9 @@ import kotlinx.coroutines.sync.withPermit
  * and edits — so the review reuses that board verbatim; a nonogram's clue lists ride
  * in [nonogram], a kakuro's cell grid in [kakuro], a slitherlink's clue grid in
  * [slitherlink], a nurikabe's in [nurikabe], a heyawake's rooms in [heyawake], a picto link's
- * clue grid in [pictoLink], a yajilin's arrow clues in [yajilin]. Metadata is
- * per-item except the shared source collection and the default difficulty (a null
- * [difficulty] inherits the batch default).
+ * clue grid in [pictoLink], a yajilin's arrow clues in [yajilin], a ripple effect's walls
+ * and numbers in [rippleEffect]. Metadata is per-item except the shared source collection
+ * and the default difficulty (a null [difficulty] inherits the batch default).
  */
 data class BatchItem(
     val id: String,
@@ -57,6 +59,7 @@ data class BatchItem(
     val heyawake: HeyawakeDraft = HeyawakeDraft(),
     val pictoLink: PictoLinkDraft = PictoLinkDraft(),
     val yajilin: YajilinDraft = YajilinDraft(),
+    val rippleEffect: RippleEffectDraft = RippleEffectDraft(),
     val title: String = "",
     val author: String = "",
     val difficulty: Int? = null,
@@ -80,15 +83,18 @@ fun BatchItem.problems(type: AuthoringType): List<String> = when (type) {
     AuthoringType.HEYAWAKE -> HeyawakeAuthoring.problems(heyawake)
     AuthoringType.PICTO_LINK -> PictoLinkAuthoring.problems(pictoLink)
     AuthoringType.YAJILIN -> YajilinAuthoring.problems(yajilin)
+    AuthoringType.RIPPLE_EFFECT -> RippleEffectAuthoring.problems(rippleEffect)
 }
 
 /**
  * The part of [problems] that makes the grid unrepresentable as its type's canon (only
- * room-based types have any: heyawake rooms that aren't rectangles). Unlike the rest,
- * these can't be overridden: the tile can't be created until they're fixed.
+ * room-based types have any: heyawake rooms that aren't rectangles, ripple effect walls
+ * that end inside a room). Unlike the rest, these can't be overridden: the tile can't be
+ * created until they're fixed.
  */
 fun BatchItem.formatProblems(type: AuthoringType): List<String> = when (type) {
     AuthoringType.HEYAWAKE -> HeyawakeAuthoring.formatProblems(heyawake)
+    AuthoringType.RIPPLE_EFFECT -> RippleEffectAuthoring.formatProblems(rippleEffect)
     else -> emptyList()
 }
 
@@ -235,6 +241,7 @@ class AdminQuestionViewModel(
                     AuthoringType.HEYAWAKE -> it.copy(heyawake = HeyawakeAuthoring.draftFromCanon(canon))
                     AuthoringType.PICTO_LINK -> it.copy(pictoLink = PictoLinkAuthoring.draftFromCanon(canon))
                     AuthoringType.YAJILIN -> it.copy(yajilin = YajilinAuthoring.draftFromCanon(canon))
+                    AuthoringType.RIPPLE_EFFECT -> it.copy(rippleEffect = RippleEffectAuthoring.draftFromCanon(canon))
                 }.copy(
                     status = ItemStatus.PARSED,
                     error = null,
@@ -302,6 +309,10 @@ class AdminQuestionViewModel(
     /** Apply a yajilin clue edit (see [YajilinAuthoring]) to tile [id]. */
     fun editYajilin(id: String, transform: (YajilinDraft) -> YajilinDraft) =
         editItem(id) { it.copy(yajilin = transform(it.yajilin)) }
+
+    /** Apply a ripple effect wall/number edit (see [RippleEffectAuthoring]) to tile [id]. */
+    fun editRippleEffect(id: String, transform: (RippleEffectDraft) -> RippleEffectDraft) =
+        editItem(id) { it.copy(rippleEffect = transform(it.rippleEffect)) }
 
     private fun editItem(id: String, transform: (BatchItem) -> BatchItem) {
         updateItem(id) {
@@ -444,6 +455,11 @@ class AdminQuestionViewModel(
                     YajilinAuthoring.canonFromDraft(item.yajilin),
                     item.yajilin.cols,
                     item.yajilin.rows,
+                )
+                AuthoringType.RIPPLE_EFFECT -> Triple(
+                    RippleEffectAuthoring.canonFromDraft(item.rippleEffect),
+                    item.rippleEffect.width,
+                    item.rippleEffect.height,
                 )
             }
             val id = repo.createPuzzle(
