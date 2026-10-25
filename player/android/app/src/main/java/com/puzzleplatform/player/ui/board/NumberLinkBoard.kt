@@ -37,6 +37,9 @@ private val TOKEN_TEXT = Color(0xFF222222)
  *
  * Paths render as thick blue segments between cell centers; numbered endpoints render as a
  * digit inside a white token on top.
+ *
+ * The Admin review editor passes [onTapCell] to select a cell and [selectedCell]
+ * ("col,row") to outline it.
  */
 @Composable
 fun NumberLinkBoard(
@@ -44,8 +47,13 @@ fun NumberLinkBoard(
     userValues: Map<String, Int>,
     onSetEdge: (key: String, state: Int) -> Unit,
     modifier: Modifier = Modifier,
+    onTapCell: (col: Int, row: Int) -> Unit = { _, _ -> },
+    selectedCell: String? = null,
 ) {
-    val cells = remember(puzzle.id) { NumberLinkEngine.parseCells(puzzle) }
+    // Keyed on the canon too: the Admin review editor changes it under a stable id.
+    val cells = remember(puzzle.id, puzzle.canonRepr) { NumberLinkEngine.parseCells(puzzle) }
+    val onTap = rememberUpdatedState(onTapCell)
+    val selectedState = rememberUpdatedState(selectedCell)
     val rows = cells.size
     val cols = cells.maxOfOrNull { it.size } ?: 0
     if (rows == 0 || cols == 0) return
@@ -63,7 +71,7 @@ fun NumberLinkBoard(
         rows = rows,
         resetKey = puzzle.id,
         modifier = modifier,
-        onTapCell = { _, _ -> }, // a plain tap draws nothing; paths need a drag
+        onTapCell = { col, row -> onTap.value(col, row) }, // a tap draws nothing; the Admin editor selects
         // ZoomableBoard reports cells as (col, row); the drag state works in (row, col) to
         // match the "h:row,col"/"v:row,col" segment keys, so swap at the boundary.
         onDrawStart = { cell -> drag.start(cell?.let { (c, r) -> r to c }) },
@@ -138,6 +146,8 @@ fun NumberLinkBoard(
                 drawToken(v, cx, cy, cell)
             }
         }
+
+        drawCellSelection(selectedState.value, cell)
     }
 }
 

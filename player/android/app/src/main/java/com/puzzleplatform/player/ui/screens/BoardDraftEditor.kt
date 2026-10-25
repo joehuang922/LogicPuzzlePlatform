@@ -4,8 +4,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.Dp
 import com.puzzleplatform.player.puzzle.AuthoringType
+import com.puzzleplatform.player.puzzle.AkariAuthoring
 import com.puzzleplatform.player.puzzle.BoardDraft
+import com.puzzleplatform.player.puzzle.NumberLinkAuthoring
+import com.puzzleplatform.player.puzzle.ShakashakaAuthoring
+import com.puzzleplatform.player.puzzle.ShikakuAuthoring
 import com.puzzleplatform.player.puzzle.SudokuAuthoring
+import com.puzzleplatform.player.ui.board.AkariBoard
+import com.puzzleplatform.player.ui.board.BlackCellMiniBoard
+import com.puzzleplatform.player.ui.board.ClueGridMiniBoard
 import com.puzzleplatform.player.ui.board.DigitBar
 import com.puzzleplatform.player.ui.board.HeyawakeMiniBoard
 import com.puzzleplatform.player.ui.board.KakuroMiniBoard
@@ -14,7 +21,9 @@ import com.puzzleplatform.player.ui.board.NonogramMiniBoard
 import com.puzzleplatform.player.ui.board.NurikabeMiniBoard
 import com.puzzleplatform.player.ui.board.PictoLinkMiniBoard
 import com.puzzleplatform.player.ui.board.RippleEffectMiniBoard
-import com.puzzleplatform.player.ui.board.ShakashakaMiniBoard
+import com.puzzleplatform.player.ui.board.NumberLinkBoard
+import com.puzzleplatform.player.ui.board.ShakashakaBoard
+import com.puzzleplatform.player.ui.board.ShikakuBoard
 import com.puzzleplatform.player.ui.board.SlalomMiniBoard
 import com.puzzleplatform.player.ui.board.SlitherlinkMiniBoard
 import com.puzzleplatform.player.ui.board.SudokuBoard
@@ -29,8 +38,10 @@ import com.puzzleplatform.player.ui.board.YajilinMiniBoard
  * [SlitherlinkClueEditor]; for nurikabe [NurikabeClueEditor]; for heyawake
  * [HeyawakeRoomEditor]; for picto link [PictoLinkClueEditor]; for yajilin
  * [YajilinClueEditor]; for ripple effect [RippleEffectRoomEditor]; for masyu
- * [MasyuCircleEditor]; for slalom [SlalomGateEditor]; for shakashaka [ShakashakaCellEditor].
- * Each lists its own problems.
+ * [MasyuCircleEditor]; for slalom [SlalomGateEditor]; for shakashaka and akari
+ * [BlackCellEditor]; for number link and shikaku [ClueGridEditor], each on its own player
+ * board (whose play input has nothing to write into here, so it's dropped). Each lists
+ * its own problems.
  */
 @Composable
 fun BoardDraftEditor(
@@ -118,12 +129,68 @@ fun BoardDraftEditor(
             onSelectCell = onSelectCell,
             onChange = { t -> onChange { it.copy(slalom = t(it.slalom)) } },
         )
-        AuthoringType.SHAKASHAKA -> ShakashakaCellEditor(
+        AuthoringType.SHAKASHAKA -> BlackCellEditor(
+            authoring = ShakashakaAuthoring,
             draft = board.shakashaka,
             selectedCell = selectedCell,
             onSelectCell = onSelectCell,
             onChange = { t -> onChange { it.copy(shakashaka = t(it.shakashaka)) } },
-        )
+        ) { puzzle, onTap, selected ->
+            ShakashakaBoard(
+                puzzle = puzzle,
+                userValues = emptyMap(),
+                onPutValue = { _, _ -> },
+                onTapCell = onTap,
+                selectedCell = selected,
+            )
+        }
+        AuthoringType.AKARI -> BlackCellEditor(
+            authoring = AkariAuthoring,
+            draft = board.akari,
+            selectedCell = selectedCell,
+            onSelectCell = onSelectCell,
+            onChange = { t -> onChange { it.copy(akari = t(it.akari)) } },
+        ) { puzzle, onTap, selected ->
+            AkariBoard(
+                puzzle = puzzle,
+                userValues = emptyMap(),
+                liveValidate = false,
+                onTapCell = onTap,
+                selectedCell = selected,
+            )
+        }
+        AuthoringType.NUMBER_LINK -> ClueGridEditor(
+            authoring = NumberLinkAuthoring,
+            draft = board.numberLink,
+            clueLabel = "Number",
+            selectedCell = selectedCell,
+            onSelectCell = onSelectCell,
+            onChange = { t -> onChange { it.copy(numberLink = t(it.numberLink)) } },
+        ) { puzzle, onTap, selected ->
+            NumberLinkBoard(
+                puzzle = puzzle,
+                userValues = emptyMap(),
+                onSetEdge = { _, _ -> },
+                onTapCell = onTap,
+                selectedCell = selected,
+            )
+        }
+        AuthoringType.SHIKAKU -> ClueGridEditor(
+            authoring = ShikakuAuthoring,
+            draft = board.shikaku,
+            clueLabel = "Area",
+            selectedCell = selectedCell,
+            onSelectCell = onSelectCell,
+            onChange = { t -> onChange { it.copy(shikaku = t(it.shikaku)) } },
+        ) { puzzle, onTap, selected ->
+            ShikakuBoard(
+                puzzle = puzzle,
+                userValues = emptyMap(),
+                onApplyChanges = {},
+                onTapCell = onTap,
+                selectedCell = selected,
+            )
+        }
     }
 }
 
@@ -152,6 +219,10 @@ fun BoardDraftMiniBoard(type: AuthoringType, board: BoardDraft, size: Dp) {
         AuthoringType.MASYU -> MasyuMiniBoard(draft = board.masyu, hasProblems = hasProblems, size = size)
         AuthoringType.SLALOM -> SlalomMiniBoard(draft = board.slalom, hasProblems = hasProblems, size = size)
         AuthoringType.SHAKASHAKA ->
-            ShakashakaMiniBoard(draft = board.shakashaka, hasProblems = hasProblems, size = size)
+            BlackCellMiniBoard(draft = board.shakashaka, hasProblems = hasProblems, size = size)
+        AuthoringType.AKARI -> BlackCellMiniBoard(draft = board.akari, hasProblems = hasProblems, size = size)
+        AuthoringType.NUMBER_LINK ->
+            ClueGridMiniBoard(draft = board.numberLink, hasProblems = hasProblems, size = size)
+        AuthoringType.SHIKAKU -> ClueGridMiniBoard(draft = board.shikaku, hasProblems = hasProblems, size = size)
     }
 }

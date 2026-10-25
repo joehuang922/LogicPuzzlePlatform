@@ -22,8 +22,8 @@ import androidx.compose.ui.unit.dp
 /**
  * Admin hub: entry point for in-app authoring. Links to create a collection, create
  * questions (sudoku, nonogram, kakuro, slitherlink, nurikabe, heyawake, picto link,
- * yajilin, ripple effect, masyu, slalom, shakashaka) from photos, and browse collections to edit or
- * delete existing questions. A plain,
+ * yajilin, ripple effect, masyu, slalom, shakashaka, akari, number link, shikaku) from
+ * photos, and browse collections to edit or delete existing questions. A plain,
  * unguarded route (the API has no auth), reached from the always-visible build
  * icon in the Home top bar.
  */

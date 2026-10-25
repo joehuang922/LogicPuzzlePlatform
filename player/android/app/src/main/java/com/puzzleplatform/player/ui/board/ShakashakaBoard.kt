@@ -11,7 +11,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
@@ -23,7 +22,6 @@ private val WHITE_BG = Color.White
 private val BLACK_FILL = Color(0xFF222222)
 private val LINE_COLOR = Color(0xFF333333)
 private val MARK_COLOR = Color(0xFF666666)
-private val SELECT = Color(0xFF1976D2)
 
 /**
  * Compose Canvas renderer for Shakashaka (puzzle type 11), the analog of
@@ -132,11 +130,7 @@ fun ShakashakaBoard(
             )
         }
 
-        // Outlined on top rather than filled, so a selected black cell still shows it.
-        selectedState.value?.split(",")?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 2 }?.let { (c, r) ->
-            val w = cell * 0.08f
-            drawRect(SELECT, topLeft = Offset(c * cell + w / 2, r * cell + w / 2), size = Size(cell - w, cell - w), style = Stroke(width = w))
-        }
+        drawCellSelection(selectedState.value, cell)
     }
 }
 

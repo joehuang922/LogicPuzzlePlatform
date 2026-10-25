@@ -18,25 +18,28 @@ import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.puzzleplatform.player.puzzle.ShakashakaAuthoring
-import com.puzzleplatform.player.puzzle.ShakashakaDraft
-import com.puzzleplatform.player.puzzle.ShakashakaEngine
-import com.puzzleplatform.player.ui.board.ShakashakaBoard
+import com.puzzleplatform.player.data.model.Puzzle
+import com.puzzleplatform.player.puzzle.BlackCell
+import com.puzzleplatform.player.puzzle.BlackCellAuthoring
+import com.puzzleplatform.player.puzzle.BlackCellDraft
 
 /**
- * Review body for a parsed shakashaka: the grid on the player board (tap a cell to select
- * it), any problems that can't be right, and a panel for the selected cell — make it
- * white or black, type a black cell's number (blank for none), or delete its row/column
- * (a parser's phantom line). Add row/column append a white line for one the parser
- * missed. Every edit goes straight to [onChange]; [selectedCell] is "col,row".
+ * Review body for a parsed black-cell puzzle (shakashaka, akari): the grid on the type's
+ * player [board] (tap a cell to select it; the board gets the preview puzzle, the tap
+ * callback and the "col,row" selection), any problems that can't be right, and a panel
+ * for the selected cell — make it white or black, type a black cell's number (blank for
+ * none), or delete its row/column (a parser's phantom line). Add row/column append a
+ * white line for one the parser missed. Every edit goes straight to [onChange].
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ShakashakaCellEditor(
-    draft: ShakashakaDraft,
+fun BlackCellEditor(
+    authoring: BlackCellAuthoring,
+    draft: BlackCellDraft,
     selectedCell: String?,
     onSelectCell: (String?) -> Unit,
-    onChange: ((ShakashakaDraft) -> ShakashakaDraft) -> Unit,
+    onChange: ((BlackCellDraft) -> BlackCellDraft) -> Unit,
+    board: @Composable (puzzle: Puzzle, onTapCell: (col: Int, row: Int) -> Unit, selectedCell: String?) -> Unit,
 ) {
     val selected = selectedCell?.split(",")?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 2 }
     val selCol = selected?.get(0)
@@ -49,21 +52,18 @@ fun ShakashakaCellEditor(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        for (problem in ShakashakaAuthoring.problems(draft)) {
+        for (problem in authoring.problems(draft)) {
             Text(problem, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         }
 
         if (draft.rows > 0 && draft.cols > 0) {
-            // A tap also asks to place a triangle; there's nothing to place into here.
-            ShakashakaBoard(
-                puzzle = ShakashakaAuthoring.previewPuzzle(draft),
-                userValues = emptyMap(),
-                onPutValue = { _, _ -> },
-                onTapCell = { col, row ->
+            board(
+                authoring.previewPuzzle(draft),
+                { col, row ->
                     val key = "$col,$row"
                     onSelectCell(if (selectedCell == key) null else key)
                 },
-                selectedCell = selectedCell?.takeIf { inGrid },
+                selectedCell?.takeIf { inGrid },
             )
         }
 
@@ -75,33 +75,31 @@ fun ShakashakaCellEditor(
             )
         } else {
             val value = draft.cellAt(selCol, selRow)
-            val black = value != ShakashakaEngine.WHITE
+            val black = value != BlackCell.WHITE
             Text("Row ${selRow + 1}, column ${selCol + 1}", fontWeight = FontWeight.Medium)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 FilterChip(
                     selected = !black,
-                    onClick = { onChange { ShakashakaAuthoring.setWhite(it, selCol, selRow) } },
+                    onClick = { onChange { authoring.setWhite(it, selCol, selRow) } },
                     label = { Text("White") },
                 )
                 FilterChip(
                     selected = black,
                     // Keep a number already there; a white cell becomes unnumbered black.
-                    onClick = {
-                        if (!black) onChange { ShakashakaAuthoring.setBlack(it, selCol, selRow, null) }
-                    },
+                    onClick = { if (!black) onChange { authoring.setBlack(it, selCol, selRow, null) } },
                     label = { Text("Black") },
                 )
             }
             if (black) {
-                val max = ShakashakaAuthoring.whiteNeighbours(draft, selCol, selRow)
+                val max = authoring.whiteNeighbours(draft, selCol, selRow)
                 val number = value.takeIf { it in 0..4 }
                 // Re-key per cell so each selection starts its field from that cell's number.
                 key(selCol, selRow) {
                     ClueNumberField(
                         label = "Number 0–$max (blank for none)",
                         clue = number,
-                        parse = ShakashakaAuthoring::parseNum,
-                        onClue = { v -> onChange { ShakashakaAuthoring.setBlack(it, selCol, selRow, v) } },
+                        parse = authoring::parseNum,
+                        onClue = { v -> onChange { authoring.setBlack(it, selCol, selRow, v) } },
                         isError = (number ?: 0) > max,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -111,14 +109,14 @@ fun ShakashakaCellEditor(
                 OutlinedButton(
                     onClick = {
                         onSelectCell(null)
-                        onChange { ShakashakaAuthoring.removeRow(it, selRow) }
+                        onChange { authoring.removeRow(it, selRow) }
                     },
                     enabled = draft.rows > 1,
                 ) { Text("Delete row ${selRow + 1}") }
                 OutlinedButton(
                     onClick = {
                         onSelectCell(null)
-                        onChange { ShakashakaAuthoring.removeCol(it, selCol) }
+                        onChange { authoring.removeCol(it, selCol) }
                     },
                     enabled = draft.cols > 1,
                 ) { Text("Delete column ${selCol + 1}") }
@@ -126,11 +124,11 @@ fun ShakashakaCellEditor(
         }
 
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            TextButton(onClick = { onChange(ShakashakaAuthoring::addRow) }) {
+            TextButton(onClick = { onChange(authoring::addRow) }) {
                 Icon(Icons.Filled.Add, contentDescription = null)
                 Text("Add row")
             }
-            TextButton(onClick = { onChange(ShakashakaAuthoring::addCol) }) {
+            TextButton(onClick = { onChange(authoring::addCol) }) {
                 Icon(Icons.Filled.Add, contentDescription = null)
                 Text("Add column")
             }

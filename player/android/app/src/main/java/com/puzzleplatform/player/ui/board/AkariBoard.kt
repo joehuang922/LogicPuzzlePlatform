@@ -38,6 +38,9 @@ private val LINE = Color(0xFF333333)
  * advances a white cell empty -> bulb -> dot -> empty, applied by the caller via
  * [onTapCell]; walls ignore taps. With [liveValidate] on, bulbs that light each other
  * turn red. Two fingers pan/zoom via [ZoomableBoard].
+ *
+ * The Admin review editor passes [selectedCell] ("col,row") to outline the cell its
+ * [onTapCell] selected.
  */
 @Composable
 fun AkariBoard(
@@ -46,8 +49,11 @@ fun AkariBoard(
     liveValidate: Boolean,
     onTapCell: (col: Int, row: Int) -> Unit,
     modifier: Modifier = Modifier,
+    selectedCell: String? = null,
 ) {
-    val cells = remember(puzzle.id) { AkariEngine.parseCells(puzzle) }
+    // Keyed on the canon too: the Admin review editor changes it under a stable id.
+    val cells = remember(puzzle.id, puzzle.canonRepr) { AkariEngine.parseCells(puzzle) }
+    val selectedState = rememberUpdatedState(selectedCell)
     val rows = cells.size
     val cols = cells.maxOfOrNull { it.size } ?: 0
     if (rows == 0 || cols == 0) return
@@ -124,6 +130,8 @@ fun AkariBoard(
                 cap = StrokeCap.Square,
             )
         }
+
+        drawCellSelection(selectedState.value, cell)
     }
 }
 

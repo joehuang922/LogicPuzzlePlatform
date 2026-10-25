@@ -54,6 +54,9 @@ private const val FILL_ALPHA = 0.28f
  * Rectangles render as a translucent tinted fill with a matching border: gray until the
  * rectangle holds exactly one clue, then green when its area matches that clue or red when
  * it doesn't (or it swallowed more than one clue). Clue circles are drawn on top.
+ *
+ * The Admin review editor passes [onTapCell] to select a cell and [selectedCell]
+ * ("col,row") to outline it.
  */
 @Composable
 fun ShikakuBoard(
@@ -61,8 +64,13 @@ fun ShikakuBoard(
     userValues: Map<String, Int>,
     onApplyChanges: (Map<String, Int>) -> Unit,
     modifier: Modifier = Modifier,
+    onTapCell: (col: Int, row: Int) -> Unit = { _, _ -> },
+    selectedCell: String? = null,
 ) {
-    val cells = remember(puzzle.id) { ShikakuEngine.parseCells(puzzle) }
+    // Keyed on the canon too: the Admin review editor changes it under a stable id.
+    val cells = remember(puzzle.id, puzzle.canonRepr) { ShikakuEngine.parseCells(puzzle) }
+    val onTap = rememberUpdatedState(onTapCell)
+    val selectedState = rememberUpdatedState(selectedCell)
     val rows = cells.size
     val cols = cells.maxOfOrNull { it.size } ?: 0
     if (rows == 0 || cols == 0) return
@@ -82,6 +90,7 @@ fun ShikakuBoard(
         resetKey = puzzle.id,
         modifier = modifier,
         onTapCell = { col, row ->
+            onTap.value(col, row)
             // Tap toggles: inside a rect erases it, an empty cell drops a 1x1 rect.
             val list = ShikakuEngine.rects(cellsState.value, valuesState.value)
             val hit = list.firstOrNull { row in it.r until it.r + it.h && col in it.c until it.c + it.w }
@@ -204,6 +213,8 @@ fun ShikakuBoard(
                 drawClueText(v, cx, cy, cell)
             }
         }
+
+        drawCellSelection(selectedState.value, cell)
     }
 }
 

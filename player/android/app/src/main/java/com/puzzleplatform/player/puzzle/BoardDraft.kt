@@ -23,7 +23,10 @@ data class BoardDraft(
     val rippleEffect: RippleEffectDraft = RippleEffectDraft(),
     val masyu: MasyuDraft = MasyuDraft(),
     val slalom: SlalomDraft = SlalomDraft(),
-    val shakashaka: ShakashakaDraft = ShakashakaDraft(),
+    val shakashaka: BlackCellDraft = BlackCellDraft(),
+    val akari: BlackCellDraft = BlackCellDraft(),
+    val numberLink: ClueGridDraft = ClueGridDraft(),
+    val shikaku: ClueGridDraft = ClueGridDraft(),
 ) {
     /**
      * What the type's misread check finds wrong with this board — the list that turns
@@ -42,6 +45,9 @@ data class BoardDraft(
         AuthoringType.MASYU -> MasyuAuthoring.problems(masyu)
         AuthoringType.SLALOM -> SlalomAuthoring.problems(slalom)
         AuthoringType.SHAKASHAKA -> ShakashakaAuthoring.problems(shakashaka)
+        AuthoringType.AKARI -> AkariAuthoring.problems(akari)
+        AuthoringType.NUMBER_LINK -> NumberLinkAuthoring.problems(numberLink)
+        AuthoringType.SHIKAKU -> ShikakuAuthoring.problems(shikaku)
     }
 
     /**
@@ -86,6 +92,12 @@ data class BoardDraft(
             CanonBoard(SlalomAuthoring.canonFromDraft(slalom), slalom.cols, slalom.rows)
         AuthoringType.SHAKASHAKA ->
             CanonBoard(ShakashakaAuthoring.canonFromDraft(shakashaka), shakashaka.cols, shakashaka.rows)
+        AuthoringType.AKARI ->
+            CanonBoard(AkariAuthoring.canonFromDraft(akari), akari.cols, akari.rows)
+        AuthoringType.NUMBER_LINK ->
+            CanonBoard(NumberLinkAuthoring.canonFromDraft(numberLink), numberLink.cols, numberLink.rows)
+        AuthoringType.SHIKAKU ->
+            CanonBoard(ShikakuAuthoring.canonFromDraft(shikaku), shikaku.cols, shikaku.rows)
     }
 
     companion object {
@@ -103,6 +115,9 @@ data class BoardDraft(
             AuthoringType.MASYU -> BoardDraft(masyu = MasyuAuthoring.draftFromCanon(canon))
             AuthoringType.SLALOM -> BoardDraft(slalom = SlalomAuthoring.draftFromCanon(canon))
             AuthoringType.SHAKASHAKA -> BoardDraft(shakashaka = ShakashakaAuthoring.draftFromCanon(canon))
+            AuthoringType.AKARI -> BoardDraft(akari = AkariAuthoring.draftFromCanon(canon))
+            AuthoringType.NUMBER_LINK -> BoardDraft(numberLink = NumberLinkAuthoring.draftFromCanon(canon))
+            AuthoringType.SHIKAKU -> BoardDraft(shikaku = ShikakuAuthoring.draftFromCanon(canon))
         }
     }
 }

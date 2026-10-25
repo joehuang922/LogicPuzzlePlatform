@@ -25,7 +25,6 @@ private val WALL = Color(0xFF333333)
 private val GATE = Color(0xFF666666)
 private val TRAIL = Color(0xFF2196F3)
 private val START = Color(0xFF222222)
-private val SELECT = Color(0xFF1976D2)
 
 /**
  * Compose Canvas renderer for Slalom (puzzle type 10), the analog of
@@ -143,11 +142,7 @@ fun SlalomBoard(
             drawLine(TRAIL, Offset(x, (r + 0.5f) * cell), Offset(x, (r + 1.5f) * cell), trailW, cap = StrokeCap.Round)
         }
 
-        // Outlined on top rather than filled, so a selected wall cell still shows it.
-        selectedState.value?.split(",")?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 2 }?.let { (c, r) ->
-            val w = cell * 0.08f
-            drawRect(SELECT, topLeft = Offset(c * cell + w / 2, r * cell + w / 2), size = Size(cell - w, cell - w), style = Stroke(width = w))
-        }
+        drawCellSelection(selectedState.value, cell)
 
         drawRect(BORDER, topLeft = Offset(0f, 0f), size = Size(boardW, boardH), style = Stroke(width = 2.dp.toPx()))
     }

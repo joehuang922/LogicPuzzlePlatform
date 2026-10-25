@@ -1,7 +1,7 @@
 package com.puzzleplatform.player.puzzle
 
-import com.puzzleplatform.player.puzzle.ShakashakaAuthoring.BLACK
-import com.puzzleplatform.player.puzzle.ShakashakaEngine.WHITE
+import com.puzzleplatform.player.puzzle.BlackCell.BLACK
+import com.puzzleplatform.player.puzzle.BlackCell.WHITE
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -10,12 +10,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Pure logic behind the Admin shakashaka flow: parser canon -> editable draft -> canon
- * round-trips, black/number and line edits, and the misread checks.
+ * Pure logic behind the Admin black-cell flow (shakashaka, akari): parser canon -> editable
+ * draft -> canon round-trips, black/number and line edits, and the misread checks.
  */
-class ShakashakaAuthoringTest {
+class BlackCellAuthoringTest {
 
-    private val small = ShakashakaDraft(
+    private val small = BlackCellDraft(
         listOf(
             listOf(1, WHITE, WHITE),
             listOf(WHITE, WHITE, BLACK),
@@ -57,7 +57,7 @@ class ShakashakaAuthoringTest {
         assertEquals(4, grown.cols)
         val shrunk = ShakashakaAuthoring.removeCol(ShakashakaAuthoring.removeRow(small, 1), 0)
         assertEquals(listOf(listOf(WHITE, WHITE), listOf(2, WHITE)), shrunk.cells)
-        val one = ShakashakaDraft(listOf(listOf(BLACK)))
+        val one = BlackCellDraft(listOf(listOf(BLACK)))
         assertEquals(one, ShakashakaAuthoring.removeRow(one, 0))
         assertEquals(one, ShakashakaAuthoring.removeCol(one, 0))
     }
@@ -65,8 +65,8 @@ class ShakashakaAuthoringTest {
     @Test
     fun problems() {
         assertTrue(ShakashakaAuthoring.problems(small).isEmpty())
-        assertEquals(listOf("No cells"), ShakashakaAuthoring.problems(ShakashakaDraft()))
-        assertEquals(listOf("No black cells"), ShakashakaAuthoring.problems(ShakashakaDraft(listOf(listOf(WHITE)))))
+        assertEquals(listOf("No cells"), ShakashakaAuthoring.problems(BlackCellDraft()))
+        assertEquals(listOf("No black cells"), ShakashakaAuthoring.problems(BlackCellDraft(listOf(listOf(WHITE)))))
         // A corner has two neighbours; a black neighbour takes one away.
         assertEquals(
             listOf("R1C1 says 3 but has 2 white cells around it"),
@@ -75,6 +75,18 @@ class ShakashakaAuthoringTest {
         assertEquals(
             listOf("R2C1 says 4 but has 2 white cells around it"),
             ShakashakaAuthoring.problems(ShakashakaAuthoring.setBlack(small, 0, 1, 4)),
+        )
+    }
+
+    @Test
+    fun akariSharesTheRulesUnderItsOwnType() {
+        val canon = AkariAuthoring.canonFromDraft(small)
+        assertEquals(small, AkariAuthoring.draftFromCanon(canon))
+        assertEquals(AkariAuthoring.PUZZLE_TYPE, AkariAuthoring.previewPuzzle(small).puzzleType)
+        assertEquals("admin-akari-draft-3x3", AkariAuthoring.previewPuzzle(small).id)
+        assertEquals(
+            listOf("R1C1 says 4 but has 2 white cells around it"),
+            AkariAuthoring.problems(AkariAuthoring.setBlack(small, 0, 0, 4)),
         )
     }
 }

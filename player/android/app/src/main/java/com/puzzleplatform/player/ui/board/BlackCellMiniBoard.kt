@@ -12,8 +12,8 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.puzzleplatform.player.puzzle.ShakashakaDraft
-import com.puzzleplatform.player.puzzle.ShakashakaEngine
+import com.puzzleplatform.player.puzzle.BlackCell
+import com.puzzleplatform.player.puzzle.BlackCellDraft
 
 private val MINI_BG = Color.White
 private val MINI_LINE = Color(0xFFBBBBBB)
@@ -21,12 +21,12 @@ private val MINI_BLACK = Color(0xFF222222)
 private val MINI_PROBLEM = Color(0xFFDD3333)
 
 /**
- * A tiny, non-interactive shakashaka preview for an Admin batch tile: the parsed grid's
- * black cells and their numbers, framed in red when [hasProblems].
+ * A tiny, non-interactive preview of a black-cell puzzle (shakashaka, akari) for an Admin
+ * batch tile: the parsed grid's black cells and their numbers, framed in red when [hasProblems].
  */
 @Composable
-fun ShakashakaMiniBoard(
-    draft: ShakashakaDraft,
+fun BlackCellMiniBoard(
+    draft: BlackCellDraft,
     hasProblems: Boolean,
     modifier: Modifier = Modifier,
     size: Dp = 104.dp,
@@ -55,7 +55,7 @@ fun ShakashakaMiniBoard(
         for (r in 0 until rows) {
             for (c in 0 until cols) {
                 val v = draft.cells[r][c]
-                if (v == ShakashakaEngine.WHITE) continue
+                if (v == BlackCell.WHITE) continue
                 drawRect(MINI_BLACK, Offset(left + c * cell, top + r * cell), Size(cell, cell))
                 if (v in 0..4) {
                     drawContext.canvas.nativeCanvas.drawText(

@@ -63,6 +63,16 @@ class BoardDraftTest {
     }
 
     @Test
+    fun clueGridTypesKeepTheirOwnDraft() {
+        val canon = json("""{"cells":[[1,0],[0,1]]}""")
+        val link = BoardDraft.fromCanon(AuthoringType.NUMBER_LINK, canon)
+        assertEquals(BoardDraft(numberLink = link.numberLink), link)
+        assertEquals(CanonBoard(canon, 2, 2), link.toCanon(AuthoringType.NUMBER_LINK))
+        val shikaku = BoardDraft.fromCanon(AuthoringType.SHIKAKU, canon)
+        assertEquals(BoardDraft(shikaku = shikaku.shikaku), shikaku)
+    }
+
+    @Test
     fun sudokuHasNoProblemCheck() {
         assertTrue(BoardDraft().problems(AuthoringType.SUDOKU).isEmpty())
         assertTrue(BoardDraft().formatProblems(AuthoringType.SUDOKU).isEmpty())
