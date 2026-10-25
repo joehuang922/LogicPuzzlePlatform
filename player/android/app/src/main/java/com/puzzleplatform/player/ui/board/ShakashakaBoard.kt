@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
@@ -22,6 +23,7 @@ private val WHITE_BG = Color.White
 private val BLACK_FILL = Color(0xFF222222)
 private val LINE_COLOR = Color(0xFF333333)
 private val MARK_COLOR = Color(0xFF666666)
+private val SELECT = Color(0xFF1976D2)
 
 /**
  * Compose Canvas renderer for Shakashaka (puzzle type 11), the analog of
@@ -33,6 +35,9 @@ private val MARK_COLOR = Color(0xFF666666)
  * empty -> triangle, other triangle -> this one, same triangle -> dot, dot -> empty.
  * [onPutValue] receives "col,row" -> state (0 clears). Two fingers pan/zoom via
  * [ZoomableBoard].
+ *
+ * The Admin review editor passes [onTapCell] to select a cell and [selectedCell]
+ * ("col,row") to highlight it.
  */
 @Composable
 fun ShakashakaBoard(
@@ -40,8 +45,11 @@ fun ShakashakaBoard(
     userValues: Map<String, Int>,
     onPutValue: (key: String, value: Int) -> Unit,
     modifier: Modifier = Modifier,
+    onTapCell: (col: Int, row: Int) -> Unit = { _, _ -> },
+    selectedCell: String? = null,
 ) {
-    val cells = remember(puzzle.id) { ShakashakaEngine.parseCells(puzzle) }
+    // Keyed on the canon too: the Admin review editor changes it under a stable id.
+    val cells = remember(puzzle.id, puzzle.canonRepr) { ShakashakaEngine.parseCells(puzzle) }
     val rows = cells.size
     val cols = cells.maxOfOrNull { it.size } ?: 0
     if (rows == 0 || cols == 0) return
@@ -50,13 +58,15 @@ fun ShakashakaBoard(
     // restart when these change), so read the freshest values/callback through state.
     val valuesState = rememberUpdatedState(userValues)
     val onPut = rememberUpdatedState(onPutValue)
+    val onTap = rememberUpdatedState(onTapCell)
+    val selectedState = rememberUpdatedState(selectedCell)
 
     ZoomableBoard(
         cols = cols,
         rows = rows,
         resetKey = puzzle.id,
         modifier = modifier,
-        onTapCell = { _, _ -> },
+        onTapCell = { col, row -> onTap.value(col, row) }, // play places by quadrant; the Admin editor selects
         onTapPrecise = { fc, fr ->
             val col = fc.toInt()
             val row = fr.toInt()
@@ -120,6 +130,12 @@ fun ShakashakaBoard(
                 cap = StrokeCap.Square,
                 pathEffect = if (isBorder) null else dash,
             )
+        }
+
+        // Outlined on top rather than filled, so a selected black cell still shows it.
+        selectedState.value?.split(",")?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 2 }?.let { (c, r) ->
+            val w = cell * 0.08f
+            drawRect(SELECT, topLeft = Offset(c * cell + w / 2, r * cell + w / 2), size = Size(cell - w, cell - w), style = Stroke(width = w))
         }
     }
 }

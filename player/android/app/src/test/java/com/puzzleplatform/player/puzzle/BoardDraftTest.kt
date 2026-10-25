@@ -56,6 +56,13 @@ class BoardDraftTest {
     }
 
     @Test
+    fun shakashakaRoundTripsWithItsSize() {
+        val canon = json("""{"cells":[[-1,2,-1],[5,-1,-1]]}""")
+        val board = BoardDraft.fromCanon(AuthoringType.SHAKASHAKA, canon)
+        assertEquals(CanonBoard(canon, 3, 2), board.toCanon(AuthoringType.SHAKASHAKA))
+    }
+
+    @Test
     fun sudokuHasNoProblemCheck() {
         assertTrue(BoardDraft().problems(AuthoringType.SUDOKU).isEmpty())
         assertTrue(BoardDraft().formatProblems(AuthoringType.SUDOKU).isEmpty())

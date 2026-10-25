@@ -14,6 +14,7 @@ import com.puzzleplatform.player.ui.board.NonogramMiniBoard
 import com.puzzleplatform.player.ui.board.NurikabeMiniBoard
 import com.puzzleplatform.player.ui.board.PictoLinkMiniBoard
 import com.puzzleplatform.player.ui.board.RippleEffectMiniBoard
+import com.puzzleplatform.player.ui.board.ShakashakaMiniBoard
 import com.puzzleplatform.player.ui.board.SlalomMiniBoard
 import com.puzzleplatform.player.ui.board.SlitherlinkMiniBoard
 import com.puzzleplatform.player.ui.board.SudokuBoard
@@ -28,7 +29,8 @@ import com.puzzleplatform.player.ui.board.YajilinMiniBoard
  * [SlitherlinkClueEditor]; for nurikabe [NurikabeClueEditor]; for heyawake
  * [HeyawakeRoomEditor]; for picto link [PictoLinkClueEditor]; for yajilin
  * [YajilinClueEditor]; for ripple effect [RippleEffectRoomEditor]; for masyu
- * [MasyuCircleEditor]; for slalom [SlalomGateEditor]. Each lists its own problems.
+ * [MasyuCircleEditor]; for slalom [SlalomGateEditor]; for shakashaka [ShakashakaCellEditor].
+ * Each lists its own problems.
  */
 @Composable
 fun BoardDraftEditor(
@@ -116,6 +118,12 @@ fun BoardDraftEditor(
             onSelectCell = onSelectCell,
             onChange = { t -> onChange { it.copy(slalom = t(it.slalom)) } },
         )
+        AuthoringType.SHAKASHAKA -> ShakashakaCellEditor(
+            draft = board.shakashaka,
+            selectedCell = selectedCell,
+            onSelectCell = onSelectCell,
+            onChange = { t -> onChange { it.copy(shakashaka = t(it.shakashaka)) } },
+        )
     }
 }
 
@@ -143,5 +151,7 @@ fun BoardDraftMiniBoard(type: AuthoringType, board: BoardDraft, size: Dp) {
             RippleEffectMiniBoard(draft = board.rippleEffect, hasProblems = hasProblems, size = size)
         AuthoringType.MASYU -> MasyuMiniBoard(draft = board.masyu, hasProblems = hasProblems, size = size)
         AuthoringType.SLALOM -> SlalomMiniBoard(draft = board.slalom, hasProblems = hasProblems, size = size)
+        AuthoringType.SHAKASHAKA ->
+            ShakashakaMiniBoard(draft = board.shakashaka, hasProblems = hasProblems, size = size)
     }
 }

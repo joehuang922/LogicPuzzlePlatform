@@ -101,6 +101,7 @@ enum class AuthoringType(val label: String, val jpLabel: String, val puzzleType:
     RIPPLE_EFFECT("Ripple Effect", "波及効果", RippleEffectAuthoring.PUZZLE_TYPE),
     MASYU("Masyu", "ましゅ", MasyuAuthoring.PUZZLE_TYPE),
     SLALOM("Slalom", "スラローム", SlalomAuthoring.PUZZLE_TYPE),
+    SHAKASHAKA("Shakashaka", "シャカシャカ", ShakashakaAuthoring.PUZZLE_TYPE),
     ;
 
     companion object {

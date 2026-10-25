@@ -68,7 +68,7 @@ import com.puzzleplatform.player.ui.board.ZoomableImage
 
 /**
  * Create one *or many* questions from album photos. The puzzle type (sudoku,
- * nonogram, kakuro, slitherlink, nurikabe, heyawake, picto link, yajilin, ripple effect, masyu or slalom, see [AuthoringType]) is picked from a dropdown and applies to the whole
+ * nonogram, kakuro, slitherlink, nurikabe, heyawake, picto link, yajilin, ripple effect, masyu, slalom or shakashaka, see [AuthoringType]) is picked from a dropdown and applies to the whole
  * batch. A single pick is just a batch of one — same flow throughout. Steps:
  * pick images → Parse all (OCR each) → review/fix any tile (full-screen, with the
  * source photo beside it: sudoku on the real player board, nonogram as editable clue
@@ -269,6 +269,10 @@ fun AdminQuestionScreen(
                                     "Tap a tile to review its photo and gates side by side, fix mis-read " +
                                         "walls, gates, numbers or phantom lines, and set its title. A red " +
                                         "tile has gates or a start that can't be right."
+                                AuthoringType.SHAKASHAKA ->
+                                    "Tap a tile to review its photo and grid side by side, fix mis-read " +
+                                        "black cells, numbers or phantom lines, and set its title. A red " +
+                                        "tile has numbers that can't be right."
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -475,6 +479,9 @@ private fun ReviewScreen(
                         "Compare the photo with the grid — pinch to zoom the photo, tap a cell to fix " +
                             "its wall, gate or gate number, move the start, delete a phantom line, or add " +
                             "a missed one."
+                    AuthoringType.SHAKASHAKA ->
+                        "Compare the photo with the grid — pinch to zoom the photo, tap a cell to make " +
+                            "it white or black or fix its number, delete a phantom line, or add a missed one."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

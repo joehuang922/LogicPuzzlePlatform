@@ -23,6 +23,7 @@ data class BoardDraft(
     val rippleEffect: RippleEffectDraft = RippleEffectDraft(),
     val masyu: MasyuDraft = MasyuDraft(),
     val slalom: SlalomDraft = SlalomDraft(),
+    val shakashaka: ShakashakaDraft = ShakashakaDraft(),
 ) {
     /**
      * What the type's misread check finds wrong with this board — the list that turns
@@ -40,6 +41,7 @@ data class BoardDraft(
         AuthoringType.RIPPLE_EFFECT -> RippleEffectAuthoring.problems(rippleEffect)
         AuthoringType.MASYU -> MasyuAuthoring.problems(masyu)
         AuthoringType.SLALOM -> SlalomAuthoring.problems(slalom)
+        AuthoringType.SHAKASHAKA -> ShakashakaAuthoring.problems(shakashaka)
     }
 
     /**
@@ -82,6 +84,8 @@ data class BoardDraft(
             CanonBoard(MasyuAuthoring.canonFromDraft(masyu), masyu.cols, masyu.rows)
         AuthoringType.SLALOM ->
             CanonBoard(SlalomAuthoring.canonFromDraft(slalom), slalom.cols, slalom.rows)
+        AuthoringType.SHAKASHAKA ->
+            CanonBoard(ShakashakaAuthoring.canonFromDraft(shakashaka), shakashaka.cols, shakashaka.rows)
     }
 
     companion object {
@@ -98,6 +102,7 @@ data class BoardDraft(
             AuthoringType.RIPPLE_EFFECT -> BoardDraft(rippleEffect = RippleEffectAuthoring.draftFromCanon(canon))
             AuthoringType.MASYU -> BoardDraft(masyu = MasyuAuthoring.draftFromCanon(canon))
             AuthoringType.SLALOM -> BoardDraft(slalom = SlalomAuthoring.draftFromCanon(canon))
+            AuthoringType.SHAKASHAKA -> BoardDraft(shakashaka = ShakashakaAuthoring.draftFromCanon(canon))
         }
     }
 }
