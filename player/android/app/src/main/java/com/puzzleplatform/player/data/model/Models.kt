@@ -49,6 +49,10 @@ data class Puzzle(
     // "reveal" fallback when the on-device hinter finds no logical next step.
     @Serializable(with = StringifiedJsonObjectSerializer::class)
     val solutionRepr: JsonObject? = null,
+    // The gate's verdict: "unique", or "multiple" / "none" / "unknown" for a board flagged
+    // for editorial review; null for types with no solver. Shown by the Admin browser only
+    // (not cached in Room).
+    val validationStatus: String? = null,
 )
 
 @Serializable
@@ -111,6 +115,28 @@ data class CreatePuzzleRequest(
 
 @Serializable
 data class CreatePuzzleResponse(val id: String)
+
+/**
+ * PATCH /puzzles/{id} body. The API updates only the fields present, and the app's Json
+ * drops nulls (explicitNulls = false), so a field that can be cleared is never null
+ * here: the metadata is always sent, with a blank [title] / [author] and a 0
+ * [srcCollection] stored as NULL (the API treats them as falsy). [canonRepr] (with its
+ * [width] / [height]) is sent only when the board changed, so a metadata-only save
+ * doesn't re-run the solver gate.
+ */
+@Serializable
+data class UpdatePuzzleRequest(
+    val title: String,
+    val author: String,
+    val difficulty: Int,
+    val srcCollection: Int,
+    val special: Boolean,
+    val canonRepr: JsonObject? = null,
+    val width: Int? = null,
+    val height: Int? = null,
+    // Admin override: skip the solver gate and store as "unknown" (flagged for review).
+    val allowUnverified: Boolean? = null,
+)
 
 /** POST <PARSER_URL> body: a base64 image + the puzzle type to parse it as. */
 @Serializable

@@ -20,9 +20,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 /**
- * Admin hub: entry point for in-app authoring. Links to the two pilot flows —
- * create a collection and create questions (sudoku, nonogram, kakuro, slitherlink,
- * nurikabe, heyawake, picto link, yajilin, ripple effect, masyu, slalom) from photos. A plain,
+ * Admin hub: entry point for in-app authoring. Links to create a collection, create
+ * questions (sudoku, nonogram, kakuro, slitherlink, nurikabe, heyawake, picto link,
+ * yajilin, ripple effect, masyu, slalom) from photos, and browse collections to edit or
+ * delete existing questions. A plain,
  * unguarded route (the API has no auth), reached from the always-visible build
  * icon in the Home top bar.
  */
@@ -32,6 +33,7 @@ fun AdminScreen(
     onBack: () -> Unit,
     onCreateCollection: () -> Unit,
     onCreateQuestion: () -> Unit,
+    onEditQuestions: () -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -50,8 +52,8 @@ fun AdminScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                "Create puzzle content directly on the device. Each question is validated " +
-                    "by the server as you create it.",
+                "Create and edit puzzle content directly on the device. Each question's board " +
+                    "is validated by the server as you create or change it.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -60,6 +62,9 @@ fun AdminScreen(
             }
             Button(onClick = onCreateQuestion, modifier = Modifier.fillMaxWidth()) {
                 Text("Create question(s)")
+            }
+            Button(onClick = onEditQuestions, modifier = Modifier.fillMaxWidth()) {
+                Text("Edit questions")
             }
         }
     }

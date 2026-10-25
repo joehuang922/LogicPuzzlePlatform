@@ -6,7 +6,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.puzzleplatform.player.ui.screens.AdminBrowseScreen
 import com.puzzleplatform.player.ui.screens.AdminCollectionScreen
+import com.puzzleplatform.player.ui.screens.AdminPuzzleEditScreen
 import com.puzzleplatform.player.ui.screens.AdminQuestionScreen
 import com.puzzleplatform.player.ui.screens.AdminScreen
 import com.puzzleplatform.player.ui.screens.HomeScreen
@@ -19,10 +21,14 @@ object Routes {
     const val ADMIN = "admin"
     const val ADMIN_COLLECTION = "admin/collection"
     const val ADMIN_QUESTION = "admin/question"
+    const val ADMIN_BROWSE = "admin/browse"
+    // admin/puzzle/{puzzleId}
+    const val ADMIN_PUZZLE = "admin/puzzle/{puzzleId}"
     // play/{puzzleId}?attempt={attemptId}
     const val PLAY = "play/{puzzleId}?attempt={attemptId}"
 
     fun play(puzzleId: String, attemptId: String) = "play/$puzzleId?attempt=$attemptId"
+    fun adminPuzzle(puzzleId: String) = "admin/puzzle/$puzzleId"
 }
 
 @Composable
@@ -69,6 +75,7 @@ fun PuzzleApp() {
                 onBack = { navController.popBackStack() },
                 onCreateCollection = { navController.navigate(Routes.ADMIN_COLLECTION) },
                 onCreateQuestion = { navController.navigate(Routes.ADMIN_QUESTION) },
+                onEditQuestions = { navController.navigate(Routes.ADMIN_BROWSE) },
             )
         }
         composable(Routes.ADMIN_COLLECTION) {
@@ -76,6 +83,21 @@ fun PuzzleApp() {
         }
         composable(Routes.ADMIN_QUESTION) {
             AdminQuestionScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Routes.ADMIN_BROWSE) {
+            AdminBrowseScreen(
+                onBack = { navController.popBackStack() },
+                onEditPuzzle = { navController.navigate(Routes.adminPuzzle(it)) },
+            )
+        }
+        composable(
+            route = Routes.ADMIN_PUZZLE,
+            arguments = listOf(navArgument("puzzleId") { type = NavType.StringType }),
+        ) { backStackEntry ->
+            AdminPuzzleEditScreen(
+                puzzleId = backStackEntry.arguments?.getString("puzzleId").orEmpty(),
+                onBack = { navController.popBackStack() },
+            )
         }
     }
 }

@@ -271,6 +271,12 @@ async function updatePuzzle(
       sets.push("width = :width, height = :height");
       params.push({ name: "width", value: { longValue: body.canonRepr.colClues.length } });
       params.push({ name: "height", value: { longValue: body.canonRepr.rowClues.length } });
+    } else if (typeof body.width === "number" && typeof body.height === "number") {
+      // A canon shape not measured above (e.g. heyawake's rooms): take the client's size,
+      // as createPuzzle does.
+      sets.push("width = :width, height = :height");
+      params.push({ name: "width", value: { longValue: body.width } });
+      params.push({ name: "height", value: { longValue: body.height } });
     }
   }
 

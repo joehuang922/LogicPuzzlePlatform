@@ -14,7 +14,11 @@ import com.puzzleplatform.player.data.model.CreatePuzzleRequest
 import com.puzzleplatform.player.data.model.DEFAULT_COLLECTION_ID
 import com.puzzleplatform.player.data.model.ParseImageRequest
 import com.puzzleplatform.player.data.model.ParseImageResponse
+import com.puzzleplatform.player.data.model.Puzzle
+import com.puzzleplatform.player.data.model.UpdatePuzzleRequest
+import com.puzzleplatform.player.data.model.defaultCollection
 import com.puzzleplatform.player.data.model.sortedForDisplay
+import com.puzzleplatform.player.data.sync.SyncClock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -23,15 +27,17 @@ import retrofit2.HttpException
 
 /**
  * Authoring-side data access for the in-app Admin screens: create a collection,
- * parse a puzzle image, and create a question. Thin wrapper over [PuzzleApi] +
- * [ParserApi] + [ImageInput], matching how screens lean on [PuzzleRepository].
+ * parse a puzzle image, create a question, and browse / edit / delete existing ones.
+ * Thin wrapper over [PuzzleApi] + [ParserApi] + [ImageInput], matching how screens
+ * lean on [PuzzleRepository].
  *
  * Create endpoints run the server's solver gate and answer 400 with a JSON
  * `{ error }` on a bad board; [serverMessage] surfaces that text so the UI can
  * show the real reason ("multiple solutions", …) instead of "HTTP 400".
  *
- * Creating a question writes through to Room (see [createPuzzle]), so the new
- * puzzle is playable and listed on this device without another pull-sync.
+ * Creating, editing and deleting a question write through to Room (see [createPuzzle],
+ * [updatePuzzle], [deletePuzzle]), so the change shows on this device without another
+ * pull-sync.
  */
 class AdminRepository(
     private val api: PuzzleApi,
@@ -48,6 +54,72 @@ class AdminRepository(
 
     suspend fun createCollection(req: CreateCollectionRequest): Int =
         api.createCollection(req).id
+
+    /**
+     * Every collection for the Admin browser, in display order: the real ones plus, when
+     * any puzzle has none, the default collection ([DEFAULT_COLLECTION_ID]) holding them.
+     * Always read from the server, so the browser shows what's live.
+     */
+    suspend fun listBrowsableCollections(): List<Collection> {
+        val res = api.listCollections()
+        val all = if (res.uncollectedCount > 0) {
+            res.collections + defaultCollection(res.uncollectedCount)
+        } else res.collections
+        return all.sortedForDisplay()
+    }
+
+    /** One collection's live questions from the server; [DEFAULT_COLLECTION_ID] lists the uncollected. */
+    suspend fun listCollectionPuzzles(collectionId: Int): List<Puzzle> =
+        api.listPuzzles(
+            srcCollection = if (collectionId == DEFAULT_COLLECTION_ID) "none" else collectionId.toString(),
+        ).puzzles
+
+    suspend fun getPuzzle(id: String): Puzzle = api.getPuzzle(id).puzzle
+
+    /**
+     * PATCH the question and return the server's updated row. It's written through to
+     * Room, keeping the cached row's sync fields; if it moved collection the cached
+     * counts follow. Best-effort, as for [createPuzzle].
+     */
+    suspend fun updatePuzzle(id: String, req: UpdatePuzzleRequest): Puzzle {
+        val updated = api.updatePuzzle(id, req).puzzle
+        runCatching {
+            val existing = db.puzzleDao().getById(id)
+            db.puzzleDao().upsert(
+                updated.toEntity(json, updatedAt = existing?.updatedAt, deletedAt = existing?.deletedAt)
+            )
+            if (existing != null && existing.srcCollection != updated.srcCollection) {
+                bumpCollectionCount(existing.srcCollection, -1)
+                bumpCollectionCount(updated.srcCollection, +1)
+            }
+        }
+        return updated
+    }
+
+    /**
+     * Soft-delete the question on the server, then mark the cached row deleted (hidden
+     * from listings, kept for any attempt on it, as a pull-sync would) and drop it from
+     * its collection's cached count.
+     */
+    suspend fun deletePuzzle(id: String) {
+        val res = api.deletePuzzle(id)
+        if (!res.isSuccessful) throw HttpException(res)
+        runCatching {
+            val existing = db.puzzleDao().getById(id) ?: return@runCatching
+            if (existing.deletedAt == null) {
+                db.puzzleDao().markDeleted(id, SyncClock.nowDatetime())
+                bumpCollectionCount(existing.srcCollection, -1)
+            }
+        }
+    }
+
+    /** Adjust a cached collection's puzzle count; a null id is the default collection. */
+    private suspend fun bumpCollectionCount(collectionId: Int?, delta: Int) {
+        val cid = collectionId ?: DEFAULT_COLLECTION_ID
+        db.collectionDao().getAll().firstOrNull { it.id == cid }?.let {
+            db.collectionDao().upsertAll(listOf(it.copy(puzzleCount = maxOf(0, it.puzzleCount + delta))))
+        }
+    }
 
     /**
      * POST the question, then write it through to Room so local-first reads see it
@@ -77,10 +149,7 @@ class AdminRepository(
             )
         }
         db.puzzleDao().upsert(entity)
-        val collectionId = req.srcCollection ?: DEFAULT_COLLECTION_ID
-        db.collectionDao().getAll().firstOrNull { it.id == collectionId }?.let {
-            db.collectionDao().upsertAll(listOf(it.copy(puzzleCount = it.puzzleCount + 1)))
-        }
+        bumpCollectionCount(req.srcCollection, +1)
     }
 
     /**

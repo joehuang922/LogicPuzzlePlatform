@@ -61,42 +61,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.puzzleplatform.player.puzzle.AuthoringType
-import com.puzzleplatform.player.puzzle.HeyawakeAuthoring
-import com.puzzleplatform.player.puzzle.HeyawakeDraft
+import com.puzzleplatform.player.puzzle.BoardDraft
 import com.puzzleplatform.player.puzzle.ItemStatus
-import com.puzzleplatform.player.puzzle.KakuroAuthoring
-import com.puzzleplatform.player.puzzle.KakuroDraft
-import com.puzzleplatform.player.puzzle.NonogramAuthoring
-import com.puzzleplatform.player.puzzle.NonogramDraft
-import com.puzzleplatform.player.puzzle.NurikabeAuthoring
-import com.puzzleplatform.player.puzzle.NurikabeDraft
-import com.puzzleplatform.player.puzzle.PictoLinkAuthoring
-import com.puzzleplatform.player.puzzle.PictoLinkDraft
-import com.puzzleplatform.player.puzzle.RippleEffectAuthoring
-import com.puzzleplatform.player.puzzle.RippleEffectDraft
-import com.puzzleplatform.player.puzzle.MasyuAuthoring
-import com.puzzleplatform.player.puzzle.MasyuDraft
-import com.puzzleplatform.player.puzzle.SlalomAuthoring
-import com.puzzleplatform.player.puzzle.SlalomDraft
-import com.puzzleplatform.player.puzzle.YajilinAuthoring
-import com.puzzleplatform.player.puzzle.YajilinDraft
-import com.puzzleplatform.player.puzzle.SlitherlinkAuthoring
-import com.puzzleplatform.player.puzzle.SlitherlinkDraft
-import com.puzzleplatform.player.puzzle.SudokuAuthoring
 import com.puzzleplatform.player.ui.DIFFICULTY_LABELS
-import com.puzzleplatform.player.ui.board.DigitBar
-import com.puzzleplatform.player.ui.board.HeyawakeMiniBoard
-import com.puzzleplatform.player.ui.board.KakuroMiniBoard
-import com.puzzleplatform.player.ui.board.NonogramMiniBoard
-import com.puzzleplatform.player.ui.board.NurikabeMiniBoard
-import com.puzzleplatform.player.ui.board.PictoLinkMiniBoard
-import com.puzzleplatform.player.ui.board.RippleEffectMiniBoard
-import com.puzzleplatform.player.ui.board.MasyuMiniBoard
-import com.puzzleplatform.player.ui.board.SlalomMiniBoard
-import com.puzzleplatform.player.ui.board.YajilinMiniBoard
-import com.puzzleplatform.player.ui.board.SlitherlinkMiniBoard
-import com.puzzleplatform.player.ui.board.SudokuBoard
-import com.puzzleplatform.player.ui.board.SudokuMiniBoard
 import com.puzzleplatform.player.ui.board.ZoomableImage
 
 /**
@@ -128,22 +95,11 @@ fun AdminQuestionScreen(
             defaultDifficulty = state.defaultDifficulty,
             onDone = vm::closeReview,
             onSelectCell = vm::selectCell,
-            onDigit = vm::enterDigit,
-            onClear = vm::clearCell,
             onTitle = { vm.setItemTitle(reviewItem.id, it) },
             onAuthor = { vm.setItemAuthor(reviewItem.id, it) },
             onDifficulty = { vm.setItemDifficulty(reviewItem.id, it) },
             onRemove = { vm.removeItem(reviewItem.id) },
-            onEditNonogram = { vm.editNonogram(reviewItem.id, it) },
-            onEditKakuro = { vm.editKakuro(reviewItem.id, it) },
-            onEditSlitherlink = { vm.editSlitherlink(reviewItem.id, it) },
-            onEditNurikabe = { vm.editNurikabe(reviewItem.id, it) },
-            onEditHeyawake = { vm.editHeyawake(reviewItem.id, it) },
-            onEditPictoLink = { vm.editPictoLink(reviewItem.id, it) },
-            onEditYajilin = { vm.editYajilin(reviewItem.id, it) },
-            onEditRippleEffect = { vm.editRippleEffect(reviewItem.id, it) },
-            onEditMasyu = { vm.editMasyu(reviewItem.id, it) },
-            onEditSlalom = { vm.editSlalom(reviewItem.id, it) },
+            onEditBoard = { vm.editBoard(reviewItem.id, it) },
             onOverrideGate = { vm.overrideGate(reviewItem.id) },
             canCreateAnyway = state.canCreateAnyway(reviewItem),
             hasFormatProblems = reviewItem.formatProblems(state.type).isNotEmpty(),
@@ -338,60 +294,7 @@ private fun BatchTile(type: AuthoringType, item: BatchItem, onClick: () -> Unit)
         Box(contentAlignment = Alignment.Center, modifier = Modifier.size(120.dp)) {
             val hasGrid = item.status in GRID_STATUSES
             if (hasGrid) {
-                when (type) {
-                    AuthoringType.SUDOKU -> SudokuMiniBoard(givens = item.userValues, size = 120.dp)
-                    AuthoringType.NONOGRAM -> NonogramMiniBoard(
-                        rows = item.nonogram.rows,
-                        cols = item.nonogram.cols,
-                        hasProblems = NonogramAuthoring.problems(item.nonogram).isNotEmpty(),
-                        size = 120.dp,
-                    )
-                    AuthoringType.KAKURO -> KakuroMiniBoard(
-                        draft = item.kakuro,
-                        hasProblems = KakuroAuthoring.problems(item.kakuro).isNotEmpty(),
-                        size = 120.dp,
-                    )
-                    AuthoringType.SLITHERLINK -> SlitherlinkMiniBoard(
-                        draft = item.slitherlink,
-                        hasProblems = SlitherlinkAuthoring.problems(item.slitherlink).isNotEmpty(),
-                        size = 120.dp,
-                    )
-                    AuthoringType.NURIKABE -> NurikabeMiniBoard(
-                        draft = item.nurikabe,
-                        hasProblems = NurikabeAuthoring.problems(item.nurikabe).isNotEmpty(),
-                        size = 120.dp,
-                    )
-                    AuthoringType.HEYAWAKE -> HeyawakeMiniBoard(
-                        draft = item.heyawake,
-                        hasProblems = HeyawakeAuthoring.problems(item.heyawake).isNotEmpty(),
-                        size = 120.dp,
-                    )
-                    AuthoringType.PICTO_LINK -> PictoLinkMiniBoard(
-                        draft = item.pictoLink,
-                        hasProblems = PictoLinkAuthoring.problems(item.pictoLink).isNotEmpty(),
-                        size = 120.dp,
-                    )
-                    AuthoringType.YAJILIN -> YajilinMiniBoard(
-                        draft = item.yajilin,
-                        hasProblems = YajilinAuthoring.problems(item.yajilin).isNotEmpty(),
-                        size = 120.dp,
-                    )
-                    AuthoringType.RIPPLE_EFFECT -> RippleEffectMiniBoard(
-                        draft = item.rippleEffect,
-                        hasProblems = RippleEffectAuthoring.problems(item.rippleEffect).isNotEmpty(),
-                        size = 120.dp,
-                    )
-                    AuthoringType.MASYU -> MasyuMiniBoard(
-                        draft = item.masyu,
-                        hasProblems = MasyuAuthoring.problems(item.masyu).isNotEmpty(),
-                        size = 120.dp,
-                    )
-                    AuthoringType.SLALOM -> SlalomMiniBoard(
-                        draft = item.slalom,
-                        hasProblems = SlalomAuthoring.problems(item.slalom).isNotEmpty(),
-                        size = 120.dp,
-                    )
-                }
+                BoardDraftMiniBoard(type = type, board = item.board, size = 120.dp)
             } else {
                 AsyncImage(
                     model = item.uri,
@@ -480,12 +383,7 @@ private fun CreateFooter(
 
 /**
  * Full-screen review for a single tile: the zoomable source photo on top (so the user
- * can read the original closely) and the editor below — for sudoku the interactive
- * player board, reused verbatim from the player; for nonogram [NonogramClueEditor]; for kakuro [KakuroCellEditor];
- * for slitherlink [SlitherlinkClueEditor]; for nurikabe [NurikabeClueEditor]; for heyawake
- * [HeyawakeRoomEditor]; for picto link [PictoLinkClueEditor]; for yajilin [YajilinClueEditor];
- * for ripple effect [RippleEffectRoomEditor]; for masyu [MasyuCircleEditor]; for slalom
- * [SlalomGateEditor].
+ * can read the original closely) and the type's [BoardDraftEditor] below.
  * A pinned top bar and a bottom button both say Done — every edit is already saved
  * to state as it's typed, so "Done" just returns to the grid.
  */
@@ -498,32 +396,17 @@ private fun ReviewScreen(
     defaultDifficulty: Int,
     onDone: () -> Unit,
     onSelectCell: (String?) -> Unit,
-    onDigit: (Int) -> Unit,
-    onClear: () -> Unit,
     onTitle: (String) -> Unit,
     onAuthor: (String) -> Unit,
     onDifficulty: (Int?) -> Unit,
     onRemove: () -> Unit,
-    onEditNonogram: ((NonogramDraft) -> NonogramDraft) -> Unit,
-    onEditKakuro: ((KakuroDraft) -> KakuroDraft) -> Unit,
-    onEditSlitherlink: ((SlitherlinkDraft) -> SlitherlinkDraft) -> Unit,
-    onEditNurikabe: ((NurikabeDraft) -> NurikabeDraft) -> Unit,
-    onEditHeyawake: ((HeyawakeDraft) -> HeyawakeDraft) -> Unit,
-    onEditPictoLink: ((PictoLinkDraft) -> PictoLinkDraft) -> Unit,
-    onEditYajilin: ((YajilinDraft) -> YajilinDraft) -> Unit,
-    onEditRippleEffect: ((RippleEffectDraft) -> RippleEffectDraft) -> Unit,
-    onEditMasyu: ((MasyuDraft) -> MasyuDraft) -> Unit,
-    onEditSlalom: ((SlalomDraft) -> SlalomDraft) -> Unit,
+    onEditBoard: ((BoardDraft) -> BoardDraft) -> Unit,
     onOverrideGate: () -> Unit,
     canCreateAnyway: Boolean,
     hasFormatProblems: Boolean,
     onCreateAnyway: () -> Unit,
     overrideEnabled: Boolean,
 ) {
-    // The review board reuses the player SudokuBoard verbatim; an all-zero-hints
-    // puzzle keeps every cell editable (parsed givens ride in as userValues).
-    val reviewPuzzle = remember { SudokuAuthoring.blankPuzzle() }
-
     // System back closes the review rather than leaving the authoring screen.
     BackHandler(onBack = onDone)
 
@@ -612,79 +495,13 @@ private fun ReviewScreen(
                 )
             }
 
-            when (type) {
-                AuthoringType.SUDOKU -> {
-                    SudokuBoard(
-                        puzzle = reviewPuzzle,
-                        userValues = item.userValues,
-                        liveValidate = true,
-                        selectedCell = selectedCell,
-                        onSelectCell = onSelectCell,
-                    )
-                    if (selectedCell != null) {
-                        DigitBar(
-                            onDigit = onDigit,
-                            onClear = onClear,
-                            onDismiss = { onSelectCell(null) },
-                        )
-                    }
-                }
-                AuthoringType.NONOGRAM -> NonogramClueEditor(draft = item.nonogram, onChange = onEditNonogram)
-                AuthoringType.KAKURO -> KakuroCellEditor(
-                    draft = item.kakuro,
-                    selectedCell = selectedCell,
-                    onSelectCell = onSelectCell,
-                    onChange = onEditKakuro,
-                )
-                AuthoringType.SLITHERLINK -> SlitherlinkClueEditor(
-                    draft = item.slitherlink,
-                    selectedCell = selectedCell,
-                    onSelectCell = onSelectCell,
-                    onChange = onEditSlitherlink,
-                )
-                AuthoringType.NURIKABE -> NurikabeClueEditor(
-                    draft = item.nurikabe,
-                    selectedCell = selectedCell,
-                    onSelectCell = onSelectCell,
-                    onChange = onEditNurikabe,
-                )
-                AuthoringType.HEYAWAKE -> HeyawakeRoomEditor(
-                    draft = item.heyawake,
-                    selectedCell = selectedCell,
-                    onSelectCell = onSelectCell,
-                    onChange = onEditHeyawake,
-                )
-                AuthoringType.PICTO_LINK -> PictoLinkClueEditor(
-                    draft = item.pictoLink,
-                    selectedCell = selectedCell,
-                    onSelectCell = onSelectCell,
-                    onChange = onEditPictoLink,
-                )
-                AuthoringType.YAJILIN -> YajilinClueEditor(
-                    draft = item.yajilin,
-                    selectedCell = selectedCell,
-                    onSelectCell = onSelectCell,
-                    onChange = onEditYajilin,
-                )
-                AuthoringType.RIPPLE_EFFECT -> RippleEffectRoomEditor(
-                    draft = item.rippleEffect,
-                    selectedCell = selectedCell,
-                    onSelectCell = onSelectCell,
-                    onChange = onEditRippleEffect,
-                )
-                AuthoringType.MASYU -> MasyuCircleEditor(
-                    draft = item.masyu,
-                    selectedCell = selectedCell,
-                    onSelectCell = onSelectCell,
-                    onChange = onEditMasyu,
-                )
-                AuthoringType.SLALOM -> SlalomGateEditor(
-                    draft = item.slalom,
-                    selectedCell = selectedCell,
-                    onSelectCell = onSelectCell,
-                    onChange = onEditSlalom,
-                )
-            }
+            BoardDraftEditor(
+                type = type,
+                board = item.board,
+                selectedCell = selectedCell,
+                onSelectCell = onSelectCell,
+                onChange = onEditBoard,
+            )
 
             item.error?.let {
                 Text("Rejected: $it", color = MaterialTheme.colorScheme.error)
@@ -805,13 +622,13 @@ private fun TypeDropdown(
 }
 
 /**
- * Optional source-collection picker, shared across the batch. "None" leaves the
- * puzzles uncollected (the common case for a quick one-off), matching the web admin's
- * optional field.
+ * Optional source-collection picker: shared across the batch here, and per question in
+ * [AdminPuzzleEditScreen]. "None" leaves the puzzles uncollected (the common case for a
+ * quick one-off), matching the web admin's optional field.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CollectionDropdown(
+internal fun CollectionDropdown(
     collections: List<com.puzzleplatform.player.data.model.Collection>,
     selectedId: Int?,
     onSelect: (Int?) -> Unit,

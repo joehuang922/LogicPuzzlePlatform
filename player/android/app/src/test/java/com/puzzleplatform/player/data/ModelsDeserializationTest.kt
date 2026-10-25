@@ -5,6 +5,7 @@ import com.puzzleplatform.player.data.model.Puzzle
 import com.puzzleplatform.player.data.model.PuzzleResponse
 import com.puzzleplatform.player.data.model.Snapshot
 import com.puzzleplatform.player.data.model.SnapshotResponse
+import com.puzzleplatform.player.data.model.UpdatePuzzleRequest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -206,5 +207,27 @@ class ModelsDeserializationTest {
     fun parseResponse_metadataOptional() {
         val res = json.decodeFromString<ParseImageResponse>("""{ "canon": {} }""")
         assertNull(res.metadata)
+    }
+
+    @Test
+    fun updateRequest_clearsWithBlanksAndOmitsAnUnchangedBoard() {
+        // The config drops nulls, so clearing a field must go as "" / 0 (the API stores
+        // a falsy value as NULL), and the absent canon leaves the board — and the gate —
+        // alone.
+        val body = json.parseToJsonElement(
+            json.encodeToString(
+                UpdatePuzzleRequest.serializer(),
+                UpdatePuzzleRequest(title = "", author = "", difficulty = 3, srcCollection = 0, special = false),
+            )
+        ) as JsonObject
+        assertEquals(setOf("title", "author", "difficulty", "srcCollection", "special"), body.keys)
+        assertEquals("", body["title"]!!.jsonPrimitive.content)
+        assertEquals(0, body["srcCollection"]!!.jsonPrimitive.int)
+    }
+
+    @Test
+    fun puzzle_validationStatusOptional() {
+        val res = json.decodeFromString<PuzzleResponse>(puzzleJson("0"))
+        assertNull(res.puzzle.validationStatus)
     }
 }

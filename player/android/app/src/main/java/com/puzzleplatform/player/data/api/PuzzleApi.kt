@@ -21,8 +21,12 @@ import com.puzzleplatform.player.data.model.SnapshotSummaryListResponse
 import com.puzzleplatform.player.data.model.SolvedQuestionsResponse
 import com.puzzleplatform.player.data.model.SyncRequest
 import com.puzzleplatform.player.data.model.SyncResponse
+import com.puzzleplatform.player.data.model.UpdatePuzzleRequest
+import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -57,6 +61,13 @@ interface PuzzleApi {
 
     @POST("puzzles")
     suspend fun createPuzzle(@Body body: CreatePuzzleRequest): CreatePuzzleResponse
+
+    @PATCH("puzzles/{id}")
+    suspend fun updatePuzzle(@Path("id") id: String, @Body body: UpdatePuzzleRequest): PuzzleResponse
+
+    // Soft delete; answers 204 with no body, hence the bare Response.
+    @DELETE("puzzles/{id}")
+    suspend fun deletePuzzle(@Path("id") id: String): Response<Unit>
 
     @GET("collections/{id}/manifest")
     suspend fun getCollectionManifest(@Path("id") id: Int): CollectionManifestResponse

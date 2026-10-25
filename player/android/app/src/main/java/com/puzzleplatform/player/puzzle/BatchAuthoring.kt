@@ -101,4 +101,10 @@ enum class AuthoringType(val label: String, val jpLabel: String, val puzzleType:
     RIPPLE_EFFECT("Ripple Effect", "波及効果", RippleEffectAuthoring.PUZZLE_TYPE),
     MASYU("Masyu", "ましゅ", MasyuAuthoring.PUZZLE_TYPE),
     SLALOM("Slalom", "スラローム", SlalomAuthoring.PUZZLE_TYPE),
+    ;
+
+    companion object {
+        /** The authoring type a stored question of [puzzleType] is edited as, if any. */
+        fun forPuzzleType(puzzleType: Int): AuthoringType? = entries.firstOrNull { it.puzzleType == puzzleType }
+    }
 }

@@ -9,28 +9,8 @@ import com.puzzleplatform.player.data.model.Collection
 import com.puzzleplatform.player.data.model.CreatePuzzleRequest
 import com.puzzleplatform.player.puzzle.AuthoringType
 import com.puzzleplatform.player.puzzle.BatchRules
-import com.puzzleplatform.player.puzzle.HeyawakeAuthoring
-import com.puzzleplatform.player.puzzle.HeyawakeDraft
+import com.puzzleplatform.player.puzzle.BoardDraft
 import com.puzzleplatform.player.puzzle.ItemStatus
-import com.puzzleplatform.player.puzzle.KakuroAuthoring
-import com.puzzleplatform.player.puzzle.KakuroDraft
-import com.puzzleplatform.player.puzzle.MasyuAuthoring
-import com.puzzleplatform.player.puzzle.MasyuDraft
-import com.puzzleplatform.player.puzzle.NonogramAuthoring
-import com.puzzleplatform.player.puzzle.NonogramDraft
-import com.puzzleplatform.player.puzzle.NurikabeAuthoring
-import com.puzzleplatform.player.puzzle.NurikabeDraft
-import com.puzzleplatform.player.puzzle.PictoLinkAuthoring
-import com.puzzleplatform.player.puzzle.PictoLinkDraft
-import com.puzzleplatform.player.puzzle.RippleEffectAuthoring
-import com.puzzleplatform.player.puzzle.RippleEffectDraft
-import com.puzzleplatform.player.puzzle.SlalomAuthoring
-import com.puzzleplatform.player.puzzle.SlalomDraft
-import com.puzzleplatform.player.puzzle.YajilinAuthoring
-import com.puzzleplatform.player.puzzle.YajilinDraft
-import com.puzzleplatform.player.puzzle.SlitherlinkAuthoring
-import com.puzzleplatform.player.puzzle.SlitherlinkDraft
-import com.puzzleplatform.player.puzzle.SudokuAuthoring
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -41,32 +21,17 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 
 /**
- * One tile in the batch: an image and everything derived from it. What the parse
- * yields depends on the batch's [AuthoringType]: a sudoku's givens ride in
- * [userValues] ("col,row" -> digit) — the same map the player's SudokuBoard renders
- * and edits — so the review reuses that board verbatim; a nonogram's clue lists ride
- * in [nonogram], a kakuro's cell grid in [kakuro], a slitherlink's clue grid in
- * [slitherlink], a nurikabe's in [nurikabe], a heyawake's rooms in [heyawake], a picto link's
- * clue grid in [pictoLink], a yajilin's arrow clues in [yajilin], a ripple effect's walls
- * and numbers in [rippleEffect], a masyu's circles in [masyu], a slalom's walls, gates and
- * start in [slalom]. Metadata is per-item except the shared source collection
- * and the default difficulty (a null [difficulty] inherits the batch default).
+ * One tile in the batch: an image and everything derived from it. The parsed grid
+ * rides in [board], whose field for the batch's [AuthoringType] is the live one (a
+ * sudoku's givens in its `userValues`, a nonogram's clue lists in its `nonogram`, ...).
+ * Metadata is per-item except the shared source collection and the default difficulty
+ * (a null [difficulty] inherits the batch default).
  */
 data class BatchItem(
     val id: String,
     val uri: Uri,
     val status: ItemStatus = ItemStatus.PENDING,
-    val userValues: Map<String, Int> = emptyMap(),
-    val nonogram: NonogramDraft = NonogramDraft(),
-    val kakuro: KakuroDraft = KakuroDraft(),
-    val slitherlink: SlitherlinkDraft = SlitherlinkDraft(),
-    val nurikabe: NurikabeDraft = NurikabeDraft(),
-    val heyawake: HeyawakeDraft = HeyawakeDraft(),
-    val pictoLink: PictoLinkDraft = PictoLinkDraft(),
-    val yajilin: YajilinDraft = YajilinDraft(),
-    val rippleEffect: RippleEffectDraft = RippleEffectDraft(),
-    val masyu: MasyuDraft = MasyuDraft(),
-    val slalom: SlalomDraft = SlalomDraft(),
+    val board: BoardDraft = BoardDraft(),
     val title: String = "",
     val author: String = "",
     val difficulty: Int? = null,
@@ -80,36 +45,11 @@ data class BatchItem(
     val allowUnverified: Boolean = false,
 )
 
-/**
- * What the type's misread check finds wrong with this tile's grid — the same list that
- * turns its tile red and shows in its review. Sudoku has no such check.
- */
-fun BatchItem.problems(type: AuthoringType): List<String> = when (type) {
-    AuthoringType.SUDOKU -> emptyList()
-    AuthoringType.NONOGRAM -> NonogramAuthoring.problems(nonogram)
-    AuthoringType.KAKURO -> KakuroAuthoring.problems(kakuro)
-    AuthoringType.SLITHERLINK -> SlitherlinkAuthoring.problems(slitherlink)
-    AuthoringType.NURIKABE -> NurikabeAuthoring.problems(nurikabe)
-    AuthoringType.HEYAWAKE -> HeyawakeAuthoring.problems(heyawake)
-    AuthoringType.PICTO_LINK -> PictoLinkAuthoring.problems(pictoLink)
-    AuthoringType.YAJILIN -> YajilinAuthoring.problems(yajilin)
-    AuthoringType.RIPPLE_EFFECT -> RippleEffectAuthoring.problems(rippleEffect)
-    AuthoringType.MASYU -> MasyuAuthoring.problems(masyu)
-    AuthoringType.SLALOM -> SlalomAuthoring.problems(slalom)
-}
+/** What the type's misread check finds wrong with this tile's grid (see [BoardDraft.problems]). */
+fun BatchItem.problems(type: AuthoringType): List<String> = board.problems(type)
 
-/**
- * The part of [problems] that makes the grid unrepresentable as its type's canon (heyawake
- * rooms that aren't rectangles, ripple effect walls that end inside a room, a slalom gate
- * with two numbers). Unlike the rest, these can't be overridden: the tile can't be
- * created until they're fixed.
- */
-fun BatchItem.formatProblems(type: AuthoringType): List<String> = when (type) {
-    AuthoringType.HEYAWAKE -> HeyawakeAuthoring.formatProblems(heyawake)
-    AuthoringType.RIPPLE_EFFECT -> RippleEffectAuthoring.formatProblems(rippleEffect)
-    AuthoringType.SLALOM -> SlalomAuthoring.formatProblems(slalom)
-    else -> emptyList()
-}
+/** The un-overridable part of [problems] (see [BoardDraft.formatProblems]). */
+fun BatchItem.formatProblems(type: AuthoringType): List<String> = board.formatProblems(type)
 
 data class AdminQuestionUiState(
     // What every tile in the batch is parsed and created as.
@@ -245,19 +185,8 @@ class AdminQuestionViewModel(
             val res = repo.parseImage(uri, type.puzzleType)
             val canon = res.canon
             updateItem(id) {
-                when (type) {
-                    AuthoringType.SUDOKU -> it.copy(userValues = SudokuAuthoring.userValuesFromCanon(canon))
-                    AuthoringType.NONOGRAM -> it.copy(nonogram = NonogramAuthoring.draftFromCanon(canon))
-                    AuthoringType.KAKURO -> it.copy(kakuro = KakuroAuthoring.draftFromCanon(canon))
-                    AuthoringType.SLITHERLINK -> it.copy(slitherlink = SlitherlinkAuthoring.draftFromCanon(canon))
-                    AuthoringType.NURIKABE -> it.copy(nurikabe = NurikabeAuthoring.draftFromCanon(canon))
-                    AuthoringType.HEYAWAKE -> it.copy(heyawake = HeyawakeAuthoring.draftFromCanon(canon))
-                    AuthoringType.PICTO_LINK -> it.copy(pictoLink = PictoLinkAuthoring.draftFromCanon(canon))
-                    AuthoringType.YAJILIN -> it.copy(yajilin = YajilinAuthoring.draftFromCanon(canon))
-                    AuthoringType.RIPPLE_EFFECT -> it.copy(rippleEffect = RippleEffectAuthoring.draftFromCanon(canon))
-                    AuthoringType.MASYU -> it.copy(masyu = MasyuAuthoring.draftFromCanon(canon))
-                    AuthoringType.SLALOM -> it.copy(slalom = SlalomAuthoring.draftFromCanon(canon))
-                }.copy(
+                it.copy(
+                    board = BoardDraft.fromCanon(type, canon),
                     status = ItemStatus.PARSED,
                     error = null,
                     // Pre-fill from the scan, but never overwrite what the admin typed.
@@ -276,66 +205,12 @@ class AdminQuestionViewModel(
     fun closeReview() = _state.update { it.copy(reviewItemId = null, selectedCell = null) }
     fun selectCell(key: String?) = _state.update { it.copy(selectedCell = key) }
 
-    /** Set the selected cell's given (1-9) on the open tile. */
-    fun enterDigit(digit: Int) {
-        val s = _state.value
-        val id = s.reviewItemId ?: return
-        val key = s.selectedCell ?: return
-        if (digit !in 1..9) return
-        editGrid(id) { it + (key to digit) }
-    }
-
-    /** Clear the selected cell's given on the open tile. */
-    fun clearCell() {
-        val s = _state.value
-        val id = s.reviewItemId ?: return
-        val key = s.selectedCell ?: return
-        editGrid(id) { it - key }
-    }
-
-    /** Apply a grid edit and re-arm a previously create-failed tile (see BatchRules.afterEdit). */
-    private fun editGrid(id: String, transform: (Map<String, Int>) -> Map<String, Int>) =
-        editItem(id) { it.copy(userValues = transform(it.userValues)) }
-
-    /** Apply a nonogram clue edit (see [NonogramAuthoring]) to tile [id]. */
-    fun editNonogram(id: String, transform: (NonogramDraft) -> NonogramDraft) =
-        editItem(id) { it.copy(nonogram = transform(it.nonogram)) }
-
-    /** Apply a kakuro cell edit (see [KakuroAuthoring]) to tile [id]. */
-    fun editKakuro(id: String, transform: (KakuroDraft) -> KakuroDraft) =
-        editItem(id) { it.copy(kakuro = transform(it.kakuro)) }
-
-    /** Apply a slitherlink clue edit (see [SlitherlinkAuthoring]) to tile [id]. */
-    fun editSlitherlink(id: String, transform: (SlitherlinkDraft) -> SlitherlinkDraft) =
-        editItem(id) { it.copy(slitherlink = transform(it.slitherlink)) }
-
-    /** Apply a nurikabe clue edit (see [NurikabeAuthoring]) to tile [id]. */
-    fun editNurikabe(id: String, transform: (NurikabeDraft) -> NurikabeDraft) =
-        editItem(id) { it.copy(nurikabe = transform(it.nurikabe)) }
-
-    /** Apply a heyawake room edit (see [HeyawakeAuthoring]) to tile [id]. */
-    fun editHeyawake(id: String, transform: (HeyawakeDraft) -> HeyawakeDraft) =
-        editItem(id) { it.copy(heyawake = transform(it.heyawake)) }
-
-    /** Apply a picto link clue edit (see [PictoLinkAuthoring]) to tile [id]. */
-    fun editPictoLink(id: String, transform: (PictoLinkDraft) -> PictoLinkDraft) =
-        editItem(id) { it.copy(pictoLink = transform(it.pictoLink)) }
-
-    /** Apply a yajilin clue edit (see [YajilinAuthoring]) to tile [id]. */
-    fun editYajilin(id: String, transform: (YajilinDraft) -> YajilinDraft) =
-        editItem(id) { it.copy(yajilin = transform(it.yajilin)) }
-
-    /** Apply a ripple effect wall/number edit (see [RippleEffectAuthoring]) to tile [id]. */
-    fun editRippleEffect(id: String, transform: (RippleEffectDraft) -> RippleEffectDraft) =
-        editItem(id) { it.copy(rippleEffect = transform(it.rippleEffect)) }
-
-    /** Apply a masyu circle edit (see [MasyuAuthoring]) to tile [id]. */
-    fun editMasyu(id: String, transform: (MasyuDraft) -> MasyuDraft) =
-        editItem(id) { it.copy(masyu = transform(it.masyu)) }
-
-    /** Apply a slalom wall/gate/start edit (see [SlalomAuthoring]) to tile [id]. */
-    fun editSlalom(id: String, transform: (SlalomDraft) -> SlalomDraft) =
-        editItem(id) { it.copy(slalom = transform(it.slalom)) }
+    /**
+     * Apply a grid edit (see the type's `*Authoring`) to tile [id], re-arming a
+     * previously create-failed tile (see BatchRules.afterEdit).
+     */
+    fun editBoard(id: String, transform: (BoardDraft) -> BoardDraft) =
+        editItem(id) { it.copy(board = transform(it.board)) }
 
     private fun editItem(id: String, transform: (BatchItem) -> BatchItem) {
         updateItem(id) {
@@ -429,63 +304,7 @@ class AdminQuestionViewModel(
         updateItem(item.id) { it.copy(status = ItemStatus.CREATING, error = null, gateTimedOut = false) }
         try {
             item.formatProblems(s.type).firstOrNull()?.let { error("Fix the grid first: $it") }
-            val (canon, width, height) = when (s.type) {
-                AuthoringType.SUDOKU -> Triple(
-                    SudokuAuthoring.canonFromUserValues(item.userValues),
-                    SudokuAuthoring.SIZE,
-                    SudokuAuthoring.SIZE,
-                )
-                AuthoringType.NONOGRAM -> Triple(
-                    NonogramAuthoring.canonFromDraft(item.nonogram),
-                    item.nonogram.cols,
-                    item.nonogram.rows,
-                )
-                AuthoringType.KAKURO -> Triple(
-                    KakuroAuthoring.canonFromDraft(item.kakuro),
-                    item.kakuro.cols,
-                    item.kakuro.rows,
-                )
-                AuthoringType.SLITHERLINK -> Triple(
-                    SlitherlinkAuthoring.canonFromDraft(item.slitherlink),
-                    item.slitherlink.cols,
-                    item.slitherlink.rows,
-                )
-                AuthoringType.NURIKABE -> Triple(
-                    NurikabeAuthoring.canonFromDraft(item.nurikabe),
-                    item.nurikabe.cols,
-                    item.nurikabe.rows,
-                )
-                AuthoringType.HEYAWAKE -> Triple(
-                    HeyawakeAuthoring.canonFromDraft(item.heyawake),
-                    item.heyawake.width,
-                    item.heyawake.height,
-                )
-                AuthoringType.PICTO_LINK -> Triple(
-                    PictoLinkAuthoring.canonFromDraft(item.pictoLink),
-                    item.pictoLink.cols,
-                    item.pictoLink.rows,
-                )
-                AuthoringType.YAJILIN -> Triple(
-                    YajilinAuthoring.canonFromDraft(item.yajilin),
-                    item.yajilin.cols,
-                    item.yajilin.rows,
-                )
-                AuthoringType.RIPPLE_EFFECT -> Triple(
-                    RippleEffectAuthoring.canonFromDraft(item.rippleEffect),
-                    item.rippleEffect.width,
-                    item.rippleEffect.height,
-                )
-                AuthoringType.MASYU -> Triple(
-                    MasyuAuthoring.canonFromDraft(item.masyu),
-                    item.masyu.cols,
-                    item.masyu.rows,
-                )
-                AuthoringType.SLALOM -> Triple(
-                    SlalomAuthoring.canonFromDraft(item.slalom),
-                    item.slalom.cols,
-                    item.slalom.rows,
-                )
-            }
+            val (canon, width, height) = item.board.toCanon(s.type)
             val id = repo.createPuzzle(
                 CreatePuzzleRequest(
                     puzzleType = s.type.puzzleType,
