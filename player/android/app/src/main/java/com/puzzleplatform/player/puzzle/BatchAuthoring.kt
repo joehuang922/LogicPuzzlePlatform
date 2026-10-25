@@ -56,8 +56,8 @@ object BatchRules {
     /**
      * A red tile that "Create all valid" skips but the admin may still send by hand —
      * not when [hasFormatProblems] (the grid can't be expressed as its canon, e.g. a
-     * non-rectangular heyawake room or a ripple effect wall that closes off nothing),
-     * which only fixing the grid clears.
+     * non-rectangular heyawake room, a ripple effect wall that closes off nothing, or a
+     * slalom gate with two numbers), which only fixing the grid clears.
      */
     fun canCreateAnyway(
         status: ItemStatus,
@@ -99,4 +99,6 @@ enum class AuthoringType(val label: String, val jpLabel: String, val puzzleType:
     PICTO_LINK("Picto Link", "ピクトリンク", PictoLinkAuthoring.PUZZLE_TYPE),
     YAJILIN("Yajilin", "ヤジリン", YajilinAuthoring.PUZZLE_TYPE),
     RIPPLE_EFFECT("Ripple Effect", "波及効果", RippleEffectAuthoring.PUZZLE_TYPE),
+    MASYU("Masyu", "ましゅ", MasyuAuthoring.PUZZLE_TYPE),
+    SLALOM("Slalom", "スラローム", SlalomAuthoring.PUZZLE_TYPE),
 }

@@ -25,6 +25,7 @@ private val WALL = Color(0xFF333333)
 private val GATE = Color(0xFF666666)
 private val TRAIL = Color(0xFF2196F3)
 private val START = Color(0xFF222222)
+private val SELECT = Color(0xFF1976D2)
 
 /**
  * Compose Canvas renderer for Slalom (puzzle type 10), the analog of
@@ -38,6 +39,9 @@ private val START = Color(0xFF222222)
  * Walls are dark squares; gates are dashed lines through cell centers, with a numbered
  * gate's order shown (number + arrow toward the gate) in the wall cells capping it; the
  * start cell shows the circled gate count.
+ *
+ * The Admin review editor passes [onTapCell] to select a cell and [selectedCell]
+ * ("col,row") to highlight it.
  */
 @Composable
 fun SlalomBoard(
@@ -45,8 +49,11 @@ fun SlalomBoard(
     userValues: Map<String, Int>,
     onApplyChanges: (Map<String, Int>) -> Unit,
     modifier: Modifier = Modifier,
+    onTapCell: (col: Int, row: Int) -> Unit = { _, _ -> },
+    selectedCell: String? = null,
 ) {
-    val canon = remember(puzzle.id) { SlalomEngine.parse(puzzle) }
+    // Keyed on the canon too: the Admin review editor changes it under a stable id.
+    val canon = remember(puzzle.id, puzzle.canonRepr) { SlalomEngine.parse(puzzle) }
     val rows = canon.rows
     val cols = canon.cols
     if (rows == 0 || cols == 0) return
@@ -55,7 +62,9 @@ fun SlalomBoard(
     // values and callback through state.
     val valuesState = rememberUpdatedState(userValues)
     val onApply = rememberUpdatedState(onApplyChanges)
-    val drag = remember(puzzle.id) {
+    val onTap = rememberUpdatedState(onTapCell)
+    val selectedState = rememberUpdatedState(selectedCell)
+    val drag = remember(puzzle.id, canon) {
         LoopStroke { from, to, key, current ->
             val t = SlalomEngine.trail(rows, cols, current)
             if (SlalomEngine.canDraw(canon, t, from, to)) mapOf(key to 1) else null
@@ -67,7 +76,7 @@ fun SlalomBoard(
         rows = rows,
         resetKey = puzzle.id,
         modifier = modifier,
-        onTapCell = { _, _ -> }, // the trail needs a drag; a tap draws nothing
+        onTapCell = { col, row -> onTap.value(col, row) }, // a tap draws nothing; the Admin editor selects
         // ZoomableBoard reports (col, row); the stroke works in (row, col) to match the
         // row-first "h:r,c"/"v:r,c" keys, so swap at the boundary.
         onDrawStart = { cell -> drag.start(cell?.let { (c, r) -> r to c }) },
@@ -132,6 +141,12 @@ fun SlalomBoard(
             if (values[SlalomEngine.vKey(r, c)] != 1) continue
             val x = (c + 0.5f) * cell
             drawLine(TRAIL, Offset(x, (r + 0.5f) * cell), Offset(x, (r + 1.5f) * cell), trailW, cap = StrokeCap.Round)
+        }
+
+        // Outlined on top rather than filled, so a selected wall cell still shows it.
+        selectedState.value?.split(",")?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 2 }?.let { (c, r) ->
+            val w = cell * 0.08f
+            drawRect(SELECT, topLeft = Offset(c * cell + w / 2, r * cell + w / 2), size = Size(cell - w, cell - w), style = Stroke(width = w))
         }
 
         drawRect(BORDER, topLeft = Offset(0f, 0f), size = Size(boardW, boardH), style = Stroke(width = 2.dp.toPx()))

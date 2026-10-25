@@ -14,6 +14,8 @@ import com.puzzleplatform.player.puzzle.HeyawakeDraft
 import com.puzzleplatform.player.puzzle.ItemStatus
 import com.puzzleplatform.player.puzzle.KakuroAuthoring
 import com.puzzleplatform.player.puzzle.KakuroDraft
+import com.puzzleplatform.player.puzzle.MasyuAuthoring
+import com.puzzleplatform.player.puzzle.MasyuDraft
 import com.puzzleplatform.player.puzzle.NonogramAuthoring
 import com.puzzleplatform.player.puzzle.NonogramDraft
 import com.puzzleplatform.player.puzzle.NurikabeAuthoring
@@ -22,6 +24,8 @@ import com.puzzleplatform.player.puzzle.PictoLinkAuthoring
 import com.puzzleplatform.player.puzzle.PictoLinkDraft
 import com.puzzleplatform.player.puzzle.RippleEffectAuthoring
 import com.puzzleplatform.player.puzzle.RippleEffectDraft
+import com.puzzleplatform.player.puzzle.SlalomAuthoring
+import com.puzzleplatform.player.puzzle.SlalomDraft
 import com.puzzleplatform.player.puzzle.YajilinAuthoring
 import com.puzzleplatform.player.puzzle.YajilinDraft
 import com.puzzleplatform.player.puzzle.SlitherlinkAuthoring
@@ -44,7 +48,8 @@ import kotlinx.coroutines.sync.withPermit
  * in [nonogram], a kakuro's cell grid in [kakuro], a slitherlink's clue grid in
  * [slitherlink], a nurikabe's in [nurikabe], a heyawake's rooms in [heyawake], a picto link's
  * clue grid in [pictoLink], a yajilin's arrow clues in [yajilin], a ripple effect's walls
- * and numbers in [rippleEffect]. Metadata is per-item except the shared source collection
+ * and numbers in [rippleEffect], a masyu's circles in [masyu], a slalom's walls, gates and
+ * start in [slalom]. Metadata is per-item except the shared source collection
  * and the default difficulty (a null [difficulty] inherits the batch default).
  */
 data class BatchItem(
@@ -60,6 +65,8 @@ data class BatchItem(
     val pictoLink: PictoLinkDraft = PictoLinkDraft(),
     val yajilin: YajilinDraft = YajilinDraft(),
     val rippleEffect: RippleEffectDraft = RippleEffectDraft(),
+    val masyu: MasyuDraft = MasyuDraft(),
+    val slalom: SlalomDraft = SlalomDraft(),
     val title: String = "",
     val author: String = "",
     val difficulty: Int? = null,
@@ -87,17 +94,20 @@ fun BatchItem.problems(type: AuthoringType): List<String> = when (type) {
     AuthoringType.PICTO_LINK -> PictoLinkAuthoring.problems(pictoLink)
     AuthoringType.YAJILIN -> YajilinAuthoring.problems(yajilin)
     AuthoringType.RIPPLE_EFFECT -> RippleEffectAuthoring.problems(rippleEffect)
+    AuthoringType.MASYU -> MasyuAuthoring.problems(masyu)
+    AuthoringType.SLALOM -> SlalomAuthoring.problems(slalom)
 }
 
 /**
- * The part of [problems] that makes the grid unrepresentable as its type's canon (only
- * room-based types have any: heyawake rooms that aren't rectangles, ripple effect walls
- * that end inside a room). Unlike the rest, these can't be overridden: the tile can't be
+ * The part of [problems] that makes the grid unrepresentable as its type's canon (heyawake
+ * rooms that aren't rectangles, ripple effect walls that end inside a room, a slalom gate
+ * with two numbers). Unlike the rest, these can't be overridden: the tile can't be
  * created until they're fixed.
  */
 fun BatchItem.formatProblems(type: AuthoringType): List<String> = when (type) {
     AuthoringType.HEYAWAKE -> HeyawakeAuthoring.formatProblems(heyawake)
     AuthoringType.RIPPLE_EFFECT -> RippleEffectAuthoring.formatProblems(rippleEffect)
+    AuthoringType.SLALOM -> SlalomAuthoring.formatProblems(slalom)
     else -> emptyList()
 }
 
@@ -245,6 +255,8 @@ class AdminQuestionViewModel(
                     AuthoringType.PICTO_LINK -> it.copy(pictoLink = PictoLinkAuthoring.draftFromCanon(canon))
                     AuthoringType.YAJILIN -> it.copy(yajilin = YajilinAuthoring.draftFromCanon(canon))
                     AuthoringType.RIPPLE_EFFECT -> it.copy(rippleEffect = RippleEffectAuthoring.draftFromCanon(canon))
+                    AuthoringType.MASYU -> it.copy(masyu = MasyuAuthoring.draftFromCanon(canon))
+                    AuthoringType.SLALOM -> it.copy(slalom = SlalomAuthoring.draftFromCanon(canon))
                 }.copy(
                     status = ItemStatus.PARSED,
                     error = null,
@@ -316,6 +328,14 @@ class AdminQuestionViewModel(
     /** Apply a ripple effect wall/number edit (see [RippleEffectAuthoring]) to tile [id]. */
     fun editRippleEffect(id: String, transform: (RippleEffectDraft) -> RippleEffectDraft) =
         editItem(id) { it.copy(rippleEffect = transform(it.rippleEffect)) }
+
+    /** Apply a masyu circle edit (see [MasyuAuthoring]) to tile [id]. */
+    fun editMasyu(id: String, transform: (MasyuDraft) -> MasyuDraft) =
+        editItem(id) { it.copy(masyu = transform(it.masyu)) }
+
+    /** Apply a slalom wall/gate/start edit (see [SlalomAuthoring]) to tile [id]. */
+    fun editSlalom(id: String, transform: (SlalomDraft) -> SlalomDraft) =
+        editItem(id) { it.copy(slalom = transform(it.slalom)) }
 
     private fun editItem(id: String, transform: (BatchItem) -> BatchItem) {
         updateItem(id) {
@@ -454,6 +474,16 @@ class AdminQuestionViewModel(
                     RippleEffectAuthoring.canonFromDraft(item.rippleEffect),
                     item.rippleEffect.width,
                     item.rippleEffect.height,
+                )
+                AuthoringType.MASYU -> Triple(
+                    MasyuAuthoring.canonFromDraft(item.masyu),
+                    item.masyu.cols,
+                    item.masyu.rows,
+                )
+                AuthoringType.SLALOM -> Triple(
+                    SlalomAuthoring.canonFromDraft(item.slalom),
+                    item.slalom.cols,
+                    item.slalom.rows,
                 )
             }
             val id = repo.createPuzzle(

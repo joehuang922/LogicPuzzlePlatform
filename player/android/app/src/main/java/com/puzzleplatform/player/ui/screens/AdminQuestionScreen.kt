@@ -74,6 +74,10 @@ import com.puzzleplatform.player.puzzle.PictoLinkAuthoring
 import com.puzzleplatform.player.puzzle.PictoLinkDraft
 import com.puzzleplatform.player.puzzle.RippleEffectAuthoring
 import com.puzzleplatform.player.puzzle.RippleEffectDraft
+import com.puzzleplatform.player.puzzle.MasyuAuthoring
+import com.puzzleplatform.player.puzzle.MasyuDraft
+import com.puzzleplatform.player.puzzle.SlalomAuthoring
+import com.puzzleplatform.player.puzzle.SlalomDraft
 import com.puzzleplatform.player.puzzle.YajilinAuthoring
 import com.puzzleplatform.player.puzzle.YajilinDraft
 import com.puzzleplatform.player.puzzle.SlitherlinkAuthoring
@@ -87,6 +91,8 @@ import com.puzzleplatform.player.ui.board.NonogramMiniBoard
 import com.puzzleplatform.player.ui.board.NurikabeMiniBoard
 import com.puzzleplatform.player.ui.board.PictoLinkMiniBoard
 import com.puzzleplatform.player.ui.board.RippleEffectMiniBoard
+import com.puzzleplatform.player.ui.board.MasyuMiniBoard
+import com.puzzleplatform.player.ui.board.SlalomMiniBoard
 import com.puzzleplatform.player.ui.board.YajilinMiniBoard
 import com.puzzleplatform.player.ui.board.SlitherlinkMiniBoard
 import com.puzzleplatform.player.ui.board.SudokuBoard
@@ -95,7 +101,7 @@ import com.puzzleplatform.player.ui.board.ZoomableImage
 
 /**
  * Create one *or many* questions from album photos. The puzzle type (sudoku,
- * nonogram, kakuro, slitherlink, nurikabe, heyawake, picto link, yajilin or ripple effect, see [AuthoringType]) is picked from a dropdown and applies to the whole
+ * nonogram, kakuro, slitherlink, nurikabe, heyawake, picto link, yajilin, ripple effect, masyu or slalom, see [AuthoringType]) is picked from a dropdown and applies to the whole
  * batch. A single pick is just a batch of one — same flow throughout. Steps:
  * pick images → Parse all (OCR each) → review/fix any tile (full-screen, with the
  * source photo beside it: sudoku on the real player board, nonogram as editable clue
@@ -136,6 +142,8 @@ fun AdminQuestionScreen(
             onEditPictoLink = { vm.editPictoLink(reviewItem.id, it) },
             onEditYajilin = { vm.editYajilin(reviewItem.id, it) },
             onEditRippleEffect = { vm.editRippleEffect(reviewItem.id, it) },
+            onEditMasyu = { vm.editMasyu(reviewItem.id, it) },
+            onEditSlalom = { vm.editSlalom(reviewItem.id, it) },
             onOverrideGate = { vm.overrideGate(reviewItem.id) },
             canCreateAnyway = state.canCreateAnyway(reviewItem),
             hasFormatProblems = reviewItem.formatProblems(state.type).isNotEmpty(),
@@ -297,6 +305,14 @@ fun AdminQuestionScreen(
                                     "Tap a tile to review its photo and rooms side by side, fix mis-read " +
                                         "numbers, walls or phantom lines, and set its title. A red tile has " +
                                         "walls or numbers that can't be right."
+                                AuthoringType.MASYU ->
+                                    "Tap a tile to review its photo and circles side by side, fix mis-read " +
+                                        "circles or phantom lines, and set its title. A red tile has " +
+                                        "circles that can't be right."
+                                AuthoringType.SLALOM ->
+                                    "Tap a tile to review its photo and gates side by side, fix mis-read " +
+                                        "walls, gates, numbers or phantom lines, and set its title. A red " +
+                                        "tile has gates or a start that can't be right."
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -363,6 +379,16 @@ private fun BatchTile(type: AuthoringType, item: BatchItem, onClick: () -> Unit)
                     AuthoringType.RIPPLE_EFFECT -> RippleEffectMiniBoard(
                         draft = item.rippleEffect,
                         hasProblems = RippleEffectAuthoring.problems(item.rippleEffect).isNotEmpty(),
+                        size = 120.dp,
+                    )
+                    AuthoringType.MASYU -> MasyuMiniBoard(
+                        draft = item.masyu,
+                        hasProblems = MasyuAuthoring.problems(item.masyu).isNotEmpty(),
+                        size = 120.dp,
+                    )
+                    AuthoringType.SLALOM -> SlalomMiniBoard(
+                        draft = item.slalom,
+                        hasProblems = SlalomAuthoring.problems(item.slalom).isNotEmpty(),
                         size = 120.dp,
                     )
                 }
@@ -458,7 +484,8 @@ private fun CreateFooter(
  * player board, reused verbatim from the player; for nonogram [NonogramClueEditor]; for kakuro [KakuroCellEditor];
  * for slitherlink [SlitherlinkClueEditor]; for nurikabe [NurikabeClueEditor]; for heyawake
  * [HeyawakeRoomEditor]; for picto link [PictoLinkClueEditor]; for yajilin [YajilinClueEditor];
- * for ripple effect [RippleEffectRoomEditor].
+ * for ripple effect [RippleEffectRoomEditor]; for masyu [MasyuCircleEditor]; for slalom
+ * [SlalomGateEditor].
  * A pinned top bar and a bottom button both say Done — every edit is already saved
  * to state as it's typed, so "Done" just returns to the grid.
  */
@@ -485,6 +512,8 @@ private fun ReviewScreen(
     onEditPictoLink: ((PictoLinkDraft) -> PictoLinkDraft) -> Unit,
     onEditYajilin: ((YajilinDraft) -> YajilinDraft) -> Unit,
     onEditRippleEffect: ((RippleEffectDraft) -> RippleEffectDraft) -> Unit,
+    onEditMasyu: ((MasyuDraft) -> MasyuDraft) -> Unit,
+    onEditSlalom: ((SlalomDraft) -> SlalomDraft) -> Unit,
     onOverrideGate: () -> Unit,
     canCreateAnyway: Boolean,
     hasFormatProblems: Boolean,
@@ -556,6 +585,13 @@ private fun ReviewScreen(
                     AuthoringType.RIPPLE_EFFECT ->
                         "Compare the photo with the rooms — pinch to zoom the photo, tap a cell to fix " +
                             "its number or walls, delete a phantom line, or add a missed one."
+                    AuthoringType.MASYU ->
+                        "Compare the photo with the grid — pinch to zoom the photo, tap a cell to fix " +
+                            "its circle, delete a phantom line, or add a missed one."
+                    AuthoringType.SLALOM ->
+                        "Compare the photo with the grid — pinch to zoom the photo, tap a cell to fix " +
+                            "its wall, gate or gate number, move the start, delete a phantom line, or add " +
+                            "a missed one."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -635,6 +671,18 @@ private fun ReviewScreen(
                     selectedCell = selectedCell,
                     onSelectCell = onSelectCell,
                     onChange = onEditRippleEffect,
+                )
+                AuthoringType.MASYU -> MasyuCircleEditor(
+                    draft = item.masyu,
+                    selectedCell = selectedCell,
+                    onSelectCell = onSelectCell,
+                    onChange = onEditMasyu,
+                )
+                AuthoringType.SLALOM -> SlalomGateEditor(
+                    draft = item.slalom,
+                    selectedCell = selectedCell,
+                    onSelectCell = onSelectCell,
+                    onChange = onEditSlalom,
                 )
             }
 

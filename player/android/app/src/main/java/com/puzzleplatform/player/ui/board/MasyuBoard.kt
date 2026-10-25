@@ -21,6 +21,7 @@ private val GRID_LINE = Color(0xFFBBBBBB)
 private val CIRCLE_DARK = Color(0xFF222222)
 private val SEGMENT = Color(0xFF888888)
 private val ERROR_COLOR = Color(0xFFDD3333)
+private val SELECT_FILL = Color(0xFFE0E8FF)
 
 /**
  * Compose Canvas renderer for Masyu (puzzle type 7), the analog of
@@ -40,6 +41,9 @@ private val ERROR_COLOR = Color(0xFFDD3333)
  * black circles (filled) must be turned on with straight segments either side. When
  * [liveValidate] is on, circles whose rule is already broken and the segments of a
  * premature closed loop are tinted red (see [MasyuEngine.analyze]).
+ *
+ * The Admin review editor passes [onTapCell] to select a cell and [selectedCell]
+ * ("col,row") to highlight it.
  */
 @Composable
 fun MasyuBoard(
@@ -48,8 +52,11 @@ fun MasyuBoard(
     liveValidate: Boolean,
     onSetEdge: (key: String, on: Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    onTapCell: (col: Int, row: Int) -> Unit = { _, _ -> },
+    selectedCell: String? = null,
 ) {
-    val cells = remember(puzzle.id) { MasyuEngine.parseCells(puzzle) }
+    // Keyed on the canon too: the Admin review editor changes it under a stable id.
+    val cells = remember(puzzle.id, puzzle.canonRepr) { MasyuEngine.parseCells(puzzle) }
     val rows = cells.size
     val cols = cells.maxOfOrNull { it.size } ?: 0
     if (rows == 0 || cols == 0) return
@@ -61,6 +68,8 @@ fun MasyuBoard(
     // The draw closure needs the freshest values to decide draw-vs-erase per gesture.
     val valuesState = rememberUpdatedState(userValues)
     val onSet = rememberUpdatedState(onSetEdge)
+    val onTap = rememberUpdatedState(onTapCell)
+    val selectedState = rememberUpdatedState(selectedCell)
 
     // Per-gesture drawing state, driven by ZoomableBoard's (col,row) callbacks.
     val drag = remember(puzzle.id) { MasyuDragState() }
@@ -70,7 +79,7 @@ fun MasyuBoard(
         rows = rows,
         resetKey = puzzle.id,
         modifier = modifier,
-        onTapCell = { _, _ -> }, // Masyu has no tap-to-select
+        onTapCell = { col, row -> onTap.value(col, row) }, // play has no tap; the Admin editor selects
         onDrawStart = { cell -> drag.start(cell) },
         onDrawEnd = { drag.end() },
         onDrawTo = { cell -> drag.moveTo(cell, valuesState.value) { key, on -> onSet.value(key, on) } },
@@ -78,6 +87,9 @@ fun MasyuBoard(
         val boardW = cols * cell
         val boardH = rows * cell
         drawRect(GRID_BG, topLeft = Offset(0f, 0f), size = Size(boardW, boardH))
+        selectedState.value?.split(",")?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 2 }?.let { (c, r) ->
+            drawRect(SELECT_FILL, topLeft = Offset(c * cell, r * cell), size = Size(cell, cell))
+        }
 
         // Inner grid lines (dashed, light).
         val dash = PathEffect.dashPathEffect(floatArrayOf(cell * 0.11f, cell * 0.08f))
