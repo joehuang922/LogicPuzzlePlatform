@@ -222,24 +222,43 @@ def _line_positions(binary: NDArray, axis: int, warp_w: int, warp_h: int) -> lis
     return lines
 
 
-def _dominant_extent(clusters: list[float], pitch: float, tol: float = 0.2) -> tuple[float, float]:
-    """Return (lo, hi) of the longest run of clusters spaced ~one pitch apart.
+def _dominant_extent(
+    clusters: list[float], pitch: float, tol: float = 0.2, max_bridge: int = 3
+) -> tuple[float, float]:
+    """Return (lo, hi) of the longest run of clusters on the one-pitch grid.
 
     A neighbouring puzzle's title band, grabbed above the board by the border
-    detector, sits a larger-than-cell gap away from the board's first line, so
-    it falls outside the run and is trimmed. Missing/faint interior lines are
-    rare on the opened mask, so a strict single-pitch chain is enough.
+    detector, sits an off-grid gap away from the board's first line, so it falls
+    outside the run and is trimmed. But on a dense board the opened mask does
+    occasionally drop an interior line, leaving a gap of ~2x (or 3x) the pitch;
+    that is still *on* the grid and must not split the run, or the larger
+    fragment wins and the rest of the board is thrown away. So a gap continues
+    the run when it is within ``tol`` of any integer multiple of the pitch (up
+    to ``max_bridge`` -- bridging the missing lines).
+
+    After the run is chosen, an *outermost* cluster sitting a sub-pitch gap
+    beyond it is re-attached: on a perspective warp the board's far edge row is
+    foreshortened to less than a cell, so its border line lands <1 pitch from
+    the first interior line. That is the real edge, not a title band (those are
+    always a *larger*-than-cell gap away), and dropping it costs a whole row.
     """
     pos = np.array(clusters, dtype=float)
     gaps = np.diff(pos)
     runs: list[list[int]] = [[0]]
     for k, gap in enumerate(gaps):
-        if abs(gap - pitch) <= tol * pitch:
+        mult = round(gap / pitch)
+        on_grid = 1 <= mult <= max_bridge and abs(gap - mult * pitch) <= tol * pitch
+        if on_grid:
             runs[-1].append(k + 1)
         else:
             runs.append([k + 1])
     best = max(runs, key=lambda r: pos[r[-1]] - pos[r[0]])
-    return float(pos[best[0]]), float(pos[best[-1]])
+    lo, hi = best[0], best[-1]
+    while lo > 0 and (pos[lo] - pos[lo - 1]) < pitch * (1 - tol):
+        lo -= 1
+    while hi < len(pos) - 1 and (pos[hi + 1] - pos[hi]) < pitch * (1 - tol):
+        hi += 1
+    return float(pos[lo]), float(pos[hi])
 
 
 def _detect_grid_lines(
