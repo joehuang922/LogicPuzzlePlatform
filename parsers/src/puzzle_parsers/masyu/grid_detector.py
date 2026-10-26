@@ -1,18 +1,27 @@
 """Grid detection for masyu puzzles using shared grid_utils.
 
 Pipeline:
-1. Find quadrilateral border and warp to rectangle
-2. Extract the full-span grid lines with a long directional opening. Masyu's
+1. Find quadrilateral border and warp to rectangle.
+2. Normalise the warped board to a canonical cell size. The downstream line
+   detection has pixel-absolute parameters (morphology kernels, gap filters)
+   that were tuned at one resolution; feeding boards at other densities -- a
+   phone photo the Android client downscaled to 2000px, or a magazine's
+   tightly-packed giant board printed at ~25px/cell -- drops it out of that band
+   and collapses rows. We estimate the cell pitch (robust even when line
+   detection is noisy: a median of inter-line gaps survives garbage that would
+   wreck a line *count*) and rescale so the pitch lands at a fixed target, so
+   10x10, 17x17 and 45x31 boards all enter detection at the same cell scale.
+3. Extract the full-span grid lines with a long directional opening. Masyu's
    dense circle-clues are heavy solid ink that dominate a raw ink projection and
    defeat count-by-projection; a morphological opening keeps only ink that runs
    most of the board's width/height, isolating the faint dashed grid lines from
    the clues.
-3. Cluster the line positions per axis, estimate a shared (square-cell) pitch,
+4. Cluster the line positions per axis, estimate a shared (square-cell) pitch,
    and take the longest run of lines spaced ~one pitch apart. The run trims any
    neighbouring puzzle's title band that the border grabbed above the board
    (multi-puzzle magazine pages have no blank gutter between a board and the
    next puzzle's number box).
-4. Emit a uniform grid over that run's extent.
+5. Emit a uniform grid over that run's extent.
 """
 from __future__ import annotations
 
@@ -43,6 +52,85 @@ class MasyuGeometry:
     cell_w: float
 
 
+# Cell size the line detection is tuned for; a warped board is rescaled so its
+# estimated pitch lands here. Chosen at the low end of the proven-good band
+# (~145-250px/cell across the sample boards) so full-res scans mostly downscale
+# and downscaled phone photos only upscale ~1.4-2x, never wildly.
+_TARGET_CELL_PITCH = 180.0
+# Below this measured pitch the dashes blur into sub-cell noise and the estimate
+# is no longer trustworthy; leave such boards at native scale rather than
+# amplifying a bad number. (Genuine scans resolve well above this.)
+_MIN_RELIABLE_PITCH = 20.0
+# Cap the upscale so a mis-estimated tiny pitch can't blow the board up to a
+# memory-eating size; 4x covers the real low-res cases (e.g. a 2000px phone
+# photo of a 17x17).
+_MAX_UPSCALE = 4.0
+
+
+def _estimate_cell_pitch(warped_gray: NDArray, warp_w: int, warp_h: int) -> float:
+    """Estimate the grid's cell pitch (px) robustly, before line detection.
+
+    Line *counting* is fragile on off-scale boards, but the *pitch* is not: it is
+    the median gap between detected lines, and a median shrugs off the spurious
+    and merged lines that wreck a count. We gather inter-line gaps on both axes,
+    then iteratively refine the median within a [0.62, 1.4]x window so that
+    double-gaps (a missed line) and sub-cell noise don't drag it. Returns 0 when
+    too few lines are found to say anything.
+    """
+    binary = cv2.adaptiveThreshold(
+        cv2.GaussianBlur(warped_gray, (3, 3), 0),
+        255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 3,
+    )
+    gaps: list[float] = []
+    for axis, span in ((0, warp_h), (1, warp_w)):
+        raw = _line_positions(binary, axis, warp_w, warp_h)
+        if len(raw) < 2:
+            continue
+        clustered = _cluster_positions(raw, min_gap=max(4.0, span * 0.012))
+        gaps.extend(np.diff(clustered).tolist())
+
+    g = np.array([x for x in gaps if x > 2.0], dtype=float)
+    if len(g) < 2:
+        return 0.0
+
+    pitch = float(np.median(g))
+    for _ in range(6):  # refine: reject harmonics and sub-cell noise, re-median
+        window = g[(g > pitch * 0.62) & (g < pitch * 1.4)]
+        if len(window) < 2:
+            break
+        updated = float(np.median(window))
+        if abs(updated - pitch) <= 0.5:
+            pitch = updated
+            break
+        pitch = updated
+    return pitch
+
+
+def _normalize_cell_scale(
+    warped: NDArray, warp_w: int, warp_h: int
+) -> tuple[NDArray, int, int]:
+    """Rescale the warped board so its cell pitch matches ``_TARGET_CELL_PITCH``.
+
+    Returns the (possibly unchanged) image and its new dimensions. A no-op when
+    the pitch can't be estimated, is already in-band, or is too coarse to trust.
+    """
+    warped_gray = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
+    pitch = _estimate_cell_pitch(warped_gray, warp_w, warp_h)
+    if pitch < _MIN_RELIABLE_PITCH:
+        return warped, warp_w, warp_h
+
+    scale = _TARGET_CELL_PITCH / pitch
+    if 0.9 <= scale <= 1.1:  # already the right density; don't resample for nothing
+        return warped, warp_w, warp_h
+    scale = min(scale, _MAX_UPSCALE)
+
+    new_w = max(1, int(round(warp_w * scale)))
+    new_h = max(1, int(round(warp_h * scale)))
+    interp = cv2.INTER_AREA if scale < 1 else cv2.INTER_CUBIC
+    resized = cv2.resize(warped, (new_w, new_h), interpolation=interp)
+    return resized, new_w, new_h
+
+
 def detect_masyu_grid(
     image: NDArray,
     debug_dir: str | None = None,
@@ -56,12 +144,16 @@ def detect_masyu_grid(
     # Step 1: Find border and warp
     border_pts = find_quadrilateral_border(gray)
     warped, warp_w, warp_h = warp_to_rectangle(image, border_pts)
+
+    # Step 2: Normalise to a canonical cell size so the pixel-absolute line
+    # detection below always runs at the density it was tuned for.
+    warped, warp_w, warp_h = _normalize_cell_scale(warped, warp_w, warp_h)
     warped_gray = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
 
     if debug_path:
         cv2.imwrite(str(debug_path / "01_warped.png"), warped)
 
-    # Step 2-4: Detect the grid lines from the full-span dashed lines only.
+    # Step 3-5: Detect the grid lines from the full-span dashed lines only.
     h_lines, v_lines = _detect_grid_lines(warped_gray, warp_w, warp_h)
 
     if debug_path:
