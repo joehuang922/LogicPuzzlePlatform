@@ -84,46 +84,10 @@ fun RippleEffectRoomEditor(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
-            Text("Row ${selRow + 1}, column ${selCol + 1}", fontWeight = FontWeight.Medium)
-            val roomSize = draft.regionAt(selCol, selRow)?.size ?: 0
-            val clue = draft.clues[selRow to selCol]
-            // Re-key per cell so each selection starts its field from that cell's number.
+            // One panel per cell: a new selection builds it afresh, so its wall chips read
+            // and toggle the newly selected cell, never the one picked before.
             key(selCol, selRow) {
-                ClueNumberField(
-                    label = "Number (room of $roomSize, blank for none)",
-                    clue = clue,
-                    parse = RippleEffectAuthoring::parseClue,
-                    onClue = { v -> onChange { RippleEffectAuthoring.setClue(it, selCol, selRow, v) } },
-                    isError = (clue ?: 0) > roomSize,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            Text("Walls", style = MaterialTheme.typography.bodySmall)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                for ((side, label) in WALL_LABELS) {
-                    FilterChip(
-                        selected = RippleEffectAuthoring.hasWall(draft, selCol, selRow, side),
-                        onClick = { onChange { RippleEffectAuthoring.toggleWall(it, selCol, selRow, side) } },
-                        enabled = RippleEffectAuthoring.canToggleWall(draft, selCol, selRow, side),
-                        label = { Text(label) },
-                    )
-                }
-            }
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                OutlinedButton(
-                    onClick = {
-                        onSelectCell(null)
-                        onChange { RippleEffectAuthoring.removeRow(it, selRow) }
-                    },
-                    enabled = draft.height > 1,
-                ) { Text("Delete row ${selRow + 1}") }
-                OutlinedButton(
-                    onClick = {
-                        onSelectCell(null)
-                        onChange { RippleEffectAuthoring.removeCol(it, selCol) }
-                    },
-                    enabled = draft.width > 1,
-                ) { Text("Delete column ${selCol + 1}") }
+                SelectedCellPanel(draft, selCol, selRow, onSelectCell, onChange)
             }
         }
 
@@ -137,6 +101,59 @@ fun RippleEffectRoomEditor(
                 Text("Add column")
             }
         }
+    }
+}
+
+/**
+ * The selected cell's number, wall chips, and delete row/column buttons. [col] and
+ * [row] are fixed for this panel's lifetime; [RippleEffectRoomEditor] keys it per cell.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SelectedCellPanel(
+    draft: RippleEffectDraft,
+    col: Int,
+    row: Int,
+    onSelectCell: (String?) -> Unit,
+    onChange: ((RippleEffectDraft) -> RippleEffectDraft) -> Unit,
+) {
+    Text("Row ${row + 1}, column ${col + 1}", fontWeight = FontWeight.Medium)
+    val roomSize = draft.regionAt(col, row)?.size ?: 0
+    val clue = draft.clues[row to col]
+    ClueNumberField(
+        label = "Number (room of $roomSize, blank for none)",
+        clue = clue,
+        parse = RippleEffectAuthoring::parseClue,
+        onClue = { v -> onChange { RippleEffectAuthoring.setClue(it, col, row, v) } },
+        isError = (clue ?: 0) > roomSize,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Text("Walls", style = MaterialTheme.typography.bodySmall)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        for ((side, label) in WALL_LABELS) {
+            FilterChip(
+                selected = RippleEffectAuthoring.hasWall(draft, col, row, side),
+                onClick = { onChange { RippleEffectAuthoring.toggleWall(it, col, row, side) } },
+                enabled = RippleEffectAuthoring.canToggleWall(draft, col, row, side),
+                label = { Text(label) },
+            )
+        }
+    }
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        OutlinedButton(
+            onClick = {
+                onSelectCell(null)
+                onChange { RippleEffectAuthoring.removeRow(it, row) }
+            },
+            enabled = draft.height > 1,
+        ) { Text("Delete row ${row + 1}") }
+        OutlinedButton(
+            onClick = {
+                onSelectCell(null)
+                onChange { RippleEffectAuthoring.removeCol(it, col) }
+            },
+            enabled = draft.width > 1,
+        ) { Text("Delete column ${col + 1}") }
     }
 }
 
