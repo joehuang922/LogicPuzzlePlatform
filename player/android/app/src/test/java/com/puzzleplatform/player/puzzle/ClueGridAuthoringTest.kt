@@ -9,7 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Pure logic behind the Admin number-clue flow (number link, shikaku): parser canon ->
+ * Pure logic behind the Admin number-clue flow (number link, shikaku, fillomino): parser canon ->
  * editable draft -> canon round-trips, clue and line edits, and each type's checks.
  */
 class ClueGridAuthoringTest {
@@ -92,5 +92,24 @@ class ClueGridAuthoringTest {
             ShikakuAuthoring.problems(boxed).drop(1),
         )
         assertTrue(ShikakuAuthoring.fits(rowsOf3, 0, 0, 3))
+    }
+
+    @Test
+    fun fillominoCluesMustFitTheirRooms() {
+        val ok = ClueGridDraft(listOf(listOf(2, 2, 0), listOf(0, 1, 3), listOf(3, 0, 0)))
+        assertTrue(FillominoAuthoring.problems(ok).isEmpty())
+        // Two adjacent 1s would be one room of 2; three connected 2s overflow a 2-room.
+        val crowded = ClueGridDraft(listOf(listOf(1, 1, 0), listOf(2, 2, 0), listOf(0, 2, 0)))
+        assertEquals(
+            listOf(
+                "R1C1: 2 connected 1s can't fit in one 1-cell room",
+                "R2C1: 3 connected 2s can't fit in one 2-cell room",
+            ),
+            FillominoAuthoring.problems(crowded),
+        )
+        assertEquals(
+            listOf("R1C1: 5 is bigger than the grid's 4 cells"),
+            FillominoAuthoring.problems(ClueGridDraft(listOf(listOf(5, 0), listOf(0, 0)))),
+        )
     }
 }

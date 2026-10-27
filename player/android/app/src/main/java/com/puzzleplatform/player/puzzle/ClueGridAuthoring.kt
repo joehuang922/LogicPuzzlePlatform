@@ -7,7 +7,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.intOrNull
 
 /**
- * The editable grid of a number-clue puzzle being authored (number link, shikaku):
+ * The editable grid of a number-clue puzzle being authored (number link, shikaku, fillomino):
  * cells[r][c] is a positive clue, or 0 for none. Always rectangular.
  */
 data class ClueGridDraft(val cells: List<List<Int>> = emptyList()) {
@@ -170,5 +170,49 @@ object ShikakuAuthoring : ClueGridAuthoring(22, "shikaku", "四角に切れ") {
             }
         }
         return false
+    }
+}
+
+/**
+ * Authoring for fillomino (type 14): a clue N sits in a room of exactly N cells, so N can't
+ * exceed the grid, and a run of orthogonally connected equal clues — one room — can't hold
+ * more than N cells.
+ */
+object FillominoAuthoring : ClueGridAuthoring(14, "fillomino", "フィルオミノ") {
+    const val PUZZLE_TYPE = 14
+
+    override fun clueProblems(draft: ClueGridDraft): List<String> = buildList {
+        val area = draft.rows * draft.cols
+        val seen = Array(draft.rows) { BooleanArray(draft.cols) }
+        for (r in 0 until draft.rows) {
+            for (c in 0 until draft.cols) {
+                val n = draft.cells[r][c]
+                if (n == 0 || seen[r][c]) continue
+                if (n > area) add("${at(r, c)}: $n is bigger than the grid's $area cells")
+                val group = sameClueGroup(draft, r, c, seen)
+                if (group > n) add("${at(r, c)}: $group connected ${n}s can't fit in one $n-cell room")
+            }
+        }
+    }
+
+    /** Size of the orthogonally connected run of clues equal to the one at (r, c), marking it [seen]. */
+    private fun sameClueGroup(draft: ClueGridDraft, r: Int, c: Int, seen: Array<BooleanArray>): Int {
+        val n = draft.cells[r][c]
+        val stack = ArrayDeque(listOf(r to c))
+        seen[r][c] = true
+        var size = 0
+        while (stack.isNotEmpty()) {
+            val (rr, cc) = stack.removeLast()
+            size++
+            for ((dr, dc) in listOf(-1 to 0, 1 to 0, 0 to -1, 0 to 1)) {
+                val nr = rr + dr
+                val nc = cc + dc
+                if (draft.inGrid(nc, nr) && !seen[nr][nc] && draft.cells[nr][nc] == n) {
+                    seen[nr][nc] = true
+                    stack.addLast(nr to nc)
+                }
+            }
+        }
+        return size
     }
 }

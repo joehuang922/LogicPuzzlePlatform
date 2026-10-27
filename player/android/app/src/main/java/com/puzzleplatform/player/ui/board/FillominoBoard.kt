@@ -43,6 +43,9 @@ private val SELECT_FILL = Color(0xFFE0E8FF)
  * Clues are drawn bold black, player numbers blue; drawn walls and the outer border
  * are solid/thick, the remaining cell separators thin and dashed (mirroring the web
  * board). Rendering and pan/zoom run through [ZoomableBoard].
+ *
+ * The Admin review editor passes [onTapCell] to hear every cell tap (clues included)
+ * and [outlinedCell] ("col,row") to outline its selection.
  */
 @Composable
 fun FillominoBoard(
@@ -53,8 +56,11 @@ fun FillominoBoard(
     onSelectCell: (String?) -> Unit,
     onSetEdge: (key: String, on: Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    onTapCell: (col: Int, row: Int) -> Unit = { _, _ -> },
+    outlinedCell: String? = null,
 ) {
-    val cells = remember(puzzle.id) { FillominoEngine.parseCells(puzzle) }
+    // Keyed on the canon too: the Admin review editor changes it under a stable id.
+    val cells = remember(puzzle.id, puzzle.canonRepr) { FillominoEngine.parseCells(puzzle) }
     val rows = cells.size
     val cols = cells.maxOfOrNull { it.size } ?: 0
     if (rows == 0 || cols == 0) return
@@ -66,6 +72,8 @@ fun FillominoBoard(
     val valuesState = rememberUpdatedState(userValues)
     val onSelect = rememberUpdatedState(onSelectCell)
     val onSet = rememberUpdatedState(onSetEdge)
+    val onTap = rememberUpdatedState(onTapCell)
+    val outlinedState = rememberUpdatedState(outlinedCell)
 
     ZoomableBoard(
         cols = cols,
@@ -73,6 +81,7 @@ fun FillominoBoard(
         resetKey = puzzle.id,
         modifier = modifier,
         onTapCell = { col, row ->
+            onTap.value(col, row)
             if (modeState.value != FillominoMode.NUMBER) return@ZoomableBoard
             if ((cells.getOrNull(row)?.getOrNull(col) ?: 0) > 0) return@ZoomableBoard // clue locked
             val key = FillominoEngine.cellKey(col, row)
@@ -148,6 +157,8 @@ fun FillominoBoard(
                 drawNumber(value, c, r, cell, color, bold)
             }
         }
+
+        drawCellSelection(outlinedState.value, cell)
     }
 }
 

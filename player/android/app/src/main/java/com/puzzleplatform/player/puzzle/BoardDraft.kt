@@ -27,6 +27,7 @@ data class BoardDraft(
     val akari: BlackCellDraft = BlackCellDraft(),
     val numberLink: ClueGridDraft = ClueGridDraft(),
     val shikaku: ClueGridDraft = ClueGridDraft(),
+    val fillomino: ClueGridDraft = ClueGridDraft(),
 ) {
     /**
      * What the type's misread check finds wrong with this board — the list that turns
@@ -48,6 +49,7 @@ data class BoardDraft(
         AuthoringType.AKARI -> AkariAuthoring.problems(akari)
         AuthoringType.NUMBER_LINK -> NumberLinkAuthoring.problems(numberLink)
         AuthoringType.SHIKAKU -> ShikakuAuthoring.problems(shikaku)
+        AuthoringType.FILLOMINO -> FillominoAuthoring.problems(fillomino)
     }
 
     /**
@@ -98,6 +100,8 @@ data class BoardDraft(
             CanonBoard(NumberLinkAuthoring.canonFromDraft(numberLink), numberLink.cols, numberLink.rows)
         AuthoringType.SHIKAKU ->
             CanonBoard(ShikakuAuthoring.canonFromDraft(shikaku), shikaku.cols, shikaku.rows)
+        AuthoringType.FILLOMINO ->
+            CanonBoard(FillominoAuthoring.canonFromDraft(fillomino), fillomino.cols, fillomino.rows)
     }
 
     companion object {
@@ -118,6 +122,7 @@ data class BoardDraft(
             AuthoringType.AKARI -> BoardDraft(akari = AkariAuthoring.draftFromCanon(canon))
             AuthoringType.NUMBER_LINK -> BoardDraft(numberLink = NumberLinkAuthoring.draftFromCanon(canon))
             AuthoringType.SHIKAKU -> BoardDraft(shikaku = ShikakuAuthoring.draftFromCanon(canon))
+            AuthoringType.FILLOMINO -> BoardDraft(fillomino = FillominoAuthoring.draftFromCanon(canon))
         }
     }
 }

@@ -70,6 +70,9 @@ class BoardDraftTest {
         assertEquals(CanonBoard(canon, 2, 2), link.toCanon(AuthoringType.NUMBER_LINK))
         val shikaku = BoardDraft.fromCanon(AuthoringType.SHIKAKU, canon)
         assertEquals(BoardDraft(shikaku = shikaku.shikaku), shikaku)
+        val fillomino = BoardDraft.fromCanon(AuthoringType.FILLOMINO, canon)
+        assertEquals(BoardDraft(fillomino = fillomino.fillomino), fillomino)
+        assertEquals(CanonBoard(canon, 2, 2), fillomino.toCanon(AuthoringType.FILLOMINO))
     }
 
     @Test

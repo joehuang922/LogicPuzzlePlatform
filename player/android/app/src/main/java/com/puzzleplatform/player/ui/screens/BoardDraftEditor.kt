@@ -6,6 +6,7 @@ import androidx.compose.ui.unit.Dp
 import com.puzzleplatform.player.puzzle.AuthoringType
 import com.puzzleplatform.player.puzzle.AkariAuthoring
 import com.puzzleplatform.player.puzzle.BoardDraft
+import com.puzzleplatform.player.puzzle.FillominoAuthoring
 import com.puzzleplatform.player.puzzle.NumberLinkAuthoring
 import com.puzzleplatform.player.puzzle.ShakashakaAuthoring
 import com.puzzleplatform.player.puzzle.ShikakuAuthoring
@@ -14,6 +15,8 @@ import com.puzzleplatform.player.ui.board.AkariBoard
 import com.puzzleplatform.player.ui.board.BlackCellMiniBoard
 import com.puzzleplatform.player.ui.board.ClueGridMiniBoard
 import com.puzzleplatform.player.ui.board.DigitBar
+import com.puzzleplatform.player.ui.board.FillominoBoard
+import com.puzzleplatform.player.ui.board.FillominoMode
 import com.puzzleplatform.player.ui.board.HeyawakeMiniBoard
 import com.puzzleplatform.player.ui.board.KakuroMiniBoard
 import com.puzzleplatform.player.ui.board.MasyuMiniBoard
@@ -39,7 +42,7 @@ import com.puzzleplatform.player.ui.board.YajilinMiniBoard
  * [HeyawakeRoomEditor]; for picto link [PictoLinkClueEditor]; for yajilin
  * [YajilinClueEditor]; for ripple effect [RippleEffectRoomEditor]; for masyu
  * [MasyuCircleEditor]; for slalom [SlalomGateEditor]; for shakashaka and akari
- * [BlackCellEditor]; for number link and shikaku [ClueGridEditor], each on its own player
+ * [BlackCellEditor]; for number link, shikaku and fillomino [ClueGridEditor], each on its own player
  * board (whose play input has nothing to write into here, so it's dropped). Each lists
  * its own problems.
  */
@@ -191,6 +194,25 @@ fun BoardDraftEditor(
                 selectedCell = selected,
             )
         }
+        AuthoringType.FILLOMINO -> ClueGridEditor(
+            authoring = FillominoAuthoring,
+            draft = board.fillomino,
+            clueLabel = "Number",
+            selectedCell = selectedCell,
+            onSelectCell = onSelectCell,
+            onChange = { t -> onChange { it.copy(fillomino = t(it.fillomino)) } },
+        ) { puzzle, onTap, selected ->
+            FillominoBoard(
+                puzzle = puzzle,
+                userValues = emptyMap(),
+                mode = FillominoMode.NUMBER,
+                selectedCell = null,
+                onSelectCell = {},
+                onSetEdge = { _, _ -> },
+                onTapCell = onTap,
+                outlinedCell = selected,
+            )
+        }
     }
 }
 
@@ -224,5 +246,7 @@ fun BoardDraftMiniBoard(type: AuthoringType, board: BoardDraft, size: Dp) {
         AuthoringType.NUMBER_LINK ->
             ClueGridMiniBoard(draft = board.numberLink, hasProblems = hasProblems, size = size)
         AuthoringType.SHIKAKU -> ClueGridMiniBoard(draft = board.shikaku, hasProblems = hasProblems, size = size)
+        AuthoringType.FILLOMINO ->
+            ClueGridMiniBoard(draft = board.fillomino, hasProblems = hasProblems, size = size)
     }
 }
