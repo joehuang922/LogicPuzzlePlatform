@@ -46,7 +46,6 @@ fun HeyawakeRoomEditor(
     val selected = selectedCell?.split(",")?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 2 }
     val selCol = selected?.get(0)
     val selRow = selected?.get(1)
-    val room = if (selCol != null && selRow != null) draft.regionAt(selCol, selRow) else null
     val formatProblems = HeyawakeAuthoring.formatProblems(draft)
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -85,48 +84,10 @@ fun HeyawakeRoomEditor(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
-            Text("Row ${selRow + 1}, column ${selCol + 1}", fontWeight = FontWeight.Medium)
-            if (room != null) {
-                val max = HeyawakeAuthoring.maxClue(room.w, room.h)
-                val size = if (room.isRectangle) "${room.w}×${room.h}" else "${room.cells.size} cells, not a rectangle"
-                // Re-key per room so each selection starts its field from that room's clue.
-                key(room.cells.first()) {
-                    ClueNumberField(
-                        label = "Room clue ($size, blank for none)",
-                        clue = room.clue,
-                        parse = HeyawakeAuthoring::parseClue,
-                        onClue = { v -> onChange { HeyawakeAuthoring.setClue(it, selCol, selRow, v) } },
-                        isError = room.clueCells.size > 1 || (room.isRectangle && (room.clue ?: 0) > max),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            }
-            Text("Walls", style = MaterialTheme.typography.bodySmall)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                for ((side, label) in WALL_LABELS) {
-                    FilterChip(
-                        selected = HeyawakeAuthoring.hasWall(draft, selCol, selRow, side),
-                        onClick = { onChange { HeyawakeAuthoring.toggleWall(it, selCol, selRow, side) } },
-                        enabled = HeyawakeAuthoring.canToggleWall(draft, selCol, selRow, side),
-                        label = { Text(label) },
-                    )
-                }
-            }
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                OutlinedButton(
-                    onClick = {
-                        onSelectCell(null)
-                        onChange { HeyawakeAuthoring.removeRow(it, selRow) }
-                    },
-                    enabled = draft.height > 1,
-                ) { Text("Delete row ${selRow + 1}") }
-                OutlinedButton(
-                    onClick = {
-                        onSelectCell(null)
-                        onChange { HeyawakeAuthoring.removeCol(it, selCol) }
-                    },
-                    enabled = draft.width > 1,
-                ) { Text("Delete column ${selCol + 1}") }
+            // One panel per cell: a new selection builds it afresh, so its wall chips read
+            // and toggle the newly selected cell, never the one picked before.
+            key(selCol, selRow) {
+                SelectedCellPanel(draft, selCol, selRow, onSelectCell, onChange)
             }
         }
 
@@ -140,6 +101,65 @@ fun HeyawakeRoomEditor(
                 Text("Add column")
             }
         }
+    }
+}
+
+/**
+ * The selected cell's room clue, wall chips, and delete row/column buttons. [col] and
+ * [row] are fixed for this panel's lifetime; [HeyawakeRoomEditor] keys it per cell.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SelectedCellPanel(
+    draft: HeyawakeDraft,
+    col: Int,
+    row: Int,
+    onSelectCell: (String?) -> Unit,
+    onChange: ((HeyawakeDraft) -> HeyawakeDraft) -> Unit,
+) {
+    Text("Row ${row + 1}, column ${col + 1}", fontWeight = FontWeight.Medium)
+    val room = draft.regionAt(col, row)
+    if (room != null) {
+        val max = HeyawakeAuthoring.maxClue(room.w, room.h)
+        val size = if (room.isRectangle) "${room.w}×${room.h}" else "${room.cells.size} cells, not a rectangle"
+        // Re-key per room so a wall edit that changes the room restarts the field from its clue.
+        key(room.cells.first()) {
+            ClueNumberField(
+                label = "Room clue ($size, blank for none)",
+                clue = room.clue,
+                parse = HeyawakeAuthoring::parseClue,
+                onClue = { v -> onChange { HeyawakeAuthoring.setClue(it, col, row, v) } },
+                isError = room.clueCells.size > 1 || (room.isRectangle && (room.clue ?: 0) > max),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+    Text("Walls", style = MaterialTheme.typography.bodySmall)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        for ((side, label) in WALL_LABELS) {
+            FilterChip(
+                selected = HeyawakeAuthoring.hasWall(draft, col, row, side),
+                onClick = { onChange { HeyawakeAuthoring.toggleWall(it, col, row, side) } },
+                enabled = HeyawakeAuthoring.canToggleWall(draft, col, row, side),
+                label = { Text(label) },
+            )
+        }
+    }
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        OutlinedButton(
+            onClick = {
+                onSelectCell(null)
+                onChange { HeyawakeAuthoring.removeRow(it, row) }
+            },
+            enabled = draft.height > 1,
+        ) { Text("Delete row ${row + 1}") }
+        OutlinedButton(
+            onClick = {
+                onSelectCell(null)
+                onChange { HeyawakeAuthoring.removeCol(it, col) }
+            },
+            enabled = draft.width > 1,
+        ) { Text("Delete column ${col + 1}") }
     }
 }
 
