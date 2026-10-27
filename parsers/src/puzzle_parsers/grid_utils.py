@@ -134,7 +134,10 @@ def _find_border_via_contours(gray: NDArray, close_k: int = 1) -> NDArray | None
     candidates = sorted(contours, key=cv2.contourArea, reverse=True)
     for contour in candidates[:10]:
         area = cv2.contourArea(contour)
-        if area < img_area * 0.2:
+        # Whole-page photos (kept so the author credit at the page foot is
+        # captured) leave a small board at ~16% of the frame; a higher floor
+        # skips its contour and lets a coarser fallback pick a wrong box.
+        if area < img_area * 0.15:
             break
         if area > img_area * 0.98:
             continue
