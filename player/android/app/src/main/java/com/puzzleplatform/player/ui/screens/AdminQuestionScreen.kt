@@ -68,7 +68,7 @@ import com.puzzleplatform.player.ui.board.ZoomableImage
 
 /**
  * Create one *or many* questions from album photos. The puzzle type (sudoku,
- * nonogram, kakuro, slitherlink, nurikabe, heyawake, picto link, yajilin, ripple effect, masyu, slalom, shakashaka, akari, number link, shikaku or fillomino, see [AuthoringType]) is picked from a dropdown and applies to the whole
+ * nonogram, kakuro, slitherlink, nurikabe, heyawake, picto link, yajilin, ripple effect, masyu, slalom, shakashaka, akari, number link, shikaku, fillomino or kuralin, see [AuthoringType]) is picked from a dropdown and applies to the whole
  * batch. A single pick is just a batch of one — same flow throughout. Steps:
  * pick images → Parse all (OCR each) → review/fix any tile (full-screen, with the
  * source photo beside it: sudoku on the real player board, nonogram as editable clue
@@ -289,6 +289,10 @@ fun AdminQuestionScreen(
                                     "Tap a tile to review its photo and grid side by side, fix mis-read " +
                                         "numbers or phantom lines, and set its title. A red tile has " +
                                         "numbers that can't fit their rooms."
+                                AuthoringType.KURALIN ->
+                                    "Tap a tile to review its photo and circles side by side, fix mis-read " +
+                                        "circles or a miscounted grid, and set its title. A red tile has " +
+                                        "no circles."
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -510,6 +514,9 @@ private fun ReviewScreen(
                     AuthoringType.FILLOMINO ->
                         "Compare the photo with the grid — pinch to zoom the photo, tap a cell to fix " +
                             "its number, delete a phantom line, or add a missed one."
+                    AuthoringType.KURALIN ->
+                        "Compare the photo with the grid — pinch to zoom the photo, tap a grid line or " +
+                            "corner to cycle its circle, or add or remove a row or column at the edge."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

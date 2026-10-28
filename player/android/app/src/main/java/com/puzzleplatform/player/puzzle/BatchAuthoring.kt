@@ -106,6 +106,7 @@ enum class AuthoringType(val label: String, val jpLabel: String, val puzzleType:
     NUMBER_LINK("Number Link", "ナンバーリンク", NumberLinkAuthoring.PUZZLE_TYPE),
     SHIKAKU("Shikaku", "四角に切れ", ShikakuAuthoring.PUZZLE_TYPE),
     FILLOMINO("Fillomino", "フィルオミノ", FillominoAuthoring.PUZZLE_TYPE),
+    KURALIN("Kuralin", "クラリン", KuralinAuthoring.PUZZLE_TYPE),
     ;
 
     companion object {

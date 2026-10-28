@@ -84,6 +84,7 @@ import com.puzzleplatform.player.ui.board.SlitherlinkBoard
 import com.puzzleplatform.player.ui.board.SudokuBoard
 import com.puzzleplatform.player.ui.board.TentaishowBoard
 import com.puzzleplatform.player.ui.board.YajilinBoard
+import com.puzzleplatform.player.ui.board.KuralinBoard
 import com.puzzleplatform.player.puzzle.NonogramEngine
 import com.puzzleplatform.player.puzzle.NonogramHinter
 import com.puzzleplatform.player.puzzle.PuzzleEngines
@@ -491,6 +492,15 @@ fun PlayScreen(
                             userValues = state.userValues,
                             onTapCell = vm::tapShadeCell,
                             onApplyChanges = vm::putUserValues,
+                        )
+                        // Kuralin: Yajilin's input (tap shades, drag draws the loop), with
+                        // live validation outlining circles whose count has failed.
+                        28 -> KuralinBoard(
+                            puzzle = puzzle,
+                            userValues = state.userValues,
+                            onTapCell = vm::tapShadeCell,
+                            onApplyChanges = vm::putUserValues,
+                            liveValidate = state.liveValidate,
                         )
                         else -> Text("This puzzle type isn't playable in this version yet.")
                     }

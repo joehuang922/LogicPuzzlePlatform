@@ -19,6 +19,7 @@ import com.puzzleplatform.player.ui.board.FillominoBoard
 import com.puzzleplatform.player.ui.board.FillominoMode
 import com.puzzleplatform.player.ui.board.HeyawakeMiniBoard
 import com.puzzleplatform.player.ui.board.KakuroMiniBoard
+import com.puzzleplatform.player.ui.board.KuralinMiniBoard
 import com.puzzleplatform.player.ui.board.MasyuMiniBoard
 import com.puzzleplatform.player.ui.board.NonogramMiniBoard
 import com.puzzleplatform.player.ui.board.NurikabeMiniBoard
@@ -42,7 +43,8 @@ import com.puzzleplatform.player.ui.board.YajilinMiniBoard
  * [HeyawakeRoomEditor]; for picto link [PictoLinkClueEditor]; for yajilin
  * [YajilinClueEditor]; for ripple effect [RippleEffectRoomEditor]; for masyu
  * [MasyuCircleEditor]; for slalom [SlalomGateEditor]; for shakashaka and akari
- * [BlackCellEditor]; for number link, shikaku and fillomino [ClueGridEditor], each on its own player
+ * [BlackCellEditor]; for number link, shikaku and fillomino [ClueGridEditor]; for kuralin
+ * [KuralinCircleEditor], each on its own player
  * board (whose play input has nothing to write into here, so it's dropped). Each lists
  * its own problems.
  */
@@ -213,6 +215,10 @@ fun BoardDraftEditor(
                 outlinedCell = selected,
             )
         }
+        AuthoringType.KURALIN -> KuralinCircleEditor(
+            draft = board.kuralin,
+            onChange = { t -> onChange { it.copy(kuralin = t(it.kuralin)) } },
+        )
     }
 }
 
@@ -248,5 +254,6 @@ fun BoardDraftMiniBoard(type: AuthoringType, board: BoardDraft, size: Dp) {
         AuthoringType.SHIKAKU -> ClueGridMiniBoard(draft = board.shikaku, hasProblems = hasProblems, size = size)
         AuthoringType.FILLOMINO ->
             ClueGridMiniBoard(draft = board.fillomino, hasProblems = hasProblems, size = size)
+        AuthoringType.KURALIN -> KuralinMiniBoard(draft = board.kuralin, hasProblems = hasProblems, size = size)
     }
 }

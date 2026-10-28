@@ -76,6 +76,14 @@ class BoardDraftTest {
     }
 
     @Test
+    fun kuralinRoundTripsWithItsSize() {
+        val canon = json("""{"width":3,"height":2,"circles":[{"dr":2,"dc":4,"color":2}]}""")
+        val board = BoardDraft.fromCanon(AuthoringType.KURALIN, canon)
+        assertEquals(BoardDraft(kuralin = board.kuralin), board)
+        assertEquals(CanonBoard(canon, 3, 2), board.toCanon(AuthoringType.KURALIN))
+    }
+
+    @Test
     fun sudokuHasNoProblemCheck() {
         assertTrue(BoardDraft().problems(AuthoringType.SUDOKU).isEmpty())
         assertTrue(BoardDraft().formatProblems(AuthoringType.SUDOKU).isEmpty())

@@ -136,6 +136,10 @@ Modeled on Yajilin:
 
 `(cells that are blackened or touched by at least one loop edge / total cells) * 100`.
 
+### Android
+
+`KuralinEngine` ports the extractor, progress and validation; `KuralinBoard` uses Yajilin's input (tap cycles empty → black → marked through the shared `ShadeMarkEngine` cycle, drag draws the loop and refuses black cells and branches). With Errors on, a circle whose touched cells are all decided and whose count fails is outlined red.
+
 ## Puzzle Editor
 
 ### Interactions
@@ -149,6 +153,10 @@ Modeled on Yajilin:
 - Same dashed grid + solid border + circle rendering as the player view.
 - Only placed circles are drawn; empty candidate positions are not marked.
 - No picture preview pane.
+
+### Android admin
+
+Kuralin is an `AuthoringType`, so it can be created from photos and edited in the question editor. `KuralinCircleEditor` shows the board; a tap snaps to the nearest grid line or corner and cycles its circle (none → ○ → ● → gray → none). Rows and columns are added or removed at the bottom/right edge only: the parser counts lines from a uniform pitch, so a miscount shifts every circle and calls for a re-shoot rather than deleting a middle line. Snapped taps keep every circle on a valid point, so there are no format problems; a board with no circles is flagged red.
 
 ## Puzzle Parser
 
