@@ -589,6 +589,39 @@ def reconcile_square_lines(
     pitch (rescue a genuinely under-detected axis). Either way cells stay
     uniform. See [[grid-parser-robustness]] for the original square-cell rescue.
     """
+    new_h, new_v = _reconcile_by_pitch(h_lines, v_lines, warp_h, warp_w, diverge_tol)
+    # An axis whose raw peaks already form a complete, regular comb needs no
+    # rescue: re-deriving its count from the *median* gap is what hurts there.
+    # On a curled page the gaps drift (Q65: 75-81px, median 79 vs true 77.6),
+    # so span/median rounds a 30-row board down to 29.
+    if _is_complete_comb(h_lines, warp_h):
+        new_h = list(h_lines)
+    if _is_complete_comb(v_lines, warp_w):
+        new_v = list(v_lines)
+    return new_h, new_v
+
+
+# Raw gaps must sit within this fraction of the median gap for the axis to be
+# trusted as-is. Partial edge rows on a slightly tight border run ~0.75 of a
+# cell; a missed line doubles a gap and a spurious one roughly halves it.
+_COMB_GAP_TOL = 0.4
+
+
+def _is_complete_comb(lines: list[int], span: int) -> bool:
+    """True when ``lines`` covers ``span`` with no missing or spurious line."""
+    if len(lines) < 4:
+        return False
+    gaps = np.diff(np.asarray(lines))
+    med = float(np.median(gaps))
+    if med <= 0 or np.any(np.abs(gaps - med) > _COMB_GAP_TOL * med):
+        return False
+    return lines[0] <= 0.5 * med and lines[-1] >= span - 0.5 * med
+
+
+def _reconcile_by_pitch(
+    h_lines: list[int], v_lines: list[int], warp_h: int, warp_w: int,
+    diverge_tol: float,
+) -> tuple[list[int], list[int]]:
     h_cell = _cell_size_from_lines(h_lines)
     v_cell = _cell_size_from_lines(v_lines)
 
