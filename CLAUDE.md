@@ -7,7 +7,12 @@ This is a solo project. Do not create pull requests or feature branches.
   `ccr-…` working branch.
 - Before pushing, run the fast checks that apply (unit tests for the changed
   module). If they can't run in the environment, say so before pushing.
-- Releases are separate: pushing to `main` does not ship. Use `/cut-release`.
+- Pushing to `main` deploys to production. `.github/workflows/deploy.yml` runs
+  `cdk deploy` for the database, assets and API stacks (the API stack includes the
+  parser Lambda), then builds and deploys the web frontend. Treat every push as a
+  production deploy: never tell the user the API, parser or frontend "still needs
+  deploying" after a push, and don't push half-finished web/API/parser work.
+- The Android app is the one exception: it ships only through `/cut-release`.
 
 # Board rendering
 
