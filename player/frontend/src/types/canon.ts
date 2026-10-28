@@ -366,3 +366,30 @@ export interface PictoLinkAnswer {
   // standalone filled cells (only ever 1-clue cells); each [row, col]
   singles: [number, number][];
 }
+
+export interface KuralinCircle {
+  // doubled coordinates: cell (r, c) center is (2r+1, 2c+1). Circles sit on grid lines:
+  // odd/even = vertical edge (2 cells), even/odd = horizontal edge (2 cells),
+  // even/even = corner (4 cells). Never odd/odd.
+  dr: number;
+  dc: number;
+  // 0 = white (more white cells), 1 = black (more black cells), 2 = gray (equal)
+  color: number;
+}
+
+export interface KuralinCanon {
+  width: number;
+  height: number;
+  circles: KuralinCircle[];
+}
+
+export interface KuralinAnswer {
+  // height x width; 1 = blackened, 0 = not
+  blacks: number[][];
+  edges: {
+    // h: height x (width-1) — loop segment between (r,c) and (r,c+1); 1 = drawn, 0 = none
+    h: number[][];
+    // v: (height-1) x width — loop segment between (r,c) and (r+1,c); 1 = drawn, 0 = none
+    v: number[][];
+  };
+}

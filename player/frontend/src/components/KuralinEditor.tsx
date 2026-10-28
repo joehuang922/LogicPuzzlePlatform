@@ -1,0 +1,282 @@
+import { useState, useMemo, useCallback, useEffect} from "react";
+import { KuralinCanon } from "../types/canon";
+import { KURALIN_CIRCLE_FILL } from "./KuralinBoard";
+
+interface KuralinEditorProps {
+  initialJson: string;
+  onChange: (json: string) => void;
+}
+
+const CELL_SIZE = 36;
+const PAD = 12;
+
+function parseCanon(json: string): KuralinCanon | null {
+  try {
+    const parsed = JSON.parse(json);
+    if (
+      typeof parsed.width === "number" &&
+      typeof parsed.height === "number" &&
+      Array.isArray(parsed.circles)
+    ) {
+      return parsed as KuralinCanon;
+    }
+  } catch {}
+  return null;
+}
+
+function makeEmptyCanon(width: number, height: number): KuralinCanon {
+  return { width, height, circles: [] };
+}
+
+export default function KuralinEditor({
+  initialJson,
+  onChange,
+}: KuralinEditorProps) {
+  const [jsonText, setJsonText] = useState(initialJson);
+  const canon = useMemo(() => parseCanon(jsonText), [jsonText]);
+
+  useEffect(() => {
+    onChange(jsonText);
+  }, [jsonText, onChange]);
+
+  const width = canon ? canon.width : 0;
+  const height = canon ? canon.height : 0;
+
+  const updateJson = useCallback((newCanon: KuralinCanon) => {
+    setJsonText(JSON.stringify(newCanon, null, 2));
+  }, []);
+
+  // Snap a pixel click to the nearest doubled coordinate on a grid line and
+  // cycle the circle there: none -> white (0) -> black (1) -> gray (2) -> none.
+  const handleSvgClick = useCallback(
+    (e: React.MouseEvent<SVGSVGElement>) => {
+      if (!canon) return;
+      const svg = e.currentTarget;
+      const rect = svg.getBoundingClientRect();
+      // Map client coords into viewBox coords, then subtract PAD offset.
+      const vx = ((e.clientX - rect.left) / rect.width) * (width * CELL_SIZE + PAD * 2) - PAD;
+      const vy = ((e.clientY - rect.top) / rect.height) * (height * CELL_SIZE + PAD * 2) - PAD;
+      const fc = (vx / CELL_SIZE) * 2;
+      const fr = (vy / CELL_SIZE) * 2;
+      let dc = Math.round(fc);
+      let dr = Math.round(fr);
+      // Circles sit on grid lines, never at a cell center: move whichever
+      // axis is closer to a line onto it.
+      if (dr % 2 === 1 && dc % 2 === 1) {
+        const nearEven = (f: number) => 2 * Math.round(f / 2);
+        if (Math.abs(fc - nearEven(fc)) <= Math.abs(fr - nearEven(fr))) dc = nearEven(fc);
+        else dr = nearEven(fr);
+      }
+      // Only interior doubled coords are valid (circles never on the border).
+      if (dr < 1 || dr > 2 * height - 1 || dc < 1 || dc > 2 * width - 1) return;
+
+      const circles = canon.circles.map((d) => ({ ...d }));
+      const idx = circles.findIndex((d) => d.dr === dr && d.dc === dc);
+      if (idx === -1) {
+        circles.push({ dr, dc, color: 0 });
+      } else if (circles[idx].color === 0) {
+        circles[idx].color = 1;
+      } else if (circles[idx].color === 1) {
+        circles[idx].color = 2;
+      } else {
+        circles.splice(idx, 1);
+      }
+      updateJson({ width, height, circles });
+    },
+    [canon, width, height, updateJson]
+  );
+
+  function handleResize(newWidth: number, newHeight: number) {
+    if (newWidth < 1 || newHeight < 1) return;
+    if (canon) {
+      const circles = canon.circles.filter(
+        (d) => d.dr <= 2 * newHeight - 1 && d.dc <= 2 * newWidth - 1
+      );
+      updateJson({ width: newWidth, height: newHeight, circles });
+    } else {
+      updateJson(makeEmptyCanon(newWidth, newHeight));
+    }
+  }
+
+  if (!canon) {
+    return (
+      <div
+        style={{
+          border: "2px solid #c33",
+          borderRadius: 8,
+          padding: "1rem",
+          background: "#fff8f8",
+        }}
+      >
+        <p style={{ color: "#c33", margin: "0 0 1rem" }}>
+          Invalid kuralin JSON. Fix the textarea below or create a new grid.
+        </p>
+        <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
+          <button onClick={() => updateJson(makeEmptyCanon(10, 10))}>
+            Create 10x10 grid
+          </button>
+        </div>
+        <textarea
+          style={{
+            width: "100%",
+            minHeight: 200,
+            fontFamily: "monospace",
+            fontSize: "0.8rem",
+            padding: "0.5rem",
+          }}
+          value={jsonText}
+          onChange={(e) => setJsonText(e.target.value)}
+        />
+      </div>
+    );
+  }
+
+  const svgWidth = width * CELL_SIZE + PAD * 2;
+  const svgHeight = height * CELL_SIZE + PAD * 2;
+
+  const elements: JSX.Element[] = [];
+
+  // Cell backgrounds.
+  for (let r = 0; r < height; r++) {
+    for (let c = 0; c < width; c++) {
+      elements.push(
+        <rect
+          key={`bg-${r}-${c}`}
+          x={c * CELL_SIZE}
+          y={r * CELL_SIZE}
+          width={CELL_SIZE}
+          height={CELL_SIZE}
+          fill="white"
+        />
+      );
+    }
+  }
+
+  // Grid lines: dashed interior, solid border.
+  for (let r = 0; r <= height; r++) {
+    const isBorder = r === 0 || r === height;
+    elements.push(
+      <line
+        key={`hline-${r}`}
+        x1={0}
+        y1={r * CELL_SIZE}
+        x2={width * CELL_SIZE}
+        y2={r * CELL_SIZE}
+        stroke={isBorder ? "#333" : "#999"}
+        strokeWidth={isBorder ? 2 : 0.75}
+        strokeDasharray={isBorder ? undefined : "3,3"}
+      />
+    );
+  }
+  for (let c = 0; c <= width; c++) {
+    const isBorder = c === 0 || c === width;
+    elements.push(
+      <line
+        key={`vline-${c}`}
+        x1={c * CELL_SIZE}
+        y1={0}
+        x2={c * CELL_SIZE}
+        y2={height * CELL_SIZE}
+        stroke={isBorder ? "#333" : "#999"}
+        strokeWidth={isBorder ? 2 : 0.75}
+        strokeDasharray={isBorder ? undefined : "3,3"}
+      />
+    );
+  }
+
+  // Circles at doubled coordinates.
+  canon.circles.forEach((circle, i) => {
+    elements.push(
+      <circle
+        key={`circle-${i}`}
+        cx={(circle.dc / 2) * CELL_SIZE}
+        cy={(circle.dr / 2) * CELL_SIZE}
+        r={CELL_SIZE * 0.24}
+        fill={KURALIN_CIRCLE_FILL[circle.color] ?? "white"}
+        stroke="#222"
+        strokeWidth={1.5}
+        pointerEvents="none"
+      />
+    );
+  });
+
+  return (
+    <div
+      style={{
+        border: "2px solid #4a90d9",
+        borderRadius: 8,
+        padding: "1rem",
+        background: "#f8fbff",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          gap: "0.75rem",
+          marginBottom: "1rem",
+          alignItems: "center",
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+          <label style={{ fontSize: "0.85rem", fontWeight: "bold" }}>Width:</label>
+          <input
+            type="number" onFocus={(e) => e.currentTarget.select()}
+            min={1}
+            max={100}
+            value={width}
+            onChange={(e) => handleResize(Number(e.target.value) || 1, height)}
+            style={{
+              width: 50,
+              padding: "0.25rem",
+              fontSize: "0.85rem",
+              border: "1px solid #ccc",
+              borderRadius: 4,
+            }}
+          />
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+          <label style={{ fontSize: "0.85rem", fontWeight: "bold" }}>Height:</label>
+          <input
+            type="number" onFocus={(e) => e.currentTarget.select()}
+            min={1}
+            max={100}
+            value={height}
+            onChange={(e) => handleResize(width, Number(e.target.value) || 1)}
+            style={{
+              width: 50,
+              padding: "0.25rem",
+              fontSize: "0.85rem",
+              border: "1px solid #ccc",
+              borderRadius: 4,
+            }}
+          />
+        </div>
+        <span style={{ fontSize: "0.75rem", color: "#666", marginLeft: "auto" }}>
+          Click near an edge / corner to cycle: none → ○ → ● → gray → none
+        </span>
+      </div>
+
+      <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+        <div style={{ flexShrink: 0 }}>
+          <svg
+            width={Math.min(svgWidth, 600)}
+            viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+            style={{
+              border: "1px solid #ccc",
+              userSelect: "none",
+              display: "block",
+              background: "white",
+              cursor: "pointer",
+            }}
+            onClick={handleSvgClick}
+          >
+            <g transform={`translate(${PAD},${PAD})`}>{elements}</g>
+          </svg>
+        </div>
+
+      </div>
+
+    </div>
+  );
+}

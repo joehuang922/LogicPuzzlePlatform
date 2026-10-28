@@ -25,7 +25,8 @@ import NurikabeBoard from "./NurikabeBoard";
 import RippleEffectBoard from "./RippleEffectBoard";
 import HitoriBoard from "./HitoriBoard";
 import PictoLinkBoard from "./PictoLinkBoard";
-import { NurimazeCanon, DoubleChocoCanon, SlitherlinkCanon, NonogramCanon, MasyuCanon, PencilsCanon, NuritwinCanon, SlalomCanon, ShakashakaCanon, KakuroCanon, YajilinCanon, FillominoCanon, LitsCanon, ChocoBananaCanon, NumberLinkCanon, AkariCanon, HellGolfCanon, TentaishowCanon, HeyawakeCanon, ShikakuCanon, NorinoriCanon, NurikabeCanon, RippleEffectCanon, HitoriCanon, PictoLinkCanon } from "../types/canon";
+import KuralinBoard from "./KuralinBoard";
+import { NurimazeCanon, DoubleChocoCanon, SlitherlinkCanon, NonogramCanon, MasyuCanon, PencilsCanon, NuritwinCanon, SlalomCanon, ShakashakaCanon, KakuroCanon, YajilinCanon, FillominoCanon, LitsCanon, ChocoBananaCanon, NumberLinkCanon, AkariCanon, HellGolfCanon, TentaishowCanon, HeyawakeCanon, ShikakuCanon, NorinoriCanon, NurikabeCanon, RippleEffectCanon, HitoriCanon, PictoLinkCanon, KuralinCanon } from "../types/canon";
 
 export default function CanonPreview({ puzzleType, canonRepr }: { puzzleType: number; canonRepr: string }) {
   let parsed: Record<string, unknown>;
@@ -115,6 +116,9 @@ export default function CanonPreview({ puzzleType, canonRepr }: { puzzleType: nu
   }
   if (puzzleType === 27 && parsed.cells) {
     return <PictoLinkBoard canon={parsed as unknown as PictoLinkCanon} readonly />;
+  }
+  if (puzzleType === 28 && parsed.circles) {
+    return <KuralinBoard canon={parsed as unknown as KuralinCanon} readonly />;
   }
   return <p style={{ color: "#666", fontSize: "0.85rem" }}>No preview available for this puzzle type.</p>;
 }

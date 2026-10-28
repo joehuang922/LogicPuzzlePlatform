@@ -1,0 +1,47 @@
+{
+  "title": "Kuralin Canonical Representation",
+  "description": "A width x height grid with dashed interior lines and a solid outer border. White, black, and gray circle clues sit on grid lines (edge midpoints or interior corners, never cell centers), encoded in doubled coordinates where cell (r, c) center is (2r+1, 2c+1). The solver draws one loop through cell centers and blackens every cell off the loop; each circle compares the black and white cells it touches.",
+  "type": "object",
+  "required": ["width", "height", "circles"],
+  "additionalProperties": false,
+  "properties": {
+    "width": {
+      "description": "Number of columns.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "height": {
+      "description": "Number of rows.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "circles": {
+      "description": "List of circle clues.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["dr", "dc", "color"],
+        "additionalProperties": false,
+        "properties": {
+          "dr": {
+            "description": "Doubled row coordinate. Interior: 1 <= dr <= 2*height - 1.",
+            "type": "integer",
+            "minimum": 1
+          },
+          "dc": {
+            "description": "Doubled column coordinate. Interior: 1 <= dc <= 2*width - 1. At least one of dr, dc is even.",
+            "type": "integer",
+            "minimum": 1
+          },
+          "color": {
+            "description": "0 = white (more white cells), 1 = black (more black cells), 2 = gray (equal).",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2
+          }
+        }
+      }
+    }
+  }
+}

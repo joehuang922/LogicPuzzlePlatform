@@ -65,7 +65,7 @@ function computeDimensions(typeId: number, canon: Record<string, unknown>): { w?
   if (typeId === 20 && typeof canon.width === "number" && typeof canon.height === "number") {
     return { w: canon.width as number, h: canon.height as number };
   }
-  if (typeId === 21 && typeof canon.width === "number" && typeof canon.height === "number") {
+  if ((typeId === 21 || typeId === 28) && typeof canon.width === "number" && typeof canon.height === "number") {
     return { w: canon.width as number, h: canon.height as number };
   }
   return {};

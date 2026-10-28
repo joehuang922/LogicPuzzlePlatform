@@ -276,6 +276,9 @@ function QuestionForm({
       } else if (typeId === 27 && canon.cells) {
         h = canon.cells.length;
         w = canon.cells[0].length;
+      } else if (typeId === 28 && canon.width && canon.height) {
+        w = canon.width;
+        h = canon.height;
       }
       const res = await createPuzzle({
         puzzleType: typeId,

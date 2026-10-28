@@ -26,6 +26,7 @@ import { nurikabeExtractor } from "./nurikabe";
 import { rippleEffectExtractor } from "./rippleEffect";
 import { hitoriExtractor } from "./hitori";
 import { pictoLinkExtractor } from "./pictoLink";
+import { kuralinExtractor } from "./kuralin";
 
 const extractorRegistry = new Map<number, AnswerExtractor>();
 
@@ -60,6 +61,7 @@ registerExtractor(nurikabeExtractor);
 registerExtractor(rippleEffectExtractor);
 registerExtractor(hitoriExtractor);
 registerExtractor(pictoLinkExtractor);
+registerExtractor(kuralinExtractor);
 
 export function getExtractor(puzzleType: number): AnswerExtractor | undefined {
   return extractorRegistry.get(puzzleType);

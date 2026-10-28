@@ -29,6 +29,7 @@ import NurikabeEditor from "./NurikabeEditor";
 import RippleEffectEditor from "./RippleEffectEditor";
 import HitoriEditor from "./HitoriEditor";
 import PictoLinkEditor from "./PictoLinkEditor";
+import KuralinEditor from "./KuralinEditor";
 
 // Puzzle types that have a visual board editor.
 export const EDITOR_TYPE_NAMES = [
@@ -36,7 +37,7 @@ export const EDITOR_TYPE_NAMES = [
   "masyu", "pencils", "nuritwin", "slalom", "shakashaka", "kakuro", "yajilin",
   "fillomino", "lits", "choco-banana", "number-link", "akari", "hell-golf",
   "tentaishow", "heyawake", "shikaku", "norinori", "nurikabe", "ripple-effect",
-  "hitori", "picto-link",
+  "hitori", "picto-link", "kuralin",
 ];
 
 export function hasVisualEditor(typeName: string | undefined): boolean {
@@ -84,6 +85,7 @@ function CanonEditor({
     case "ripple-effect": return <RippleEffectEditor initialJson={canonRepr} onChange={onChange} />;
     case "hitori": return <HitoriEditor initialJson={canonRepr} onChange={onChange} />;
     case "picto-link": return <PictoLinkEditor initialCanon={canonRepr} onChange={onChange} />;
+    case "kuralin": return <KuralinEditor initialJson={canonRepr} onChange={onChange} />;
     default: return null;
   }
 }

@@ -26,6 +26,7 @@ import nurikabeSchema from "../../../../schemas/canon/nurikabe.json";
 import rippleEffectSchema from "../../../../schemas/canon/ripple-effect.json";
 import hitoriSchema from "../../../../schemas/canon/hitori.json";
 import pictoLinkSchema from "../../../../schemas/canon/picto-link.json";
+import kuralinSchema from "../../../../schemas/canon/kuralin.json";
 
 const ajv = new Ajv();
 
@@ -57,6 +58,7 @@ const validators: Record<number, ValidateFunction> = {
   25: ajv.compile(rippleEffectSchema),
   26: ajv.compile(hitoriSchema),
   27: ajv.compile(pictoLinkSchema),
+  28: ajv.compile(kuralinSchema),
 };
 
 export function validateCanon(puzzleType: number, data: unknown): void {
@@ -177,6 +179,23 @@ const semanticChecks: Record<number, (data: any) => void> = {
           throw new Error(`Invalid ripple effect: a wall at R${r + 1}C${c + 1} doesn't close off a room`);
         }
       }
+    }
+  },
+  // Kuralin: every circle must sit on an interior grid line (edge midpoint or corner,
+  // never a cell center), and no two circles may share a spot.
+  28: (data: { width: number; height: number; circles: { dr: number; dc: number }[] }) => {
+    const { width, height, circles } = data;
+    const seen = new Set<string>();
+    for (const { dr, dc } of circles) {
+      if (dr > 2 * height - 1 || dc > 2 * width - 1) {
+        throw new Error(`Invalid kuralin: circle at (${dr},${dc}) is outside the ${width}x${height} grid`);
+      }
+      if (dr % 2 === 1 && dc % 2 === 1) {
+        throw new Error(`Invalid kuralin: circle at (${dr},${dc}) is at a cell center; circles sit on grid lines`);
+      }
+      const key = `${dr},${dc}`;
+      if (seen.has(key)) throw new Error(`Invalid kuralin: two circles at (${dr},${dc})`);
+      seen.add(key);
     }
   },
 };

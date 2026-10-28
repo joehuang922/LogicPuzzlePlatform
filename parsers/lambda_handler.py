@@ -127,6 +127,9 @@ def _build_parser(puzzle_type: int):
     if puzzle_type == 27:
         from puzzle_parsers.picto_link.parser import PictoLinkParser
         return PictoLinkParser(ocr_backend=ocr)
+    if puzzle_type == 28:
+        from puzzle_parsers.kuralin.parser import KuralinParser
+        return KuralinParser()
     return None
 
 
