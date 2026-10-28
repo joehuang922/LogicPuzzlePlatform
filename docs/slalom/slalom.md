@@ -46,8 +46,10 @@ A rectangular grid of cells. Some cells are black walls. Dashed segments ("gates
 
 ### Sample images
 
-- [board-slalom.jpg](slalom/board-slalom.jpg) — 9x9 easy board
-- [board-slalom-medium.jpg](slalom/board-slalom-medium.jpg) — 15x15 medium board
+- [board-slalom.jpg](slalom/board-slalom.jpg) — 10x10 easy board
+- [board-slalom-medium.jpg](slalom/board-slalom-medium.jpg) — 17x17 medium board
+- [board-slalom-vol194-3.jpg](slalom/board-slalom-vol194-3.jpg) — 10x10, mostly long vertical gates
+- [board-slalom-vol194-4.jpg](slalom/board-slalom-vol194-4.jpg) — 10x10, long horizontal gates
 
 ## Answer structure description
 

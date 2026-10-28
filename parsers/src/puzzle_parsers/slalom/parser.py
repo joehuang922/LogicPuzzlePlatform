@@ -3,9 +3,11 @@
 Strategy:
 1. Detect grid, classify walls (black cells) via pixel intensity.
 2. Binarize cell crops (Otsu), invert annotated walls (white-on-black text).
-3. Use classify_cells with CircledIntegerTarget + DirectedIntegerTarget +
-   DashedGateTarget to find start cell, gate annotations, and gate cells.
-4. Build gates from DashedGate cells (merge contiguous cells on same line).
+3. Use classify_cells with CircledIntegerTarget + DirectedIntegerTarget to find
+   the start cell and the gate annotations.
+4. Find gate cells from pixels (dashed lines through cell centres), merge
+   contiguous cells on the same line, and keep only gates that run wall to wall
+   (the board border counts as a wall).
 5. Assign numbers from DirectedInteger arrows pointing to adjacent gate cells.
 """
 from __future__ import annotations
@@ -24,17 +26,15 @@ from puzzle_parsers.cell_classify import (
     classify_cells,
     CircledIntegerTarget,
     DirectedIntegerTarget,
-    DashedGateTarget,
     CircledInteger,
     DirectedInteger,
-    DashedGate,
-    Empty,
 )
 from puzzle_parsers.recognition import CellRecognizer, GeminiRecognizer
 from puzzle_parsers.slalom.grid_detector import (
     SlalomGeometry,
     detect_slalom_grid,
     classify_walls,
+    detect_gate_cells,
 )
 from puzzle_parsers.slalom.models import SlalomBoard, SlalomGate
 
@@ -106,7 +106,7 @@ class SlalomParser(PuzzleParser):
         classifications = classify_cells(
             self.recognizer,
             cell_crops,
-            [CircledIntegerTarget(), DirectedIntegerTarget(), DashedGateTarget()],
+            [CircledIntegerTarget(), DirectedIntegerTarget()],
         )
 
         # Step 3: Find start cell
@@ -119,9 +119,16 @@ class SlalomParser(PuzzleParser):
                     start = {"row": r, "col": c}
                     gate_count = cls.value
 
-        # Step 4: Infer all gates from dashed-gate cells, then assign numbers
-        # from directed integers.
-        all_gates = self._infer_gates_from_dashed(classifications, cells, geom)
+        # Step 4: Find gates from pixels, then assign numbers from directed
+        # integers. The start circle's ring can read as dashes; it is never on
+        # a gate, so drop it before merging (only when a circle was read; the
+        # R1C1 default could be a real gate cell).
+        vertical, horizontal = detect_gate_cells(geom.warped_gray, geom, cells)
+        if gate_count:
+            start_cell = (start["row"], start["col"])
+            vertical.discard(start_cell)
+            horizontal.discard(start_cell)
+        all_gates = self._build_gates(vertical, horizontal, cells, geom)
         self._assign_gate_numbers(classifications, all_gates, geom)
 
         # If gate_count wasn't found via circled integer, use total detected
@@ -179,61 +186,42 @@ class SlalomParser(PuzzleParser):
             cell_crops.append(row_crops)
         return cell_crops
 
-    def _infer_gates_from_dashed(
-        self,
-        classifications: list[list],
+    @staticmethod
+    def _build_gates(
+        vertical: set[tuple[int, int]],
+        horizontal: set[tuple[int, int]],
         cells: list[list[int]],
         geom: SlalomGeometry,
     ) -> list[SlalomGate]:
-        """Build gates from all DashedGate cells. Each dashed cell becomes a
-        unit-length gate on the indicated grid line. Cells on the same gate
-        (same orientation + line + contiguous span) are merged.
+        """Merge gate cells into gates and keep the ones that run wall to wall.
+
+        Contiguous cells on the same column (vertical) or row (horizontal) form
+        one gate. A gate must end at a wall or the board border on both sides;
+        a run that doesn't is a misread (e.g. stray marks) and is dropped.
         """
         rows, cols = geom.rows, geom.cols
-        raw_gates: list[tuple[str, int, int]] = []  # (orientation, line, position)
 
-        for r in range(rows):
-            for c in range(cols):
-                cls = classifications[r][c]
-                if not isinstance(cls, DashedGate):
-                    continue
-
-                # In cell-center convention, a dashed line through a cell means
-                # the gate passes through that cell. "left"/"right" = vertical gate
-                # through this cell's column. "top"/"bottom" = horizontal gate
-                # through this cell's row.
-                side = cls.side
-                if side in ("top", "bottom"):
-                    raw_gates.append(("h", r, c))
-                elif side in ("left", "right"):
-                    raw_gates.append(("v", c, r))
-
-        # Merge contiguous positions on the same (orientation, line)
-        from collections import defaultdict
-        grouped: dict[tuple[str, int], list[int]] = defaultdict(list)
-        for orientation, line, pos in raw_gates:
-            grouped[(orientation, line)].append(pos)
+        def is_wall(r: int, c: int) -> bool:
+            return not (0 <= r < rows and 0 <= c < cols) or cells[r][c] == 1
 
         gates: list[SlalomGate] = []
-        for (orientation, line), positions in grouped.items():
-            positions.sort()
-            # Merge contiguous runs
-            start = positions[0]
-            end = positions[0]
-            for p in positions[1:]:
-                if p == end + 1:
-                    end = p
+        for orientation, gate_cells, lines in (("v", vertical, cols), ("h", horizontal, rows)):
+            for line in range(lines):
+                # Positions along the gate: row index for "v", column index for "h".
+                if orientation == "v":
+                    positions = sorted(r for r, c in gate_cells if c == line)
                 else:
-                    gates.append(SlalomGate(
-                        orientation=orientation, line=line,
-                        from_=start, to=end, number=None,
-                    ))
-                    start = end = p
-            gates.append(SlalomGate(
-                orientation=orientation, line=line,
-                from_=start, to=end, number=None,
-            ))
-
+                    positions = sorted(c for r, c in gate_cells if r == line)
+                for start, end in _contiguous_runs(positions):
+                    if orientation == "v":
+                        capped = is_wall(start - 1, line) and is_wall(end + 1, line)
+                    else:
+                        capped = is_wall(line, start - 1) and is_wall(line, end + 1)
+                    if capped:
+                        gates.append(SlalomGate(
+                            orientation=orientation, line=line,
+                            from_=start, to=end, number=None,
+                        ))
         return gates
 
     def _assign_gate_numbers(
@@ -375,3 +363,14 @@ class SlalomParser(PuzzleParser):
             return True
         except (KeyError, TypeError, IndexError):
             return False
+
+
+def _contiguous_runs(positions: list[int]) -> list[tuple[int, int]]:
+    """Group sorted positions into inclusive (start, end) runs of consecutive values."""
+    runs: list[tuple[int, int]] = []
+    for p in positions:
+        if runs and p == runs[-1][1] + 1:
+            runs[-1] = (runs[-1][0], p)
+        else:
+            runs.append((p, p))
+    return runs

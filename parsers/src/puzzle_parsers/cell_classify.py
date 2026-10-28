@@ -19,6 +19,7 @@ Usage:
 from __future__ import annotations
 
 import io
+import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Generic, TypeVar
@@ -450,8 +451,13 @@ def classify_cells(
     montage_bytes = _build_montage(non_empty)
     prompt = _build_prompt(targets, len(non_empty))
 
-    # Call LLM
-    raw_results = _call_recognizer(recognizer, montage_bytes, prompt)
+    # Call LLM. The model occasionally returns malformed JSON; one retry
+    # usually clears it, and otherwise the parse fails as before.
+    try:
+        raw_results = _call_recognizer(recognizer, montage_bytes, prompt)
+    except json.JSONDecodeError as e:
+        print(f"  [classify_cells] malformed JSON from recognizer ({e}); retrying once")
+        raw_results = _call_recognizer(recognizer, montage_bytes, prompt)
 
     if not isinstance(raw_results, list):
         raise ValueError(
