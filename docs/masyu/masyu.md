@@ -31,7 +31,12 @@ A rectangular grid of cells. Some cells contain a white (hollow) circle or a bla
 ### Sample images
 
 - [board-masyu.png](masyu/board-masyu.png) — 10x10 board
-- [board-masyu-medium.png](masyu/board-masyu-medium.png) — larger board (~18x18)
+- [board-masyu-medium.png](masyu/board-masyu-medium.png) — 17x17 board
+- [board-masyu-big.png](masyu/board-masyu-big.png) — 45x31 board, scanned slightly askew
+- [board-masyu-curved-photo.jpg](masyu/board-masyu-curved-photo.jpg) — 50x64 board, phone photo of a curved magazine page
+
+Each sample except the 10x10 has a hand-checked `<name>.canon.json` next to it,
+pinned by `parsers/tests/test_masyu_parser.py`.
 
 ## Answer structure description
 

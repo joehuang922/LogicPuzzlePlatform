@@ -392,8 +392,10 @@ _MIN_LINE_SUPPORT = 0.75
 # Length, in cells, of the extra strip at each end of the lines.
 _EDGE_STRIP_CELLS = 2
 # Below this misfit (traced lines vs. an even straight grid, in cells) a board
-# is flat enough for the plain path.
-_MIN_MISFIT_CELLS = 0.12
+# is flat enough for the plain path. Kept low: at 0.10 cell (the 45x31 scan)
+# the plain grid already lets a black circle's rim poke into the cell above
+# and read as a white circle -- 18 false circles on that board.
+_MIN_MISFIT_CELLS = 0.05
 # Cell size of the flattened output image.
 _FLAT_CELL_PX = 64
 
