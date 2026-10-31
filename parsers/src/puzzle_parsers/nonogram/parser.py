@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -113,11 +114,8 @@ class NonogramParser(PuzzleParser):
                 col_clue_img, geom.cols, geom.cell_w, grid_cell_h=geom.cell_h
             )
         else:
-            row_clues = self._llm_recognize_clues(
-                row_clue_img, ROW_CLUE_PROMPT.format(n=geom.rows)
-            )
-            col_clues = self._llm_recognize_col_clues(
-                col_clue_img, geom.cols, geom.cell_w
+            row_clues, col_clues = self._llm_recognize_all_clues(
+                row_clue_img, geom.rows, col_clue_img, geom.cols, geom.cell_w
             )
 
         if debug_path:
@@ -136,29 +134,56 @@ class NonogramParser(PuzzleParser):
             result = self.recognizer.recognize_full_image(f.name, prompt)
         return result
 
-    def _llm_recognize_col_clues(
-        self, col_clue_img: np.ndarray, num_cols: int, cell_w: float,
+    def _llm_recognize_all_clues(
+        self,
+        row_clue_img: np.ndarray,
+        num_rows: int,
+        col_clue_img: np.ndarray,
+        num_cols: int,
+        cell_w: float,
         chunk_size: int = 5,
-    ) -> list[list[int]]:
-        """Split column clue image into chunks and recognize each separately."""
-        h, w = col_clue_img.shape[:2]
-        all_clues: list[list[int]] = []
+    ) -> tuple[list[list[int]], list[list[int]]]:
+        """Recognize row clues and column-clue chunks with concurrent LLM calls.
 
-        for start in range(0, num_cols, chunk_size):
-            end = min(start + chunk_size, num_cols)
+        Column clues are read in strips of ``chunk_size`` columns: a vertical
+        stack is hard for the model to follow across a full-width crop, so
+        narrow strips keep columns from shifting or merging. A wide board means
+        many strips (10 for 50 columns), and run one after another their
+        latencies add up past the 120s client timeout — a single stalled call
+        alone costs the 50s primary timeout. The calls are independent, so run
+        them all at once: the parse takes about as long as the slowest call.
+        """
+        h, w = col_clue_img.shape[:2]
+        spans = [
+            (start, min(start + chunk_size, num_cols))
+            for start in range(0, num_cols, chunk_size)
+        ]
+
+        def read_chunk(start: int, end: int) -> list[list[int]]:
             n = end - start
-            x1 = int(start * cell_w)
-            x2 = int(end * cell_w)
-            x1 = max(0, min(x1, w))
-            x2 = max(0, min(x2, w))
-            chunk_img = col_clue_img[:, x1:x2]
-            prompt = COL_CLUE_PROMPT.format(n=n)
-            clues = self._llm_recognize_clues(chunk_img, prompt)
+            x1 = max(0, min(int(start * cell_w), w))
+            x2 = max(0, min(int(end * cell_w), w))
+            clues = self._llm_recognize_clues(
+                col_clue_img[:, x1:x2], COL_CLUE_PROMPT.format(n=n)
+            )
             if len(clues) < n:
                 clues.extend([[0]] * (n - len(clues)))
-            all_clues.extend(clues[:n])
+            return clues[:n]
 
-        return all_clues
+        # Build the (lazily created) recognizer before fanning out, so the
+        # worker threads share one client instead of racing to create several.
+        _ = self.recognizer
+        with ThreadPoolExecutor(max_workers=len(spans) + 1) as pool:
+            row_future = pool.submit(
+                self._llm_recognize_clues,
+                row_clue_img,
+                ROW_CLUE_PROMPT.format(n=num_rows),
+            )
+            chunk_futures = [pool.submit(read_chunk, s, e) for s, e in spans]
+            row_clues = row_future.result()
+            col_clues = [c for f in chunk_futures for c in f.result()]
+
+        return row_clues, col_clues
 
     def _ocr_row_clues(
         self, row_clue_img: np.ndarray, num_rows: int, cell_h: float,
