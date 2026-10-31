@@ -594,11 +594,26 @@ def reconcile_square_lines(
     # rescue: re-deriving its count from the *median* gap is what hurts there.
     # On a curled page the gaps drift (Q65: 75-81px, median 79 vs true 77.6),
     # so span/median rounds a 30-row board down to 29.
-    if _is_complete_comb(h_lines, warp_h):
+    #
+    # But only when its pitch agrees with the other axis. Bold every-5 lines
+    # alone also form a complete comb: on a downscaled 60-row nonogram (~20px
+    # cells, as the Android client uploads) only the bold columns survived and
+    # the comb kept them, reading the board as 8 columns wide. A comb 5x coarser than the
+    # other axis is an under-detected axis, which the pitch rescue handles.
+    h_cell = _cell_size_from_lines(h_lines)
+    v_cell = _cell_size_from_lines(v_lines)
+    if _is_complete_comb(h_lines, warp_h) and _pitch_agrees(h_cell, v_cell, diverge_tol):
         new_h = list(h_lines)
-    if _is_complete_comb(v_lines, warp_w):
+    if _is_complete_comb(v_lines, warp_w) and _pitch_agrees(v_cell, h_cell, diverge_tol):
         new_v = list(v_lines)
     return new_h, new_v
+
+
+def _pitch_agrees(own: float | None, other: float | None, tol: float) -> bool:
+    """False when ``own`` is much coarser than ``other`` (``own`` lost lines)."""
+    if own is None or other is None:
+        return True
+    return own <= other * (1 + tol)
 
 
 # Raw gaps must sit within this fraction of the median gap for the axis to be

@@ -44,6 +44,129 @@ def detect_nonogram_grid(
     image: NDArray,
     debug_dir: str | None = None,
 ) -> NonogramGeometry:
+    """Locate the clue regions and playable grid, straightening a tilted photo.
+
+    Lines are found by projecting ink straight down/across the image, so a
+    photo tilted even half a cell over the grid's height smears each thin line
+    across a cell and only the bold every-5 lines survive. That bites on the
+    Android client's uploads (downscaled to 2000px, ~20px cells): a 60x50
+    board read as 60x51, another as 61x8. So locate the grid once, find its four corners, warp
+    the whole image so the grid is an upright rectangle (the clue areas beside
+    it come along), and detect again. The returned geometry's ``image`` is the
+    image its coordinates refer to; crop clues from that, not the input.
+    """
+    first = _detect(image, debug_dir)
+    straight = _straighten(image, first.grid_rect)
+    if straight is None:
+        return first
+    return _detect(straight, debug_dir)
+
+
+# Corners already within this many px of an upright rectangle: leave as is.
+_UPRIGHT_PX = 1.5
+# Points sampled along each side of the grid border when fitting it.
+_BORDER_SAMPLES = 24
+
+
+def _straighten(image: NDArray, grid_rect: tuple[int, int, int, int]) -> NDArray | None:
+    """Warp ``image`` so the playable grid's border is an upright rectangle.
+
+    Returns ``None`` when the grid is already upright or its border can't be
+    fitted (keep the first pass rather than warp on a bad quad).
+    """
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    quad = _fit_grid_corners(gray, grid_rect)
+    if quad is None:
+        return None
+
+    tl, tr, br, bl = quad
+    left, right = (tl[0] + bl[0]) / 2, (tr[0] + br[0]) / 2
+    top, bottom = (tl[1] + tr[1]) / 2, (bl[1] + br[1]) / 2
+    upright = np.float32([[left, top], [right, top], [right, bottom], [left, bottom]])
+    if np.max(np.abs(quad - upright)) <= _UPRIGHT_PX:
+        return None
+
+    h_img, w_img = image.shape[:2]
+    M = cv2.getPerspectiveTransform(quad, upright)
+    return cv2.warpPerspective(
+        image, M, (w_img, h_img),
+        flags=cv2.INTER_LINEAR,
+        borderMode=cv2.BORDER_CONSTANT, borderValue=(255, 255, 255),
+    )
+
+
+def _fit_grid_corners(
+    gray: NDArray, grid_rect: tuple[int, int, int, int]
+) -> NDArray | None:
+    """Fit the four thick border lines of the playable grid; return TL, TR, BR, BL.
+
+    The first pass's axis-aligned rect sits on each border line somewhere
+    along its length. Sample the darkest band near the rect edge at points
+    along each side, fit a straight line through them (dropping strays such as
+    a clue digit), and intersect neighbouring sides.
+    """
+    gx, gy, gw, gh = grid_rect
+    h_img, w_img = gray.shape
+    dark = 255.0 - gray.astype(np.float32)
+    reach = max(12, int(0.035 * max(gw, gh)))  # how far a tilted edge can stray
+    half = max(2, int(0.01 * max(gw, gh)))  # half-width of each sample strip
+
+    def side(horizontal: bool, at: int) -> tuple[float, float] | None:
+        """Fit ``pos = a * t + b`` for one side; t runs along the side."""
+        span = (gx, gx + gw) if horizontal else (gy, gy + gh)
+        ts, ps = [], []
+        for k in range(_BORDER_SAMPLES):
+            # Keep clear of the corners, where the crossing side's ink sits.
+            t = int(span[0] + (0.05 + 0.9 * k / (_BORDER_SAMPLES - 1)) * (span[1] - span[0]))
+            lo, hi = max(0, at - reach), min((h_img if horizontal else w_img), at + reach)
+            if horizontal:
+                prof = dark[lo:hi, max(0, t - half):t + half + 1].mean(axis=1)
+            else:
+                prof = dark[max(0, t - half):t + half + 1, lo:hi].mean(axis=0)
+            if prof.size < 3:
+                continue
+            # Smooth over a line's thickness so the thick border beats a thin line.
+            prof = np.convolve(prof, np.ones(5) / 5, mode="same")
+            ts.append(t)
+            ps.append(lo + float(np.argmax(prof)))
+        if len(ts) < _BORDER_SAMPLES // 2:
+            return None
+        t_arr, p_arr = np.array(ts, float), np.array(ps, float)
+        keep = np.ones(len(t_arr), bool)
+        for _ in range(3):
+            a, b = np.polyfit(t_arr[keep], p_arr[keep], 1)
+            res = np.abs(p_arr - (a * t_arr + b))
+            new_keep = res <= max(2.0, 2.5 * float(np.median(res[keep])))
+            if (new_keep == keep).all() or new_keep.sum() < _BORDER_SAMPLES // 2:
+                break
+            keep = new_keep
+        return float(a), float(b)
+
+    top = side(True, gy)
+    bottom = side(True, gy + gh)
+    left = side(False, gx)
+    right = side(False, gx + gw)
+    if None in (top, bottom, left, right):
+        return None
+
+    def meet(hl: tuple[float, float], vl: tuple[float, float]) -> tuple[float, float]:
+        # y = a1 x + b1 (horizontal side), x = a2 y + b2 (vertical side)
+        a1, b1 = hl
+        a2, b2 = vl
+        y = (a1 * b2 + b1) / (1 - a1 * a2)
+        return a2 * y + b2, y
+
+    quad = np.float32([meet(top, left), meet(top, right), meet(bottom, right), meet(bottom, left)])
+    rect = np.float32([[gx, gy], [gx + gw, gy], [gx + gw, gy + gh], [gx, gy + gh]])
+    if np.any(np.linalg.norm(quad - rect, axis=1) > reach * 1.5):
+        return None
+    return quad
+
+
+def _detect(
+    image: NDArray,
+    debug_dir: str | None = None,
+) -> NonogramGeometry:
     debug_path = Path(debug_dir) if debug_dir else None
     if debug_path:
         debug_path.mkdir(parents=True, exist_ok=True)
