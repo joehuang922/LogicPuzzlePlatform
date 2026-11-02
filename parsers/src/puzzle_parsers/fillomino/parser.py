@@ -64,8 +64,11 @@ class FillominoParser(PuzzleParser):
                 x1 = v_lines[c]
                 x2 = v_lines[c + 1]
 
-                margin_y = int((y2 - y1) * 0.2)
-                margin_x = int((x2 - x1) * 0.2)
+                # Clues are unbounded (10, 12, 100...), and a two-digit clue is
+                # printed nearly cell-wide, so trim less horizontally than
+                # vertically: a 20% side trim cut the "0" off every "10".
+                margin_y = int((y2 - y1) * 0.15)
+                margin_x = int((x2 - x1) * 0.10)
                 cell_roi = warped_gray[
                     y1 + margin_y : y2 - margin_y, x1 + margin_x : x2 - margin_x
                 ]
@@ -75,7 +78,9 @@ class FillominoParser(PuzzleParser):
         # Recognize numbers via batch OCR
         if self._ocr is not None:
             with timed(f"fillomino OCR ({rows}x{cols}={rows * cols} cells)"):
-                cells = self._ocr.recognize_cells(cell_rois)
+                cells = self._ocr.recognize_cells(
+                    cell_rois, multi_digit=True, min_confidence=0.2
+                )
         else:
             cells = [[0] * cols for _ in range(rows)]
 
