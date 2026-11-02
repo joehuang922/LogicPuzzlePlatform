@@ -9,6 +9,7 @@ import numpy as np
 from PIL import Image
 
 from puzzle_parsers.base import PuzzleParser
+from puzzle_parsers.cell_ocr import read_grid_clues
 from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.nurikabe.grid_detector import detect_nurikabe_grid
 from puzzle_parsers.nurikabe.models import NurikabeBoard
@@ -53,38 +54,9 @@ class NurikabeParser(PuzzleParser):
 
         debug_path = Path(debug_dir) if debug_dir else None
 
-        # Extract cell ROIs with an inner margin so the thin grid lines at the
-        # cell edges do not confuse the digit recognizer.
-        cell_rois: list[list[np.ndarray]] = []
-        for r in range(rows):
-            row_rois: list[np.ndarray] = []
-            for c in range(cols):
-                y1 = h_lines[r]
-                y2 = h_lines[r + 1]
-                x1 = v_lines[c]
-                x2 = v_lines[c + 1]
-
-                margin_y = int((y2 - y1) * 0.15)
-                margin_x = int((x2 - x1) * 0.15)
-                cell_roi = warped_gray[
-                    y1 + margin_y : y2 - margin_y, x1 + margin_x : x2 - margin_x
-                ]
-                row_rois.append(cell_roi)
-            cell_rois.append(row_rois)
-
-        # Recognize clue numbers via batch OCR. The shared INT_CELL_PROMPT returns
-        # -1 for empty cells; our canon convention uses 0 for empty, so normalize
-        # any non-positive value to 0. Nurikabe clues have no fixed upper bound
-        # and are commonly multi-digit (10-13 on dense boards), so we opt into
-        # the multi-digit path; a confidence floor suppresses the grid-line
-        # fragments and smudges that otherwise surface as ghost clues.
-        if self._ocr is not None:
-            recognized = self._ocr.recognize_cells(
-                cell_rois, multi_digit=True, min_confidence=0.2
-            )
-            cells = [[v if v > 0 else 0 for v in row] for row in recognized]
-        else:
-            cells = [[0] * cols for _ in range(rows)]
+        cells = read_grid_clues(
+            self._ocr, warped_gray, h_lines, v_lines, allow_multi_digits=True
+        )
 
         if debug_path:
             vis = geom.warped.copy()

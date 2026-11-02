@@ -7,6 +7,7 @@ import numpy as np
 from PIL import Image
 
 from puzzle_parsers.base import PuzzleParser
+from puzzle_parsers.cell_ocr import read_cells
 from puzzle_parsers.cell_extraction import (
     GridGeometry,
     detect_internal_grid,
@@ -119,7 +120,7 @@ class SudokuParser(PuzzleParser):
         )
 
         cells = extract_cells_from_geometry(geometry)
-        hints = self.ocr.recognize_cells(cells)
+        hints = read_cells(self.ocr, cells, allow_multi_digits=False)
 
         if debug_path:
             _save_cells_debug(debug_path, cells)

@@ -15,6 +15,8 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.signal import find_peaks
 
+from puzzle_parsers.cell_ocr import crop_cell
+
 
 @dataclass
 class GridGeometry:
@@ -59,14 +61,11 @@ def extract_cells_from_geometry(
 ) -> list[list[NDArray]]:
     """Extract cell images from a grid geometry (warped to a single board)."""
     warped = geometry.warped
-    h, w = warped.shape[:2]
 
     cell_w = geometry.cell_w
     cell_h = geometry.cell_h
     x0 = geometry.grid_x0
     y0 = geometry.grid_y0
-
-    margin_ratio = 0.15
     cells: list[list[NDArray]] = []
 
     for row in range(grid_size):
@@ -77,17 +76,7 @@ def extract_cells_from_geometry(
             x2 = int(x1 + cell_w)
             y2 = int(y1 + cell_h)
 
-            margin_x = int(cell_w * margin_ratio)
-            margin_y = int(cell_h * margin_ratio)
-
-            cy1 = max(0, y1 + margin_y)
-            cy2 = min(h, y2 - margin_y)
-            cx1 = max(0, x1 + margin_x)
-            cx2 = min(w, x2 - margin_x)
-
-            cell = warped[cy1:cy2, cx1:cx2]
-            if cell.size == 0:
-                cell = np.ones((10, 10, 3), dtype=np.uint8) * 255
+            cell = crop_cell(warped, y1, y2, x1, x2)
             row_cells.append(cell)
         cells.append(row_cells)
 

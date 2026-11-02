@@ -8,6 +8,7 @@ import numpy as np
 from PIL import Image
 
 from puzzle_parsers.base import PuzzleParser
+from puzzle_parsers.cell_ocr import read_cells
 from puzzle_parsers.combo_sudoku.grid_detector import (
     CROSS_LAYOUT,
     detect_grid_geometry,
@@ -91,7 +92,7 @@ class ComboSudokuParser(PuzzleParser):
         subboards: list[SubBoard] = []
         for room_x, room_y in self._layout:
             cells = extract_cells_for_subboard(geometry.warped, geometry, room_x, room_y)
-            hints = self.ocr.recognize_cells(cells)
+            hints = read_cells(self.ocr, cells, allow_multi_digits=False)
             subboards.append(SubBoard(x=room_x, y=room_y, hints=hints))
 
         return ComboSudokuBoard(room_width=3, room_height=3, subboards=subboards)
@@ -111,7 +112,7 @@ class ComboSudokuParser(PuzzleParser):
         subboards: list[SubBoard] = []
         for i, sb in enumerate(detected):
             cells = extract_cells_from_geometry(sb.geometry)
-            hints = self.ocr.recognize_cells(cells)
+            hints = read_cells(self.ocr, cells, allow_multi_digits=False)
             subboards.append(SubBoard(x=sb.room_x, y=sb.room_y, hints=hints))
 
             if debug_dir:
@@ -137,7 +138,7 @@ class ComboSudokuParser(PuzzleParser):
         subboards: list[SubBoard] = []
         for room_x, room_y in layout:
             cells = extract_cells_for_subboard(geometry.warped, geometry, room_x, room_y)
-            hints = self.ocr.recognize_cells(cells)
+            hints = read_cells(self.ocr, cells, allow_multi_digits=False)
             subboards.append(SubBoard(x=room_x, y=room_y, hints=hints))
 
         return ComboSudokuBoard(room_width=3, room_height=3, subboards=subboards)

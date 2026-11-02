@@ -96,7 +96,13 @@ If any of these are missing, ask before proceeding.
 1. Create `parsers/src/puzzle_parsers/<puzzle_name>/` with `__init__.py`, `__main__.py`, `models.py`, `grid_detector.py`, `parser.py`.
 2. Parser class must extend `PuzzleParser` and implement `_parse()` (base class handles schema validation automatically).
 3. Implement `validate()` method.
-4. Register the new parser in `lambda_handler.py`: import it and add a `<type_id>: <Parser>(ocr_backend=_ocr)` entry to the `_parsers` dict inside `_init_parsers()`.
+4. If the puzzle has number clues in grid cells, read them with EasyOCR through the shared component — never crop cells or call the OCR backend yourself:
+   ```python
+   from puzzle_parsers.cell_ocr import read_grid_clues
+   cells = read_grid_clues(self._ocr, warped_gray, h_lines, v_lines, allow_multi_digits=True)
+   ```
+   `allow_multi_digits=True` for every puzzle except sudoku-style 1-9 boards. Crop margins and the confidence floor are shared (all sources use the same Nikoli font); don't add per-puzzle values. Use `read_cells(self._ocr, rois, allow_multi_digits=...)` only when cells don't come from a line grid. `tests/test_cell_ocr_contract.py` enforces this.
+5. Register the new parser in `lambda_handler.py`: import it and add an `if puzzle_type == <type_id>: return <Parser>(...)` branch to `_build_parser()`. If it reads clues with EasyOCR, pass `ocr_backend=ocr` **and add the type id to `_OCR_TYPES`** — otherwise production builds it with `ocr_backend=None` and every clue reads as empty (the contract test catches this).
 
 ## Phase 11: Database
 

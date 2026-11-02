@@ -9,6 +9,7 @@ import numpy as np
 from PIL import Image
 
 from puzzle_parsers.base import PuzzleParser
+from puzzle_parsers.cell_ocr import read_grid_clues
 from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.hitori.grid_detector import detect_hitori_grid
 from puzzle_parsers.hitori.models import HitoriBoard
@@ -56,33 +57,10 @@ class HitoriParser(PuzzleParser):
 
         debug_path = Path(debug_dir) if debug_dir else None
 
-        # Extract cell ROIs with a small inner margin. Two-digit values (10-17)
-        # are printed in a condensed font that nearly fills the cell width, so
-        # the horizontal margin is tighter than Nurikabe's 15% to keep both digits.
-        cell_rois: list[list[np.ndarray]] = []
-        for r in range(rows):
-            row_rois: list[np.ndarray] = []
-            for c in range(cols):
-                y1 = h_lines[r]
-                y2 = h_lines[r + 1]
-                x1 = v_lines[c]
-                x2 = v_lines[c + 1]
-
-                margin_y = int((y2 - y1) * 0.12)
-                margin_x = int((x2 - x1) * 0.06)
-                cell_roi = warped_gray[
-                    y1 + margin_y : y2 - margin_y, x1 + margin_x : x2 - margin_x
-                ]
-                row_rois.append(cell_roi)
-            cell_rois.append(row_rois)
-
-        # Every cell holds a number, commonly two-digit on large boards, so we
-        # opt into the multi-digit OCR path. Non-positive reads mean the cell
-        # could not be recognized; replace them with a placeholder (see above).
-        if self._ocr is not None:
-            recognized = self._ocr.recognize_cells(cell_rois, multi_digit=True)
-        else:
-            recognized = [[0] * cols for _ in range(rows)]
+        # Every cell holds a number; non-positive reads become the placeholder below.
+        recognized = read_grid_clues(
+            self._ocr, warped_gray, h_lines, v_lines, allow_multi_digits=True
+        )
 
         unreadable = sum(1 for row in recognized for v in row if v <= 0)
         if unreadable:

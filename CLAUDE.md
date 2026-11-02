@@ -29,6 +29,16 @@ This is a solo project. Do not create pull requests or feature branches.
   override `shadeGroup` when a tap covers a room or some cells take no input — and
   wire its board's `onTapCell` to `vm::tapShadeCell`. Don't hand-roll a cycle.
 
+# Parser clue OCR
+
+- Every parser that reads grid-cell number clues with EasyOCR goes through
+  `parsers/src/puzzle_parsers/cell_ocr.py` (`read_grid_clues` / `read_cells`). All
+  sources use the same Nikoli font, so crop margins and the confidence floor are
+  shared; the only per-puzzle setting is `allow_multi_digits`, which is `False` only
+  for sudoku and combo_sudoku. Tune OCR in `cell_ocr.py` for everyone, not per parser.
+- Such a parser's type id must be in `_OCR_TYPES` in `parsers/lambda_handler.py`.
+  `parsers/tests/test_cell_ocr_contract.py` enforces both rules.
+
 # Authoring room-based puzzles
 
 - A room-based editor (web or Android admin) may hold layouts that aren't valid

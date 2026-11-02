@@ -9,6 +9,7 @@ import numpy as np
 from PIL import Image
 
 from puzzle_parsers.base import PuzzleParser
+from puzzle_parsers.cell_ocr import read_grid_clues
 from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.ripple_effect.grid_detector import (
     RippleEffectGeometry,
@@ -72,26 +73,9 @@ class RippleEffectParser(PuzzleParser):
         rows, cols = geom.rows, geom.cols
         h_lines, v_lines = geom.h_lines, geom.v_lines
 
-        cell_rois: list[list[np.ndarray]] = []
-        for r in range(rows):
-            row_rois: list[np.ndarray] = []
-            for c in range(cols):
-                y1 = h_lines[r]
-                y2 = h_lines[r + 1]
-                x1 = v_lines[c]
-                x2 = v_lines[c + 1]
-                margin_y = int((y2 - y1) * 0.2)
-                margin_x = int((x2 - x1) * 0.2)
-                roi = warped_gray[
-                    y1 + margin_y : y2 - margin_y, x1 + margin_x : x2 - margin_x
-                ]
-                row_rois.append(roi)
-            cell_rois.append(row_rois)
-
-        if self._ocr is not None:
-            cells = self._ocr.recognize_cells(cell_rois)
-        else:
-            cells = [[0] * cols for _ in range(rows)]
+        cells = read_grid_clues(
+            self._ocr, warped_gray, h_lines, v_lines, allow_multi_digits=True
+        )
 
         if debug_dir:
             debug_path = Path(debug_dir)

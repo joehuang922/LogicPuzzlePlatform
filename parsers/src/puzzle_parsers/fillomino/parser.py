@@ -9,6 +9,7 @@ import numpy as np
 from PIL import Image
 
 from puzzle_parsers.base import PuzzleParser, timed
+from puzzle_parsers.cell_ocr import read_grid_clues
 from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.fillomino.grid_detector import detect_fillomino_grid
 from puzzle_parsers.fillomino.models import FillominoBoard
@@ -54,35 +55,9 @@ class FillominoParser(PuzzleParser):
 
         debug_path = _Path(debug_dir) if debug_dir else None
 
-        # Extract cell ROIs
-        cell_rois: list[list[np.ndarray]] = []
-        for r in range(rows):
-            row_rois: list[np.ndarray] = []
-            for c in range(cols):
-                y1 = h_lines[r]
-                y2 = h_lines[r + 1]
-                x1 = v_lines[c]
-                x2 = v_lines[c + 1]
-
-                # Clues are unbounded (10, 12, 100...), and a two-digit clue is
-                # printed nearly cell-wide, so trim less horizontally than
-                # vertically: a 20% side trim cut the "0" off every "10".
-                margin_y = int((y2 - y1) * 0.15)
-                margin_x = int((x2 - x1) * 0.10)
-                cell_roi = warped_gray[
-                    y1 + margin_y : y2 - margin_y, x1 + margin_x : x2 - margin_x
-                ]
-                row_rois.append(cell_roi)
-            cell_rois.append(row_rois)
-
-        # Recognize numbers via batch OCR
-        if self._ocr is not None:
-            with timed(f"fillomino OCR ({rows}x{cols}={rows * cols} cells)"):
-                cells = self._ocr.recognize_cells(
-                    cell_rois, multi_digit=True, min_confidence=0.2
-                )
-        else:
-            cells = [[0] * cols for _ in range(rows)]
+        cells = read_grid_clues(
+            self._ocr, warped_gray, h_lines, v_lines, allow_multi_digits=True
+        )
 
         if debug_path:
             vis = geom.warped.copy()

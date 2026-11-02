@@ -9,10 +9,10 @@ import numpy as np
 from PIL import Image
 
 from puzzle_parsers.base import PuzzleParser
+from puzzle_parsers.cell_ocr import crop_cell, read_cells
 from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.double_choco.grid_detector import detect_double_choco_grid
 from puzzle_parsers.double_choco.models import DoubleChocoBoard
-from puzzle_parsers.ocr_utils import ocr_read_digit
 
 if TYPE_CHECKING:
     from puzzle_parsers.recognition import OcrBackend
@@ -21,13 +21,6 @@ if TYPE_CHECKING:
 class DoubleChocoParser(PuzzleParser):
     puzzle_type = "double-choco"
 
-    # Fraction of the cell cropped away on each side before OCR. The color
-    # classifier uses a tight 0.2 crop (below), but Double Choco clues can be
-    # two digits ("11", "12", ...) that sit side by side and nearly span the
-    # cell width; a 0.2 crop slices the outer "1"s and the detector misses the
-    # whole glyph. 0.08 keeps the digits intact while still excluding the grid
-    # lines. (Measured: 0.2 reads 0/13 "11" clues, 0.08 reads 13/13.)
-    _OCR_MARGIN = 0.08
     _COLOR_MARGIN = 0.2
 
     def __init__(self, ocr_backend: OcrBackend | None = None) -> None:
@@ -64,8 +57,7 @@ class DoubleChocoParser(PuzzleParser):
         debug_path = _Path(debug_dir) if debug_dir else None
 
         # First pass: for each cell compute the mean intensity over a tight crop
-        # (for color classification) and collect a wider OCR crop, so two-digit
-        # clues that nearly span the cell width aren't sliced before OCR.
+        # (for color classification) and collect the shared OCR crop.
         ocr_rois: list[list[np.ndarray]] = []
         cell_means: list[float] = []
         for r in range(rows):
@@ -81,9 +73,7 @@ class DoubleChocoParser(PuzzleParser):
                 color_roi = warped_gray[y1 + margin_y : y2 - margin_y, x1 + margin_x : x2 - margin_x]
                 cell_means.append(float(np.mean(color_roi)))
 
-                omy = int((y2 - y1) * self._OCR_MARGIN)
-                omx = int((x2 - x1) * self._OCR_MARGIN)
-                row_ocr.append(warped_gray[y1 + omy : y2 - omy, x1 + omx : x2 - omx])
+                row_ocr.append(crop_cell(warped_gray, y1, y2, x1, x2))
             ocr_rois.append(row_ocr)
 
         # Adaptive color threshold using Otsu on cell mean intensities
@@ -92,14 +82,17 @@ class DoubleChocoParser(PuzzleParser):
         otsu_val, _ = cv2.threshold(scaled, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         color_threshold = means_arr.min() + (otsu_val / 255) * (means_arr.max() - means_arr.min())
 
-        # Second pass: classify and recognize
+        # Clues can exceed 9 ("11", "12", ...).
+        numbers = read_cells(self._ocr, ocr_rois, allow_multi_digits=True)
+
+        # Second pass: classify color and attach the clue
         cells: list[list[list[int]]] = []
         idx = 0
         for r in range(rows):
             row: list[list[int]] = []
             for c in range(cols):
                 color = 1 if cell_means[idx] < color_threshold else 0
-                number = self._recognize_number(ocr_rois[r][c])
+                number = numbers[r][c]
                 row.append([color, number])
                 idx += 1
             cells.append(row)
@@ -116,66 +109,6 @@ class DoubleChocoParser(PuzzleParser):
             cv2.imwrite(str(debug_path / "04_cells.png"), vis)
 
         return DoubleChocoBoard(cells=cells)
-
-    def _recognize_number(self, cell_roi: np.ndarray) -> int:
-        """Recognize a number in the cell using OCR or contour-based heuristic."""
-        # First check if cell has significant ink (a number present)
-        _, binary = cv2.threshold(cell_roi, 140, 255, cv2.THRESH_BINARY_INV)
-        h, w = cell_roi.shape[:2]
-        pixel_ratio = np.count_nonzero(binary) / binary.size
-        if pixel_ratio < 0.03:
-            return 0
-
-        # Check if there are significant contours
-        contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        min_area = h * w * 0.05
-        significant = [cnt for cnt in contours if cv2.contourArea(cnt) > min_area]
-        if not significant:
-            return 0
-
-        # Use EasyOCR if available
-        if self._ocr is not None:
-            return self._ocr_single_cell(cell_roi)
-
-        # Fallback: contour-based estimation (counts significant blobs)
-        return self._contour_estimate(cell_roi, significant)
-
-    def _ocr_single_cell(self, cell_roi: np.ndarray) -> int:
-        """Use EasyOCR to read a number from a single cell.
-
-        Double Choco clues can exceed 9, so read the full digit run
-        (multi_digit) rather than just the first digit.
-        """
-        val = ocr_read_digit(
-            cell_roi,
-            self._ocr._reader,
-            allowlist="0123456789",
-            empty_val=0,
-            multi_digit=True,
-        )
-        return val if val > 0 else 0
-
-    def _contour_estimate(self, cell_roi: np.ndarray, contours: list) -> int:
-        """Fallback heuristic: estimate number from contour properties.
-
-        This is a rough heuristic that works for single digits by comparing
-        contour aspect ratio and fill ratio against known digit patterns.
-        Without OCR, this is unreliable for multi-digit numbers.
-        """
-        # Merge all significant contours into one bounding rect
-        all_pts = np.vstack(contours)
-        x, y, bw, bh = cv2.boundingRect(all_pts)
-
-        # If bounding box is too small relative to cell, probably noise
-        h, w = cell_roi.shape[:2]
-        if bw < w * 0.15 or bh < h * 0.25:
-            return 0
-
-        # There's definitely a number here, but we can't reliably read it
-        # without OCR. Return -1 as a sentinel to indicate "number present
-        # but unrecognized" — the parser will convert this to 0.
-        # In practice, the EasyOCR path handles this.
-        return 0
 
     def validate(self, data: PuzzleData) -> bool:
         if data.puzzle_type != self.puzzle_type:
