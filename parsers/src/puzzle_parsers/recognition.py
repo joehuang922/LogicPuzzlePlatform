@@ -614,6 +614,23 @@ class ClaudeOcrBackend(OcrBackend):
         return self._recognizer.recognize_full_image(image_path, prompt)
 
 
+def _has_glyph_blob(ink: NDArray) -> bool:
+    """True when the binary crop holds a digit-like blob, not just edge scraps.
+
+    A glyph is an ink component at least 40% of the crop's height that keeps
+    clear of the left and right edges; leftover grid lines hug an edge.
+    """
+    import cv2
+
+    h, w = ink.shape[:2]
+    n, _, stats, _ = cv2.connectedComponentsWithStats(ink, connectivity=8)
+    for i in range(1, n):
+        x, _, bw, bh, _ = stats[i]
+        if bh >= 0.4 * h and x > 0 and x + bw < w:
+            return True
+    return False
+
+
 class EasyOcrBackend(OcrBackend):
     """OCR backend using EasyOCR (free, local, no API key needed)."""
 
@@ -706,6 +723,23 @@ class EasyOcrBackend(OcrBackend):
             detail=1,
             paragraph=False,
         )
+
+        if not results and _has_glyph_blob(thresh):
+            # EasyOCR's text detector finds nothing when a glyph runs edge to
+            # edge (a lone "1" fills the crop's height). Retry once padded with
+            # the cell's own background. Only as a retry: padding every crop
+            # isolates grid-line scraps at the edge into extra "1"s (5 -> 15).
+            # The blob test skips cells holding only such scraps, which would
+            # otherwise pay for a second read (+46% parse time).
+            pad = max(4, round(0.2 * max(gray.shape[:2])))
+            background = int(np.percentile(gray, 90))
+            padded = cv2.copyMakeBorder(
+                gray, pad, pad, pad, pad, cv2.BORDER_CONSTANT, value=background
+            )
+            resized = cv2.resize(padded, (128, 128), interpolation=cv2.INTER_CUBIC)
+            results = self._reader.readtext(
+                resized, allowlist=allowlist, detail=1, paragraph=False
+            )
 
         if not results:
             return 0

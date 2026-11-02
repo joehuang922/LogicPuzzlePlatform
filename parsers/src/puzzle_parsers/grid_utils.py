@@ -749,10 +749,84 @@ def detect_uniform_grid(
     if rows is not None and cols is not None:
         return uniform_grid(warp_h, rows), uniform_grid(warp_w, cols)
 
-    # Both axes refused (e.g. a bowed/curved scan): fall back to peak detection.
+    # Both axes refused: typically a phone photo of a curved page, where lines
+    # drift up to ~10% of a cell off any straight uniform lattice. The *local*
+    # line spacing is still steady, so read the pitch from the projection's
+    # autocorrelation, then snap each expected line to the nearby ink peak so the
+    # grid follows the drift. Peak counting (below) mistakes dense clue columns
+    # for grid lines on such boards (a 17x17 fillomino read as 16x17 / 17x16).
+    ink = (binary > 0).astype(np.float32)
+    row_proj, col_proj = ink.sum(axis=1), ink.sum(axis=0)
+    row_pitch = _projection_pitch(row_proj)
+    col_pitch = _projection_pitch(col_proj)
+    if (
+        row_pitch is not None
+        and col_pitch is not None
+        and max(row_pitch, col_pitch) / min(row_pitch, col_pitch) <= 1.15
+    ):
+        rows = max(2, round(warp_h / row_pitch))
+        cols = max(2, round(warp_w / col_pitch))
+        return (
+            _grid_snapped_to_projection(row_proj, warp_h, rows),
+            _grid_snapped_to_projection(col_proj, warp_w, cols),
+        )
+
+    # Still no pitch: fall back to peak detection.
     return detect_grid_lines(
         warped_gray, warp_w, warp_h, preprocessed_mask=preprocessed_mask
     )
+
+
+def _projection_pitch(proj: NDArray) -> float | None:
+    """Grid pitch (px) from the autocorrelation of an ink projection.
+
+    Unlike the lattice fit this ignores phase, so it survives lines that drift
+    off a straight uniform grid. Takes the smallest lag nearly as strong as the
+    strongest one, so 2x/3x multiples of the pitch can't win; returns ``None``
+    when no lag in the plausible 4..64-cell range stands out.
+    """
+    from scipy.signal import find_peaks
+
+    span = len(proj)
+    p = proj - proj.mean()
+    if not np.any(p):
+        return None
+    ac = np.correlate(p, p, "full")[span - 1 :]
+    ac = ac / ac[0]
+    lo, hi = max(3, span // 64), span // 4
+    peaks, _ = find_peaks(ac[: hi + 1], distance=max(2, lo // 2))
+    peaks = [int(k) for k in peaks if k >= lo]
+    if not peaks:
+        return None
+    best = max(ac[k] for k in peaks)
+    if best <= 0:
+        return None
+    return float(next(k for k in peaks if ac[k] >= 0.7 * best))
+
+
+def _grid_snapped_to_projection(proj: NDArray, span: int, n_cells: int) -> list[int]:
+    """Uniform ``n_cells`` grid with each interior line snapped to its ink peak.
+
+    A line moves only to a peak within a quarter cell of its uniform position;
+    the outer two stay on the border.
+    """
+    from scipy.signal import find_peaks
+
+    pitch = span / n_cells
+    smooth = np.convolve(proj, np.ones(3) / 3, "same")
+    peaks, _ = find_peaks(
+        smooth, distance=max(2, int(pitch * 0.5)), prominence=smooth.max() * 0.05
+    )
+    lines: list[int] = []
+    for i in range(n_cells + 1):
+        expected = i * pitch
+        pos = int(round(expected))
+        if 0 < i < n_cells and len(peaks):
+            nearest = int(peaks[np.argmin(np.abs(peaks - expected))])
+            if abs(nearest - expected) < pitch * 0.25:
+                pos = nearest
+        lines.append(pos)
+    return lines
 
 
 def _lattice_count_1d(
