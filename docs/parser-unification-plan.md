@@ -37,10 +37,10 @@ places that do the same job their own way today and should switch to the home.
 |---|-----|------|------------------|--------|
 | 1 | Find the board outline | `grid_utils.find_quadrilateral_border` | none (kakuro's Hough-grid border and sudoku's own finder removed; same grids, kakuro black-cell maps identical, sudoku 0 errors) | **done** |
 | 2 | Warp the board to a rectangle | `grid_utils.warp_to_rectangle` | sudoku warps to a fixed 540×540 (to fold into row 3) | 24/25 shared |
-| 3 | Normalise to a standard cell size | — (masyu `_normalize_cell_scale` only) | none; other parsers run pixel-absolute kernels at whatever resolution arrives | to extract |
+| 3 | Normalise to a standard cell size | `grid_utils.rectify_board` / `normalize_cell_scale` (72–160 px/cell band; grid found on the normalised board, clues read at native resolution via `RectifiedBoard.to_native`) | masyu keeps its own 180 px rescale until its line finder moves to shared code (row 4) | **done** for 24 detectors |
 | 4 | Find the grid lines | `grid_utils` | five methods: `detect_grid_lines` (solid), `auto_detect_grid_lines` (dashed), `detect_uniform_grid` (lattice fit), double_choco's own peak finder, masyu's own `_detect_grid_lines` | to consolidate |
 | 5 | Count cells when lines are unreliable | `tentaishow._count_cells` (also imported by kuralin) | — | to move into `grid_utils` |
-| 6 | Make an evenly spaced line list | `grid_utils.uniform_grid` | pencils and slalom `_uniform_lines`; double_choco `_uniform_grid_snapped` (copy of the `grid_utils` one) | to dedupe |
+| 6 | Make an evenly spaced line list | `grid_utils.uniform_grid` | slalom `_uniform_lines`; double_choco `_uniform_grid_snapped` (pencils' copy removed: it moved to `detect_uniform_grid`) | to dedupe |
 | 7 | Enforce square-ish cells | `grid_utils.reconcile_square_lines` | used by 5 parsers; the lattice fit has its own square-cell rescue | to unify |
 | 8 | Follow a curved page | masyu `_flatten_curved_board` (re-warps along traced lines) | `grid_utils` pitch + snap fallback (commit 9af6bd2) | two approaches, pick one |
 | 9 | Trim a neighbouring puzzle's title band | masyu `_dominant_extent` | — | to extract |
@@ -64,6 +64,9 @@ Notes on specific rows:
   argument (`solid` / `dashed`) rather than every parser picking among five
   functions. It must also cope with non-grid ink: dense clue columns, black
   cells, halftone grey, circles and dots all look like lines to a projection.
+- **Row 3 (shipped).** Known regressions from lines shifting a few pixels:
+  heyawake-medium and nuritwin each read one thin wall as thick; EasyOCR on
+  fillomino-big flips `1`/`7` both ways (+15/−14). Fix under rows 4 and 16.
 - **Row 8.** Masyu's flattening re-warps the photo along traced lines, so the
   grid ends up straight. The `grid_utils` fallback only snaps straight lines
   onto the ink, so a line that bends along its own length still drifts a few

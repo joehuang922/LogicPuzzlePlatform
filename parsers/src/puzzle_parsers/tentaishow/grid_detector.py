@@ -38,9 +38,8 @@ from numpy.typing import NDArray
 from scipy.signal import find_peaks
 
 from puzzle_parsers.grid_utils import (
-    find_quadrilateral_border,
+    rectify_board,
     preprocess_dashed_lines,
-    warp_to_rectangle,
 )
 
 
@@ -68,15 +67,16 @@ def detect_tentaishow_grid(
     if debug_path:
         debug_path.mkdir(parents=True, exist_ok=True)
 
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    border_pts = find_quadrilateral_border(gray)
+    board = rectify_board(image)
+
+    warped, border_pts = board.warped, board.quad
 
     if debug_path:
         vis = image.copy()
         cv2.polylines(vis, [border_pts.astype(int)], True, (0, 255, 0), 3)
         cv2.imwrite(str(debug_path / "01_border.png"), vis)
 
-    warped, warp_w, warp_h = warp_to_rectangle(image, border_pts)
+    warp_h, warp_w = warped.shape[:2]
     warped_gray = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
 
     if debug_path:

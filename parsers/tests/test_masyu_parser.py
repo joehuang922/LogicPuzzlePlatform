@@ -55,7 +55,6 @@ def test_sample_matches_canon(name):
     assert not wrong, f"{len(wrong)} cells differ (row, col, got, want): {wrong[:20]}"
 
 
-@pytest.mark.xfail(reason="10x10 sample has read as 1x2 or 1x4 since before the curved-page work", strict=True)
 def test_small_sample_is_10x10():
     cells = MasyuParser().parse_file(DOCS_DIR / "board-masyu.png").cells
     assert (len(cells), len(cells[0])) == (10, 10)

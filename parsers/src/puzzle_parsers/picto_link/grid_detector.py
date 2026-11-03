@@ -31,11 +31,10 @@ from numpy.typing import NDArray
 
 from puzzle_parsers.board_grid import BoardGrid
 from puzzle_parsers.grid_utils import (
+    rectify_board,
     detect_grid_lines,
-    find_quadrilateral_border,
     ink_intensity,
     reconcile_square_lines,
-    warp_to_rectangle,
 )
 
 
@@ -49,14 +48,15 @@ def detect_picto_link_grid(
         debug_path.mkdir(parents=True, exist_ok=True)
 
     ink = ink_intensity(image)
-    border_pts = find_quadrilateral_border(ink)
+    board = rectify_board(image, border_image=ink)
+    warped, border_pts = board.warped, board.quad
 
     if debug_path:
         vis = image.copy()
         cv2.polylines(vis, [border_pts.astype(int)], True, (0, 255, 0), 3)
         cv2.imwrite(str(debug_path / "01_border.png"), vis)
 
-    warped, warp_w, warp_h = warp_to_rectangle(image, border_pts)
+    warp_h, warp_w = warped.shape[:2]
 
     if debug_path:
         cv2.imwrite(str(debug_path / "02_warped.png"), warped)
@@ -74,6 +74,6 @@ def detect_picto_link_grid(
         cv2.imwrite(str(debug_path / "03_gridlines.png"), vis)
 
 
-    return BoardGrid(
+    return board.to_native(BoardGrid(
         warped=warped, h_lines=h_lines, v_lines=v_lines,
-    )
+    ))

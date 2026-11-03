@@ -33,10 +33,9 @@ from numpy.typing import NDArray
 
 from puzzle_parsers.board_grid import BoardGrid
 from puzzle_parsers.grid_utils import (
+    rectify_board,
     _cluster_positions,
     _median_single_spacing,
-    find_quadrilateral_border,
-    warp_to_rectangle,
 )
 
 
@@ -130,11 +129,11 @@ def detect_masyu_grid(
     if debug_path:
         debug_path.mkdir(parents=True, exist_ok=True)
 
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
     # Step 1: Find border and warp
-    border_pts = find_quadrilateral_border(gray)
-    warped, warp_w, warp_h = warp_to_rectangle(image, border_pts)
+    board = rectify_board(image)
+    warped, border_pts = board.warped, board.quad
+    warp_h, warp_w = warped.shape[:2]
 
     # Step 2: Normalise to a canonical cell size so the pixel-absolute line
     # detection below always runs at the density it was tuned for.

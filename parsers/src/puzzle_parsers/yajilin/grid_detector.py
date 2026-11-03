@@ -14,8 +14,7 @@ from numpy.typing import NDArray
 
 from puzzle_parsers.board_grid import BoardGrid
 from puzzle_parsers.grid_utils import (
-    find_quadrilateral_border,
-    warp_to_rectangle,
+    rectify_board,
     detect_grid_lines,
 )
 
@@ -29,11 +28,11 @@ def detect_yajilin_grid(
     if debug_path:
         debug_path.mkdir(parents=True, exist_ok=True)
 
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
     # Step 1: Find border and warp
-    border_pts = find_quadrilateral_border(gray)
-    warped, warp_w, warp_h = warp_to_rectangle(image, border_pts)
+    board = rectify_board(image)
+    warped = board.warped
+    warp_h, warp_w = warped.shape[:2]
     warped_gray = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
 
     if debug_path:
@@ -53,9 +52,9 @@ def detect_yajilin_grid(
     # Determine dimensions from detected lines
 
 
-    return BoardGrid(
+    return board.to_native(BoardGrid(
         warped=warped,
         warped_gray=warped_gray,
         h_lines=h_lines,
         v_lines=v_lines,
-    )
+    ))

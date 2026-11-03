@@ -9,10 +9,14 @@ Provides reusable building blocks for:
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import cv2
 import numpy as np
 from numpy.typing import NDArray
 from scipy.signal import find_peaks
+
+from puzzle_parsers.board_grid import BoardGrid
 
 
 # Minimum fraction of a quad's weakest edge that must run along dark ink for
@@ -347,6 +351,136 @@ def warp_to_rectangle(
     return warped, warp_w, warp_h
 
 
+# Step 1 sees the same input on web and Android: the border is searched on a
+# copy no larger than what the Android client uploads (longest side 2000px).
+# At full scan resolution the multi-scale contour search fused a board with
+# the bottom rows of the puzzle printed above it (shakashaka-titled read 12x10).
+BORDER_SEARCH_MAX_SIDE = 2000
+# Margin (fraction of the coarse board size) kept around it for the full-
+# resolution corner refinement; small enough to leave a neighbouring puzzle out.
+_REFINE_MARGIN = 0.05
+# Every rectified board is rescaled to this cell size, so grid detection's
+# pixel-sized kernels always run at one density whatever the source. Samples
+# span 29-266 px/cell natively; every target in 64-90 parsed all of them, at
+# full resolution and after Android's 2000px/JPEG upload, so 72 sits mid-band.
+TARGET_CELL_PX = 72.0
+MIN_CELL_PX = TARGET_CELL_PX
+MAX_CELL_PX = 160.0
+# Guards: never upscale a board more than 4x, never produce a side over 4096px
+# (a 64-column board lands at 64px/cell instead), and don't resample a board
+# already within 10% of the target.
+_MAX_UPSCALE = 4.0
+_MAX_RECTIFIED_SIDE = 4096
+# Cells are square-ish; when the two axes' pitch estimates differ by more than
+# this the estimate is untrustworthy (e.g. halftone shading), so keep scale.
+_PITCH_AXIS_AGREEMENT = 1.15
+# Lattice-fit tooth half-width as a fraction of the normalised cell.
+_LATTICE_BAND_FRAC = 0.055
+
+
+def rectify_board(
+    image: NDArray, *, border_image: NDArray | None = None
+) -> RectifiedBoard:
+    """Find the board, warp it to a rectangle and normalise its cell size.
+
+    Returns a :class:`RectifiedBoard`: ``warped`` is the board at a normalised
+    cell size, for finding the grid; ``native`` is the same board at source
+    resolution, for reading clues (``to_native`` maps a grid found on
+    ``warped`` onto it). ``border_image`` is a grayscale image, same size as
+    ``image``, to search for the border in instead of ``image`` itself (picto
+    link searches an ink mask).
+    """
+    gray = border_image
+    if gray is None:
+        gray = image if image.ndim == 2 else cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    h, w = gray.shape[:2]
+    s = BORDER_SEARCH_MAX_SIDE / max(h, w)
+    if s < 1:
+        # Pick the board on an Android-sized copy, then re-find its corners at
+        # full resolution inside that board's box: the coarse corners alone sat
+        # up to ~0.12 cell inside a thick border (hitori), shifting every crop.
+        small = cv2.resize(gray, None, fx=s, fy=s, interpolation=cv2.INTER_AREA)
+        coarse = find_quadrilateral_border(small) / s
+        (x0, y0), (x1, y1) = coarse.min(axis=0), coarse.max(axis=0)
+        mx, my = (x1 - x0) * _REFINE_MARGIN, (y1 - y0) * _REFINE_MARGIN
+        cx0, cy0 = int(max(0, x0 - mx)), int(max(0, y0 - my))
+        cx1, cy1 = int(min(w, x1 + mx)), int(min(h, y1 + my))
+        crop = gray[cy0:cy1, cx0:cx1]
+        quad = (find_quadrilateral_border(crop) + np.float32([cx0, cy0])).astype(np.float32)
+    else:
+        quad = find_quadrilateral_border(gray)
+    native, _, _ = warp_to_rectangle(image, quad)
+    return RectifiedBoard(warped=normalize_cell_scale(native), quad=quad, native=native)
+
+
+@dataclass
+class RectifiedBoard:
+    """A board found and warped flat, at two resolutions.
+
+    Grid finding runs on ``warped`` (normalised cell size, so pixel-sized
+    kernels behave the same for every source). Clue reading stays on
+    ``native``: OCR, wall-thickness and fill thresholds were tuned on source
+    pixels, and resampling a 39px-cell board to 72px blurred thin walls into
+    thick ones (heyawake) and flipped digit reads.
+    """
+
+    warped: NDArray
+    quad: NDArray
+    native: NDArray
+
+    def to_native(self, grid: BoardGrid) -> BoardGrid:
+        """Re-express a grid found on ``warped`` on the ``native`` board."""
+        nh, nw = self.native.shape[:2]
+        wh, ww = self.warped.shape[:2]
+        if (nh, nw) == (wh, ww):
+            return BoardGrid(warped=self.native, h_lines=grid.h_lines, v_lines=grid.v_lines, quad=grid.quad)
+        sy, sx = nh / wh, nw / ww
+        return BoardGrid(
+            warped=self.native,
+            h_lines=[int(round(y * sy)) for y in grid.h_lines],
+            v_lines=[int(round(x * sx)) for x in grid.v_lines],
+            quad=grid.quad,
+        )
+
+
+def estimate_cell_pitch(warped_gray: NDArray) -> float | None:
+    """Cell pitch (px) of a rectified board, or ``None`` if it can't be trusted.
+
+    Reads each axis's ink projection by autocorrelation (phase-free, so drift
+    and clue clutter don't matter) and requires the two axes to agree.
+    """
+    binary = cv2.adaptiveThreshold(
+        cv2.GaussianBlur(warped_gray, (3, 3), 0),
+        255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 3,
+    )
+    ink = (binary > 0).astype(np.float32)
+    row_pitch = _projection_pitch(ink.sum(axis=1))
+    col_pitch = _projection_pitch(ink.sum(axis=0))
+    if not row_pitch or not col_pitch:
+        return None
+    if max(row_pitch, col_pitch) / min(row_pitch, col_pitch) > _PITCH_AXIS_AGREEMENT:
+        return None
+    return (row_pitch + col_pitch) / 2
+
+
+def normalize_cell_scale(warped: NDArray) -> NDArray:
+    """Rescale a rectified board so a cell is ~``TARGET_CELL_PX`` wide."""
+    gray = warped if warped.ndim == 2 else cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
+    pitch = estimate_cell_pitch(gray)
+    if pitch is None:
+        return warped
+    h, w = warped.shape[:2]
+    if MIN_CELL_PX <= pitch <= MAX_CELL_PX:
+        return warped
+    target = MIN_CELL_PX if pitch < MIN_CELL_PX else MAX_CELL_PX
+    scale = min(target / pitch, _MAX_UPSCALE, _MAX_RECTIFIED_SIDE / max(h, w))
+    if 0.9 <= scale <= 1.1:
+        return warped
+    size = (max(1, round(w * scale)), max(1, round(h * scale)))
+    interp = cv2.INTER_AREA if scale < 1 else cv2.INTER_CUBIC
+    return cv2.resize(warped, size, interpolation=interp)
+
+
 def preprocess_dashed_lines(
     warped_gray: NDArray,
     *,
@@ -663,7 +797,13 @@ def detect_uniform_grid(
         rows = max(2, round(warp_h / (warp_w / cols)))
 
     if rows is not None and cols is not None:
-        return uniform_grid(warp_h, rows), uniform_grid(warp_w, cols)
+        # The count is settled; let each line follow the ink a little, so a
+        # gently curved page (lines drifting a few % of a cell) stays on grid.
+        ink = (binary > 0).astype(np.float32)
+        return (
+            _follow_ink(ink.sum(axis=1), uniform_grid(warp_h, rows)),
+            _follow_ink(ink.sum(axis=0), uniform_grid(warp_w, cols)),
+        )
 
     # Both axes refused: typically a phone photo of a curved page, where lines
     # drift up to ~10% of a cell off any straight uniform lattice. The *local*
@@ -720,6 +860,32 @@ def _projection_pitch(proj: NDArray) -> float | None:
     return float(next(k for k in peaks if ac[k] >= 0.7 * best))
 
 
+# How far (fraction of a cell) a line may move to follow the ink once the count
+# is known. Large enough for a curved page's drift (~0.1 cell on the fillomino
+# photo), small enough that a dense clue column can't capture the line.
+_FOLLOW_INK_FRAC = 0.12
+
+
+def _follow_ink(proj: NDArray, lines: list[int]) -> list[int]:
+    """Move each interior line to the strongest ink within a small window.
+
+    On a flat board the strongest ink near a line *is* that line, so nothing
+    moves; on a curved page each line tracks its drift. The outer two lines
+    stay on the border.
+    """
+    if len(lines) < 3:
+        return lines
+    pitch = (lines[-1] - lines[0]) / (len(lines) - 1)
+    tol = max(1, int(round(pitch * _FOLLOW_INK_FRAC)))
+    smooth = np.convolve(proj, np.ones(3) / 3, "same")
+    out = [lines[0]]
+    for pos in lines[1:-1]:
+        lo, hi = max(0, pos - tol), min(len(smooth), pos + tol + 1)
+        out.append(lo + int(np.argmax(smooth[lo:hi])) if hi > lo else pos)
+    out.append(lines[-1])
+    return out
+
+
 def _grid_snapped_to_projection(proj: NDArray, span: int, n_cells: int) -> list[int]:
     """Uniform ``n_cells`` grid with each interior line snapped to its ink peak.
 
@@ -751,7 +917,7 @@ def _lattice_count_1d(
     *,
     n_min: int = 4,
     n_max: int = 64,
-    band: int = 2,
+    band: int | None = None,
     weak_pct: int = 15,
     ratio: float = 2.0,
     floor: float = 0.02,
@@ -775,6 +941,11 @@ def _lattice_count_1d(
     ``None`` when no count qualifies (e.g. a bowed/curved scan where the ink no
     longer lands at a single uniform phase); callers fall back to peak detection.
     """
+    if band is None:
+        # Boards arrive at ~TARGET_CELL_PX per cell (rectify_board), so a fixed
+        # band is a fixed fraction of a cell: ~5.5%. The old 2px band was tuned
+        # at native scan scale and refused boards once they were upscaled.
+        band = max(2, round(TARGET_CELL_PX * _LATTICE_BAND_FRAC))
     m = float(proj.max())
     if m <= 0:
         return None
