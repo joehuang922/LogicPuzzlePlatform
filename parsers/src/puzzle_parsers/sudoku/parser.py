@@ -13,7 +13,7 @@ from puzzle_parsers.cell_extraction import (
     detect_internal_grid,
     extract_cells_from_geometry,
 )
-from puzzle_parsers.grid_utils import order_points
+from puzzle_parsers.grid_utils import find_quadrilateral_border
 from puzzle_parsers.recognition import GeminiOcrBackend, OcrBackend
 from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.sudoku.models import SudokuBoard
@@ -66,7 +66,7 @@ class SudokuParser(PuzzleParser):
             debug_path.mkdir(parents=True, exist_ok=True)
 
         gray = cv2.cvtColor(img_array, cv2.COLOR_BGR2GRAY)
-        border_pts = _find_single_board_border(gray)
+        border_pts = find_quadrilateral_border(gray)
 
         if debug_path:
             vis = img_array.copy()
@@ -143,41 +143,6 @@ class SudokuParser(PuzzleParser):
         except Exception:
             return False
 
-
-def _find_single_board_border(gray: np.ndarray) -> np.ndarray:
-    """Find the 4 corners of a single sudoku board using contour detection."""
-    h, w = gray.shape
-
-    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-    binary = cv2.adaptiveThreshold(
-        blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY_INV, 11, 3,
-    )
-
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-    binary = cv2.dilate(binary, kernel, iterations=1)
-
-    contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    if not contours:
-        return np.float32([[0, 0], [w, 0], [w, h], [0, h]])
-
-    largest = max(contours, key=cv2.contourArea)
-    area = cv2.contourArea(largest)
-    img_area = h * w
-
-    if area < img_area * 0.1:
-        return np.float32([[0, 0], [w, 0], [w, h], [0, h]])
-
-    peri = cv2.arcLength(largest, True)
-    approx = cv2.approxPolyDP(largest, 0.02 * peri, True)
-
-    if len(approx) == 4:
-        pts = approx.reshape(4, 2).astype(np.float32)
-        return order_points(pts)
-
-    rect = cv2.minAreaRect(largest)
-    box = cv2.boxPoints(rect)
-    return order_points(np.float32(box))
 
 
 def _save_cells_debug(debug_path: Path, cells: list[list[np.ndarray]]) -> None:

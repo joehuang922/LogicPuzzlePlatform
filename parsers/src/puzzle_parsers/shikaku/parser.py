@@ -9,10 +9,11 @@ import numpy as np
 from numpy.typing import NDArray
 from PIL import Image
 
+from puzzle_parsers.board_grid import BoardGrid
 from puzzle_parsers.base import PuzzleParser
 from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.recognition_schemas import SHIKAKU_CLUE_PROMPT
-from puzzle_parsers.shikaku.grid_detector import ShikakuGeometry, detect_shikaku_grid
+from puzzle_parsers.shikaku.grid_detector import detect_shikaku_grid
 from puzzle_parsers.shikaku.models import ShikakuBoard
 
 if TYPE_CHECKING:
@@ -67,7 +68,7 @@ class ShikakuParser(PuzzleParser):
         return ShikakuBoard(cells=cells)
 
     def _read_clues(
-        self, warped_gray: NDArray, geom: ShikakuGeometry, debug_dir: str | None = None
+        self, warped_gray: NDArray, geom: BoardGrid, debug_dir: str | None = None
     ) -> list[list[int]]:
         """Read printed clue numbers, one per cell (0 where blank).
 

@@ -8,10 +8,10 @@ import numpy as np
 from numpy.typing import NDArray
 from PIL import Image
 
+from puzzle_parsers.board_grid import BoardGrid
 from puzzle_parsers.base import PuzzleParser
 from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.nurimaze.grid_detector import (
-    NurimazeGeometry,
     classify_borders,
     detect_nurimaze_grid,
 )
@@ -56,7 +56,7 @@ class NurimazeParser(PuzzleParser):
     def _classify_symbols(
         self,
         warped_gray: NDArray,
-        geom: NurimazeGeometry,
+        geom: BoardGrid,
         debug_dir: str | None = None,
     ) -> list[list[int]]:
         """Classify cell symbols using the LLM recognizer."""

@@ -8,11 +8,11 @@ import cv2
 import numpy as np
 from PIL import Image
 
+from puzzle_parsers.board_grid import BoardGrid
 from puzzle_parsers.base import PuzzleParser
 from puzzle_parsers.cell_ocr import read_grid_clues
 from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.ripple_effect.grid_detector import (
-    RippleEffectGeometry,
     classify_borders,
     detect_ripple_effect_grid,
 )
@@ -67,7 +67,7 @@ class RippleEffectParser(PuzzleParser):
     def _read_cells(
         self,
         warped_gray: np.ndarray,
-        geom: RippleEffectGeometry,
+        geom: BoardGrid,
         debug_dir: str | None = None,
     ) -> list[list[int]]:
         rows, cols = geom.rows, geom.cols

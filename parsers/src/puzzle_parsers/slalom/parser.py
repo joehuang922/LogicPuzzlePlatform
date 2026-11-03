@@ -20,6 +20,7 @@ import numpy as np
 from numpy.typing import NDArray
 from PIL import Image
 
+from puzzle_parsers.board_grid import BoardGrid
 from puzzle_parsers.base import PuzzleParser
 from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.cell_classify import (
@@ -31,7 +32,6 @@ from puzzle_parsers.cell_classify import (
 )
 from puzzle_parsers.recognition import CellRecognizer, GeminiRecognizer
 from puzzle_parsers.slalom.grid_detector import (
-    SlalomGeometry,
     detect_slalom_grid,
     classify_walls,
     detect_gate_cells,
@@ -171,7 +171,7 @@ class SlalomParser(PuzzleParser):
         bright_ratio = np.sum(center > 180) / center.size
         return bright_ratio > 0.05
 
-    def _extract_cell_crops(self, geom: SlalomGeometry) -> list[list[NDArray]]:
+    def _extract_cell_crops(self, geom: BoardGrid) -> list[list[NDArray]]:
         """Extract cell ROI images for LLM classification."""
         cell_crops: list[list[NDArray]] = []
         for r in range(geom.rows):
@@ -191,7 +191,7 @@ class SlalomParser(PuzzleParser):
         vertical: set[tuple[int, int]],
         horizontal: set[tuple[int, int]],
         cells: list[list[int]],
-        geom: SlalomGeometry,
+        geom: BoardGrid,
     ) -> list[SlalomGate]:
         """Merge gate cells into gates and keep the ones that run wall to wall.
 
@@ -228,7 +228,7 @@ class SlalomParser(PuzzleParser):
         self,
         classifications: list[list],
         gates: list[SlalomGate],
-        geom: SlalomGeometry,
+        geom: BoardGrid,
     ) -> None:
         """Assign numbers to gates using directed integer annotations.
 
@@ -286,7 +286,7 @@ class SlalomParser(PuzzleParser):
     def _save_debug(
         self,
         debug_path: Path,
-        geom: SlalomGeometry,
+        geom: BoardGrid,
         cells: list[list[int]],
         classifications: list[list],
         gates: list[SlalomGate],

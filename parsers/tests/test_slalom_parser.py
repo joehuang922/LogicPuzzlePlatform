@@ -12,8 +12,8 @@ from pathlib import Path
 import cv2
 import pytest
 
+from puzzle_parsers.board_grid import BoardGrid
 from puzzle_parsers.slalom.grid_detector import (
-    SlalomGeometry,
     classify_walls,
     detect_gate_cells,
     detect_slalom_grid,
@@ -51,7 +51,7 @@ SAMPLE_GATES = {
 }
 
 
-def _gates(cells: list[list[int]], geom: SlalomGeometry) -> set[tuple[str, int, int, int]]:
+def _gates(cells: list[list[int]], geom: BoardGrid) -> set[tuple[str, int, int, int]]:
     vertical, horizontal = detect_gate_cells(geom.warped_gray, geom, cells)
     gates = SlalomParser._build_gates(vertical, horizontal, cells, geom)
     return {(g.orientation, g.line, g.from_, g.to) for g in gates}
@@ -64,11 +64,9 @@ def test_sample_gates(name):
     assert _gates(cells, geom) == SAMPLE_GATES[name]
 
 
-def _geometry(rows: int, cols: int) -> SlalomGeometry:
-    return SlalomGeometry(
-        warped=None, warped_gray=None, rows=rows, cols=cols,
-        h_lines=list(range(rows + 1)), v_lines=list(range(cols + 1)),
-        cell_h=1.0, cell_w=1.0,
+def _geometry(rows: int, cols: int) -> BoardGrid:
+    return BoardGrid(
+        warped=None, h_lines=list(range(rows + 1)), v_lines=list(range(cols + 1)),
     )
 
 

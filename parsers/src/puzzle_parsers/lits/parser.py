@@ -9,7 +9,6 @@ from PIL import Image
 
 from puzzle_parsers.base import PuzzleParser
 from puzzle_parsers.lits.grid_detector import (
-    LitsGeometry,
     classify_borders,
     detect_lits_grid,
 )

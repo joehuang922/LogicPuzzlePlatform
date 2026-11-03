@@ -9,9 +9,9 @@ import numpy as np
 from numpy.typing import NDArray
 from PIL import Image
 
+from puzzle_parsers.board_grid import BoardGrid
 from puzzle_parsers.base import PuzzleParser
 from puzzle_parsers.heyawake.grid_detector import (
-    HeyawakeGeometry,
     classify_borders,
     detect_heyawake_grid,
 )
@@ -116,7 +116,7 @@ class HeyawakeParser(PuzzleParser):
 
     def _build_rooms(
         self,
-        geom: HeyawakeGeometry,
+        geom: BoardGrid,
         h_borders: list[list[int]],
         v_borders: list[list[int]],
     ) -> list[HeyawakeRoom]:
@@ -158,7 +158,7 @@ class HeyawakeParser(PuzzleParser):
         return rooms
 
     def _read_clues(
-        self, warped_gray: NDArray, geom: HeyawakeGeometry
+        self, warped_gray: NDArray, geom: BoardGrid
     ) -> list[list[int]]:
         """Read printed clue digits, one per cell (-1 where blank).
 

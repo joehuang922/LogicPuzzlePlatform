@@ -10,7 +10,7 @@ from PIL import Image
 
 from puzzle_parsers.base import PuzzleParser
 from puzzle_parsers.models import PuzzleData
-from puzzle_parsers.yajilin.grid_detector import YajilinGeometry, detect_yajilin_grid
+from puzzle_parsers.yajilin.grid_detector import detect_yajilin_grid
 from puzzle_parsers.yajilin.models import YajilinBoard, YajilinClue
 from puzzle_parsers.recognition import CellRecognizer, GeminiRecognizer
 from puzzle_parsers.recognition_schemas import DIRECTED_INT_CELL_PROMPT

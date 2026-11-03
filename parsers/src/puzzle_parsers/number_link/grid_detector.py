@@ -7,12 +7,12 @@ sample images use dashed/dotted grid lines, so we use ``auto_detect_grid_lines``
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 
 import cv2
 from numpy.typing import NDArray
 
+from puzzle_parsers.board_grid import BoardGrid
 from puzzle_parsers.grid_utils import (
     auto_detect_grid_lines,
     find_quadrilateral_border,
@@ -20,20 +20,10 @@ from puzzle_parsers.grid_utils import (
 )
 
 
-@dataclass
-class NumberLinkGeometry:
-    warped: NDArray
-    rows: int
-    cols: int
-    h_lines: list[int]
-    v_lines: list[int]
-    cell_h: float
-    cell_w: float
-
 
 def detect_number_link_grid(
     image: NDArray, debug_dir: str | None = None
-) -> NumberLinkGeometry:
+) -> BoardGrid:
     """Detect the Number Link grid: find border, warp, locate dashed grid lines."""
     debug_path = Path(debug_dir) if debug_dir else None
     if debug_path:
@@ -63,13 +53,7 @@ def detect_number_link_grid(
             cv2.line(vis, (x, 0), (x, warp_h), (180, 0, 0), 1)
         cv2.imwrite(str(debug_path / "03_gridlines.png"), vis)
 
-    rows = len(h_lines) - 1
-    cols = len(v_lines) - 1
-    cell_h = (h_lines[-1] - h_lines[0]) / rows if rows > 0 else 1.0
-    cell_w = (v_lines[-1] - v_lines[0]) / cols if cols > 0 else 1.0
 
-    return NumberLinkGeometry(
-        warped=warped, rows=rows, cols=cols,
-        h_lines=h_lines, v_lines=v_lines,
-        cell_h=cell_h, cell_w=cell_w,
+    return BoardGrid(
+        warped=warped, h_lines=h_lines, v_lines=v_lines,
     )

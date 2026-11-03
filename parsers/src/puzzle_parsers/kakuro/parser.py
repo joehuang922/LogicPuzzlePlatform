@@ -8,10 +8,10 @@ import numpy as np
 from numpy.typing import NDArray
 from PIL import Image
 
+from puzzle_parsers.board_grid import BoardGrid
 from puzzle_parsers.base import PuzzleParser, timed
 from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.kakuro.grid_detector import (
-    KakuroGeometry,
     detect_kakuro_grid,
 )
 from puzzle_parsers.kakuro.models import KakuroBoard, KakuroClueCell, KakuroEmptyCell
@@ -86,7 +86,7 @@ class KakuroParser(PuzzleParser):
     def _classify_cells(
         self,
         warped_gray: NDArray,
-        geom: KakuroGeometry,
+        geom: BoardGrid,
         debug_dir: str | None = None,
     ) -> list[list[KakuroClueCell | KakuroEmptyCell]]:
         rows, cols = geom.rows, geom.cols

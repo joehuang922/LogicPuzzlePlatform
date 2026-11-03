@@ -8,10 +8,10 @@ import numpy as np
 from numpy.typing import NDArray
 from PIL import Image
 
+from puzzle_parsers.board_grid import BoardGrid
 from puzzle_parsers.base import PuzzleParser
 from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.shakashaka.grid_detector import (
-    ShakashakaGeometry,
     detect_shakashaka_grid,
 )
 from puzzle_parsers.shakashaka.models import ShakashakaBoard
@@ -56,7 +56,7 @@ class ShakashakaParser(PuzzleParser):
     def _classify_cells(
         self,
         warped_gray: NDArray,
-        geom: ShakashakaGeometry,
+        geom: BoardGrid,
         debug_dir: str | None = None,
     ) -> list[list[int]]:
         rows, cols = geom.rows, geom.cols

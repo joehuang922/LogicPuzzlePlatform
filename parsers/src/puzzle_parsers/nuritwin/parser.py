@@ -8,10 +8,10 @@ import numpy as np
 from numpy.typing import NDArray
 from PIL import Image
 
+from puzzle_parsers.board_grid import BoardGrid
 from puzzle_parsers.base import PuzzleParser
 from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.nuritwin.grid_detector import (
-    NuritwinGeometry,
     classify_borders,
     detect_nuritwin_grid,
 )
@@ -58,7 +58,7 @@ class NuritwinParser(PuzzleParser):
     def _classify_cells(
         self,
         warped_gray: NDArray,
-        geom: NuritwinGeometry,
+        geom: BoardGrid,
         debug_dir: str | None = None,
     ) -> list[list[int]]:
         """Classify cell numbers using the LLM recognizer."""

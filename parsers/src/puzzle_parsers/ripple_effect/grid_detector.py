@@ -14,12 +14,12 @@ itself, so we call it directly like the other border-first parsers.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 
 import cv2
 from numpy.typing import NDArray
 
+from puzzle_parsers.board_grid import BoardGrid
 from puzzle_parsers.grid_utils import (
     auto_detect_grid_lines,
     classify_border_thickness,
@@ -29,20 +29,10 @@ from puzzle_parsers.grid_utils import (
 )
 
 
-@dataclass
-class RippleEffectGeometry:
-    warped: NDArray
-    rows: int
-    cols: int
-    h_lines: list[int]
-    v_lines: list[int]
-    cell_h: float
-    cell_w: float
-
 
 def detect_ripple_effect_grid(
     image: NDArray, debug_dir: str | None = None
-) -> RippleEffectGeometry:
+) -> BoardGrid:
     """Detect the Ripple Effect grid: find border, warp, locate grid lines."""
     debug_path = Path(debug_dir) if debug_dir else None
     if debug_path:
@@ -68,10 +58,6 @@ def detect_ripple_effect_grid(
     # under-detected axis, but keep per-axis counts on near-square warped boards.
     h_lines, v_lines = reconcile_square_lines(h_lines, v_lines, warp_h, warp_w)
 
-    rows = len(h_lines) - 1
-    cols = len(v_lines) - 1
-    cell_h = (h_lines[-1] - h_lines[0]) / rows if rows > 0 else 1.0
-    cell_w = (v_lines[-1] - v_lines[0]) / cols if cols > 0 else 1.0
 
     if debug_path:
         vis = warped.copy()
@@ -81,15 +67,13 @@ def detect_ripple_effect_grid(
             cv2.line(vis, (x, 0), (x, warp_h), (180, 0, 0), 1)
         cv2.imwrite(str(debug_path / "03_gridlines.png"), vis)
 
-    return RippleEffectGeometry(
-        warped=warped, rows=rows, cols=cols,
-        h_lines=h_lines, v_lines=v_lines,
-        cell_h=cell_h, cell_w=cell_w,
+    return BoardGrid(
+        warped=warped, h_lines=h_lines, v_lines=v_lines,
     )
 
 
 def classify_borders(
-    warped_gray: NDArray, geom: RippleEffectGeometry, debug_dir: str | None = None
+    warped_gray: NDArray, geom: BoardGrid, debug_dir: str | None = None
 ) -> tuple[list[list[int]], list[list[int]]]:
     """Classify each internal border as thick (1, room boundary) or thin (0)."""
     debug_path = Path(debug_dir) if debug_dir else None

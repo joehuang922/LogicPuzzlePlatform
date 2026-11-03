@@ -25,13 +25,13 @@ Pipeline:
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 
 import cv2
 import numpy as np
 from numpy.typing import NDArray
 
+from puzzle_parsers.board_grid import BoardGrid
 from puzzle_parsers.grid_utils import (
     _cluster_positions,
     _median_single_spacing,
@@ -39,17 +39,6 @@ from puzzle_parsers.grid_utils import (
     warp_to_rectangle,
 )
 
-
-@dataclass
-class MasyuGeometry:
-    warped: NDArray
-    warped_gray: NDArray
-    rows: int
-    cols: int
-    h_lines: list[int]
-    v_lines: list[int]
-    cell_h: float
-    cell_w: float
 
 
 # Cell size the line detection is tuned for; a warped board is rescaled so its
@@ -136,7 +125,7 @@ def _normalize_cell_scale(
 def detect_masyu_grid(
     image: NDArray,
     debug_dir: str | None = None,
-) -> MasyuGeometry:
+) -> BoardGrid:
     debug_path = Path(debug_dir) if debug_dir else None
     if debug_path:
         debug_path.mkdir(parents=True, exist_ok=True)
@@ -186,21 +175,13 @@ def detect_masyu_grid(
             cv2.line(vis, (x, 0), (x, warp_h), (255, 0, 0), 2)
         cv2.imwrite(str(debug_path / "03_grid_lines.png"), vis)
 
-    rows = len(h_lines) - 1
-    cols = len(v_lines) - 1
 
-    cell_h = (h_lines[-1] - h_lines[0]) / rows if rows > 0 else 50.0
-    cell_w = (v_lines[-1] - v_lines[0]) / cols if cols > 0 else 50.0
 
-    return MasyuGeometry(
+    return BoardGrid(
         warped=warped,
         warped_gray=warped_gray,
-        rows=rows,
-        cols=cols,
         h_lines=h_lines,
         v_lines=v_lines,
-        cell_h=cell_h,
-        cell_w=cell_w,
     )
 
 

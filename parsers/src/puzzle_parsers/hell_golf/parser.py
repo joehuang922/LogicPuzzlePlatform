@@ -8,6 +8,7 @@ import numpy as np
 from numpy.typing import NDArray
 from PIL import Image
 
+from puzzle_parsers.board_grid import BoardGrid
 from puzzle_parsers.base import PuzzleParser
 from puzzle_parsers.cell_classify import (
     CircledInteger,
@@ -17,7 +18,6 @@ from puzzle_parsers.cell_classify import (
     classify_cells,
 )
 from puzzle_parsers.hell_golf.grid_detector import (
-    HellGolfGeometry,
     detect_hell_golf_grid,
 )
 from puzzle_parsers.hell_golf.models import HellGolfBall, HellGolfBoard
@@ -69,7 +69,7 @@ class HellGolfParser(PuzzleParser):
 
         return HellGolfBoard(lakes=lakes, balls=balls, goals=goals)
 
-    def _cell_bounds(self, geom: HellGolfGeometry, r: int, c: int):
+    def _cell_bounds(self, geom: BoardGrid, r: int, c: int):
         y1 = geom.h_lines[r]
         y2 = geom.h_lines[r + 1]
         x1 = geom.v_lines[c]
@@ -77,7 +77,7 @@ class HellGolfParser(PuzzleParser):
         return y1, y2, x1, x2
 
     def _detect_lakes(
-        self, warped_gray: NDArray, geom: HellGolfGeometry
+        self, warped_gray: NDArray, geom: BoardGrid
     ) -> list[list[int]]:
         """A cell is a lake when its centre is predominantly mid-gray."""
         rows, cols = geom.rows, geom.cols
@@ -103,7 +103,7 @@ class HellGolfParser(PuzzleParser):
     def _classify_features(
         self,
         warped_gray: NDArray,
-        geom: HellGolfGeometry,
+        geom: BoardGrid,
         lakes: list[list[int]],
         debug_dir: str | None = None,
     ) -> tuple[list[HellGolfBall], list[list[int]]]:
