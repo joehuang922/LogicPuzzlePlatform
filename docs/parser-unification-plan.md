@@ -38,21 +38,21 @@ places that do the same job their own way today and should switch to the home.
 | 1 | Find the board outline | `grid_utils.find_quadrilateral_border` | none (kakuro's Hough-grid border and sudoku's own finder removed; same grids, kakuro black-cell maps identical, sudoku 0 errors) | **done** |
 | 2 | Warp the board to a rectangle | `grid_utils.warp_to_rectangle` | sudoku warps to a fixed 540×540 (to fold into row 3) | 24/25 shared |
 | 3 | Normalise to a standard cell size | `grid_utils.rectify_board` / `normalize_cell_scale` (72–160 px/cell band; grid found on the normalised board, clues read at native resolution via `RectifiedBoard.to_native`) | masyu keeps its own 180 px rescale until its line finder moves to shared code (row 4) | **done** for 24 detectors |
-| 4 | Find the grid lines | `grid_utils.find_grid_lines` (lattice candidates chosen by the autocorrelation pitch, at exactly 72 px/cell; lines follow the ink) | batch 1 (dashed: fillomino, hell_golf, norinori, number_link, nurikabe, pencils, ripple_effect, shakashaka, shikaku) and batch 2 (solid: akari, choco_banana, heyawake, hitori, lits, nurimaze, nuritwin, picto_link, slalom, yajilin) migrated; outer lines sit on the border's ink and inner lines are tracked one pitch at a time from each border; batch 3 (dots/circles: tentaishow, kuralin) next; kakuro, masyu, double_choco, sudoku stay custom for now | in progress |
-| 5 | Count cells when lines are unreliable | `tentaishow._count_cells` (also imported by kuralin) | — | to move into `grid_utils` |
+| 4 | Find the grid lines | `grid_utils.find_grid_lines` (lattice candidates chosen by the autocorrelation pitch, at exactly 72 px/cell; lines follow the ink) | batch 1 (dashed: fillomino, hell_golf, norinori, number_link, nurikabe, pencils, ripple_effect, shakashaka, shikaku) and batch 2 (solid: akari, choco_banana, heyawake, hitori, lits, nurimaze, nuritwin, picto_link, slalom, yajilin) and batch 3 (dots/circles: tentaishow, kuralin) migrated; outer lines sit on the border's ink and inner lines are tracked one pitch at a time from each border; kakuro, masyu, double_choco, sudoku stay custom for now | in progress |
+| 5 | Count cells when lines are unreliable | `find_grid_lines` (lattice fit) | `tentaishow._count_cells` deleted with batch 3 | **done** |
 | 6 | Make an evenly spaced line list | `grid_utils.uniform_grid` | double_choco `_uniform_grid_snapped` (slalom's `_uniform_lines` removed with batch 2) (pencils' copy removed: it moved to `detect_uniform_grid`) | to dedupe |
 | 7 | Enforce square-ish cells | `grid_utils.reconcile_square_lines` | used by 5 parsers; the lattice fit has its own square-cell rescue | to unify |
 | 8 | Follow a curved page | masyu `_flatten_curved_board` (re-warps along traced lines) | `grid_utils` pitch + snap fallback (commit 9af6bd2) | two approaches, pick one |
 | 9 | Trim a neighbouring puzzle's title band | masyu `_dominant_extent` | — | to extract |
-| 10 | Hold the grid result | `board_grid.BoardGrid` | kuralin and tentaishow keep their own (dots/circles, no lines) until row 17 | **done** for 22 detectors |
+| 10 | Hold the grid result | `board_grid.BoardGrid` | none (kuralin and tentaishow geometries now hold a `BoardGrid` plus their circles/dots) | **done** for 24 detectors |
 | 11 | Crop a cell | `cell_ocr.crop_cell` | the Gemini parsers crop by hand (akari, heyawake, kakuro, nurimaze, nuritwin, pencils, shakashaka, shikaku, yajilin), mostly at a 20% margin | to migrate |
 | 12 | Is this cell empty? | — | heyawake ink fraction; shikaku dark fraction; EasyOCR's 3% pixel-ratio check inside `recognition.py` | to extract |
 | 13 | Is this cell black / filled? | `cell_fill.is_filled` (dark fraction > 0.35; akari and shakashaka use it — shakashaka keys went 15/2/1 → 0/0/0 errors) | kakuro mean brightness; slalom `classify_walls` dark ratio | 2 done; kakuro, slalom next |
 | 14 | Read a plain number in a cell | `cell_ocr.read_grid_clues` / `read_cells` | heyawake and nuritwin read plain dark-on-light numbers through Gemini | done for 10; 2 candidates |
 | 15 | Read composite cell content (arrows, two numbers, symbols, white-on-black) | `recognition.GeminiRecognizer` montage + `cell_classify` + prompts in `recognition_schemas.py` | — | shared; confirm all callers |
 | 16 | Measure room-wall thickness | `grid_utils.classify_border_thickness` | six identical 27-line `classify_borders` wrappers (heyawake, lits, norinori, nurimaze, nuritwin, ripple_effect) | to delete wrappers |
-| 17 | Find circles and dots | — | masyu `_detect_circles` (ring pooled over 8 tiles), kuralin `_probe_circles` (ring test at lattice points), tentaishow `_detect_dots` (HoughCircles + verify) | to unify |
-| 18 | Address cells, edges and corners | — (tentaishow uses doubled coordinates internally) | kuralin, tentaishow and slalom each work out edge/corner positions themselves | to extract |
+| 17 | Find circles and dots | `ring_probe.probe_ring` / `fill_ratio` (ring test at lattice points; kuralin and tentaishow) | masyu `_detect_circles` (ring pooled over 8 tiles) | 2 done; masyu next |
+| 18 | Address cells, edges and corners | `BoardGrid.point(dr, dc)` / `BoardGrid.doubled(x, y)` (doubled coordinates through the found lines; kuralin, tentaishow) | slalom works out edge/corner positions itself | 2 done; slalom next |
 | 19 | Draw debug overlays | — | 9 copies of the `04_cells.png` digit overlay | to extract |
 | 20 | Read title/author around the board | `PuzzleParser` + `metadata_extract` | — | shared |
 | 21 | Report parse-quality problems | — | none (see "Sanity checks") | new |
@@ -75,6 +75,15 @@ Notes on specific rows:
   (one shared thick/thin threshold), and picto_link-big whose printed columns
   are slanted (~5 px across the board) so no straight line fits — row 8.
   Next targets: shift-robust EasyOCR (row 14) and wall thickness (row 16).
+- **Batch 3 (rows 4, 17, 18).** The grid move alone left all 8 tentaishow and
+  kuralin parses (2 sizes each) identical. Tentaishow's HoughCircles then
+  turned out to miss dots: 24/38 found on the Easy board (16 as JPEG), 74–83
+  of 91 on Medium. Kuralin's lattice ring test, now shared as `ring_probe`,
+  finds 38/38 and 91/91 with no ghosts or colour errors, down to 500 px
+  images (weakest real dot 0.87 support vs 0.24 for the strongest empty
+  point; cutoff 0.75). Kuralin stays exact on both keys and is ~6x faster
+  (vectorised). The committed Easy key had 3 dots not printed on the board;
+  removed.
 - **Row 8.** Masyu's flattening re-warps the photo along traced lines, so the
   grid ends up straight. The `grid_utils` fallback only snaps straight lines
   onto the ink, so a line that bends along its own length still drifts a few

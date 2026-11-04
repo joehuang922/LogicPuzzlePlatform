@@ -117,15 +117,16 @@ Tentai Show is unusual among our puzzle types: the **question image contains no 
 1. **First puzzle with sub-cell clues → grid geometry must be very accurate.** On an ~80px pitch, the corner/edge boundary is only ±20px. A grid origin or pitch off by ~15px flips a corner dot into an edge dot. Masyu-style half-cell slop is not tolerable here.
 2. **Dots may interfere with dashed-line detection.** The existing `_detect_lines_1d` detects lines via morphological OPEN with long directional kernels (≈ `img_len/4`), so a ~32px circular blob cannot survive and cell-center dots effectively evaporate before projection; edge/corner dots merely thicken a line locally and merge harmlessly. So the existing pipeline is more robust than it first appears — but we harden it anyway (see step 3).
 
-### Baseline pipeline (v1)
+### Pipeline
 
-1. **Border + warp** — `find_quadrilateral_border` → `warp_to_rectangle` → `(warp_w, warp_h)`. The solid outer border is the precise geometry source (post-warp the frame is exactly `0..warp_w`, `0..warp_h`).
-2. **Detect dots** on the warped image with `cv2.HoughCircles` (radius ≈ `0.15–0.4 × pitch`, like Masyu), plus a contour/circularity fallback. Record each center `(cx, cy)`; classify `color` by center intensity (dark center → filled `1`, light center → open `0`).
-3. **Mask dots** — paint each detected blob to background *before* line detection. Cheap insurance against residual interference and cleans up the auto-sweep CV scoring.
-4. **Count cells** — run `auto_detect_grid_lines` on the dot-masked image to get `rows`, `cols` only. The dashed peaks are trusted for *counting*, not for *positioning*.
-5. **Synthesize a uniform grid** — decouple counting from positioning: `pitch_x = warp_w / cols`, `pitch_y = warp_h / rows`. Never snap a dot against an individual noisy dashed peak.
-6. **Snap dots to doubled coordinates** — `dc = round(2·cx / pitch_x)`, `dr = round(2·cy / pitch_y)`; clamp to `[1, 2·cols − 1]` / `[1, 2·rows − 1]`; dedup any collisions.
-7. **Validate** — coordinate ranges, parity sanity, and no duplicate `(dr, dc)`.
+1. **Border + warp** — shared `rectify_board`.
+2. **Grid lines** — shared `find_grid_lines` (lattice fit at the autocorrelation pitch, lines followed onto the ink). Dots don't disturb it: the lattice comb fits the real pitch.
+3. **Probe every lattice point for a dot** — shared `ring_probe.probe_ring` at every centre, edge midpoint and corner (`BoardGrid.point(dr, dc)`): a dot is a ring of ink at radius 0.14–0.22 pitch within ±0.1 pitch of the point, with ≥75% of perimeter samples inked. Kuralin uses the same test. It replaced HoughCircles + a contour fallback, which missed 14 of 38 dots on the Easy board (22 after JPEG compression).
+4. **Colour** — inner-disk brightness over paper (`ring_probe.fill_ratio`) below 0.65 is filled. Filled halftone dots measure 0.29–0.36, open ones 0.99–1.0.
+5. **Snap to doubled coordinates** through the found lines (`BoardGrid.doubled`); dedup any collisions.
+6. **Validate** — coordinate ranges, parity sanity, and no duplicate `(dr, dc)`.
+
+Measured (answer keys `board-tentaishow.canon.json`, `board-tentaishow-medium.canon.json`): 38/38 and 91/91 dots with 0 ghosts and 0 colour errors, at full size, as JPEG, and downscaled to 500 px.
 
 ### Accuracy metric for this type
 
@@ -135,10 +136,10 @@ The repo's border-partition metric (judge by *edges-off*) does **not** apply —
 
 Parser accuracy will likely take multiple sessions to reach the bar. The following are explicitly deferred candidates, roughly in priority order:
 
+The candidates below predate the ring probe; both answer keys now parse exactly.
+
 - **Independent N cross-check.** Detected dot centers all land on multiples of half-pitch. Use the GCD/spacing of dot coordinates as a *second independent vote* on `rows`/`cols`, reconciled with the dashed-line count. Highest-value hardening for the dense "Medium" board, where obscured dashed lines make N-estimation the fragile link.
 - **Border refinement of origin/pitch.** If the warp leaves small residual skew, refine `(x0, pitch)` by least-squares fitting detected dot centers to the nearest half-pitch lattice.
-- **Dot detection fallback ladder.** If HoughCircles under-detects on the dense board, add a connected-components pass (area + circularity filter) and/or template matching for the two dot glyphs.
-- **Robust color classification.** Replace the single center-pixel intensity test with a ring-vs-center fill-ratio (annulus mean vs. disk mean) to separate ○ from ● under halftone/anti-aliasing noise.
 - **Sub-cell confidence flagging.** When a dot center falls within a tunable margin of the corner/edge decision boundary, log/flag it as low-confidence so review can focus on the exact cells most likely to be wrong.
 - **Optional LLM assist.** If purely geometric detection plateaus below the bar, use an LLM recognizer to confirm dot presence/color per detected location (positions still come from geometry, never from the LLM).
 

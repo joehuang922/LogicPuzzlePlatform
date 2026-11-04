@@ -46,16 +46,13 @@ class TentaishowParser(PuzzleParser):
 
         rows = geom.rows
         cols = geom.cols
-        pitch_x = geom.warp_w / cols
-        pitch_y = geom.warp_h / rows
 
-        # Snap each detected dot to the nearest doubled coordinate. A cell
-        # (r, c) center is (2r+1, 2c+1); doubled = round(2 * pixel / pitch).
+        # Snap each detected dot to the nearest doubled coordinate (a cell
+        # (r, c) centre is (2r+1, 2c+1)), measured through the found lines.
         # Track the rounding error so we can dedup near-duplicate detections.
         candidates: list[tuple[float, int, int, int]] = []
         for d in geom.dots:
-            fdc = (d.cx / pitch_x) * 2
-            fdr = (d.cy / pitch_y) * 2
+            fdr, fdc = geom.grid.doubled(d.cx, d.cy)
             dc = max(1, min(2 * cols - 1, int(round(fdc))))
             dr = max(1, min(2 * rows - 1, int(round(fdr))))
             err = (fdr - dr) ** 2 + (fdc - dc) ** 2
