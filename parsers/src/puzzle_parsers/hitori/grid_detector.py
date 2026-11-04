@@ -20,9 +20,8 @@ from numpy.typing import NDArray
 
 from puzzle_parsers.board_grid import BoardGrid
 from puzzle_parsers.grid_utils import (
+    find_grid_lines,
     rectify_board,
-    detect_grid_lines,
-    reconcile_square_lines,
 )
 
 
@@ -50,8 +49,7 @@ def detect_hitori_grid(
         cv2.imwrite(str(debug_path / "02_warped.png"), warped)
 
     warped_gray = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
-    h_lines, v_lines = detect_grid_lines(warped_gray, warp_w, warp_h)
-    h_lines, v_lines = reconcile_square_lines(h_lines, v_lines, warp_h, warp_w)
+    h_lines, v_lines = find_grid_lines(warped_gray)
 
 
     if debug_path:

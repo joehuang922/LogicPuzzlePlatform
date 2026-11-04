@@ -1046,13 +1046,63 @@ def find_grid_lines(
     if rows is None or cols is None:
         return detect_grid_lines(warped_gray, w, h)
 
-    h_work = _follow_ink(projs[0], uniform_grid(wh, rows))
-    v_work = _follow_ink(projs[1], uniform_grid(ww, cols))
+    h_work = _track_ink(projs[0], _border_follow_ink(projs[0], uniform_grid(wh, rows)))
+    v_work = _track_ink(projs[1], _border_follow_ink(projs[1], uniform_grid(ww, cols)))
     sy, sx = h / wh, w / ww
     h_lines = [int(round(y * sy)) for y in h_work]
     v_lines = [int(round(x * sx)) for x in v_work]
-    h_lines[0], h_lines[-1], v_lines[0], v_lines[-1] = 0, h, 0, w
     return h_lines, v_lines
+
+
+def _track_ink(proj: NDArray, lines: list[int]) -> list[int]:
+    """Place the interior lines by tracking the ink from each border inward.
+
+    Each line is searched within ``_FOLLOW_INK_FRAC`` of a cell around
+    *the previous line plus one pitch*, not around its evenly spaced slot, so a
+    bowed page whose middle rows sit ~0.25 cell off an even grid (picto link
+    big) is followed one small step at a time. A top-down and a bottom-up pass
+    anchor both borders; each line keeps whichever pass found more ink.
+    """
+    n = len(lines) - 1
+    if n < 2:
+        return lines
+    pitch = (lines[-1] - lines[0]) / n
+    tol = max(1, int(round(pitch * _FOLLOW_INK_FRAC)))
+    smooth = np.convolve(proj, np.ones(3) / 3, "same")
+    size = len(smooth)
+
+    def peak_near(expected: float) -> int:
+        lo = max(0, int(round(expected)) - tol)
+        hi = min(size, int(round(expected)) + tol + 1)
+        return lo + int(np.argmax(smooth[lo:hi])) if hi > lo else int(round(expected))
+
+    down = [lines[0]]
+    for _ in range(1, n):
+        down.append(peak_near(down[-1] + pitch))
+    up = [lines[-1]]
+    for _ in range(1, n):
+        up.append(peak_near(up[-1] - pitch))
+    up = up[::-1]
+    inner = [d if smooth[d] >= smooth[u] else u for d, u in zip(down[1:], up)]
+    return [lines[0], *inner, lines[-1]]
+
+
+def _border_follow_ink(proj: NDArray, lines: list[int]) -> list[int]:
+    """Move the two outer lines onto the border's ink, searching inward only.
+
+    The warp puts the board's outer edge at the image edge, but the thick
+    border line's centre sits a few px inside it; detectors that sample walls
+    or crop edge cells want the centre (peak detection used to find it).
+    """
+    if len(lines) < 3:
+        return lines
+    pitch = (lines[-1] - lines[0]) / (len(lines) - 1)
+    tol = max(1, int(round(pitch * _FOLLOW_INK_FRAC)))
+    smooth = np.convolve(proj, np.ones(3) / 3, "same")
+    n = len(smooth)
+    first = int(np.argmax(smooth[: tol + 1]))
+    last = n - 1 - tol + int(np.argmax(smooth[n - 1 - tol:]))
+    return [first, *lines[1:-1], last]
 
 
 def detect_grid_dimensions(

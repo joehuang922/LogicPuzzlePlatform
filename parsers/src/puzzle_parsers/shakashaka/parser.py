@@ -8,6 +8,7 @@ import numpy as np
 from numpy.typing import NDArray
 from PIL import Image
 
+from puzzle_parsers.cell_fill import is_filled
 from puzzle_parsers.board_grid import BoardGrid
 from puzzle_parsers.base import PuzzleParser
 from puzzle_parsers.models import PuzzleData
@@ -18,7 +19,6 @@ from puzzle_parsers.shakashaka.models import ShakashakaBoard
 from puzzle_parsers.recognition import CellRecognizer, GeminiRecognizer
 from puzzle_parsers.recognition_schemas import INT_CELL_PROMPT
 
-BLACK_THRESHOLD = 100
 
 
 class ShakashakaParser(PuzzleParser):
@@ -80,9 +80,7 @@ class ShakashakaParser(PuzzleParser):
                 mx = int(cell_w * margin_ratio)
 
                 roi = warped_gray[y1 + my: y2 - my, x1 + mx: x2 - mx]
-                mean_val = np.mean(roi)
-
-                if mean_val < BLACK_THRESHOLD:
+                if is_filled(roi):
                     # Black cell — need to determine if numbered
                     row.append(5)  # placeholder, will be updated
                     black_cell_coords.append((r, c))

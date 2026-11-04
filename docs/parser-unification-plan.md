@@ -38,16 +38,16 @@ places that do the same job their own way today and should switch to the home.
 | 1 | Find the board outline | `grid_utils.find_quadrilateral_border` | none (kakuro's Hough-grid border and sudoku's own finder removed; same grids, kakuro black-cell maps identical, sudoku 0 errors) | **done** |
 | 2 | Warp the board to a rectangle | `grid_utils.warp_to_rectangle` | sudoku warps to a fixed 540×540 (to fold into row 3) | 24/25 shared |
 | 3 | Normalise to a standard cell size | `grid_utils.rectify_board` / `normalize_cell_scale` (72–160 px/cell band; grid found on the normalised board, clues read at native resolution via `RectifiedBoard.to_native`) | masyu keeps its own 180 px rescale until its line finder moves to shared code (row 4) | **done** for 24 detectors |
-| 4 | Find the grid lines | `grid_utils.find_grid_lines` (lattice candidates chosen by the autocorrelation pitch, at exactly 72 px/cell; lines follow the ink) | batch 1 (dashed: fillomino, hell_golf, norinori, number_link, nurikabe, pencils, ripple_effect, shakashaka, shikaku) migrated; batch 2 (solid) and 3 (dots/circles) next; kakuro, masyu, double_choco, sudoku stay custom for now | in progress |
+| 4 | Find the grid lines | `grid_utils.find_grid_lines` (lattice candidates chosen by the autocorrelation pitch, at exactly 72 px/cell; lines follow the ink) | batch 1 (dashed: fillomino, hell_golf, norinori, number_link, nurikabe, pencils, ripple_effect, shakashaka, shikaku) and batch 2 (solid: akari, choco_banana, heyawake, hitori, lits, nurimaze, nuritwin, picto_link, slalom, yajilin) migrated; outer lines sit on the border's ink and inner lines are tracked one pitch at a time from each border; batch 3 (dots/circles: tentaishow, kuralin) next; kakuro, masyu, double_choco, sudoku stay custom for now | in progress |
 | 5 | Count cells when lines are unreliable | `tentaishow._count_cells` (also imported by kuralin) | — | to move into `grid_utils` |
-| 6 | Make an evenly spaced line list | `grid_utils.uniform_grid` | slalom `_uniform_lines`; double_choco `_uniform_grid_snapped` (pencils' copy removed: it moved to `detect_uniform_grid`) | to dedupe |
+| 6 | Make an evenly spaced line list | `grid_utils.uniform_grid` | double_choco `_uniform_grid_snapped` (slalom's `_uniform_lines` removed with batch 2) (pencils' copy removed: it moved to `detect_uniform_grid`) | to dedupe |
 | 7 | Enforce square-ish cells | `grid_utils.reconcile_square_lines` | used by 5 parsers; the lattice fit has its own square-cell rescue | to unify |
 | 8 | Follow a curved page | masyu `_flatten_curved_board` (re-warps along traced lines) | `grid_utils` pitch + snap fallback (commit 9af6bd2) | two approaches, pick one |
 | 9 | Trim a neighbouring puzzle's title band | masyu `_dominant_extent` | — | to extract |
 | 10 | Hold the grid result | `board_grid.BoardGrid` | kuralin and tentaishow keep their own (dots/circles, no lines) until row 17 | **done** for 22 detectors |
 | 11 | Crop a cell | `cell_ocr.crop_cell` | the Gemini parsers crop by hand (akari, heyawake, kakuro, nurimaze, nuritwin, pencils, shakashaka, shikaku, yajilin), mostly at a 20% margin | to migrate |
 | 12 | Is this cell empty? | — | heyawake ink fraction; shikaku dark fraction; EasyOCR's 3% pixel-ratio check inside `recognition.py` | to extract |
-| 13 | Is this cell black / filled? | — | akari dark fraction; kakuro mean brightness; shakashaka mean brightness; slalom `classify_walls` dark ratio. Akari found mean brightness misreads numbered walls (white digit pulls the mean up), so dark fraction is the better rule | to extract |
+| 13 | Is this cell black / filled? | `cell_fill.is_filled` (dark fraction > 0.35; akari and shakashaka use it — shakashaka keys went 15/2/1 → 0/0/0 errors) | kakuro mean brightness; slalom `classify_walls` dark ratio | 2 done; kakuro, slalom next |
 | 14 | Read a plain number in a cell | `cell_ocr.read_grid_clues` / `read_cells` | heyawake and nuritwin read plain dark-on-light numbers through Gemini | done for 10; 2 candidates |
 | 15 | Read composite cell content (arrows, two numbers, symbols, white-on-black) | `recognition.GeminiRecognizer` montage + `cell_classify` + prompts in `recognition_schemas.py` | — | shared; confirm all callers |
 | 16 | Measure room-wall thickness | `grid_utils.classify_border_thickness` | six identical 27-line `classify_borders` wrappers (heyawake, lits, norinori, nurimaze, nuritwin, ripple_effect) | to delete wrappers |
@@ -67,6 +67,14 @@ Notes on specific rows:
 - **Row 3 (shipped).** Known regressions from lines shifting a few pixels:
   heyawake-medium and nuritwin each read one thin wall as thick; EasyOCR on
   fillomino-big flips `1`/`7` both ways (+15/−14). Fix under rows 4 and 16.
+- **Batch 2 (row 4, shipped).** On answer keys: shakashaka 15/2/1 → 0/0/0,
+  pencils-big 9 → 0, lits-medium 3 → 2, hitori 17×17 2 → 3 (one `1`/`7` flip),
+  the rest unchanged. On unkeyed samples, judged by eye: 7 fixed, 19 broken,
+  mostly EasyOCR `1`/`7` and `2`/`9` flips on fillomino-big (small shifts of
+  the crop flip this font), ripple_effect-medium's two edge walls back to thick
+  (one shared thick/thin threshold), and picto_link-big whose printed columns
+  are slanted (~5 px across the board) so no straight line fits — row 8.
+  Next targets: shift-robust EasyOCR (row 14) and wall thickness (row 16).
 - **Row 8.** Masyu's flattening re-warps the photo along traced lines, so the
   grid ends up straight. The `grid_utils` fallback only snaps straight lines
   onto the ink, so a line that bends along its own length still drifts a few

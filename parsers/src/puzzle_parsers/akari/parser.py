@@ -15,16 +15,10 @@ from puzzle_parsers.akari.grid_detector import (
     detect_akari_grid,
 )
 from puzzle_parsers.akari.models import AkariBoard
+from puzzle_parsers.cell_fill import dark_fraction, is_filled
 from puzzle_parsers.recognition import CellRecognizer, GeminiRecognizer
 from puzzle_parsers.recognition_schemas import INT_CELL_PROMPT
 
-# A wall cell is mostly dark. We classify by the *fraction* of dark pixels
-# rather than the mean intensity: numbered walls print the digit white-on-black,
-# so their mean brightness is pulled up past a mean-based threshold and they
-# would be misread as empty. The dark fraction stays high for both plain walls
-# (~1.0) and numbered walls (~0.5), while empty cells are ~0.0.
-DARK_PIXEL_VALUE = 100
-WALL_DARK_FRACTION = 0.35
 # A numbered wall's white digit keeps its dark fraction around 0.72-0.77, while
 # a plain wall is near-solid (~1.0). Above this cutoff there is no real digit,
 # so any LLM-reported number is vetoed as a hallucination.
@@ -89,14 +83,14 @@ class AkariParser(PuzzleParser):
                 mx = int(cell_w * margin_ratio)
 
                 roi = warped_gray[y1 + my: y2 - my, x1 + mx: x2 - mx]
-                dark_fraction = float(np.mean(roi < DARK_PIXEL_VALUE))
+                dark = dark_fraction(roi)
 
-                if dark_fraction > WALL_DARK_FRACTION:
+                if is_filled(roi):
                     # Black cell (wall) — need to determine if numbered
                     row.append(5)  # placeholder, will be updated
                     black_cell_coords.append((r, c))
                     black_cell_crops.append(roi)
-                    black_cell_dark_fractions.append(dark_fraction)
+                    black_cell_dark_fractions.append(dark)
                 else:
                     row.append(-1)  # white/empty
             cells.append(row)

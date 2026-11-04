@@ -15,8 +15,8 @@ from numpy.typing import NDArray
 
 from puzzle_parsers.board_grid import BoardGrid
 from puzzle_parsers.grid_utils import (
+    find_grid_lines,
     rectify_board,
-    detect_grid_lines,
 )
 
 
@@ -40,7 +40,7 @@ def detect_slalom_grid(
     if debug_path:
         cv2.imwrite(str(debug_path / "01_warped.png"), warped)
 
-    h_lines, v_lines = detect_grid_lines(warped_gray, warp_w, warp_h)
+    h_lines, v_lines = find_grid_lines(warped_gray)
 
     if debug_path:
         vis = warped.copy()
@@ -49,12 +49,6 @@ def detect_slalom_grid(
         for x in v_lines:
             cv2.line(vis, (x, 0), (x, warp_h), (255, 0, 0), 1)
         cv2.imwrite(str(debug_path / "02_grid_lines.png"), vis)
-
-    rows = len(h_lines) - 1
-    cols = len(v_lines) - 1
-
-    h_lines = _uniform_lines(h_lines[0], h_lines[-1], rows + 1)
-    v_lines = _uniform_lines(v_lines[0], v_lines[-1], cols + 1)
 
 
     return board.to_native(BoardGrid(
@@ -166,7 +160,3 @@ def _run_lengths(mask: NDArray) -> list[int]:
     edges = np.flatnonzero(np.diff(padded))
     return list(edges[1::2] - edges[0::2])
 
-
-def _uniform_lines(start: int, end: int, count: int) -> list[int]:
-    """Generate uniformly spaced lines between start and end."""
-    return [int(start + i * (end - start) / (count - 1)) for i in range(count)]

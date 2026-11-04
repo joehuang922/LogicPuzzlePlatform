@@ -14,8 +14,8 @@ from numpy.typing import NDArray
 
 from puzzle_parsers.board_grid import BoardGrid
 from puzzle_parsers.grid_utils import (
+    find_grid_lines,
     rectify_board,
-    detect_grid_lines,
 )
 
 
@@ -39,7 +39,7 @@ def detect_yajilin_grid(
         cv2.imwrite(str(debug_path / "01_warped.png"), warped)
 
     # Step 2: Detect solid grid lines (no dashed preprocessing needed)
-    h_lines, v_lines = detect_grid_lines(warped_gray, warp_w, warp_h)
+    h_lines, v_lines = find_grid_lines(warped_gray)
 
     if debug_path:
         vis = warped.copy()
