@@ -941,6 +941,25 @@ def _lattice_count_1d(
     ``None`` when no count qualifies (e.g. a bowed/curved scan where the ink no
     longer lands at a single uniform phase); callers fall back to peak detection.
     """
+    passing = _lattice_candidates_1d(
+        proj, span, n_min=n_min, n_max=n_max, band=band,
+        weak_pct=weak_pct, ratio=ratio, floor=floor,
+    )
+    return max(passing) if passing else None
+
+
+def _lattice_candidates_1d(
+    proj: NDArray,
+    span: int,
+    *,
+    n_min: int = 4,
+    n_max: int = 64,
+    band: int | None = None,
+    weak_pct: int = 15,
+    ratio: float = 2.0,
+    floor: float = 0.02,
+) -> list[int]:
+    """Every cell count whose uniform comb passes the weak-tooth test (see above)."""
     if band is None:
         # Boards arrive at ~TARGET_CELL_PX per cell (rectify_board), so a fixed
         # band is a fixed fraction of a cell: ~5.5%. The old 2px band was tuned
@@ -948,10 +967,10 @@ def _lattice_count_1d(
         band = max(2, round(TARGET_CELL_PX * _LATTICE_BAND_FRAC))
     m = float(proj.max())
     if m <= 0:
-        return None
+        return []
     proj = proj / m
 
-    best: int | None = None
+    passing: list[int] = []
     for n in range(n_min, n_max + 1):
         pitch = span / n
         on = np.zeros(span, dtype=bool)
@@ -966,8 +985,74 @@ def _lattice_count_1d(
             continue
         off = float(proj[~on].mean())
         if np.percentile(teeth, weak_pct) > off * ratio + floor:
-            best = n
-    return best
+            passing.append(n)
+    return passing
+
+
+def find_grid_lines(
+    warped_gray: NDArray, *, size: tuple[int, int] | None = None
+) -> tuple[list[int], list[int]]:
+    """The shared grid finder: ``(h_lines, v_lines)`` on ``warped_gray``.
+
+    1. Work at exactly ``TARGET_CELL_PX`` per cell (resampled from the
+       estimated pitch), so the lattice band is always the same fraction of a
+       cell. Readers never see this copy.
+    2. Per axis, list every count whose uniform comb passes the lattice test
+       and take the one nearest ``span / pitch``. "Largest passing" alone
+       picked 2x/3x overtones on boards with a digit centred in every cell
+       (hitori 8x8 read 8x16).
+    3. No count passes (rows of black cells, a bowed page): count from the
+       pitch. One axis still unknown: square cells give it.
+    4. Lines start evenly spaced, then each follows the ink within 12% of a
+       cell (a curved page drifts ~0.1 cell).
+
+    ``size=(rows, cols)`` skips counting for fixed-size boards. Falls back to
+    peak detection only when nothing above yields a count.
+    """
+    h, w = warped_gray.shape[:2]
+    pitch = estimate_cell_pitch(warped_gray)
+    scale = 1.0
+    if pitch:
+        scale = min(TARGET_CELL_PX / pitch, _MAX_UPSCALE, _MAX_RECTIFIED_SIDE / max(h, w))
+        if 0.9 <= scale <= 1.1:
+            scale = 1.0
+    work = warped_gray if scale == 1.0 else cv2.resize(
+        warped_gray, (max(1, round(w * scale)), max(1, round(h * scale))),
+        interpolation=cv2.INTER_AREA if scale < 1 else cv2.INTER_CUBIC,
+    )
+    wh, ww = work.shape[:2]
+    binary = cv2.adaptiveThreshold(
+        cv2.GaussianBlur(work, (3, 3), 0),
+        255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 3,
+    )
+    ink = (binary > 0).astype(np.float32)
+    projs = (ink.sum(axis=1), ink.sum(axis=0))
+    work_pitch = pitch * scale if pitch else None
+
+    counts: list[int | None] = []
+    for proj, span in zip(projs, (wh, ww)):
+        cands = _lattice_candidates_1d(proj, span)
+        if cands:
+            counts.append(
+                min(cands, key=lambda n: abs(n - span / work_pitch)) if work_pitch else max(cands)
+            )
+        else:
+            counts.append(max(2, round(span / work_pitch)) if work_pitch else None)
+    rows, cols = size if size else (counts[0], counts[1])
+    if rows is None and cols is not None:
+        rows = max(2, round(wh / (ww / cols)))
+    elif cols is None and rows is not None:
+        cols = max(2, round(ww / (wh / rows)))
+    if rows is None or cols is None:
+        return detect_grid_lines(warped_gray, w, h)
+
+    h_work = _follow_ink(projs[0], uniform_grid(wh, rows))
+    v_work = _follow_ink(projs[1], uniform_grid(ww, cols))
+    sy, sx = h / wh, w / ww
+    h_lines = [int(round(y * sy)) for y in h_work]
+    v_lines = [int(round(x * sx)) for x in v_work]
+    h_lines[0], h_lines[-1], v_lines[0], v_lines[-1] = 0, h, 0, w
+    return h_lines, v_lines
 
 
 def detect_grid_dimensions(

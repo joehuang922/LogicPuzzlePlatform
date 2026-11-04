@@ -16,9 +16,9 @@ from numpy.typing import NDArray
 
 from puzzle_parsers.board_grid import BoardGrid
 from puzzle_parsers.grid_utils import (
+    find_grid_lines,
     rectify_board,
     preprocess_dashed_lines,
-    detect_uniform_grid,
 )
 
 
@@ -47,9 +47,7 @@ def detect_pencils_grid(
     if debug_path:
         cv2.imwrite(str(debug_path / "02_dashed_mask.png"), dashed_mask)
 
-    h_lines, v_lines = detect_uniform_grid(
-        warped_gray, warp_w, warp_h, preprocessed_mask=dashed_mask
-    )
+    h_lines, v_lines = find_grid_lines(warped_gray)
 
     if debug_path:
         vis = warped.copy()
