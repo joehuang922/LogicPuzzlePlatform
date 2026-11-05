@@ -7,16 +7,14 @@ import numpy as np
 from PIL import Image
 
 from puzzle_parsers.base import PuzzleParser
-from puzzle_parsers.cell_ocr import read_cells
-from puzzle_parsers.cell_extraction import (
-    GridGeometry,
-    detect_internal_grid,
-    extract_cells_from_geometry,
-)
-from puzzle_parsers.grid_utils import find_quadrilateral_border
+from puzzle_parsers.board_grid import BoardGrid
+from puzzle_parsers.cell_ocr import read_grid_clues
+from puzzle_parsers.grid_utils import find_grid_lines, rectify_board
 from puzzle_parsers.recognition import GeminiOcrBackend, OcrBackend
 from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.sudoku.models import SudokuBoard
+
+
 class SudokuParser(PuzzleParser):
     puzzle_type = "sudoku"
 
@@ -65,66 +63,30 @@ class SudokuParser(PuzzleParser):
         if debug_path:
             debug_path.mkdir(parents=True, exist_ok=True)
 
-        gray = cv2.cvtColor(img_array, cv2.COLOR_BGR2GRAY)
-        border_pts = find_quadrilateral_border(gray)
-
+        board = rectify_board(img_array)
         if debug_path:
             vis = img_array.copy()
-            cv2.polylines(vis, [border_pts.astype(int)], True, (0, 255, 0), 3)
+            cv2.polylines(vis, [board.quad.astype(int)], True, (0, 255, 0), 3)
             cv2.imwrite(str(debug_path / "01_border.png"), vis)
+            cv2.imwrite(str(debug_path / "02_warped.png"), board.warped)
 
-        # Warp to a square
-        warp_size = 540
-        dst = np.float32([[0, 0], [warp_size, 0], [warp_size, warp_size], [0, warp_size]])
-        M = cv2.getPerspectiveTransform(border_pts, dst)
-        warped = cv2.warpPerspective(img_array, M, (warp_size, warp_size))
-
-        if debug_path:
-            cv2.imwrite(str(debug_path / "02_warped.png"), warped)
-
-        # Detect internal grid lines
-        warped_gray = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
-        h_lines, v_lines = detect_internal_grid(warped_gray, warp_size)
-
-        # Compute cell geometry
-        cell_w = warp_size / 9.0
-        cell_h = warp_size / 9.0
-        grid_x0 = 0.0
-        grid_y0 = 0.0
-
-        if h_lines and len(h_lines) >= 8:
-            refined_cell_h = (h_lines[-1] - h_lines[0]) / (len(h_lines) - 1)
-            refined_y0 = float(h_lines[0]) - refined_cell_h
-            if abs(refined_y0) < cell_h * 0.4:
-                cell_h = refined_cell_h
-                grid_y0 = refined_y0
-        if v_lines and len(v_lines) >= 8:
-            refined_cell_w = (v_lines[-1] - v_lines[0]) / (len(v_lines) - 1)
-            refined_x0 = float(v_lines[0]) - refined_cell_w
-            if abs(refined_x0) < cell_w * 0.4:
-                cell_w = refined_cell_w
-                grid_x0 = refined_x0
+        warped_gray = cv2.cvtColor(board.warped, cv2.COLOR_BGR2GRAY)
+        h_lines, v_lines = find_grid_lines(warped_gray, size=(9, 9))
+        grid = board.to_native(BoardGrid(warped=board.warped, h_lines=h_lines, v_lines=v_lines))
 
         if debug_path:
-            vis = warped.copy()
-            for y in h_lines:
-                cv2.line(vis, (0, y), (warp_size, y), (0, 180, 0), 1)
-            for x in v_lines:
-                cv2.line(vis, (x, 0), (x, warp_size), (180, 0, 0), 1)
+            vis = grid.warped.copy()
+            gh, gw = vis.shape[:2]
+            for y in grid.h_lines:
+                cv2.line(vis, (0, y), (gw, y), (0, 180, 0), 1)
+            for x in grid.v_lines:
+                cv2.line(vis, (x, 0), (x, gh), (180, 0, 0), 1)
             cv2.imwrite(str(debug_path / "03_gridlines.png"), vis)
 
-        geometry = GridGeometry(
-            warped=warped, grid_x0=grid_x0, grid_y0=grid_y0,
-            cell_w=cell_w, cell_h=cell_h,
-            h_lines=h_lines, v_lines=v_lines,
+        native_gray = cv2.cvtColor(grid.warped, cv2.COLOR_BGR2GRAY)
+        hints = read_grid_clues(
+            self.ocr, native_gray, grid.h_lines, grid.v_lines, allow_multi_digits=False,
         )
-
-        cells = extract_cells_from_geometry(geometry)
-        hints = read_cells(self.ocr, cells, allow_multi_digits=False)
-
-        if debug_path:
-            _save_cells_debug(debug_path, cells)
-
         return SudokuBoard(hints=hints)
 
     def validate(self, data: PuzzleData) -> bool:
@@ -143,19 +105,3 @@ class SudokuParser(PuzzleParser):
         except Exception:
             return False
 
-
-
-def _save_cells_debug(debug_path: Path, cells: list[list[np.ndarray]]) -> None:
-    cell_display = 60
-    composite = np.ones((9 * cell_display, 9 * cell_display, 3), dtype=np.uint8) * 255
-    for r in range(9):
-        for c in range(9):
-            cell = cells[r][c]
-            resized = cv2.resize(cell, (cell_display, cell_display))
-            if len(resized.shape) == 2:
-                resized = cv2.cvtColor(resized, cv2.COLOR_GRAY2BGR)
-            composite[
-                r * cell_display: (r + 1) * cell_display,
-                c * cell_display: (c + 1) * cell_display,
-            ] = resized
-    cv2.imwrite(str(debug_path / "04_cells.png"), composite)

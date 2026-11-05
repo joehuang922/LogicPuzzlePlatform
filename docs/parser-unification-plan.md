@@ -36,11 +36,11 @@ places that do the same job their own way today and should switch to the home.
 | # | Job | Home | Duplicates today | Status |
 |---|-----|------|------------------|--------|
 | 1 | Find the board outline | `grid_utils.find_quadrilateral_border` | none (kakuro's Hough-grid border and sudoku's own finder removed; same grids, kakuro black-cell maps identical, sudoku 0 errors) | **done** |
-| 2 | Warp the board to a rectangle | `grid_utils.warp_to_rectangle` | sudoku warps to a fixed 540×540 (to fold into row 3) | 24/25 shared |
+| 2 | Warp the board to a rectangle | `grid_utils.warp_to_rectangle` | none (sudoku's fixed 540×540 warp replaced by `rectify_board`) | **done** |
 | 3 | Normalise to a standard cell size | `grid_utils.rectify_board` / `normalize_cell_scale` (72–160 px/cell band; grid found on the normalised board, clues read at native resolution via `RectifiedBoard.to_native`) | masyu keeps its own 180 px rescale until its line finder moves to shared code (row 4) | **done** for 24 detectors |
-| 4 | Find the grid lines | `grid_utils.find_grid_lines` (lattice candidates chosen by the autocorrelation pitch, at exactly 72 px/cell; lines follow the ink) | batch 1 (dashed: fillomino, hell_golf, norinori, number_link, nurikabe, pencils, ripple_effect, shakashaka, shikaku) and batch 2 (solid: akari, choco_banana, heyawake, hitori, lits, nurimaze, nuritwin, picto_link, slalom, yajilin) and batch 3 (dots/circles: tentaishow, kuralin) migrated; outer lines sit on the border's ink and inner lines are tracked one pitch at a time from each border; kakuro, masyu, double_choco, sudoku stay custom for now | in progress |
+| 4 | Find the grid lines | `grid_utils.find_grid_lines` (lattice candidates chosen by the autocorrelation pitch, at exactly 72 px/cell; lines follow the ink) | batch 1 (dashed: fillomino, hell_golf, norinori, number_link, nurikabe, pencils, ripple_effect, shakashaka, shikaku) and batch 2 (solid: akari, choco_banana, heyawake, hitori, lits, nurimaze, nuritwin, picto_link, slalom, yajilin) and batch 3 (dots/circles: tentaishow, kuralin) and batch 4 (double_choco, sudoku) migrated; outer lines sit on the border's ink and inner lines are tracked one pitch at a time from each border; kakuro and masyu wait for row 8 (see note) | 23/25 |
 | 5 | Count cells when lines are unreliable | `find_grid_lines` (lattice fit) | `tentaishow._count_cells` deleted with batch 3 | **done** |
-| 6 | Make an evenly spaced line list | `grid_utils.uniform_grid` | double_choco `_uniform_grid_snapped` (slalom's `_uniform_lines` removed with batch 2) (pencils' copy removed: it moved to `detect_uniform_grid`) | to dedupe |
+| 6 | Make an evenly spaced line list | `grid_utils.uniform_grid` | none in parsers (double_choco's and slalom's copies removed with row 4; pencils' moved to `detect_uniform_grid`); `grid_utils._uniform_grid_snapped` still backs the legacy `reconcile_square_lines` | parsers done |
 | 7 | Enforce square-ish cells | `grid_utils.reconcile_square_lines` | used by 5 parsers; the lattice fit has its own square-cell rescue | to unify |
 | 8 | Follow a curved page | masyu `_flatten_curved_board` (re-warps along traced lines) | `grid_utils` pitch + snap fallback (commit 9af6bd2) | two approaches, pick one |
 | 9 | Trim a neighbouring puzzle's title band | masyu `_dominant_extent` | — | to extract |
@@ -84,6 +84,19 @@ Notes on specific rows:
   point; cutoff 0.75). Kuralin stays exact on both keys and is ~6x faster
   (vectorised). The committed Easy key had 3 dots not printed on the board;
   removed.
+- **Batch 4 (row 4).** double_choco and sudoku: identical boards on every
+  sample at both sizes; sudoku key 0 errors, double_choco keys unchanged (its
+  20 and 15 errors are cell-colour reads). double_choco's 4000px photo of
+  halftone grey had no trustworthy pitch (the threshold turned every halftone
+  dot into ink), so `estimate_cell_pitch` now retries on halved copies; no
+  other parser's geometry changed (118 of 124 samples identical, the rest are
+  double_choco's own lines). Kakuro was tried and held back: its big scan
+  (one page, three crops) leans ~0.36 cell top to bottom and its border sits
+  up to 0.4 cell outside the grid behind a heavy frame, so no straight-line
+  fit beats its current finder (line error 7-12 px at top and bottom with
+  either), and every count/placement fallback that fixed it moved
+  fillomino, picto_link or kakuro's own edge cells. Masyu's line finder is
+  its flattening step. Both move with row 8.
 - **Row 8.** Masyu's flattening re-warps the photo along traced lines, so the
   grid ends up straight. The `grid_utils` fallback only snaps straight lines
   onto the ink, so a line that bends along its own length still drifts a few

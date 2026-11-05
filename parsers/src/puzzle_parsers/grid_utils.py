@@ -374,6 +374,11 @@ _MAX_RECTIFIED_SIDE = 4096
 # Cells are square-ish; when the two axes' pitch estimates differ by more than
 # this the estimate is untrustworthy (e.g. halftone shading), so keep scale.
 _PITCH_AXIS_AGREEMENT = 1.15
+# A board with no trustworthy pitch is retried on halved copies down to this
+# shorter side: on a 4000px photo of halftone grey (double_choco, ~270 px/cell)
+# the threshold turns every halftone dot into ink and drowns the lines; at half
+# or quarter size the dots blur out and the lines read again.
+_PITCH_MIN_SIDE = 400
 # Lattice-fit tooth half-width as a fraction of the normalised cell.
 _LATTICE_BAND_FRAC = 0.055
 
@@ -447,8 +452,21 @@ def estimate_cell_pitch(warped_gray: NDArray) -> float | None:
     """Cell pitch (px) of a rectified board, or ``None`` if it can't be trusted.
 
     Reads each axis's ink projection by autocorrelation (phase-free, so drift
-    and clue clutter don't matter) and requires the two axes to agree.
+    and clue clutter don't matter) and requires the two axes to agree. When
+    they don't, retries on halved copies (see ``_PITCH_MIN_SIDE``).
     """
+    gray, factor = warped_gray, 1.0
+    while True:
+        pitch = _pitch_at_scale(gray)
+        if pitch is not None:
+            return pitch * factor
+        if min(gray.shape[:2]) < 2 * _PITCH_MIN_SIDE:
+            return None
+        gray = cv2.resize(gray, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_AREA)
+        factor *= 2
+
+
+def _pitch_at_scale(warped_gray: NDArray) -> float | None:
     binary = cv2.adaptiveThreshold(
         cv2.GaussianBlur(warped_gray, (3, 3), 0),
         255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 3,
