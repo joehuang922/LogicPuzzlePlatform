@@ -21,7 +21,7 @@ _parsers: dict = {}
 # either does OCR via the Gemini vision API or has no text to read, so it must
 # not pay the ~7s EasyOCR model-load cost. Keep this in sync with the
 # ``ocr_backend=`` arguments in ``_PARSER_FACTORIES``.
-_OCR_TYPES = frozenset({1, 2, 4, 5, 7, 8, 14, 16, 17, 19, 20, 23, 24, 25, 26, 27})
+_OCR_TYPES = frozenset({1, 2, 4, 5, 7, 8, 9, 11, 14, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27})
 
 
 def _get_ocr():
@@ -72,13 +72,13 @@ def _build_parser(puzzle_type: int):
         return PencilsParser(ocr_backend=ocr)
     if puzzle_type == 9:
         from puzzle_parsers.nuritwin.parser import NuritwinParser
-        return NuritwinParser()
+        return NuritwinParser(ocr_backend=ocr)
     if puzzle_type == 10:
         from puzzle_parsers.slalom.parser import SlalomParser
         return SlalomParser()
     if puzzle_type == 11:
         from puzzle_parsers.shakashaka.parser import ShakashakaParser
-        return ShakashakaParser()
+        return ShakashakaParser(ocr_backend=ocr)
     if puzzle_type == 12:
         from puzzle_parsers.kakuro.parser import KakuroParser
         return KakuroParser()
@@ -99,7 +99,7 @@ def _build_parser(puzzle_type: int):
         return NumberLinkParser(ocr_backend=ocr)
     if puzzle_type == 18:
         from puzzle_parsers.akari.parser import AkariParser
-        return AkariParser()
+        return AkariParser(ocr_backend=ocr)
     if puzzle_type == 19:
         from puzzle_parsers.hell_golf.parser import HellGolfParser
         return HellGolfParser(ocr_backend=ocr)
@@ -108,10 +108,10 @@ def _build_parser(puzzle_type: int):
         return TentaishowParser(ocr_backend=ocr)
     if puzzle_type == 21:
         from puzzle_parsers.heyawake.parser import HeyawakeParser
-        return HeyawakeParser()
+        return HeyawakeParser(ocr_backend=ocr)
     if puzzle_type == 22:
         from puzzle_parsers.shikaku.parser import ShikakuParser
-        return ShikakuParser()
+        return ShikakuParser(ocr_backend=ocr)
     if puzzle_type == 23:
         from puzzle_parsers.norinori.parser import NorinoriParser
         return NorinoriParser(ocr_backend=ocr)

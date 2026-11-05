@@ -34,7 +34,7 @@ class FakeOcr(OcrBackend):
     def __init__(self, grid: list[list[int | None]]):
         self._grid = grid
 
-    def recognize_cells(self, cells, *, multi_digit=False, min_confidence=0.0):
+    def recognize_cells(self, cells, *, multi_digit=False, min_confidence=0.0, allowlist=None):
         return [[0 if v is None else v for v in row] for row in self._grid]
 
     @property

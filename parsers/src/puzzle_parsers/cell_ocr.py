@@ -1,9 +1,15 @@
 """Shared cell-clue OCR for every EasyOCR-backed grid parser.
 
 All of our sources print clues in the same Nikoli font, so every parser crops
-cells and reads them the same way; the only per-puzzle choice is whether a
-clue may have more than one digit (``allow_multi_digits``). Only sudoku-style
-boards, whose clues are 1-9 by definition, turn it off.
+cells and reads them the same way. The only per-puzzle settings are the
+puzzle's clue rules, never OCR tuning:
+
+- ``allow_multi_digits``: a clue may have two-plus digits (``10``). Off only
+  where clues are single digits by definition (sudoku, akari, slitherlink...).
+- ``allow_zero``: ``0`` is a real clue (heyawake, slitherlink, akari). Empty
+  cells then read ``-1``; otherwise empty is ``0``.
+- ``max_value``: the largest single-digit clue (akari 4, slitherlink 3).
+  Narrowing the allowlist stops look-alikes outside the range (``1`` -> ``7``).
 
 The crop trims less horizontally than vertically: a two-digit clue such as
 ``10`` is printed nearly cell-wide, and a symmetric 20% trim cut its ``0`` off.
@@ -61,14 +67,35 @@ def read_cells(
     cell_rois: list[list[NDArray]],
     *,
     allow_multi_digits: bool,
+    allow_zero: bool = False,
+    max_value: int | None = None,
 ) -> list[list[int]]:
-    """Read one clue per crop; ``0`` means empty or unreadable."""
+    """Read one clue per crop (dark digits on a light ground).
+
+    Empty or unreadable cells are ``0``, or ``-1`` when ``allow_zero``.
+    """
+    empty = -1 if allow_zero else 0
     if ocr is None:
-        return [[0] * len(row) for row in cell_rois]
+        return [[empty] * len(row) for row in cell_rois]
+    low = 0 if allow_zero else 1
+    high = 9 if allow_multi_digits or max_value is None else min(9, max_value)
+    if allow_multi_digits:
+        allowlist = "0123456789"
+    else:
+        allowlist = "".join(str(d) for d in range(low, high + 1))
     raw = ocr.recognize_cells(
-        cell_rois, multi_digit=allow_multi_digits, min_confidence=MIN_CONFIDENCE
+        cell_rois,
+        multi_digit=allow_multi_digits,
+        min_confidence=MIN_CONFIDENCE,
+        allowlist=allowlist,
     )
-    return [[v if v > 0 else 0 for v in row] for row in raw]
+
+    def clean(v: int) -> int:
+        if v < low or (max_value is not None and v > max_value):
+            return empty
+        return v
+
+    return [[clean(v) for v in row] for row in raw]
 
 
 def read_grid_clues(
@@ -78,7 +105,12 @@ def read_grid_clues(
     v_lines: Sequence[float],
     *,
     allow_multi_digits: bool,
+    allow_zero: bool = False,
+    max_value: int | None = None,
 ) -> list[list[int]]:
     """Crop and read every cell of a grid in one batch."""
     rois = crop_grid_cells(image, h_lines, v_lines)
-    return read_cells(ocr, rois, allow_multi_digits=allow_multi_digits)
+    return read_cells(
+        ocr, rois, allow_multi_digits=allow_multi_digits,
+        allow_zero=allow_zero, max_value=max_value,
+    )

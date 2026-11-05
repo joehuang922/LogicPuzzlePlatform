@@ -1,7 +1,8 @@
 """Every EasyOCR grid parser reads clues through ``puzzle_parsers.cell_ocr``.
 
 All sources print clues in the same Nikoli font, so cropping and recognition
-are shared; a parser chooses only ``allow_multi_digits``. These checks stop a
+are shared; a parser chooses only its clue rules (``allow_multi_digits``,
+``allow_zero``, ``max_value``). These checks stop a
 new (or edited) parser from hand-rolling its own crop/OCR path, and from being
 left out of ``_OCR_TYPES`` (which silently hands it ``ocr_backend=None`` in
 production — hitori shipped that way and read every cell as unreadable).
@@ -22,8 +23,9 @@ sys.path.insert(0, str(PARSERS_ROOT))
 _OCR_CORE = {PKG / "recognition.py", PKG / "cell_ocr.py"}
 # Not a grid-cell clue reader: nonogram OCRs the clue strips outside the grid.
 _EXEMPT_PACKAGES = {"nonogram"}
-# Clues are 1-9 by definition; every other puzzle allows multi-digit clues.
-_SINGLE_DIGIT_PACKAGES = {"sudoku", "combo_sudoku"}
+# Clues are single digits by the puzzle's rules (sudoku 1-9, akari and
+# shakashaka 0-4, slitherlink 0-3); every other puzzle allows multi-digit clues.
+_SINGLE_DIGIT_PACKAGES = {"sudoku", "combo_sudoku", "akari", "shakashaka", "slitherlink"}
 
 _DIRECT_OCR = re.compile(r"\.recognize_cells\(|\.readtext\(|\._reader\b|import easyocr")
 _SHARED_READ = re.compile(r"\b(read_cells|read_grid_clues)\(")

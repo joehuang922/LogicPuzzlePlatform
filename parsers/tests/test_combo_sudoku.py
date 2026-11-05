@@ -24,7 +24,7 @@ class FakeOcrBackend(OcrBackend):
     def supports_full_image(self) -> bool:
         return True
 
-    def recognize_cells(self, cells, *, multi_digit=False, min_confidence=0.0):
+    def recognize_cells(self, cells, *, multi_digit=False, min_confidence=0.0, allowlist=None):
         return self._hints
 
     def recognize_full_image(self, image_path, num_subboards):

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import cv2
 import numpy as np
@@ -9,6 +10,7 @@ from numpy.typing import NDArray
 from PIL import Image
 
 from puzzle_parsers.cell_fill import is_filled
+from puzzle_parsers.cell_ocr import crop_cell, read_cells
 from puzzle_parsers.board_grid import BoardGrid
 from puzzle_parsers.base import PuzzleParser
 from puzzle_parsers.models import PuzzleData
@@ -16,17 +18,17 @@ from puzzle_parsers.shakashaka.grid_detector import (
     detect_shakashaka_grid,
 )
 from puzzle_parsers.shakashaka.models import ShakashakaBoard
-from puzzle_parsers.recognition import CellRecognizer, GeminiRecognizer
-from puzzle_parsers.recognition_schemas import INT_CELL_PROMPT
 
+if TYPE_CHECKING:
+    from puzzle_parsers.recognition import OcrBackend
 
 
 class ShakashakaParser(PuzzleParser):
     puzzle_type = "shakashaka"
     locates_board = True
 
-    def __init__(self, recognizer: CellRecognizer | None = None, **kwargs) -> None:
-        self._recognizer = recognizer or GeminiRecognizer(**kwargs)
+    def __init__(self, ocr_backend: OcrBackend | None = None) -> None:
+        self._ocr = ocr_backend
 
     def _parse(self, image: Image.Image) -> PuzzleData:
         img_array = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
@@ -64,7 +66,6 @@ class ShakashakaParser(PuzzleParser):
 
         cells: list[list[int]] = []
         black_cell_coords: list[tuple[int, int]] = []
-        black_cell_crops: list[NDArray] = []
 
         for r in range(rows):
             row: list[int] = []
@@ -84,39 +85,25 @@ class ShakashakaParser(PuzzleParser):
                     # Black cell — need to determine if numbered
                     row.append(5)  # placeholder, will be updated
                     black_cell_coords.append((r, c))
-                    black_cell_crops.append(roi)
                 else:
                     row.append(-1)  # white/empty
             cells.append(row)
 
-        # Use LLM to classify black cells (numbered vs plain)
-        if black_cell_crops:
-            # Invert crops so white numbers appear as dark on light background
-            inverted_crops = [cv2.bitwise_not(crop) for crop in black_cell_crops]
-            # Arrange into a grid with ~10 columns for better LLM interpretation
-            cols_per_row = min(10, len(inverted_crops))
-            crop_grid: list[list[NDArray]] = []
-            for i in range(0, len(inverted_crops), cols_per_row):
-                row = inverted_crops[i:i + cols_per_row]
-                # Pad last row if needed
-                while len(row) < cols_per_row:
-                    row.append(np.ones_like(inverted_crops[0]) * 255)
-                crop_grid.append(row)
-
-            raw = self._recognizer.recognize(crop_grid, INT_CELL_PROMPT)
-            # Flatten the results back
-            flat_results: list[int] = []
-            for row in raw:
-                flat_results.extend(row)
-
-            for i, (r, c) in enumerate(black_cell_coords):
-                if i >= len(flat_results):
-                    break
-                val = flat_results[i]
-                if 0 <= val <= 4:
-                    cells[r][c] = val
-                else:
-                    cells[r][c] = 5  # black with no number
+        # Numbered black cells carry a white 0-4: read the inverted crops.
+        # A black cell with nothing readable is a plain black cell (5).
+        if black_cell_coords:
+            crops = [
+                cv2.bitwise_not(crop_cell(
+                    warped_gray, geom.h_lines[r], geom.h_lines[r + 1],
+                    geom.v_lines[c], geom.v_lines[c + 1],
+                ))
+                for r, c in black_cell_coords
+            ]
+            values = read_cells(
+                self._ocr, [crops], allow_multi_digits=False, allow_zero=True, max_value=4
+            )[0]
+            for (r, c), val in zip(black_cell_coords, values):
+                cells[r][c] = val if val >= 0 else 5
 
         return cells
 

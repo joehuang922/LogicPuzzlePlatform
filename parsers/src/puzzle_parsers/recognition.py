@@ -505,13 +505,15 @@ class OcrBackend(ABC):
         *,
         multi_digit: bool = False,
         min_confidence: float = 0.0,
+        allowlist: str | None = None,
     ) -> list[list[int]]:
         """Recognize digits from a grid of cell images.
 
-        Returns a 2D array where each value is 0 (empty), 1-9, or — when
-        ``multi_digit`` is set — a larger clue (e.g. 10-13). ``multi_digit`` and
-        ``min_confidence`` tune the local EasyOCR path; LLM-backed backends read
-        via a prompt and accept the flags for interface parity.
+        Returns a 2D array where each value is -1 (empty), a digit, or — when
+        ``multi_digit`` is set — a larger clue (e.g. 10-13). ``allowlist`` is
+        the digits a clue may use. The flags tune the local EasyOCR path;
+        LLM-backed backends read via a prompt and accept them for interface
+        parity. Use ``cell_ocr`` rather than calling this directly.
         """
         ...
 
@@ -548,6 +550,7 @@ class GeminiOcrBackend(OcrBackend):
         *,
         multi_digit: bool = False,
         min_confidence: float = 0.0,
+        allowlist: str | None = None,
     ) -> list[list[int]]:
         # The vision prompt reads whatever is printed, so multi-digit clues and
         # confidence filtering are handled by the model itself; the flags exist
@@ -591,6 +594,7 @@ class ClaudeOcrBackend(OcrBackend):
         *,
         multi_digit: bool = False,
         min_confidence: float = 0.0,
+        allowlist: str | None = None,
     ) -> list[list[int]]:
         # Flags accepted for interface parity; the vision prompt already reads
         # multi-digit clues and filters noise.
@@ -614,21 +618,96 @@ class ClaudeOcrBackend(OcrBackend):
         return self._recognizer.recognize_full_image(image_path, prompt)
 
 
-def _has_glyph_blob(ink: NDArray) -> bool:
-    """True when the binary crop holds a digit-like blob, not just edge scraps.
+# --- EasyOCR cell reading -------------------------------------------------
+# Every source prints clues in the same Nikoli font. EasyOCR's text *detector*
+# is the weak link on single cells: it found nothing in a clean lone "7" or an
+# edge-to-edge "1", and made the recogniser read this font's flagged "1" as
+# "7" and "2" as "9" on loosely framed crops. So we find the glyph ourselves,
+# render it like a line of text (fixed height, aspect kept, white margin) and
+# hand its box straight to the recogniser. On 806 answer-key cells this cut
+# errors from 8 to 1, it matched or beat Gemini on 1,174 cells from the parsers
+# that used to send digits to Gemini, and it reads ~10x faster.
 
-    A glyph is an ink component at least 40% of the crop's height that keeps
-    clear of the left and right edges; leftover grid lines hug an edge.
-    """
+# A crop is empty when its contrast, measured on a 64x64 copy blurred to wash
+# out halftone and JPEG speckle, is below this: empty cells (including plain
+# halftone walls) reach ~50, the faintest digits ~127.
+_EMPTY_CONTRAST = 90
+_GLYPH_HEIGHT = 64
+_LINE_LEN = 0.95
+_LINE_ZONE = 0.12
+_GLYPH_MARGIN_Y = 24
+_GLYPH_MARGIN_X = 32
+
+
+def _is_blank(gray: NDArray) -> bool:
     import cv2
+    import numpy as np
 
-    h, w = ink.shape[:2]
-    n, _, stats, _ = cv2.connectedComponentsWithStats(ink, connectivity=8)
+    small = cv2.resize(gray, (64, 64), interpolation=cv2.INTER_AREA)
+    lo, hi = np.percentile(cv2.GaussianBlur(small, (5, 5), 0), (2, 98))
+    return hi - lo < _EMPTY_CONTRAST
+
+
+def _glyph_mask(gray: NDArray) -> NDArray:
+    """Ink of the clue glyph(s), without grid-line scraps along the crop edge."""
+    import cv2
+    import numpy as np
+
+    _, ink = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    h, w = ink.shape
+    # Grid lines that run inside the crop (a slanted or bowed page): rows or
+    # columns in the outer band that are inked along nearly their whole
+    # length. A small smear across the line first tolerates a slant of a few
+    # px. Digits sit in the middle, so even a full-height "1" keeps its stem.
+    for axis in (0, 1):
+        size = ink.shape[1 - axis]
+        smear = cv2.dilate(ink, np.ones((1, 5) if axis == 0 else (5, 1), np.uint8))
+        cover = (smear > 0).mean(axis=axis)
+        zone = max(1, int(_LINE_ZONE * size))
+        for i in [*range(zone), *range(size - zone, size)]:
+            if cover[i] >= _LINE_LEN:
+                lo, hi = max(0, i - 2), min(size, i + 3)
+                if axis == 0:
+                    ink[:, lo:hi] = 0
+                else:
+                    ink[lo:hi, :] = 0
+    n, labels, stats, _ = cv2.connectedComponentsWithStats(ink, connectivity=8)
+    keep = np.zeros_like(ink)
     for i in range(1, n):
-        x, _, bw, bh, _ = stats[i]
-        if bh >= 0.4 * h and x > 0 and x + bw < w:
-            return True
-    return False
+        x, y, bw, bh, area = stats[i]
+        if area < 0.004 * h * w:
+            continue
+        touches = x == 0 or y == 0 or x + bw == w or y + bh == h
+        # A grid line: long and thin along an edge. An edge nick: small.
+        line = min(bw, bh) < 0.12 * min(h, w) and max(bw, bh) > 0.5 * max(h, w)
+        nick = bh < 0.3 * h and bw < 0.3 * w
+        if touches and (line or nick):
+            continue
+        keep[labels == i] = 255
+    return keep
+
+
+def _render_glyph(gray: NDArray) -> tuple[NDArray, list[int]] | None:
+    """The glyph on white, as a text line, plus its box for the recogniser."""
+    import cv2
+    import numpy as np
+
+    mask = _glyph_mask(gray)
+    ys, xs = np.nonzero(mask)
+    if len(ys) < 0.02 * mask.size:
+        return None
+    y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
+    glyph = gray[y0:y1, x0:x1].copy()
+    glyph[mask[y0:y1, x0:x1] == 0] = 255
+    scale = _GLYPH_HEIGHT / glyph.shape[0]
+    width = max(8, int(round(glyph.shape[1] * scale)))
+    interp = cv2.INTER_AREA if scale < 1 else cv2.INTER_CUBIC
+    glyph = cv2.resize(glyph, (width, _GLYPH_HEIGHT), interpolation=interp)
+    my, mx = _GLYPH_MARGIN_Y, _GLYPH_MARGIN_X
+    line = cv2.copyMakeBorder(glyph, my, my, mx, mx, cv2.BORDER_CONSTANT, value=255)
+    pad = 8  # box slightly larger than the ink, as the detector would give
+    box = [mx - pad, mx + width + pad, my - pad, my + _GLYPH_HEIGHT + pad]
+    return line, box
 
 
 class EasyOcrBackend(OcrBackend):
@@ -645,9 +724,9 @@ class EasyOcrBackend(OcrBackend):
             kwargs["download_enabled"] = False
         self._reader = easyocr.Reader(languages or ["en"], **kwargs)
 
-        # Per-cell ``readtext`` is the dominant cost on large boards (measured
+        # Per-cell recognition is the dominant cost on large boards (measured
         # ~83s for a 720-cell fillomino on Lambda's ~1.7 vCPU, enough to blow the
-        # timeout). ``readtext`` releases the GIL during torch inference, so we
+        # timeout). EasyOCR releases the GIL during torch inference, so we
         # dispatch cells across a thread pool in ``recognize_cells``. Pinning
         # torch to a single intra-op thread lets the pool — not torch's own
         # thread fan-out — own the parallelism, which gave the cleanest scaling
@@ -663,107 +742,45 @@ class EasyOcrBackend(OcrBackend):
     def supports_full_image(self) -> bool:
         return False
 
-    def _reread_without_zero(self, resized: NDArray, min_confidence: float) -> int:
-        """Re-read a crop that came back as a lone ``0`` with ``0`` banned.
-
-        ``0`` is never a valid single-cell clue in any puzzle we parse, and this
-        print font's ``9`` (closed top loop) is routinely misread as ``0`` when
-        ``0`` is in the allowlist. Dropping ``0`` from the allowlist and reading
-        again recovers the intended ``9`` (or other digit) that the ``0``
-        outvoted.
-        """
-        results = self._reader.readtext(
-            resized, allowlist="123456789", detail=1, paragraph=False
-        )
-        if not results:
-            return 0
-        _, text, conf = results[0]
-        text = text.strip()
-        if float(conf) < min_confidence or not text.isdigit():
-            return 0
-        return int(text)
-
     def _recognize_single_cell(
         self,
         cell: NDArray,
         *,
         multi_digit: bool = False,
         min_confidence: float = 0.0,
+        allowlist: str | None = None,
     ) -> int:
-        """Recognize the integer in one cell crop.
+        """Read the clue in one cell crop (dark on light); ``-1`` when empty.
 
-        Defaults reproduce the original single-digit behaviour exactly (``1``-
-        ``9`` allowlist, lone digit, ``0`` rejected, no confidence floor), which
-        single-digit boards (sudoku, slitherlink) rely on. Callers whose clues
-        can be multi-digit (nurikabe's ``10``-``13``) pass ``multi_digit=True``,
-        which allows ``0`` in the allowlist, accepts two-plus-character reads,
-        and recovers a lone ``0`` as a ``9`` via :meth:`_reread_without_zero`.
-        ``min_confidence`` drops low-confidence reads — chiefly grid-line
-        fragments and smudges that otherwise surface as ghost digits.
+        ``allowlist`` is the digits a clue may use (default ``1``-``9``, or
+        ``0``-``9`` for multi-digit clues such as ``10``). A ``0`` comes back
+        only when the allowlist has it; callers decide whether a lone ``0`` is
+        a clue. Without ``multi_digit`` a read of two-plus digits is empty.
         """
         import cv2
-        import numpy as np
 
-        gray = cell if len(cell.shape) == 2 else cv2.cvtColor(cell, cv2.COLOR_BGR2GRAY)
-        _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-
-        pixel_ratio = np.count_nonzero(thresh) / thresh.size
-        if pixel_ratio < 0.03:
-            return 0
-
-        resized = cv2.resize(gray, (128, 128), interpolation=cv2.INTER_CUBIC)
-
-        # ``0`` must be in the allowlist for multi-digit clues (e.g. ``10``) to
-        # survive; single-digit boards keep the ``1``-``9`` list, which doubles
-        # as a cheap reject of the common 9->0 misread.
-        allowlist = "0123456789" if multi_digit else "123456789"
-        results = self._reader.readtext(
-            resized,
-            allowlist=allowlist,
-            detail=1,
-            paragraph=False,
+        gray = cell if cell.ndim == 2 else cv2.cvtColor(cell, cv2.COLOR_BGR2GRAY)
+        if gray.size == 0 or _is_blank(gray):
+            return -1
+        rendered = _render_glyph(gray)
+        if rendered is None:
+            return -1
+        line, box = rendered
+        if allowlist is None:
+            allowlist = "0123456789" if multi_digit else "123456789"
+        results = self._reader.recognize(
+            line, horizontal_list=[box], free_list=[], allowlist=allowlist,
+            detail=1, paragraph=False,
         )
-
-        if not results and _has_glyph_blob(thresh):
-            # EasyOCR's text detector finds nothing when a glyph runs edge to
-            # edge (a lone "1" fills the crop's height). Retry once padded with
-            # the cell's own background. Only as a retry: padding every crop
-            # isolates grid-line scraps at the edge into extra "1"s (5 -> 15).
-            # The blob test skips cells holding only such scraps, which would
-            # otherwise pay for a second read (+46% parse time).
-            pad = max(4, round(0.2 * max(gray.shape[:2])))
-            background = int(np.percentile(gray, 90))
-            padded = cv2.copyMakeBorder(
-                gray, pad, pad, pad, pad, cv2.BORDER_CONSTANT, value=background
-            )
-            resized = cv2.resize(padded, (128, 128), interpolation=cv2.INTER_CUBIC)
-            results = self._reader.readtext(
-                resized, allowlist=allowlist, detail=1, paragraph=False
-            )
-
         if not results:
-            return 0
-
+            return -1
         _, text, conf = results[0]
         text = text.strip()
         if float(conf) < min_confidence or not text.isdigit():
-            return 0
-
-        if multi_digit:
-            # Multi-character read: a genuine two-plus-digit clue (10, 11, 13...).
-            if len(text) >= 2:
-                val = int(text)
-                return val if val > 0 else 0
-            # Single character: a lone ``0`` is never valid, so try to recover
-            # the ``9`` (or other digit) it most likely masked.
-            if text == "0":
-                return self._reread_without_zero(resized, min_confidence)
-            return int(text)
-
-        # Single-digit path: original behaviour, byte-for-byte.
-        if len(text) == 1 and text != "0":
-            return int(text)
-        return 0
+            return -1
+        if len(text) > 1 and not multi_digit:
+            return -1
+        return int(text)
 
     def recognize_cells(
         self,
@@ -771,6 +788,7 @@ class EasyOcrBackend(OcrBackend):
         *,
         multi_digit: bool = False,
         min_confidence: float = 0.0,
+        allowlist: str | None = None,
     ) -> list[list[int]]:
         import os
         from functools import partial
@@ -786,6 +804,7 @@ class EasyOcrBackend(OcrBackend):
             self._recognize_single_cell,
             multi_digit=multi_digit,
             min_confidence=min_confidence,
+            allowlist=allowlist,
         )
 
         # Lambda allocates ~1 vCPU per 1769 MB; at 3008 MB (~1.7 vCPU) there is

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -10,40 +9,18 @@ from PIL import Image
 
 from puzzle_parsers.base import PuzzleParser
 from puzzle_parsers.models import PuzzleData
-from puzzle_parsers.recognition import CellRecognizer, GeminiRecognizer
-from puzzle_parsers.recognition_schemas import INT_CELL_PROMPT
+from puzzle_parsers.cell_ocr import read_cells
 from puzzle_parsers.slitherlink.grid_detector import detect_slitherlink_grid
 from puzzle_parsers.slitherlink.models import SlitherlinkBoard
 if TYPE_CHECKING:
     from puzzle_parsers.recognition import OcrBackend
 
 
-SLITHERLINK_PROMPT = (
-    "This image shows a grid of cells cropped from a slitherlink puzzle. "
-    "Each cell is labeled with its row,col position. "
-    "Each cell may contain a single digit (0, 1, 2, or 3) or be empty. "
-    "For each cell, output the digit if one is clearly printed, or -1 if empty. "
-    "Respond with ONLY a JSON array of arrays (rows of integers). "
-    "Example for a 3x3: [[1,-1,3],[-1,2,-1],[0,-1,-1]]. No explanation, just the JSON."
-)
-
-
 class SlitherlinkParser(PuzzleParser):
     puzzle_type = "slitherlink"
 
-    def __init__(
-        self,
-        ocr_backend: OcrBackend | None = None,
-        recognizer: CellRecognizer | None = None,
-    ) -> None:
+    def __init__(self, ocr_backend: OcrBackend | None = None) -> None:
         self._ocr = ocr_backend
-        self._recognizer = recognizer
-
-    @property
-    def recognizer(self) -> CellRecognizer:
-        if self._recognizer is None:
-            self._recognizer = GeminiRecognizer()
-        return self._recognizer
 
     def _parse(self, image: Image.Image) -> PuzzleData:
         img_array = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
@@ -102,8 +79,10 @@ class SlitherlinkParser(PuzzleParser):
                 row_crops.append(cell_roi)
             cell_crops.append(row_crops)
 
-        # Recognize digits via LLM
-        cells = self.recognizer.recognize(cell_crops, SLITHERLINK_PROMPT)
+        # Clues are 0-3; empty cells read -1.
+        cells = read_cells(
+            self._ocr, cell_crops, allow_multi_digits=False, allow_zero=True, max_value=3
+        )
 
         if debug_path:
             vis = img_array.copy()

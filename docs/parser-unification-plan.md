@@ -45,10 +45,10 @@ places that do the same job their own way today and should switch to the home.
 | 8 | Follow a curved page | masyu `_flatten_curved_board` (re-warps along traced lines) | `grid_utils` pitch + snap fallback (commit 9af6bd2) | two approaches, pick one |
 | 9 | Trim a neighbouring puzzle's title band | masyu `_dominant_extent` | — | to extract |
 | 10 | Hold the grid result | `board_grid.BoardGrid` | none (kuralin and tentaishow geometries now hold a `BoardGrid` plus their circles/dots) | **done** for 24 detectors |
-| 11 | Crop a cell | `cell_ocr.crop_cell` | the Gemini parsers crop by hand (akari, heyawake, kakuro, nurimaze, nuritwin, pencils, shakashaka, shikaku, yajilin), mostly at a 20% margin | to migrate |
-| 12 | Is this cell empty? | — | heyawake ink fraction; shikaku dark fraction; EasyOCR's 3% pixel-ratio check inside `recognition.py` | to extract |
+| 11 | Crop a cell | `cell_ocr.crop_cell` | akari, heyawake, nuritwin, shakashaka, shikaku moved with row 14; the Gemini parsers crop by hand (kakuro, nurimaze, pencils, yajilin), mostly at a 20% margin | 5 done; Gemini parsers left |
+| 12 | Is this cell empty? | `recognition._is_blank` (contrast of a blurred 64 px copy; empty ≤ ~50, faintest digit ~127, cutoff 90) for every OCR cell | heyawake's ink fraction removed; shikaku dark fraction (clue disc detection) | done for OCR cells |
 | 13 | Is this cell black / filled? | `cell_fill.is_filled` (dark fraction > 0.35; akari and shakashaka use it — shakashaka keys went 15/2/1 → 0/0/0 errors) | kakuro mean brightness; slalom `classify_walls` dark ratio | 2 done; kakuro, slalom next |
-| 14 | Read a plain number in a cell | `cell_ocr.read_grid_clues` / `read_cells` | heyawake and nuritwin read plain dark-on-light numbers through Gemini | done for 10; 2 candidates |
+| 14 | Read a plain number in a cell | `cell_ocr.read_grid_clues` / `read_cells` (EasyOCR recogniser on a located glyph; clue rules `allow_multi_digits`, `allow_zero`, `max_value`) | none: akari, heyawake, nuritwin, shakashaka, shikaku, slitherlink moved off Gemini | **done** for 17 |
 | 15 | Read composite cell content (arrows, two numbers, symbols, white-on-black) | `recognition.GeminiRecognizer` montage + `cell_classify` + prompts in `recognition_schemas.py` | — | shared; confirm all callers |
 | 16 | Measure room-wall thickness | `grid_utils.classify_border_thickness` | six identical 27-line `classify_borders` wrappers (heyawake, lits, norinori, nurimaze, nuritwin, ripple_effect) | to delete wrappers |
 | 17 | Find circles and dots | `ring_probe.probe_ring` / `fill_ratio` (ring test at lattice points; kuralin and tentaishow) | masyu `_detect_circles` (ring pooled over 8 tiles) | 2 done; masyu next |
@@ -89,8 +89,18 @@ Notes on specific rows:
   onto the ink, so a line that bends along its own length still drifts a few
   pixels (visible on the fillomino curved photo). Flattening is the better
   end state, but it currently erases masyu's circles and assumes solid lines.
-- **Row 14.** Shikaku also uses Gemini, but its clues are white numbers on
-  solid dark circles, which EasyOCR can't read as-is. Leave it on Gemini.
+- **Row 14 (shipped).** EasyOCR's text detector was the weak link on single
+  cells (nothing found in a lone `7`; this font's `1` read as `7`, `2` as `9`).
+  The backend now finds the glyph itself (Otsu ink minus edge grid scraps and
+  slanted lines in the outer 12%), renders it at 64 px with a white margin and
+  calls the recogniser on that box. Answer-key cells: 8 errors -> 1 (806
+  cells). Unkeyed bench changes: 50 fixed, 2 broken (picto big's slanted
+  columns). ~10x faster (fillomino-big 7.1 s -> 0.7 s). The six Gemini digit
+  parsers then moved to `cell_ocr`: five give boards identical to Gemini on
+  all 11 samples, slitherlink-medium-1 fixes 18 cells Gemini's montage put one
+  cell off; 0.05-0.8 s instead of 2.5-6.4 s, and no Gemini call. Shikaku lifts
+  its white number off the disc first (`_disc_digit`). The fillomino-medium key
+  had 3 wrong cells (r8c12 1, r8c13 11, r11c6 1); fixed.
 - **Row 17.** Kuralin's comment records why it moved off HoughCircles: a gray
   circle with touching dashes defeated both Hough and the contour fallback,
   while a ring test at a known lattice point found it. That argues for the

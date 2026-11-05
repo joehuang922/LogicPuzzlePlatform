@@ -31,11 +31,18 @@ This is a solo project. Do not create pull requests or feature branches.
 
 # Parser clue OCR
 
-- Every parser that reads grid-cell number clues with EasyOCR goes through
-  `parsers/src/puzzle_parsers/cell_ocr.py` (`read_grid_clues` / `read_cells`). All
-  sources use the same Nikoli font, so crop margins and the confidence floor are
-  shared; the only per-puzzle setting is `allow_multi_digits`, which is `False` only
-  for sudoku and combo_sudoku. Tune OCR in `cell_ocr.py` for everyone, not per parser.
+- Every parser that reads plain number clues in grid cells goes through
+  `parsers/src/puzzle_parsers/cell_ocr.py` (`read_grid_clues` / `read_cells`) on
+  EasyOCR, not Gemini. All sources use the same Nikoli font, so crop margins, the
+  empty-cell test and glyph handling are shared. The only per-puzzle settings are
+  the puzzle's clue rules: `allow_multi_digits` (`False` only where clues are
+  single digits by rule: sudoku, combo_sudoku, akari, shakashaka, slitherlink),
+  `allow_zero` (0 is a clue) and `max_value`. Tune OCR in `cell_ocr.py` /
+  `EasyOcrBackend` for everyone, not per parser. A parser whose digits are not dark
+  on light (white on black, on a disc) converts its crop to dark-on-light first.
+- Gemini stays only for cells EasyOCR can't represent: arrows, symbols, two
+  numbers per cell, circled vs plain numbers (pencils, yajilin, nurimaze,
+  hell_golf, kakuro, slalom).
 - Such a parser's type id must be in `_OCR_TYPES` in `parsers/lambda_handler.py`.
   `parsers/tests/test_cell_ocr_contract.py` enforces both rules.
 

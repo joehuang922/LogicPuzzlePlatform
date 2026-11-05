@@ -32,7 +32,9 @@ def main() -> None:
         print(f"Error: Image file not found: {image_path}", file=sys.stderr)
         sys.exit(1)
 
-    akari_parser = AkariParser()
+    from puzzle_parsers.recognition import EasyOcrBackend
+
+    akari_parser = AkariParser(ocr_backend=EasyOcrBackend())
     board = akari_parser.parse_file(image_path, debug_dir=args.debug)
 
     output_json = json.dumps(board.model_dump(), indent=4)

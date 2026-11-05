@@ -32,7 +32,9 @@ def main() -> None:
         print(f"Error: Image file not found: {image_path}", file=sys.stderr)
         sys.exit(1)
 
-    nuritwin_parser = NuritwinParser()
+    from puzzle_parsers.recognition import EasyOcrBackend
+
+    nuritwin_parser = NuritwinParser(ocr_backend=EasyOcrBackend())
     board = nuritwin_parser.parse_file(image_path, debug_dir=args.debug)
 
     output_json = json.dumps(board.model_dump(), indent=4)
