@@ -29,6 +29,8 @@ data class BoardDraft(
     val shikaku: ClueGridDraft = ClueGridDraft(),
     val fillomino: ClueGridDraft = ClueGridDraft(),
     val kuralin: KuralinDraft = KuralinDraft(),
+    val norinori: RippleEffectDraft = RippleEffectDraft(),
+    val doubleChoco: DoubleChocoDraft = DoubleChocoDraft(),
 ) {
     /**
      * What the type's misread check finds wrong with this board — the list that turns
@@ -52,18 +54,21 @@ data class BoardDraft(
         AuthoringType.SHIKAKU -> ShikakuAuthoring.problems(shikaku)
         AuthoringType.FILLOMINO -> FillominoAuthoring.problems(fillomino)
         AuthoringType.KURALIN -> KuralinAuthoring.problems(kuralin)
+        AuthoringType.NORINORI -> NorinoriAuthoring.problems(norinori)
+        AuthoringType.DOUBLE_CHOCO -> DoubleChocoAuthoring.problems(doubleChoco)
     }
 
     /**
      * The part of [problems] that makes the board unrepresentable as its type's canon
-     * (heyawake rooms that aren't rectangles, ripple effect walls that end inside a room,
-     * a slalom gate with two numbers). Unlike the rest these can't be overridden: the
+     * (heyawake rooms that aren't rectangles, ripple effect or norinori walls that end
+     * inside a room, a slalom gate with two numbers). Unlike the rest these can't be overridden: the
      * board can't be created or saved until they're fixed.
      */
     fun formatProblems(type: AuthoringType): List<String> = when (type) {
         AuthoringType.HEYAWAKE -> HeyawakeAuthoring.formatProblems(heyawake)
         AuthoringType.RIPPLE_EFFECT -> RippleEffectAuthoring.formatProblems(rippleEffect)
         AuthoringType.SLALOM -> SlalomAuthoring.formatProblems(slalom)
+        AuthoringType.NORINORI -> NorinoriAuthoring.formatProblems(norinori)
         else -> emptyList()
     }
 
@@ -106,6 +111,10 @@ data class BoardDraft(
             CanonBoard(FillominoAuthoring.canonFromDraft(fillomino), fillomino.cols, fillomino.rows)
         AuthoringType.KURALIN ->
             CanonBoard(KuralinAuthoring.canonFromDraft(kuralin), kuralin.cols, kuralin.rows)
+        AuthoringType.NORINORI ->
+            CanonBoard(NorinoriAuthoring.canonFromDraft(norinori), norinori.width, norinori.height)
+        AuthoringType.DOUBLE_CHOCO ->
+            CanonBoard(DoubleChocoAuthoring.canonFromDraft(doubleChoco), doubleChoco.cols, doubleChoco.rows)
     }
 
     companion object {
@@ -128,6 +137,8 @@ data class BoardDraft(
             AuthoringType.SHIKAKU -> BoardDraft(shikaku = ShikakuAuthoring.draftFromCanon(canon))
             AuthoringType.FILLOMINO -> BoardDraft(fillomino = FillominoAuthoring.draftFromCanon(canon))
             AuthoringType.KURALIN -> BoardDraft(kuralin = KuralinAuthoring.draftFromCanon(canon))
+            AuthoringType.NORINORI -> BoardDraft(norinori = NorinoriAuthoring.draftFromCanon(canon))
+            AuthoringType.DOUBLE_CHOCO -> BoardDraft(doubleChoco = DoubleChocoAuthoring.draftFromCanon(canon))
         }
     }
 }

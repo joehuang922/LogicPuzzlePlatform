@@ -34,6 +34,9 @@ import com.puzzleplatform.player.ui.board.RippleEffectDraftBoard
  * Walls toggle one cell side at a time with no checks. A wall left ending inside a room
  * is a format problem: listed (and tinted on the board) and a block on creating the
  * question until it's fixed.
+ *
+ * Norinori reuses it with [numbers] off (its canon is only walls) and its own
+ * [formatProblems] / [problems].
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -42,11 +45,14 @@ fun RippleEffectRoomEditor(
     selectedCell: String?,
     onSelectCell: (String?) -> Unit,
     onChange: ((RippleEffectDraft) -> RippleEffectDraft) -> Unit,
+    numbers: Boolean = true,
+    formatProblems: (RippleEffectDraft) -> List<String> = RippleEffectAuthoring::formatProblems,
+    problems: (RippleEffectDraft) -> List<String> = RippleEffectAuthoring::problems,
 ) {
     val selected = selectedCell?.split(",")?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 2 }
     val selCol = selected?.get(0)?.takeIf { it < draft.width }
     val selRow = selected?.get(1)?.takeIf { it < draft.height }
-    val formatProblems = RippleEffectAuthoring.formatProblems(draft)
+    val hasFormatProblems = formatProblems(draft).isNotEmpty()
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
@@ -54,7 +60,7 @@ fun RippleEffectRoomEditor(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        if (formatProblems.isNotEmpty()) {
+        if (hasFormatProblems) {
             Text(
                 "Fix before creating — every wall must close off a room:",
                 style = MaterialTheme.typography.bodySmall,
@@ -62,7 +68,7 @@ fun RippleEffectRoomEditor(
                 color = MaterialTheme.colorScheme.error,
             )
         }
-        for (problem in RippleEffectAuthoring.problems(draft)) {
+        for (problem in problems(draft)) {
             Text(problem, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         }
 
@@ -79,7 +85,7 @@ fun RippleEffectRoomEditor(
 
         if (selCol == null || selRow == null) {
             Text(
-                "Tap a cell to edit its number or walls.",
+                if (numbers) "Tap a cell to edit its number or walls." else "Tap a cell to edit its walls.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -87,7 +93,7 @@ fun RippleEffectRoomEditor(
             // One panel per cell: a new selection builds it afresh, so its wall chips read
             // and toggle the newly selected cell, never the one picked before.
             key(selCol, selRow) {
-                SelectedCellPanel(draft, selCol, selRow, onSelectCell, onChange)
+                SelectedCellPanel(draft, selCol, selRow, numbers, onSelectCell, onChange)
             }
         }
 
@@ -114,20 +120,25 @@ private fun SelectedCellPanel(
     draft: RippleEffectDraft,
     col: Int,
     row: Int,
+    numbers: Boolean,
     onSelectCell: (String?) -> Unit,
     onChange: ((RippleEffectDraft) -> RippleEffectDraft) -> Unit,
 ) {
     Text("Row ${row + 1}, column ${col + 1}", fontWeight = FontWeight.Medium)
     val roomSize = draft.regionAt(col, row)?.size ?: 0
-    val clue = draft.clues[row to col]
-    ClueNumberField(
-        label = "Number (room of $roomSize, blank for none)",
-        clue = clue,
-        parse = RippleEffectAuthoring::parseClue,
-        onClue = { v -> onChange { RippleEffectAuthoring.setClue(it, col, row, v) } },
-        isError = (clue ?: 0) > roomSize,
-        modifier = Modifier.fillMaxWidth(),
-    )
+    if (numbers) {
+        val clue = draft.clues[row to col]
+        ClueNumberField(
+            label = "Number (room of $roomSize, blank for none)",
+            clue = clue,
+            parse = RippleEffectAuthoring::parseClue,
+            onClue = { v -> onChange { RippleEffectAuthoring.setClue(it, col, row, v) } },
+            isError = (clue ?: 0) > roomSize,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    } else {
+        Text("Room of $roomSize", style = MaterialTheme.typography.bodySmall)
+    }
     Text("Walls", style = MaterialTheme.typography.bodySmall)
     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         for ((side, label) in WALL_LABELS) {

@@ -32,6 +32,9 @@ private val GRAY_CELL = Color(0xFFCCCCCC)
  *
  * Rendering mirrors the web board: white and gray cells from the canon, bold black
  * clues, dashed thin separators, and thick solid borders and outline.
+ *
+ * The Admin review editor passes [onTapCell] to select a cell and [selectedCell]
+ * ("col,row") to outline it.
  */
 @Composable
 fun DoubleChocoBoard(
@@ -39,8 +42,11 @@ fun DoubleChocoBoard(
     userValues: Map<String, Int>,
     onSetEdge: (key: String, on: Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    onTapCell: (col: Int, row: Int) -> Unit = { _, _ -> },
+    selectedCell: String? = null,
 ) {
-    val board = remember(puzzle.id) { DoubleChocoEngine.parseBoard(puzzle) }
+    // Keyed on the canon too: the Admin review editor changes it under a stable id.
+    val board = remember(puzzle.id, puzzle.canonRepr) { DoubleChocoEngine.parseBoard(puzzle) }
     val rows = board.rows
     val cols = board.cols
     if (rows == 0 || cols == 0) return
@@ -49,13 +55,14 @@ fun DoubleChocoBoard(
     // when these change), so read the freshest values/callback through state.
     val valuesState = rememberUpdatedState(userValues)
     val onSet = rememberUpdatedState(onSetEdge)
+    val onTap = rememberUpdatedState(onTapCell)
 
     ZoomableBoard(
         cols = cols,
         rows = rows,
         resetKey = puzzle.id,
         modifier = modifier,
-        onTapCell = { _, _ -> },
+        onTapCell = { col, row -> onTap.value(col, row) },
         onTapPrecise = { fx, fy ->
             val key = wallKeyAt(fx, fy, rows, cols) ?: return@ZoomableBoard
             onSet.value(key, valuesState.value[key] != 1)
@@ -109,6 +116,7 @@ fun DoubleChocoBoard(
                 )
             }
         }
+        drawCellSelection(selectedCell, cell)
     }
 }
 

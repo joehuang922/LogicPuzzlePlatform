@@ -84,6 +84,22 @@ class BoardDraftTest {
     }
 
     @Test
+    fun norinoriRoundTripsWithItsSize() {
+        val canon = json("""{"grids":{"h":[[1,1,0]],"v":[[0,1],[0,1]]}}""")
+        val board = BoardDraft.fromCanon(AuthoringType.NORINORI, canon)
+        assertEquals(BoardDraft(norinori = board.norinori), board)
+        assertEquals(CanonBoard(canon, 3, 2), board.toCanon(AuthoringType.NORINORI))
+    }
+
+    @Test
+    fun doubleChocoRoundTripsWithItsSize() {
+        val canon = json("""{"cells":[[[0,2],[1,0],[1,0]],[[0,0],[0,0],[1,3]]]}""")
+        val board = BoardDraft.fromCanon(AuthoringType.DOUBLE_CHOCO, canon)
+        assertEquals(BoardDraft(doubleChoco = board.doubleChoco), board)
+        assertEquals(CanonBoard(canon, 3, 2), board.toCanon(AuthoringType.DOUBLE_CHOCO))
+    }
+
+    @Test
     fun sudokuHasNoProblemCheck() {
         assertTrue(BoardDraft().problems(AuthoringType.SUDOKU).isEmpty())
         assertTrue(BoardDraft().formatProblems(AuthoringType.SUDOKU).isEmpty())

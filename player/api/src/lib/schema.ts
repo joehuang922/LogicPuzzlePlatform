@@ -132,6 +132,14 @@ const semanticChecks: Record<number, (data: any) => void> = {
       }
     }
   },
+  // Norinori: the walls are the board's format; every one must separate two rooms. Editors
+  // may hold a wall that stops halfway through a room; this keeps one from ever being stored.
+  23: (data: { grids: { h: number[][]; v: number[][] } }) => {
+    const { h, v } = data.grids;
+    const rows = v.length;
+    if (rows === 0) throw new Error("Invalid norinori: no cells");
+    checkRoomWalls("norinori", rows, v[0].length + 1, h, v);
+  },
   // Ripple Effect: the edge grids must fit the cell grid, and every border must separate
   // two rooms. Editors may hold a wall that stops halfway through a room; this keeps one
   // from ever being stored.
@@ -139,47 +147,10 @@ const semanticChecks: Record<number, (data: any) => void> = {
     const { cells, edges } = data;
     const rows = cells.length;
     const cols = cells[0].length;
-    const fits = (grid: number[][], height: number, width: number) =>
-      grid.length === height && grid.every((line) => line.length === width);
-    if (!fits(cells, rows, cols)) throw new Error("Invalid ripple effect: cells rows differ in length");
-    if (!fits(edges.h, rows - 1, cols) || !fits(edges.v, rows, cols - 1)) {
-      throw new Error(`Invalid ripple effect: edges don't match the ${cols}x${rows} grid`);
+    if (!cells.every((line) => line.length === cols)) {
+      throw new Error("Invalid ripple effect: cells rows differ in length");
     }
-    const room = Array.from({ length: rows }, () => Array<number>(cols).fill(-1));
-    let next = 0;
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        if (room[r][c] >= 0) continue;
-        room[r][c] = next;
-        const stack: [number, number][] = [[r, c]];
-        while (stack.length > 0) {
-          const [cr, cc] = stack.pop()!;
-          const open: [number, number, boolean][] = [
-            [cr - 1, cc, cr > 0 && edges.h[cr - 1][cc] === 0],
-            [cr + 1, cc, cr < rows - 1 && edges.h[cr][cc] === 0],
-            [cr, cc - 1, cc > 0 && edges.v[cr][cc - 1] === 0],
-            [cr, cc + 1, cc < cols - 1 && edges.v[cr][cc] === 0],
-          ];
-          for (const [nr, nc, passable] of open) {
-            if (passable && room[nr][nc] < 0) {
-              room[nr][nc] = next;
-              stack.push([nr, nc]);
-            }
-          }
-        }
-        next++;
-      }
-    }
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const inside =
-          (r < rows - 1 && edges.h[r][c] === 1 && room[r][c] === room[r + 1][c]) ||
-          (c < cols - 1 && edges.v[r][c] === 1 && room[r][c] === room[r][c + 1]);
-        if (inside) {
-          throw new Error(`Invalid ripple effect: a wall at R${r + 1}C${c + 1} doesn't close off a room`);
-        }
-      }
-    }
+    checkRoomWalls("ripple effect", rows, cols, edges.h, edges.v);
   },
   // Kuralin: every circle must sit on an interior grid line (edge midpoint or corner,
   // never a cell center), and no two circles may share a spot.
@@ -199,3 +170,51 @@ const semanticChecks: Record<number, (data: any) => void> = {
     }
   },
 };
+
+/**
+ * The wall grids of a rooms-by-walls board — h: (rows-1) x cols, the wall under each cell;
+ * v: rows x (cols-1), the wall right of it (1 = wall) — must fit the grid, and every wall
+ * must separate two rooms (a wall that stops halfway through a room isn't a layout).
+ */
+function checkRoomWalls(name: string, rows: number, cols: number, h: number[][], v: number[][]): void {
+  const fits = (grid: number[][], height: number, width: number) =>
+    grid.length === height && grid.every((line) => line.length === width);
+  if (!fits(h, rows - 1, cols) || !fits(v, rows, cols - 1)) {
+    throw new Error(`Invalid ${name}: walls don't match the ${cols}x${rows} grid`);
+  }
+  const room = Array.from({ length: rows }, () => Array<number>(cols).fill(-1));
+  let next = 0;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (room[r][c] >= 0) continue;
+      room[r][c] = next;
+      const stack: [number, number][] = [[r, c]];
+      while (stack.length > 0) {
+        const [cr, cc] = stack.pop()!;
+        const open: [number, number, boolean][] = [
+          [cr - 1, cc, cr > 0 && h[cr - 1][cc] === 0],
+          [cr + 1, cc, cr < rows - 1 && h[cr][cc] === 0],
+          [cr, cc - 1, cc > 0 && v[cr][cc - 1] === 0],
+          [cr, cc + 1, cc < cols - 1 && v[cr][cc] === 0],
+        ];
+        for (const [nr, nc, passable] of open) {
+          if (passable && room[nr][nc] < 0) {
+            room[nr][nc] = next;
+            stack.push([nr, nc]);
+          }
+        }
+      }
+      next++;
+    }
+  }
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const inside =
+        (r < rows - 1 && h[r][c] === 1 && room[r][c] === room[r + 1][c]) ||
+        (c < cols - 1 && v[r][c] === 1 && room[r][c] === room[r][c + 1]);
+      if (inside) {
+        throw new Error(`Invalid ${name}: a wall at R${r + 1}C${c + 1} doesn't close off a room`);
+      }
+    }
+  }
+}

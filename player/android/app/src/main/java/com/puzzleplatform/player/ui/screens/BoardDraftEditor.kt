@@ -7,6 +7,7 @@ import com.puzzleplatform.player.puzzle.AuthoringType
 import com.puzzleplatform.player.puzzle.AkariAuthoring
 import com.puzzleplatform.player.puzzle.BoardDraft
 import com.puzzleplatform.player.puzzle.FillominoAuthoring
+import com.puzzleplatform.player.puzzle.NorinoriAuthoring
 import com.puzzleplatform.player.puzzle.NumberLinkAuthoring
 import com.puzzleplatform.player.puzzle.ShakashakaAuthoring
 import com.puzzleplatform.player.puzzle.ShikakuAuthoring
@@ -15,6 +16,7 @@ import com.puzzleplatform.player.ui.board.AkariBoard
 import com.puzzleplatform.player.ui.board.BlackCellMiniBoard
 import com.puzzleplatform.player.ui.board.ClueGridMiniBoard
 import com.puzzleplatform.player.ui.board.DigitBar
+import com.puzzleplatform.player.ui.board.DoubleChocoMiniBoard
 import com.puzzleplatform.player.ui.board.FillominoBoard
 import com.puzzleplatform.player.ui.board.FillominoMode
 import com.puzzleplatform.player.ui.board.HeyawakeMiniBoard
@@ -44,7 +46,8 @@ import com.puzzleplatform.player.ui.board.YajilinMiniBoard
  * [YajilinClueEditor]; for ripple effect [RippleEffectRoomEditor]; for masyu
  * [MasyuCircleEditor]; for slalom [SlalomGateEditor]; for shakashaka and akari
  * [BlackCellEditor]; for number link, shikaku and fillomino [ClueGridEditor]; for kuralin
- * [KuralinCircleEditor], each on its own player
+ * [KuralinCircleEditor]; for norinori [RippleEffectRoomEditor] without numbers; for
+ * double choco [DoubleChocoCellEditor], each on its own player
  * board (whose play input has nothing to write into here, so it's dropped). Each lists
  * its own problems.
  */
@@ -219,6 +222,21 @@ fun BoardDraftEditor(
             draft = board.kuralin,
             onChange = { t -> onChange { it.copy(kuralin = t(it.kuralin)) } },
         )
+        AuthoringType.NORINORI -> RippleEffectRoomEditor(
+            draft = board.norinori,
+            selectedCell = selectedCell,
+            onSelectCell = onSelectCell,
+            onChange = { t -> onChange { it.copy(norinori = t(it.norinori)) } },
+            numbers = false,
+            formatProblems = NorinoriAuthoring::formatProblems,
+            problems = NorinoriAuthoring::problems,
+        )
+        AuthoringType.DOUBLE_CHOCO -> DoubleChocoCellEditor(
+            draft = board.doubleChoco,
+            selectedCell = selectedCell,
+            onSelectCell = onSelectCell,
+            onChange = { t -> onChange { it.copy(doubleChoco = t(it.doubleChoco)) } },
+        )
     }
 }
 
@@ -255,5 +273,9 @@ fun BoardDraftMiniBoard(type: AuthoringType, board: BoardDraft, size: Dp) {
         AuthoringType.FILLOMINO ->
             ClueGridMiniBoard(draft = board.fillomino, hasProblems = hasProblems, size = size)
         AuthoringType.KURALIN -> KuralinMiniBoard(draft = board.kuralin, hasProblems = hasProblems, size = size)
+        AuthoringType.NORINORI ->
+            RippleEffectMiniBoard(draft = board.norinori, hasProblems = hasProblems, size = size)
+        AuthoringType.DOUBLE_CHOCO ->
+            DoubleChocoMiniBoard(draft = board.doubleChoco, hasProblems = hasProblems, size = size)
     }
 }
