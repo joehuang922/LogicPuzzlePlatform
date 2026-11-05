@@ -19,6 +19,10 @@ from puzzle_parsers.recognition import CellRecognizer, GeminiRecognizer
 from puzzle_parsers.recognition_schemas import DUAL_INT_CELL_PROMPT
 from puzzle_parsers.cell_ocr import crop_cell
 
+# A clue cell is grey-shaded (with a white diagonal and white clue discs), not
+# black, so cell_fill.is_filled does not apply: only 13-31% of its pixels are
+# black-dark. Mean brightness separates the two cleanly: shaded cells <= ~171,
+# plain >= ~241 on every sample at full and Android size.
 BLACK_THRESHOLD = 200
 
 

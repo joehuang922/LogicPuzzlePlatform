@@ -18,6 +18,7 @@ from puzzle_parsers.grid_utils import (
     find_grid_lines,
     rectify_board,
 )
+from puzzle_parsers.cell_fill import is_filled
 from puzzle_parsers.cell_ocr import crop_cell
 
 
@@ -60,15 +61,11 @@ def detect_slalom_grid(
     ))
 
 
-def classify_walls(
-    warped_gray: NDArray,
-    geom: BoardGrid,
-    threshold: float = 0.4,
-) -> list[list[int]]:
-    """Classify cells as wall (1) or empty (0) based on pixel intensity.
+def classify_walls(warped_gray: NDArray, geom: BoardGrid) -> list[list[int]]:
+    """Classify cells as wall (1) or empty (0) with the shared ``is_filled``.
 
-    A cell is a wall if the fraction of dark pixels in its central region
-    exceeds the threshold.
+    Walls are black cells (some carry a white gate number); the test reads the
+    central region so the grid lines stay out.
     """
     rows, cols = geom.rows, geom.cols
     cells = [[0] * cols for _ in range(rows)]
@@ -82,8 +79,7 @@ def classify_walls(
 
             center = crop_cell(warped_gray, y1, y2, x1, x2, margin=0.2)
 
-            dark_ratio = np.sum(center < 128) / center.size
-            if dark_ratio > threshold:
+            if is_filled(center):
                 cells[r][c] = 1
 
     return cells

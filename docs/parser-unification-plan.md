@@ -47,7 +47,8 @@ places that do the same job their own way today and should switch to the home.
 | 10 | Hold the grid result | `board_grid.BoardGrid` | none (kuralin and tentaishow geometries now hold a `BoardGrid` plus their circles/dots) | **done** for 24 detectors |
 | 11 | Crop a cell | `cell_ocr.crop_cell(image, y1, y2, x1, x2, margin=)` (margin is where the puzzle puts content: 0 = full cell for kakuro's corner numbers, pencils, slalom; 0.1-0.25 for symbols and centre fill tests; default = the OCR crop) | none (17 hand slices in akari, double_choco, hell_golf, kakuro, masyu, nurimaze, pencils, shakashaka, shikaku, slalom, yajilin moved; nonogram's clue strips and slitherlink's dot lattice are out of scope; `tests/test_cell_ocr_contract.py`) | **done** |
 | 12 | Is this cell empty? | `recognition._is_blank` (contrast of a blurred 64 px copy; empty ≤ ~50, faintest digit ~127, cutoff 90) for every OCR cell | heyawake's ink fraction removed; shikaku dark fraction (clue disc detection) | done for OCR cells |
-| 13 | Is this cell black / filled? | `cell_fill.is_filled` (dark fraction > 0.35; akari and shakashaka use it — shakashaka keys went 15/2/1 → 0/0/0 errors) | kakuro mean brightness; slalom `classify_walls` dark ratio | 2 done; kakuro, slalom next |
+| 13 | Is this cell black / filled? | `cell_fill.is_filled` (dark fraction > 0.35): akari, shakashaka, slalom | none. Kakuro's clue cells are grey-shaded, not black (13-31% black-dark), so it keeps mean < 200 (shaded <= ~171, plain >= ~241); "is this cell shaded" is a separate job, see row 13b | **done** |
+| 13b | Is this cell shaded (grey vs white)? | — | kakuro mean < 200 (exact on all samples); double_choco Otsu over cell means (key errors 15 / 20 are white cells holding a large digit) | to investigate |
 | 14 | Read a plain number in a cell | `cell_ocr.read_grid_clues` / `read_cells` (EasyOCR recogniser on a located glyph; clue rules `allow_multi_digits`, `allow_zero`, `max_value`) | none: akari, heyawake, nuritwin, shakashaka, shikaku, slitherlink moved off Gemini | **done** for 17 |
 | 15 | Read composite cell content (arrows, two numbers, symbols, white-on-black) | `recognition.GeminiRecognizer` montage + `cell_classify` + prompts in `recognition_schemas.py` | — | shared; confirm all callers |
 | 16 | Measure room-wall thickness | `grid_utils.classify_border_thickness(gray, grid)` (width of the run through the line, sub-pixel, 40th percentile of 7 points; Otsu split; dead-end repair) | none (the six `classify_borders` wrappers deleted; `tests/test_wall_contract.py`) | **done** |
@@ -97,6 +98,19 @@ Notes on specific rows:
   either), and every count/placement fallback that fixed it moved
   fillomino, picto_link or kakuro's own edge cells. Masyu's line finder is
   its flattening step. Both move with row 8.
+- **Row 13 (shipped).** Slalom's wall test (dark < 128 over 40%) moved to
+  `is_filled`: walls measure 0.57+ dark and empty cells 0.33 or less, so
+  every slalom run (and every kakuro run, untouched) is identical. Kakuro
+  can't use `is_filled`: its clue cells are grey shading with white discs
+  and diagonal, so `is_filled` flipped 12-100 cells per board.
+- **Row 13b (open).** "Grey vs white" is a separate job done by kakuro and
+  double_choco. Double_choco's Otsu over cell means misreads white cells
+  that hold a large black digit (14 of its 15 key errors on the small
+  board); a cell's median ignores the digit, but on double_choco's photos
+  grey and white sit only ~10 grey levels apart and no split tried (widest
+  gap, Otsu on medians, median of a 24 px average) was stable at both
+  sizes, while kakuro's fixed mean < 200 has a ~70-level margin. Needs a
+  lighting-normalised shade measure.
 - **Row 11 (shipped).** Every hand slice computed the same box (a fixed
   fraction in from the cell's lines) with its own margin, so the margins stay
   per puzzle and only the arithmetic is shared. Every crop handed to a reader
