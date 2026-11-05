@@ -10,9 +10,9 @@ from PIL import Image
 
 from puzzle_parsers.board_grid import BoardGrid
 from puzzle_parsers.base import PuzzleParser
+from puzzle_parsers.grid_utils import classify_border_thickness
 from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.nurimaze.grid_detector import (
-    classify_borders,
     detect_nurimaze_grid,
 )
 from puzzle_parsers.nurimaze.models import NurimazeBoard, NurimazeGrids
@@ -45,7 +45,7 @@ class NurimazeParser(PuzzleParser):
         geom = detect_nurimaze_grid(img_array, debug_dir=debug_dir)
         warped_gray = cv2.cvtColor(geom.warped, cv2.COLOR_BGR2GRAY)
 
-        h_borders, v_borders = classify_borders(warped_gray, geom, debug_dir=debug_dir)
+        h_borders, v_borders = classify_border_thickness(warped_gray, geom, debug_dir=debug_dir)
         cells = self._classify_symbols(warped_gray, geom, debug_dir=debug_dir)
 
         return NurimazeBoard(

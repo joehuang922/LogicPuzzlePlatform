@@ -11,9 +11,9 @@ from PIL import Image
 from puzzle_parsers.board_grid import BoardGrid
 from puzzle_parsers.base import PuzzleParser
 from puzzle_parsers.cell_ocr import read_grid_clues
+from puzzle_parsers.grid_utils import classify_border_thickness
 from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.ripple_effect.grid_detector import (
-    classify_borders,
     detect_ripple_effect_grid,
 )
 from puzzle_parsers.ripple_effect.models import (
@@ -52,9 +52,7 @@ class RippleEffectParser(PuzzleParser):
         warped_gray = cv2.cvtColor(geom.warped, cv2.COLOR_BGR2GRAY)
 
         # Room partition from thick-border classification (like LITS/Heyawake).
-        h_borders, v_borders = classify_borders(
-            warped_gray, geom, debug_dir=debug_dir
-        )
+        h_borders, v_borders = classify_border_thickness(warped_gray, geom, debug_dir=debug_dir)
 
         # Per-cell clue digits via batch OCR (like Fillomino). Blank cells -> 0.
         cells = self._read_cells(warped_gray, geom, debug_dir=debug_dir)

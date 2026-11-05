@@ -46,6 +46,13 @@ This is a solo project. Do not create pull requests or feature branches.
 - Such a parser's type id must be in `_OCR_TYPES` in `parsers/lambda_handler.py`.
   `parsers/tests/test_cell_ocr_contract.py` enforces both rules.
 
+# Parser room walls
+
+- Every parser of a board divided into rooms by thick walls reads them with
+  `grid_utils.classify_border_thickness(warped_gray, grid)`; no per-parser
+  wrapper or width measurement. Tune it there for everyone.
+  `parsers/tests/test_wall_contract.py` enforces it.
+
 # Authoring room-based puzzles
 
 - A room-based editor (web or Android admin) may hold layouts that aren't valid

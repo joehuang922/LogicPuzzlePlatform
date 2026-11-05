@@ -19,7 +19,6 @@ from puzzle_parsers.board_grid import BoardGrid
 from puzzle_parsers.grid_utils import (
     find_grid_lines,
     rectify_board,
-    classify_border_thickness,
 )
 
 # These Nikoli scans carry a title band above the board ("17 ... Easy"), and the
@@ -67,35 +66,3 @@ def detect_norinori_grid(
     return board.to_native(BoardGrid(
         warped=warped, h_lines=h_lines, v_lines=v_lines,
     ))
-
-
-def classify_borders(
-    warped_gray: NDArray, geom: BoardGrid, debug_dir: str | None = None
-) -> tuple[list[list[int]], list[list[int]]]:
-    """Classify each internal border as thick (1, region boundary) or thin (0)."""
-    debug_path = Path(debug_dir) if debug_dir else None
-
-    h_borders, v_borders = classify_border_thickness(
-        warped_gray, geom.h_lines, geom.v_lines, geom.rows, geom.cols
-    )
-
-    if debug_path:
-        vis = geom.warped.copy()
-        rows, cols = geom.rows, geom.cols
-        for r in range(rows - 1):
-            for c in range(cols):
-                if h_borders[r][c] == 1:
-                    y = geom.h_lines[r + 1]
-                    x1 = geom.v_lines[c]
-                    x2 = geom.v_lines[c + 1]
-                    cv2.line(vis, (x1, y), (x2, y), (0, 0, 255), 2)
-        for r in range(rows):
-            for c in range(cols - 1):
-                if v_borders[r][c] == 1:
-                    x = geom.v_lines[c + 1]
-                    y1 = geom.h_lines[r]
-                    y2 = geom.h_lines[r + 1]
-                    cv2.line(vis, (x, y1), (x, y2), (255, 0, 0), 2)
-        cv2.imwrite(str(debug_path / "04_thick_borders.png"), vis)
-
-    return h_borders, v_borders

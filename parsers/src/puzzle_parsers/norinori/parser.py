@@ -9,10 +9,10 @@ from PIL import Image
 
 from puzzle_parsers.base import PuzzleParser
 from puzzle_parsers.norinori.grid_detector import (
-    classify_borders,
     detect_norinori_grid,
 )
 from puzzle_parsers.norinori.models import NorinoriBoard, NorinoriGrids
+from puzzle_parsers.grid_utils import classify_border_thickness
 from puzzle_parsers.models import PuzzleData
 
 
@@ -45,7 +45,7 @@ class NorinoriParser(PuzzleParser):
         geom = detect_norinori_grid(img_array, debug_dir=debug_dir)
         warped_gray = cv2.cvtColor(geom.warped, cv2.COLOR_BGR2GRAY)
 
-        h_borders, v_borders = classify_borders(warped_gray, geom, debug_dir=debug_dir)
+        h_borders, v_borders = classify_border_thickness(warped_gray, geom, debug_dir=debug_dir)
 
         return NorinoriBoard(grids=NorinoriGrids(h=h_borders, v=v_borders))
 

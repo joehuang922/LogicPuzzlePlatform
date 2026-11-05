@@ -50,7 +50,7 @@ places that do the same job their own way today and should switch to the home.
 | 13 | Is this cell black / filled? | `cell_fill.is_filled` (dark fraction > 0.35; akari and shakashaka use it — shakashaka keys went 15/2/1 → 0/0/0 errors) | kakuro mean brightness; slalom `classify_walls` dark ratio | 2 done; kakuro, slalom next |
 | 14 | Read a plain number in a cell | `cell_ocr.read_grid_clues` / `read_cells` (EasyOCR recogniser on a located glyph; clue rules `allow_multi_digits`, `allow_zero`, `max_value`) | none: akari, heyawake, nuritwin, shakashaka, shikaku, slitherlink moved off Gemini | **done** for 17 |
 | 15 | Read composite cell content (arrows, two numbers, symbols, white-on-black) | `recognition.GeminiRecognizer` montage + `cell_classify` + prompts in `recognition_schemas.py` | — | shared; confirm all callers |
-| 16 | Measure room-wall thickness | `grid_utils.classify_border_thickness` | six identical 27-line `classify_borders` wrappers (heyawake, lits, norinori, nurimaze, nuritwin, ripple_effect) | to delete wrappers |
+| 16 | Measure room-wall thickness | `grid_utils.classify_border_thickness(gray, grid)` (width of the run through the line, sub-pixel, 40th percentile of 7 points; Otsu split; dead-end repair) | none (the six `classify_borders` wrappers deleted; `tests/test_wall_contract.py`) | **done** |
 | 17 | Find circles and dots | `ring_probe.probe_ring` / `fill_ratio` (ring test at lattice points; kuralin and tentaishow) | masyu `_detect_circles` (ring pooled over 8 tiles) | 2 done; masyu next |
 | 18 | Address cells, edges and corners | `BoardGrid.point(dr, dc)` / `BoardGrid.doubled(x, y)` (doubled coordinates through the found lines; kuralin, tentaishow) | slalom works out edge/corner positions itself | 2 done; slalom next |
 | 19 | Draw debug overlays | — | 9 copies of the `04_cells.png` digit overlay | to extract |
@@ -114,6 +114,22 @@ Notes on specific rows:
   cell off; 0.05-0.8 s instead of 2.5-6.4 s, and no Gemini call. Shikaku lifts
   its white number off the disc first (`_disc_digit`). The fillomino-medium key
   had 3 wrong cells (r8c12 1, r8c13 11, r11c6 1); fixed.
+- **Row 16 (shipped).** The old width was the longest dark run within
+  +-30% of a cell, so the bottom stroke of a digit above a thin wall read as
+  a thick wall (heyawake 13-16 per board), and whole-pixel widths left thick
+  and thin a value apart (norinori-medium flipped ~157 walls between nearby
+  settings). Now: the run through the line (seeded within 12% of a cell),
+  sub-pixel edges, 40th percentile of the points (a digit covers the middle
+  ones), then a repair step: rooms are closed, so a thick wall that ends
+  mid-board flips the least certain wall at that corner. Keyed walls 31 -> 4
+  (all four are two heyawake-titled walls the key has wrong: printed thin,
+  measured 5 px like every thin wall); dead-end walls on all 13 samples x 2
+  sizes 68 -> 0; full vs Android disagreements 42 -> 9. End to end,
+  lits-medium 2 -> 0, nuritwin 3 -> 0, ripple_effect 1 -> 0. Unkeyed changes
+  judged by eye: heyawake 20 fixed, norinori 6 fixed, ripple_effect-medium
+  12 fixed, nurimaze-big ~10 fixed (full) / ~15 (Android); broken: nurimaze-big
+  h7,30 (and h3,30, h41,25 on Android), narrow solid lines in its last column
+  that measure between the classes and leave a valid layout either way.
 - **Row 17.** Kuralin's comment records why it moved off HoughCircles: a gray
   circle with touching dashes defeated both Hough and the contour fallback,
   while a ring test at a known lattice point found it. That argues for the

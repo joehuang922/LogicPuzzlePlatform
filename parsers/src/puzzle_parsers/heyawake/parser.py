@@ -12,10 +12,10 @@ from PIL import Image
 from puzzle_parsers.board_grid import BoardGrid
 from puzzle_parsers.base import PuzzleParser
 from puzzle_parsers.heyawake.grid_detector import (
-    classify_borders,
     detect_heyawake_grid,
 )
 from puzzle_parsers.heyawake.models import HeyawakeBoard, HeyawakeRoom
+from puzzle_parsers.grid_utils import classify_border_thickness
 from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.cell_ocr import read_grid_clues
 
@@ -91,9 +91,7 @@ class HeyawakeParser(PuzzleParser):
         geom = detect_heyawake_grid(img_array, debug_dir=debug_dir)
         warped_gray = cv2.cvtColor(geom.warped, cv2.COLOR_BGR2GRAY)
 
-        h_borders, v_borders = classify_borders(
-            warped_gray, geom, debug_dir=debug_dir
-        )
+        h_borders, v_borders = classify_border_thickness(warped_gray, geom, debug_dir=debug_dir)
 
         rooms = self._build_rooms(geom, h_borders, v_borders)
 

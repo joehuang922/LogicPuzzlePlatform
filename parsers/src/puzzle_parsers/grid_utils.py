@@ -10,6 +10,7 @@ Provides reusable building blocks for:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -1343,65 +1344,132 @@ def merge_close_peaks(lines: list[int], min_gap: int = 10) -> list[int]:
     return merged
 
 
-def classify_border_thickness(
-    warped_gray: NDArray,
-    h_lines: list[int],
-    v_lines: list[int],
-    rows: int,
-    cols: int,
-) -> tuple[list[list[int]], list[list[int]]]:
-    """Classify each internal border as thick (1) or thin (0).
+# Wall widths are measured on the dark run that contains the grid line itself,
+# seeded at the darkest pixel within this fraction of a cell of the found line.
+# The old "longest dark run within +-30% of a cell" measured the bottom stroke
+# of a clue digit sitting just above a thin wall (heyawake read 13-16 such
+# walls thick per board).
+_WALL_SEED_FRAC = 0.12
+# Half-width of the cross-line profile scan, as a fraction of a cell.
+_WALL_SCAN_FRAC = 0.3
+# A wall's width is this percentile of its (up to 7) point widths rather than
+# the median: a clue digit sitting on a thin wall covers the middle points
+# only (heyawake-titled h6,14 read 4.3, 4.5, 5.1 px off the digit and 9.9-17.4
+# px under it).
+_WALL_PCT = 40
 
-    Measures border width from the grayscale profile directly using a local
-    relative threshold (50% between ink minimum and background maximum). This
-    is robust to degraded scan quality where absolute binarization fails.
+
+def classify_border_thickness(
+    warped_gray: NDArray, grid: BoardGrid, debug_dir: str | None = None
+) -> tuple[list[list[int]], list[list[int]]]:
+    """Classify each internal wall of a room board as thick (1) or thin (0).
+
+    1. Measure every wall's width (sub-pixel, on the run through the line).
+    2. Split widths into two classes (Otsu on this board's widths).
+    3. Rooms are closed, so a thick wall can't end in the middle of the board:
+       where one does, flip the least certain wall at that corner (see
+       ``_close_dangling_walls``).
 
     Returns (h_borders, v_borders):
       h_borders: (rows-1) x cols — border below cell[r][c]
       v_borders: rows x (cols-1) — border right of cell[r][c]
     """
-    avg_cell_h = (h_lines[-1] - h_lines[0]) / rows if rows > 0 else 50.0
-    avg_cell_w = (v_lines[-1] - v_lines[0]) / cols if cols > 0 else 50.0
-    scan_range_h = max(5, int(avg_cell_h * 0.3))
-    scan_range_w = max(5, int(avg_cell_w * 0.3))
+    h_lines, v_lines, rows, cols = grid.h_lines, grid.v_lines, grid.rows, grid.cols
+    scan_h = max(5, int(grid.cell_h * _WALL_SCAN_FRAC))
+    scan_w = max(5, int(grid.cell_w * _WALL_SCAN_FRAC))
+    seed_h = max(2, int(round(grid.cell_h * _WALL_SEED_FRAC)))
+    seed_w = max(2, int(round(grid.cell_w * _WALL_SEED_FRAC)))
 
-    # Measure horizontal border widths
-    h_widths: list[tuple[int, int, float]] = []
-    for r in range(1, rows):
-        y = h_lines[r]
-        for c in range(cols):
-            x_start = v_lines[c]
-            x_end = v_lines[c + 1]
-            width = _measure_border_width_gray(
-                warped_gray, "h", y, x_start, x_end, scan_range_h
+    h_widths = [
+        [
+            _measure_border_width_gray(
+                warped_gray, "h", h_lines[r + 1], v_lines[c], v_lines[c + 1], scan_h, seed_h
             )
-            h_widths.append((r - 1, c, width))
+            for c in range(cols)
+        ]
+        for r in range(rows - 1)
+    ]
+    v_widths = [
+        [
+            _measure_border_width_gray(
+                warped_gray, "v", v_lines[c + 1], h_lines[r], h_lines[r + 1], scan_w, seed_w
+            )
+            for c in range(cols - 1)
+        ]
+        for r in range(rows)
+    ]
+    threshold = _find_thickness_threshold(
+        [w for row in h_widths for w in row] + [w for row in v_widths for w in row]
+    )
+    h_borders = [[int(w > threshold) for w in row] for row in h_widths]
+    v_borders = [[int(w > threshold) for w in row] for row in v_widths]
+    _close_dangling_walls(h_borders, v_borders, h_widths, v_widths, threshold)
 
-    # Measure vertical border widths
-    v_widths: list[tuple[int, int, float]] = []
-    for c in range(1, cols):
-        x = v_lines[c]
+    if debug_dir:
+        vis = grid.warped.copy()
+        for r in range(rows - 1):
+            for c in range(cols):
+                if h_borders[r][c]:
+                    cv2.line(vis, (v_lines[c], h_lines[r + 1]), (v_lines[c + 1], h_lines[r + 1]), (0, 0, 255), 2)
         for r in range(rows):
-            y_start = h_lines[r]
-            y_end = h_lines[r + 1]
-            width = _measure_border_width_gray(
-                warped_gray, "v", x, y_start, y_end, scan_range_w
-            )
-            v_widths.append((r, c - 1, width))
-
-    # Classify using bimodal threshold
-    all_widths = [w for _, _, w in h_widths] + [w for _, _, w in v_widths]
-    threshold = _find_thickness_threshold(all_widths)
-
-    h_borders = [[0] * cols for _ in range(rows - 1)]
-    for r, c, w in h_widths:
-        h_borders[r][c] = 1 if w > threshold else 0
-
-    v_borders = [[0] * (cols - 1) for _ in range(rows)]
-    for r, c, w in v_widths:
-        v_borders[r][c] = 1 if w > threshold else 0
+            for c in range(cols - 1):
+                if v_borders[r][c]:
+                    cv2.line(vis, (v_lines[c + 1], h_lines[r]), (v_lines[c + 1], h_lines[r + 1]), (255, 0, 0), 2)
+        cv2.imwrite(str(Path(debug_dir) / "04_thick_borders.png"), vis)
 
     return h_borders, v_borders
+
+
+def _dangling_corners(h: list[list[int]], v: list[list[int]]) -> list[tuple[int, int]]:
+    """Interior grid corners where exactly one thick wall meets (a dead end).
+
+    Corner (r, c) joins h[r][c], h[r][c+1] (left/right) and v[r][c], v[r+1][c]
+    (above/below).
+    """
+    rows, cols = len(v), len(h[0]) if h else 0
+    return [
+        (r, c)
+        for r in range(rows - 1)
+        for c in range(cols - 1)
+        if h[r][c] + h[r][c + 1] + v[r][c] + v[r + 1][c] == 1
+    ]
+
+
+def _close_dangling_walls(
+    h: list[list[int]],
+    v: list[list[int]],
+    h_widths: list[list[float]],
+    v_widths: list[list[float]],
+    threshold: float,
+) -> None:
+    """Repair dead-end thick walls in place.
+
+    Some walls measure between the two classes (norinori-medium: 28 of 600
+    walls fall between the thin and thick clusters, and its real split lies
+    between 3.44 and 3.78 px). At every dead end, the candidates are the four
+    walls meeting there; flip the one whose width is closest to the threshold,
+    as long as the flip lowers the number of dead ends. Repeat until none are
+    left or no flip helps.
+    """
+    walls = {"h": (h, h_widths), "v": (v, v_widths)}
+    count = len(_dangling_corners(h, v))
+    for _ in range(4 * count):
+        if count == 0:
+            return
+        options: list[tuple[float, str, int, int]] = []
+        for r, c in _dangling_corners(h, v):
+            for kind, wr, wc in (("h", r, c), ("h", r, c + 1), ("v", r, c), ("v", r + 1, c)):
+                options.append((abs(walls[kind][1][wr][wc] - threshold), kind, wr, wc))
+        for _, kind, wr, wc in sorted(set(options)):
+            grid = walls[kind][0]
+            grid[wr][wc] ^= 1
+            after = len(_dangling_corners(h, v))
+            if after < count:
+                count = after
+                break
+            grid[wr][wc] ^= 1
+        else:
+            return
 
 
 def _measure_border_width_gray(
@@ -1411,47 +1479,61 @@ def _measure_border_width_gray(
     start: int,
     end: int,
     scan_range: int,
+    seed_range: int,
 ) -> float:
-    """Measure border width from the grayscale profile using a local threshold.
+    """Width (px, sub-pixel) of the wall at ``line_pos`` between ``start``/``end``.
 
-    Instead of relying on a pre-binarized image (which fails in low-contrast
-    regions), this measures the width of the dark valley at each sample point
-    using a threshold set at 50% between the local background and ink levels.
+    At up to 7 points along the wall, take the cross-line profile (minimum over
+    3 px along the wall, which bridges dashes), seed at the darkest pixel within
+    ``seed_range`` of the line, and measure the run darker than halfway between
+    that pixel and the local paper, with linear interpolation at both edges.
+    The points are combined with ``_WALL_PCT``.
+    Whole-pixel runs left thick and thin a value or two apart and Otsu's split
+    jumped between them (norinori-medium flipped ~157 walls between settings).
+    Returns 0.0 when no point has contrast.
     """
     h, w = gray.shape
     num_samples = max(3, min(7, (end - start) // 10))
-    samples = []
+    samples: list[float] = []
 
     for i in range(num_samples):
         pos = start + (end - start) * (i + 1) // (num_samples + 1)
         if axis == "h":
-            y0 = max(0, line_pos - scan_range)
-            y1 = min(h, line_pos + scan_range)
-            strip = gray[y0:y1, max(0, pos - 1): pos + 2].min(axis=1).astype(float)
+            lo = max(0, line_pos - scan_range)
+            strip = gray[lo:min(h, line_pos + scan_range), max(0, pos - 1): pos + 2].min(axis=1)
         else:
-            x0 = max(0, line_pos - scan_range)
-            x1 = min(w, line_pos + scan_range)
-            strip = gray[max(0, pos - 1): pos + 2, x0:x1].min(axis=0).astype(float)
-
-        bg = float(strip.max())
-        ink = float(strip.min())
-        if bg - ink < 20:
+            lo = max(0, line_pos - scan_range)
+            strip = gray[max(0, pos - 1): pos + 2, lo:min(w, line_pos + scan_range)].min(axis=0)
+        strip = strip.astype(float)
+        if strip.size == 0:
             continue
+        paper = float(strip.max())
+        if paper - float(strip.min()) < 20:
+            continue
+        centre = line_pos - lo
+        s0, s1 = max(0, centre - seed_range), min(len(strip), centre + seed_range + 1)
+        if s1 <= s0:
+            continue
+        seed = s0 + int(np.argmin(strip[s0:s1]))
+        thresh = strip[seed] + (paper - strip[seed]) * 0.5
+        if strip[seed] >= thresh:
+            continue
+        a = seed
+        while a > 0 and strip[a - 1] < thresh:
+            a -= 1
+        b = seed
+        while b < len(strip) - 1 and strip[b + 1] < thresh:
+            b += 1
+        width = float(b - a + 1)
+        # Each edge pixel outside the run contributes the fraction of it that
+        # lies below the threshold (linear interpolation), minus half a pixel.
+        if a > 0:
+            width += min(1.0, max(0.0, (thresh - strip[a]) / max(1e-6, strip[a - 1] - strip[a]))) - 0.5
+        if b < len(strip) - 1:
+            width += min(1.0, max(0.0, (thresh - strip[b]) / max(1e-6, strip[b + 1] - strip[b]))) - 0.5
+        samples.append(width)
 
-        thresh = ink + (bg - ink) * 0.5
-        max_run = 0
-        current_run = 0
-        for val in strip:
-            if val < thresh:
-                current_run += 1
-                if current_run > max_run:
-                    max_run = current_run
-            else:
-                current_run = 0
-        if max_run > 0:
-            samples.append(max_run)
-
-    return float(np.median(samples)) if samples else 0.0
+    return float(np.percentile(samples, _WALL_PCT)) if samples else 0.0
 
 
 def _find_thickness_threshold(widths: list[float]) -> float:
