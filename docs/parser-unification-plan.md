@@ -45,7 +45,7 @@ places that do the same job their own way today and should switch to the home.
 | 8 | Follow a curved page | `flatten.flatten_board(image, board)` (traces every line through strips, remaps so they come out straight and even; flat boards pass through unchanged), called by kakuro, masyu, picto_link, fillomino | none (masyu's tracer moved here; `grid_utils.detect_uniform_grid` and its pitch + snap fallback deleted; `tests/test_flatten.py`) | **done** |
 | 9 | Trim a neighbouring puzzle's title band | `flatten._dominant_extent` (on traced lines only) | — | in flatten; straight boards rely on the border finder |
 | 10 | Hold the grid result | `board_grid.BoardGrid` | none (kuralin and tentaishow geometries now hold a `BoardGrid` plus their circles/dots) | **done** for 24 detectors |
-| 11 | Crop a cell | `cell_ocr.crop_cell` | akari, heyawake, nuritwin, shakashaka, shikaku moved with row 14; the Gemini parsers crop by hand (kakuro, nurimaze, pencils, yajilin), mostly at a 20% margin | 5 done; Gemini parsers left |
+| 11 | Crop a cell | `cell_ocr.crop_cell(image, y1, y2, x1, x2, margin=)` (margin is where the puzzle puts content: 0 = full cell for kakuro's corner numbers, pencils, slalom; 0.1-0.25 for symbols and centre fill tests; default = the OCR crop) | none (17 hand slices in akari, double_choco, hell_golf, kakuro, masyu, nurimaze, pencils, shakashaka, shikaku, slalom, yajilin moved; nonogram's clue strips and slitherlink's dot lattice are out of scope; `tests/test_cell_ocr_contract.py`) | **done** |
 | 12 | Is this cell empty? | `recognition._is_blank` (contrast of a blurred 64 px copy; empty ≤ ~50, faintest digit ~127, cutoff 90) for every OCR cell | heyawake's ink fraction removed; shikaku dark fraction (clue disc detection) | done for OCR cells |
 | 13 | Is this cell black / filled? | `cell_fill.is_filled` (dark fraction > 0.35; akari and shakashaka use it — shakashaka keys went 15/2/1 → 0/0/0 errors) | kakuro mean brightness; slalom `classify_walls` dark ratio | 2 done; kakuro, slalom next |
 | 14 | Read a plain number in a cell | `cell_ocr.read_grid_clues` / `read_cells` (EasyOCR recogniser on a located glyph; clue rules `allow_multi_digits`, `allow_zero`, `max_value`) | none: akari, heyawake, nuritwin, shakashaka, shikaku, slitherlink moved off Gemini | **done** for 17 |
@@ -97,6 +97,14 @@ Notes on specific rows:
   either), and every count/placement fallback that fixed it moved
   fillomino, picto_link or kakuro's own edge cells. Masyu's line finder is
   its flattening step. Both move with row 8.
+- **Row 11 (shipped).** Every hand slice computed the same box (a fixed
+  fraction in from the cell's lines) with its own margin, so the margins stay
+  per puzzle and only the arithmetic is shared. Every crop handed to a reader
+  is byte-identical: hashed montages sent to Gemini (kakuro, nurimaze,
+  pencils, yajilin, slalom, hell_golf) and all 68 parser outputs over the 11
+  touched parsers at full and Android size match HEAD, so no Gemini run was
+  needed. Whether those margins are the best ones (nurimaze 0.2 vs yajilin
+  0.1) is a separate, Gemini-measured question.
 - **Row 7 (shipped).** `reconcile_square_lines` (nonogram only) worked from
   detected peaks and mostly guarded that input's flaws (median gaps on a
   curled page, bold every-5 lines posing as a full comb); its one idea the

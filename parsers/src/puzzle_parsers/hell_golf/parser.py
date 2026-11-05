@@ -23,6 +23,7 @@ from puzzle_parsers.hell_golf.grid_detector import (
 from puzzle_parsers.hell_golf.models import HellGolfBall, HellGolfBoard
 from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.recognition import CellRecognizer, GeminiRecognizer
+from puzzle_parsers.cell_ocr import crop_cell
 
 # A lake cell is filled with mid-gray: darker than paper-white, lighter than
 # the near-black of ink/borders. We test the mean intensity of the cell centre.
@@ -81,15 +82,11 @@ class HellGolfParser(PuzzleParser):
     ) -> list[list[int]]:
         """A cell is a lake when its centre is predominantly mid-gray."""
         rows, cols = geom.rows, geom.cols
-        margin_ratio = 0.25
         lakes: list[list[int]] = []
         for r in range(rows):
             row: list[int] = []
             for c in range(cols):
-                y1, y2, x1, x2 = self._cell_bounds(geom, r, c)
-                my = int((y2 - y1) * margin_ratio)
-                mx = int((x2 - x1) * margin_ratio)
-                roi = warped_gray[y1 + my: y2 - my, x1 + mx: x2 - mx]
+                roi = crop_cell(warped_gray, *self._cell_bounds(geom, r, c), margin=0.25)
                 # Fraction of pixels within the mid-gray band. Ink strokes and
                 # paper are excluded, so a cell with a printed glyph on white
                 # still reads as non-lake.
@@ -109,16 +106,11 @@ class HellGolfParser(PuzzleParser):
     ) -> tuple[list[HellGolfBall], list[list[int]]]:
         """Classify non-lake cells: circled numbers (balls) and H marks (goals)."""
         rows, cols = geom.rows, geom.cols
-        margin_ratio = 0.2
-
         cell_crops: list[list[NDArray]] = []
         for r in range(rows):
             row_crops: list[NDArray] = []
             for c in range(cols):
-                y1, y2, x1, x2 = self._cell_bounds(geom, r, c)
-                my = int((y2 - y1) * margin_ratio)
-                mx = int((x2 - x1) * margin_ratio)
-                roi = warped_gray[y1 + my: y2 - my, x1 + mx: x2 - mx]
+                roi = crop_cell(warped_gray, *self._cell_bounds(geom, r, c), margin=0.2)
                 # Blank out lake cells so the classifier ignores them (the gray
                 # fill would otherwise register as non-empty content).
                 if lakes[r][c] == 1:

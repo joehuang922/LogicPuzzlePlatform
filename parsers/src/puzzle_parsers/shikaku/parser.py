@@ -79,11 +79,7 @@ class ShikakuParser(PuzzleParser):
                 y2 = geom.h_lines[r + 1]
                 x1 = geom.v_lines[c]
                 x2 = geom.v_lines[c + 1]
-                dy = int((y2 - y1) * DETECT_MARGIN)
-                dx = int((x2 - x1) * DETECT_MARGIN)
-                detect_roi = warped_gray[y1 + dy : y2 - dy, x1 + dx : x2 - dx]
-                if detect_roi.size == 0:
-                    continue
+                detect_roi = crop_cell(warped_gray, y1, y2, x1, x2, margin=DETECT_MARGIN)
                 if float(np.mean(detect_roi < DARK_PIXEL_VALUE)) < CLUE_MIN_DARK_FRACTION:
                     continue
                 clue_coords.append((r, c))

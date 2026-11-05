@@ -18,6 +18,9 @@ from puzzle_parsers.nurimaze.grid_detector import (
 from puzzle_parsers.nurimaze.models import NurimazeBoard, NurimazeGrids
 from puzzle_parsers.recognition import CellRecognizer, GeminiRecognizer
 from puzzle_parsers.recognition_schemas import SYMBOL_CELL_PROMPT
+from puzzle_parsers.cell_ocr import crop_cell
+
+
 class NurimazeParser(PuzzleParser):
     puzzle_type = "nurimaze"
 
@@ -61,25 +64,16 @@ class NurimazeParser(PuzzleParser):
     ) -> list[list[int]]:
         """Classify cell symbols using the LLM recognizer."""
         rows, cols = geom.rows, geom.cols
-        margin_ratio = 0.2
-
-        cell_crops: list[list[NDArray]] = []
-        for r in range(rows):
-            row_crops: list[NDArray] = []
-            for c in range(cols):
-                y1 = geom.h_lines[r]
-                y2 = geom.h_lines[r + 1]
-                x1 = geom.v_lines[c]
-                x2 = geom.v_lines[c + 1]
-
-                cell_h = y2 - y1
-                cell_w = x2 - x1
-                my = int(cell_h * margin_ratio)
-                mx = int(cell_w * margin_ratio)
-
-                roi = warped_gray[y1 + my: y2 - my, x1 + mx: x2 - mx]
-                row_crops.append(roi)
-            cell_crops.append(row_crops)
+        cell_crops = [
+            [
+                crop_cell(
+                    warped_gray, geom.h_lines[r], geom.h_lines[r + 1],
+                    geom.v_lines[c], geom.v_lines[c + 1], margin=0.2,
+                )
+                for c in range(cols)
+            ]
+            for r in range(rows)
+        ]
 
         return self._recognizer.recognize(cell_crops, SYMBOL_CELL_PROMPT)
 

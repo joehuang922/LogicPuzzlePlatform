@@ -73,12 +73,7 @@ class AkariParser(PuzzleParser):
                 x1 = geom.v_lines[c]
                 x2 = geom.v_lines[c + 1]
 
-                cell_h = y2 - y1
-                cell_w = x2 - x1
-                my = int(cell_h * margin_ratio)
-                mx = int(cell_w * margin_ratio)
-
-                roi = warped_gray[y1 + my: y2 - my, x1 + mx: x2 - mx]
+                roi = crop_cell(warped_gray, y1, y2, x1, x2, margin=margin_ratio)
 
                 if is_filled(roi):
                     # Black cell (wall) — need to determine if numbered

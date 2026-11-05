@@ -14,6 +14,7 @@ from puzzle_parsers.yajilin.grid_detector import detect_yajilin_grid
 from puzzle_parsers.yajilin.models import YajilinBoard, YajilinClue
 from puzzle_parsers.recognition import CellRecognizer, GeminiRecognizer
 from puzzle_parsers.recognition_schemas import DIRECTED_INT_CELL_PROMPT
+from puzzle_parsers.cell_ocr import crop_cell
 
 EMPTY_THRESHOLD = 0.02
 
@@ -59,14 +60,11 @@ class YajilinParser(PuzzleParser):
             crop_row = []
             mask_row = []
             for c in range(cols):
-                y1 = geom.h_lines[r]
-                y2 = geom.h_lines[r + 1]
-                x1 = geom.v_lines[c]
-                x2 = geom.v_lines[c + 1]
                 # Shrink slightly to avoid grid line artifacts
-                margin_y = int((y2 - y1) * 0.1)
-                margin_x = int((x2 - x1) * 0.1)
-                cell = geom.warped_gray[y1 + margin_y:y2 - margin_y, x1 + margin_x:x2 - margin_x]
+                cell = crop_cell(
+                    geom.warped_gray, geom.h_lines[r], geom.h_lines[r + 1],
+                    geom.v_lines[c], geom.v_lines[c + 1], margin=0.1,
+                )
                 _, binary = cv2.threshold(cell, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
                 has_content = np.sum(binary > 0) / binary.size > EMPTY_THRESHOLD
                 crop_row.append(cell)

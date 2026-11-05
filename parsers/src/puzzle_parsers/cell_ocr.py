@@ -31,15 +31,32 @@ CELL_MARGIN_X = 0.10
 MIN_CONFIDENCE = 0.2
 
 
-def crop_cell(image: NDArray, y1: float, y2: float, x1: float, x2: float) -> NDArray:
+def crop_cell(
+    image: NDArray,
+    y1: float,
+    y2: float,
+    x1: float,
+    x2: float,
+    *,
+    margin: float | tuple[float, float] | None = None,
+) -> NDArray:
     """Inner crop of the cell bounded by ``y1..y2`` / ``x1..x2``.
 
+    ``margin`` is the fraction of the cell trimmed off each side, one value or
+    ``(y, x)``; the default is the OCR crop (``CELL_MARGIN_Y`` /
+    ``CELL_MARGIN_X``). It depends on where the puzzle puts content: 0 for
+    the full cell when marks reach the edges (kakuro's corner numbers,
+    pencils), ~0.2-0.25 for a fill test that samples only the centre.
     Clamped to the image; a degenerate crop becomes a small white patch so the
     recognizer reads it as empty instead of failing.
     """
+    if margin is None:
+        margin = (CELL_MARGIN_Y, CELL_MARGIN_X)
+    elif not isinstance(margin, tuple):
+        margin = (margin, margin)
     h, w = image.shape[:2]
-    my = int((y2 - y1) * CELL_MARGIN_Y)
-    mx = int((x2 - x1) * CELL_MARGIN_X)
+    my = int((y2 - y1) * margin[0])
+    mx = int((x2 - x1) * margin[1])
     cy1, cy2 = max(0, int(y1) + my), min(h, int(y2) - my)
     cx1, cx2 = max(0, int(x1) + mx), min(w, int(x2) - mx)
     roi = image[cy1:cy2, cx1:cx2]

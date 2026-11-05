@@ -11,6 +11,7 @@ from puzzle_parsers.base import PuzzleParser
 from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.masyu.grid_detector import detect_masyu_grid
 from puzzle_parsers.masyu.models import MasyuBoard
+from puzzle_parsers.cell_ocr import crop_cell
 
 if TYPE_CHECKING:
     from puzzle_parsers.recognition import OcrBackend
@@ -140,9 +141,7 @@ def _detect_circles(
             if ch <= 8 or cw <= 8:
                 continue
 
-            iy = int(ch * _CELL_INSET)
-            ix = int(cw * _CELL_INSET)
-            cell = g[y0 + iy:y1 - iy, x0 + ix:x1 - ix]
+            cell = crop_cell(g, y0, y1, x0, x1, margin=_CELL_INSET)
             ph, pw = cell.shape
             if ph < 9 or pw < 9:
                 continue

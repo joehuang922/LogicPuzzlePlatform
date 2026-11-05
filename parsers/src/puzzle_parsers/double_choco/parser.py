@@ -68,9 +68,7 @@ class DoubleChocoParser(PuzzleParser):
                 x1 = v_lines[c]
                 x2 = v_lines[c + 1]
 
-                margin_y = int((y2 - y1) * self._COLOR_MARGIN)
-                margin_x = int((x2 - x1) * self._COLOR_MARGIN)
-                color_roi = warped_gray[y1 + margin_y : y2 - margin_y, x1 + margin_x : x2 - margin_x]
+                color_roi = crop_cell(warped_gray, y1, y2, x1, x2, margin=self._COLOR_MARGIN)
                 cell_means.append(float(np.mean(color_roi)))
 
                 row_ocr.append(crop_cell(warped_gray, y1, y2, x1, x2))

@@ -17,6 +17,7 @@ from puzzle_parsers.kakuro.grid_detector import (
 from puzzle_parsers.kakuro.models import KakuroBoard, KakuroClueCell, KakuroEmptyCell
 from puzzle_parsers.recognition import CellRecognizer, GeminiRecognizer
 from puzzle_parsers.recognition_schemas import DUAL_INT_CELL_PROMPT
+from puzzle_parsers.cell_ocr import crop_cell
 
 BLACK_THRESHOLD = 200
 
@@ -90,8 +91,6 @@ class KakuroParser(PuzzleParser):
         debug_dir: str | None = None,
     ) -> list[list[KakuroClueCell | KakuroEmptyCell]]:
         rows, cols = geom.rows, geom.cols
-        margin_ratio = 0.15
-
         cells: list[list[KakuroClueCell | KakuroEmptyCell]] = []
         clue_cell_coords: list[tuple[int, int]] = []
         clue_cell_crops: list[NDArray] = []
@@ -104,20 +103,14 @@ class KakuroParser(PuzzleParser):
                 x1 = geom.v_lines[c]
                 x2 = geom.v_lines[c + 1]
 
-                cell_h = y2 - y1
-                cell_w = x2 - x1
-                my = int(cell_h * margin_ratio)
-                mx = int(cell_w * margin_ratio)
-
-                roi = warped_gray[y1 + my : y2 - my, x1 + mx : x2 - mx]
-                mean_val = np.mean(roi)
+                mean_val = np.mean(crop_cell(warped_gray, y1, y2, x1, x2, margin=0.15))
 
                 if mean_val < BLACK_THRESHOLD:
                     # Dark cell = clue cell (may have numbers)
                     row.append(KakuroClueCell())  # placeholder
                     clue_cell_coords.append((r, c))
                     # Use the full cell (not margined) for number reading
-                    clue_cell_crops.append(warped_gray[y1:y2, x1:x2])
+                    clue_cell_crops.append(crop_cell(warped_gray, y1, y2, x1, x2, margin=0))
                 else:
                     row.append(KakuroEmptyCell())
             cells.append(row)

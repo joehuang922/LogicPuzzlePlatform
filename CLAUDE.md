@@ -45,6 +45,10 @@ This is a solo project. Do not create pull requests or feature branches.
   hell_golf, kakuro, slalom).
 - Such a parser's type id must be in `_OCR_TYPES` in `parsers/lambda_handler.py`.
   `parsers/tests/test_cell_ocr_contract.py` enforces both rules.
+- Every parser crops a cell with `cell_ocr.crop_cell(image, y1, y2, x1, x2,
+  margin=...)`, never by slicing the board with its grid lines; the margin
+  (0 for a full cell) is the only per-puzzle choice. The same contract test
+  enforces it.
 
 # Parser room walls
 

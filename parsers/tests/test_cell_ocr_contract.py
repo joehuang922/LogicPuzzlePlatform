@@ -96,3 +96,22 @@ def test_every_shared_ocr_parser_is_in_ocr_types(monkeypatch):
 @pytest.mark.parametrize("pkg", sorted(_SINGLE_DIGIT_PACKAGES))
 def test_single_digit_packages_exist(pkg):
     assert (PKG / pkg).is_dir()
+
+
+# A cell sliced straight out of the board by its grid lines, e.g.
+# ``gray[y1 + my: y2 - my, x1 + mx: x2 - mx]``.
+_HAND_CROP = re.compile(r"\[\s*\(?y[01]\s*(?:\+[^:\]]*)?:\s*y[12]\b")
+# Out of the plan's scope: nonogram's clue strips and slitherlink's dot lattice.
+_CROP_EXEMPT = {"nonogram", "slitherlink"}
+
+
+def test_cells_are_cropped_with_crop_cell():
+    pkg = Path(__file__).resolve().parent.parent / "src" / "puzzle_parsers"
+    offenders = [
+        f"{p.relative_to(pkg)}:{i}: {line.strip()}"
+        for p in sorted(pkg.glob("*/*.py"))
+        if p.parent.name not in _CROP_EXEMPT
+        for i, line in enumerate(p.read_text().splitlines(), 1)
+        if _HAND_CROP.search(line)
+    ]
+    assert not offenders, "Crop cells with cell_ocr.crop_cell(..., margin=):\n" + "\n".join(offenders)

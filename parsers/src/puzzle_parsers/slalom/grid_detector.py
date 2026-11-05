@@ -18,6 +18,7 @@ from puzzle_parsers.grid_utils import (
     find_grid_lines,
     rectify_board,
 )
+from puzzle_parsers.cell_ocr import crop_cell
 
 
 
@@ -79,14 +80,7 @@ def classify_walls(
             x1 = geom.v_lines[c]
             x2 = geom.v_lines[c + 1]
 
-            h = y2 - y1
-            w = x2 - x1
-            margin_y = int(h * 0.2)
-            margin_x = int(w * 0.2)
-            center = warped_gray[y1 + margin_y:y2 - margin_y, x1 + margin_x:x2 - margin_x]
-
-            if center.size == 0:
-                continue
+            center = crop_cell(warped_gray, y1, y2, x1, x2, margin=0.2)
 
             dark_ratio = np.sum(center < 128) / center.size
             if dark_ratio > threshold:
@@ -127,9 +121,8 @@ def detect_gate_cells(
                 continue
             y1, y2 = geom.h_lines[r], geom.h_lines[r + 1]
             x1, x2 = geom.v_lines[c], geom.v_lines[c + 1]
-            h, w = y2 - y1, x2 - x1
-            v_band = norm[y1 + int(0.12 * h):y2 - int(0.12 * h), x1 + int(0.25 * w):x2 - int(0.25 * w)]
-            h_band = norm[y1 + int(0.25 * h):y2 - int(0.25 * h), x1 + int(0.12 * w):x2 - int(0.12 * w)].T
+            v_band = crop_cell(norm, y1, y2, x1, x2, margin=(0.12, 0.25))
+            h_band = crop_cell(norm, y1, y2, x1, x2, margin=(0.25, 0.12)).T
             if _has_dashed_line(v_band, dark_threshold):
                 vertical.add((r, c))
             if _has_dashed_line(h_band, dark_threshold):

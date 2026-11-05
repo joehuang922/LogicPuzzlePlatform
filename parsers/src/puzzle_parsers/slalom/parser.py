@@ -37,6 +37,7 @@ from puzzle_parsers.slalom.grid_detector import (
     detect_gate_cells,
 )
 from puzzle_parsers.slalom.models import SlalomBoard, SlalomGate
+from puzzle_parsers.cell_ocr import crop_cell
 
 if TYPE_CHECKING:
     from puzzle_parsers.recognition import OcrBackend
@@ -177,12 +178,10 @@ class SlalomParser(PuzzleParser):
         for r in range(geom.rows):
             row_crops: list[NDArray] = []
             for c in range(geom.cols):
-                y1 = geom.h_lines[r]
-                y2 = geom.h_lines[r + 1]
-                x1 = geom.v_lines[c]
-                x2 = geom.v_lines[c + 1]
-                roi = geom.warped_gray[y1:y2, x1:x2]
-                row_crops.append(roi)
+                row_crops.append(crop_cell(
+                    geom.warped_gray, geom.h_lines[r], geom.h_lines[r + 1],
+                    geom.v_lines[c], geom.v_lines[c + 1], margin=0,
+                ))
             cell_crops.append(row_crops)
         return cell_crops
 

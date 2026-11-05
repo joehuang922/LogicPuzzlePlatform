@@ -13,6 +13,7 @@ from puzzle_parsers.recognition import GeminiRecognizer, CellRecognizer
 from puzzle_parsers.recognition_schemas import PENCILS_CLUE_PROMPT
 from puzzle_parsers.pencils.grid_detector import detect_pencils_grid
 from puzzle_parsers.pencils.models import PencilsBoard
+from puzzle_parsers.cell_ocr import crop_cell
 
 if TYPE_CHECKING:
     from puzzle_parsers.recognition import OcrBackend
@@ -63,18 +64,17 @@ class PencilsParser(PuzzleParser):
         rows = geom.rows
         cols = geom.cols
 
-        # Extract cell crops for batch LLM recognition (full cell, no margin reduction)
-        cell_crops: list[list[np.ndarray]] = []
-        for r in range(rows):
-            row_crops: list[np.ndarray] = []
-            for c in range(cols):
-                x1 = geom.v_lines[c]
-                x2 = geom.v_lines[c + 1]
-                y1 = geom.h_lines[r]
-                y2 = geom.h_lines[r + 1]
-                cell_roi = geom.warped_gray[y1:y2, x1:x2]
-                row_crops.append(cell_roi)
-            cell_crops.append(row_crops)
+        # Full cells for LLM recognition: a pencil's tip and shaft reach the edges.
+        cell_crops = [
+            [
+                crop_cell(
+                    geom.warped_gray, geom.h_lines[r], geom.h_lines[r + 1],
+                    geom.v_lines[c], geom.v_lines[c + 1], margin=0,
+                )
+                for c in range(cols)
+            ]
+            for r in range(rows)
+        ]
 
         # Recognize all cells via LLM using custom montage with red borders
         cells = self._recognize_with_montage(cell_crops)
@@ -120,11 +120,7 @@ class PencilsParser(PuzzleParser):
             for c in range(num_cols):
                 cell = cell_crops[r][c]
                 h, w = cell.shape[:2]
-                margin_y = int(h * 0.15)
-                margin_x = int(w * 0.15)
-                center = cell[margin_y:h - margin_y, margin_x:w - margin_x]
-                if center.size == 0:
-                    continue
+                center = crop_cell(cell, 0, h, 0, w, margin=0.15)
                 nonwhite = np.sum(center < 200)
                 if nonwhite / center.size > 0.02:
                     non_empty_coords.append((r, c))
