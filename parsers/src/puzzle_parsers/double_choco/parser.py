@@ -9,6 +9,7 @@ import numpy as np
 from PIL import Image
 
 from puzzle_parsers.base import PuzzleParser
+from puzzle_parsers.cell_fill import shaded_cells
 from puzzle_parsers.cell_ocr import crop_cell, read_cells
 from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.double_choco.grid_detector import detect_double_choco_grid
@@ -56,44 +57,26 @@ class DoubleChocoParser(PuzzleParser):
 
         debug_path = _Path(debug_dir) if debug_dir else None
 
-        # First pass: for each cell compute the mean intensity over a tight crop
-        # (for color classification) and collect the shared OCR crop.
-        ocr_rois: list[list[np.ndarray]] = []
-        cell_means: list[float] = []
-        for r in range(rows):
-            row_ocr: list[np.ndarray] = []
-            for c in range(cols):
-                y1 = h_lines[r]
-                y2 = h_lines[r + 1]
-                x1 = v_lines[c]
-                x2 = v_lines[c + 1]
-
-                color_roi = crop_cell(warped_gray, y1, y2, x1, x2, margin=self._COLOR_MARGIN)
-                cell_means.append(float(np.mean(color_roi)))
-
-                row_ocr.append(crop_cell(warped_gray, y1, y2, x1, x2))
-            ocr_rois.append(row_ocr)
-
-        # Adaptive color threshold using Otsu on cell mean intensities
-        means_arr = np.array(cell_means)
-        scaled = ((means_arr - means_arr.min()) / (means_arr.max() - means_arr.min() + 1e-6) * 255).astype(np.uint8)
-        otsu_val, _ = cv2.threshold(scaled, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        color_threshold = means_arr.min() + (otsu_val / 255) * (means_arr.max() - means_arr.min())
+        # Colour crops (centre of each cell) for the shared grey/white split,
+        # and the shared OCR crop for the clue.
+        color_rois = [
+            [crop_cell(warped_gray, h_lines[r], h_lines[r + 1], v_lines[c], v_lines[c + 1],
+                       margin=self._COLOR_MARGIN) for c in range(cols)]
+            for r in range(rows)
+        ]
+        ocr_rois = [
+            [crop_cell(warped_gray, h_lines[r], h_lines[r + 1], v_lines[c], v_lines[c + 1])
+             for c in range(cols)]
+            for r in range(rows)
+        ]
+        colors = shaded_cells(color_rois)
 
         # Clues can exceed 9 ("11", "12", ...).
         numbers = read_cells(self._ocr, ocr_rois, allow_multi_digits=True)
 
-        # Second pass: classify color and attach the clue
-        cells: list[list[list[int]]] = []
-        idx = 0
-        for r in range(rows):
-            row: list[list[int]] = []
-            for c in range(cols):
-                color = 1 if cell_means[idx] < color_threshold else 0
-                number = numbers[r][c]
-                row.append([color, number])
-                idx += 1
-            cells.append(row)
+        cells = [
+            [[colors[r][c], numbers[r][c]] for c in range(cols)] for r in range(rows)
+        ]
 
         if debug_path:
             vis = geom.warped.copy()
