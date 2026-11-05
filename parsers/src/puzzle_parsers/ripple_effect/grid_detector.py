@@ -3,10 +3,9 @@
 A Ripple Effect board is a rectangular grid pre-divided into irregular rooms by
 thick borders; the internal cell dividers are thin. Both are solid by design,
 but real Nikoli scans degrade the thin dividers into faint, broken segments — so
-we locate geometry with ``auto_detect_grid_lines`` and guard an under-detected
-axis with square-cell reconciliation (the shared robust path used by Nurikabe),
-then classify each internal border as thick (room boundary) or thin, exactly
-like LITS / Heyawake.
+we locate geometry with the shared ``find_grid_lines`` (lattice fit, tolerant
+of broken lines), then classify each internal border as thick (room boundary)
+or thin with the shared classifier, exactly like LITS / Heyawake.
 
 These scans carry a title band above the board ("1 ... Easy") and a halftone
 strip at the page margin; the shared ``find_quadrilateral_border`` rejects those

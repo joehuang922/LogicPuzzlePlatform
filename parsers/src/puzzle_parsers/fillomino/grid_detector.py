@@ -1,8 +1,8 @@
 """Grid detection for fillomino puzzles with dashed internal lines.
 
-Bridges the dashes with preprocess_dashed_lines(), then fits a uniform grid to
-the ink projection (detect_uniform_grid) — the square-cell fact makes an exact
-uniform grid more reliable than snapping to jittery detected peaks.
+The shared board finder, then ``flatten_board`` (fillomino comes as phone
+photos of a curved page, whose lines drift ~0.1 cell off any straight grid),
+then the shared grid finder.
 """
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ import cv2
 from numpy.typing import NDArray
 
 from puzzle_parsers.board_grid import BoardGrid
+from puzzle_parsers.flatten import flatten_board
 from puzzle_parsers.grid_utils import (
     find_grid_lines,
     rectify_board,
@@ -26,7 +27,7 @@ def detect_fillomino_grid(
     if debug_path:
         debug_path.mkdir(parents=True, exist_ok=True)
 
-    board = rectify_board(image)
+    board = flatten_board(image, rectify_board(image), debug_dir=debug_dir)
 
     warped, border_pts = board.warped, board.quad
 

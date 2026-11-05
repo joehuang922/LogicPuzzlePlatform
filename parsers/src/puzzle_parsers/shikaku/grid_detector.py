@@ -1,8 +1,7 @@
 """Grid detection for shikaku puzzles with dashed internal lines.
 
-Bridges the dashes with preprocess_dashed_lines(), then fits a uniform grid to
-the ink projection (detect_uniform_grid) — the square-cell fact makes an exact
-uniform grid more reliable than snapping to jittery detected peaks.
+The shared board finder and grid finder (``find_grid_lines``: lattice fit on
+the ink projection, then each line follows its ink).
 """
 from __future__ import annotations
 

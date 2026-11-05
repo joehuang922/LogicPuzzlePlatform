@@ -1,20 +1,11 @@
 """Picto Link grid detection — thin orchestrator over shared grid_utils.
 
 Picto Link boards are a plain rectangular grid of square cells with no regions.
-The sample images use *solid* grid rulings, so we detect the real line peaks and
-then :func:`reconcile_square_lines` them under the square-cell assumption.
 
-We deliberately do *not* use the perfectly-uniform synthesiser
-(``detect_uniform_grid``) here. A photographed magazine page bows, and the 4-corner
-warp only removes perspective — it cannot straighten a curved page. The synthesiser
-emits lines at an exactly even phase (``round(i*span/count)``) and discards the real
-peak positions, so on a bowed board its lines drift away from the actual rulings,
-worst in the centre (measured ~20% of a cell on the 25×25 sample). At the parser's
-0.15 cell-ROI margin that drift drags a ruling bar into the digit window — turning a
-``3`` into a ``5`` or clipping a digit — and corrupts OCR. ``reconcile_square_lines``
-instead *snaps* each line to the nearest real peak, so the grid follows the bow;
-this cut the sample's centre drift to 0 and its parity errors by more than half.
-See [[grid-parser-robustness]].
+A photographed magazine page bows, and the 4-corner warp only removes
+perspective: on the 25x25 sample the printed columns slant ~0.2 cell across the
+board, so no straight line fits them and a ruling bar lands inside the digit
+crop. ``flatten_board`` straightens the board before the shared grid finder.
 
 The rulings are printed in a single ink colour (red in the samples, but the
 pipeline must not assume any particular hue). We therefore drive every geometry
@@ -30,6 +21,7 @@ import cv2
 from numpy.typing import NDArray
 
 from puzzle_parsers.board_grid import BoardGrid
+from puzzle_parsers.flatten import flatten_board
 from puzzle_parsers.grid_utils import (
     find_grid_lines,
     rectify_board,
@@ -41,13 +33,15 @@ from puzzle_parsers.grid_utils import (
 def detect_picto_link_grid(
     image: NDArray, debug_dir: str | None = None
 ) -> BoardGrid:
-    """Detect the Picto Link grid: find border, warp, fit a uniform grid."""
+    """Detect the Picto Link grid: find the board, flatten it, find the lines."""
     debug_path = Path(debug_dir) if debug_dir else None
     if debug_path:
         debug_path.mkdir(parents=True, exist_ok=True)
 
     ink = ink_intensity(image)
-    board = rectify_board(image, border_image=ink)
+    board = flatten_board(
+        image, rectify_board(image, border_image=ink), line_image=ink, debug_dir=debug_dir
+    )
     warped, border_pts = board.warped, board.quad
 
     if debug_path:

@@ -1,9 +1,8 @@
 """Number Link grid detection — thin orchestrator over shared grid_utils.
 
 Number Link boards are a plain rectangular grid of cells with no regions. The
-sample images use dashed/dotted grid lines, so we use ``auto_detect_grid_lines``
-(which sweeps erode sizes to find the faint rulings) rather than the solid-line
-``detect_grid_lines``.
+sample images use dashed/dotted grid lines; the shared ``find_grid_lines``
+(lattice fit on the ink projection) handles them like solid ones.
 """
 from __future__ import annotations
 

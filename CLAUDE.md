@@ -53,6 +53,15 @@ This is a solo project. Do not create pull requests or feature branches.
   wrapper or width measurement. Tune it there for everyone.
   `parsers/tests/test_wall_contract.py` enforces it.
 
+# Parser curved pages
+
+- A parser whose boards arrive as photos of a curved page or leaning scans
+  (kakuro, masyu, picto_link, fillomino) straightens them with
+  `flatten.flatten_board(image, rectify_board(image))` before
+  `find_grid_lines`; no per-parser line tracing or remap.
+  `parsers/tests/test_flatten.py` enforces it. Opt a parser in only after
+  every one of its samples traces to the right size, at full and Android size.
+
 # Authoring room-based puzzles
 
 - A room-based editor (web or Android admin) may hold layouts that aren't valid

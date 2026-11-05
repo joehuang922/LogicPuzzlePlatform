@@ -3,10 +3,9 @@
 Norinori boards are pre-divided into regions by thick borders; the internal
 cell divider lines are thin. All lines are solid *by design*, but real scans
 degrade the thin dividers into faint, broken segments — so we detect geometry
-with ``auto_detect_grid_lines`` (sweeps erode sizes, tolerant of broken lines),
-guard against an under-detected axis with square-cell reconciliation, then
-classify each internal border by thickness (thick = region boundary), exactly
-like LITS.
+with the shared ``find_grid_lines`` (lattice fit, tolerant of broken lines),
+then classify each internal border by thickness (thick = region boundary)
+with the shared classifier, exactly like LITS.
 """
 from __future__ import annotations
 

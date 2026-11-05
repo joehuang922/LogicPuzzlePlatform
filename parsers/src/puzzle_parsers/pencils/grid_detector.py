@@ -3,7 +3,7 @@
 Pipeline:
 1. Find quadrilateral border and warp to rectangle
 2. Preprocess dashed grid lines into solid mask
-3. Fit the grid with the shared lattice detector (``detect_uniform_grid``).
+3. Fit the grid with the shared grid finder (``find_grid_lines``).
    Counting projection peaks let the pencil-shaped clues add or drop a line
    whenever the board's scale changed.
 """

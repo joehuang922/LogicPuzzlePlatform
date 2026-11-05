@@ -3,8 +3,8 @@
 Nurikabe boards are a plain rectangular grid of cells with no regions; some
 cells hold a printed number clue. All grid lines are solid *by design*, but real
 scans degrade the thin dividers into faint, broken segments — so we locate
-geometry with ``auto_detect_grid_lines`` (sweeps erode sizes, tolerant of broken
-lines) and guard against an under-detected axis with square-cell reconciliation.
+geometry with the shared ``find_grid_lines`` (lattice fit, tolerant of broken
+lines).
 
 These Nikoli scans carry a title band above the board ("1 ... Easy") and a
 halftone shading strip at the page margin, which the border detector must not

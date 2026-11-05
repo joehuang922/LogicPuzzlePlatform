@@ -3,8 +3,8 @@
 Hell Golf boards are a plain rectangular grid of cells. Lakes (gray, thick-
 bordered regions) live inside the grid but do not subdivide it. The sample
 images use dashed/dotted interior grid lines with a solid thick outer border,
-so we use ``auto_detect_grid_lines`` (which sweeps erode sizes to find the
-faint rulings) rather than the solid-line ``detect_grid_lines``.
+which the shared ``find_grid_lines`` (lattice fit on the ink projection)
+handles like solid ones.
 """
 from __future__ import annotations
 

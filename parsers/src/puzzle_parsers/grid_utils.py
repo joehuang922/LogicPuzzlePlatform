@@ -266,33 +266,6 @@ def _projection_box_quad(gray: NDArray) -> NDArray:
 
 
 
-def _cluster_positions(positions: list[float], min_gap: float = 10) -> list[float]:
-    """Cluster nearby positions and return the median of each cluster."""
-    if not positions:
-        return []
-    positions = sorted(positions)
-    result: list[float] = []
-    group = [positions[0]]
-    for p in positions[1:]:
-        if p - group[-1] < min_gap:
-            group.append(p)
-        else:
-            result.append(float(np.median(group)))
-            group = [p]
-    result.append(float(np.median(group)))
-    return result
-
-
-def _median_single_spacing(positions: list[float]) -> float:
-    """Estimate cell size as the median of single-cell spacings."""
-    spacings = np.diff(positions)
-    if len(spacings) < 2:
-        return 0
-    med = float(np.median(spacings))
-    single = spacings[spacings < med * 1.5]
-    return float(np.median(single)) if len(single) >= 3 else med
-
-
 def _find_border_via_gradient(gray: NDArray) -> NDArray | None:
     """Find the border by locating steepest brightness transitions on each edge.
 
@@ -544,89 +517,6 @@ def preprocess_dashed_lines(
     return cv2.bitwise_or(h_closed, v_closed)
 
 
-def auto_detect_grid_lines(
-    warped_gray: NDArray,
-    warp_w: int,
-    warp_h: int,
-    *,
-    erode_range: range = range(4, 10),
-    close_gap_size: int = 40,
-) -> tuple[list[int], list[int]]:
-    """Auto-detect grid lines by sweeping erode sizes and picking the most uniform.
-
-    For boards with dashed/dotted grid lines, the optimal erode size depends on
-    image resolution. This function tries multiple erode sizes, scores each by
-    the coefficient of variation (CV) of cell spacings, and returns the result
-    with the lowest CV (most uniform grid).
-
-    Args:
-        warped_gray: Grayscale warped puzzle image.
-        warp_w: Width of the warped image.
-        warp_h: Height of the warped image.
-        erode_range: Range of erode kernel sizes to try (default 4–9).
-        close_gap_size: Size of the closing kernel to bridge dash gaps.
-
-    Returns:
-        (h_lines, v_lines) from the best-scoring erode size.
-    """
-    binary = cv2.adaptiveThreshold(
-        cv2.GaussianBlur(warped_gray, (3, 3), 0),
-        255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 3,
-    )
-
-    best_score = float("inf")
-    best_h: list[int] = []
-    best_v: list[int] = []
-
-    for erode_size in erode_range:
-        h_erode_k = cv2.getStructuringElement(cv2.MORPH_RECT, (erode_size, 1))
-        v_erode_k = cv2.getStructuringElement(cv2.MORPH_RECT, (1, erode_size))
-        h_cleaned = cv2.erode(binary, h_erode_k)
-        v_cleaned = cv2.erode(binary, v_erode_k)
-
-        h_close_k = cv2.getStructuringElement(cv2.MORPH_RECT, (close_gap_size, 1))
-        v_close_k = cv2.getStructuringElement(cv2.MORPH_RECT, (1, close_gap_size))
-        h_closed = cv2.morphologyEx(h_cleaned, cv2.MORPH_CLOSE, h_close_k)
-        v_closed = cv2.morphologyEx(v_cleaned, cv2.MORPH_CLOSE, v_close_k)
-
-        mask = cv2.bitwise_or(h_closed, v_closed)
-        h_lines, v_lines = detect_grid_lines(
-            warped_gray, warp_w, warp_h, preprocessed_mask=mask
-        )
-
-        rows = len(h_lines) - 1
-        cols = len(v_lines) - 1
-        if rows < 3 or cols < 3:
-            continue
-
-        score = _grid_uniformity_score(h_lines, v_lines)
-        if score < best_score:
-            best_score = score
-            best_h = h_lines
-            best_v = v_lines
-
-    if not best_h:
-        return detect_grid_lines(warped_gray, warp_w, warp_h)
-
-    return best_h, best_v
-
-
-def _grid_uniformity_score(h_lines: list[int], v_lines: list[int]) -> float:
-    """Score grid uniformity as the CV of all gaps pooled across both axes.
-
-    Pooling exploits the assumption that cells are roughly square: if one axis
-    has much larger gaps than the other (e.g. a degenerate 2×5 detection), the
-    combined distribution will have high variance and score poorly.
-    """
-    h_gaps = [h_lines[i + 1] - h_lines[i] for i in range(len(h_lines) - 1)]
-    v_gaps = [v_lines[i + 1] - v_lines[i] for i in range(len(v_lines) - 1)]
-    all_gaps = h_gaps + v_gaps
-    mean = float(np.mean(all_gaps))
-    if mean == 0:
-        return float("inf")
-    return float(np.std(all_gaps)) / mean
-
-
 # Max fraction by which the two per-axis pitches may differ before we treat one
 # axis as genuinely under-detected (rather than merely non-square from warp).
 # Warp leaves cells a few percent off square; a faint/broken axis is off by tens
@@ -640,8 +530,8 @@ def reconcile_square_lines(
 ) -> tuple[list[int], list[int]]:
     """Re-derive both axis line sets from detected pitches, assuming square cells.
 
-    Companion to :func:`auto_detect_grid_lines`: it fixes the row/column *count*
-    once lines are detected. Two failure modes to guard against:
+    Companion to :func:`detect_grid_lines` (nonogram): it fixes the row/column
+    *count* once lines are detected. Two failure modes to guard against:
 
     1. **Under-detection.** A faint/broken axis can lose lines, which only ever
        *inflates* that axis's estimated cell size (you cannot detect more lines
@@ -768,90 +658,6 @@ def _uniform_grid_snapped(
     return result
 
 
-def detect_uniform_grid(
-    warped_gray: NDArray,
-    warp_w: int,
-    warp_h: int,
-    *,
-    preprocessed_mask: NDArray | None = None,
-) -> tuple[list[int], list[int]]:
-    """Unified step-4 grid detector: lattice-fit count, then emit a uniform grid.
-
-    This is the shared procedure for both solid- and dashed-line boards. Per axis:
-
-    1. Fit the cell count with :func:`detect_grid_dimensions` (uniform-lattice fit
-       on the raw ink projection — robust to clue clutter and octave errors).
-    2. If exactly one axis fits, recover the other from the square-cell fact
-       (both axes share a pitch, so count = round(span / pitch)).
-    3. If a count is known for both axes, synthesise perfectly uniform grids via
-       :func:`uniform_grid` (the square-cell fact makes jittery peak positions
-       redundant, so we discard them).
-    4. If both axes refuse (e.g. a bowed/curved scan whose ink no longer lands at a
-       single uniform phase), fall back to peak-based :func:`detect_grid_lines`.
-
-    Args:
-        warped_gray: Grayscale warped (rectified) puzzle image.
-        warp_w, warp_h: Warped image dimensions.
-        preprocessed_mask: Optional pre-binarised ink mask (e.g. from
-            :func:`preprocess_dashed_lines`); binarised internally when omitted.
-    """
-    if preprocessed_mask is not None:
-        binary = preprocessed_mask
-    else:
-        binary = cv2.adaptiveThreshold(
-            cv2.GaussianBlur(warped_gray, (3, 3), 0),
-            255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 3,
-        )
-
-    rows, cols = detect_grid_dimensions(binary)
-
-    # When exactly one axis fits confidently, the square-cell fact recovers the
-    # other: both axes share the same pitch, so count = round(span / pitch). This
-    # rescues large/clue-heavy boards (e.g. fillomino-big, whose 37 rows refuse the
-    # lattice fit under clue-inflated background but whose 23 cols fit cleanly)
-    # without inventing an octave-prone count heuristic.
-    if rows is not None and cols is None:
-        cols = max(2, round(warp_w / (warp_h / rows)))
-    elif cols is not None and rows is None:
-        rows = max(2, round(warp_h / (warp_w / cols)))
-
-    if rows is not None and cols is not None:
-        # The count is settled; let each line follow the ink a little, so a
-        # gently curved page (lines drifting a few % of a cell) stays on grid.
-        ink = (binary > 0).astype(np.float32)
-        return (
-            _follow_ink(ink.sum(axis=1), uniform_grid(warp_h, rows)),
-            _follow_ink(ink.sum(axis=0), uniform_grid(warp_w, cols)),
-        )
-
-    # Both axes refused: typically a phone photo of a curved page, where lines
-    # drift up to ~10% of a cell off any straight uniform lattice. The *local*
-    # line spacing is still steady, so read the pitch from the projection's
-    # autocorrelation, then snap each expected line to the nearby ink peak so the
-    # grid follows the drift. Peak counting (below) mistakes dense clue columns
-    # for grid lines on such boards (a 17x17 fillomino read as 16x17 / 17x16).
-    ink = (binary > 0).astype(np.float32)
-    row_proj, col_proj = ink.sum(axis=1), ink.sum(axis=0)
-    row_pitch = _projection_pitch(row_proj)
-    col_pitch = _projection_pitch(col_proj)
-    if (
-        row_pitch is not None
-        and col_pitch is not None
-        and max(row_pitch, col_pitch) / min(row_pitch, col_pitch) <= 1.15
-    ):
-        rows = max(2, round(warp_h / row_pitch))
-        cols = max(2, round(warp_w / col_pitch))
-        return (
-            _grid_snapped_to_projection(row_proj, warp_h, rows),
-            _grid_snapped_to_projection(col_proj, warp_w, cols),
-        )
-
-    # Still no pitch: fall back to peak detection.
-    return detect_grid_lines(
-        warped_gray, warp_w, warp_h, preprocessed_mask=preprocessed_mask
-    )
-
-
 def _projection_pitch(proj: NDArray) -> float | None:
     """Grid pitch (px) from the autocorrelation of an ink projection.
 
@@ -885,88 +691,6 @@ def _projection_pitch(proj: NDArray) -> float | None:
 _FOLLOW_INK_FRAC = 0.12
 
 
-def _follow_ink(proj: NDArray, lines: list[int]) -> list[int]:
-    """Move each interior line to the strongest ink within a small window.
-
-    On a flat board the strongest ink near a line *is* that line, so nothing
-    moves; on a curved page each line tracks its drift. The outer two lines
-    stay on the border.
-    """
-    if len(lines) < 3:
-        return lines
-    pitch = (lines[-1] - lines[0]) / (len(lines) - 1)
-    tol = max(1, int(round(pitch * _FOLLOW_INK_FRAC)))
-    smooth = np.convolve(proj, np.ones(3) / 3, "same")
-    out = [lines[0]]
-    for pos in lines[1:-1]:
-        lo, hi = max(0, pos - tol), min(len(smooth), pos + tol + 1)
-        out.append(lo + int(np.argmax(smooth[lo:hi])) if hi > lo else pos)
-    out.append(lines[-1])
-    return out
-
-
-def _grid_snapped_to_projection(proj: NDArray, span: int, n_cells: int) -> list[int]:
-    """Uniform ``n_cells`` grid with each interior line snapped to its ink peak.
-
-    A line moves only to a peak within a quarter cell of its uniform position;
-    the outer two stay on the border.
-    """
-    from scipy.signal import find_peaks
-
-    pitch = span / n_cells
-    smooth = np.convolve(proj, np.ones(3) / 3, "same")
-    peaks, _ = find_peaks(
-        smooth, distance=max(2, int(pitch * 0.5)), prominence=smooth.max() * 0.05
-    )
-    lines: list[int] = []
-    for i in range(n_cells + 1):
-        expected = i * pitch
-        pos = int(round(expected))
-        if 0 < i < n_cells and len(peaks):
-            nearest = int(peaks[np.argmin(np.abs(peaks - expected))])
-            if abs(nearest - expected) < pitch * 0.25:
-                pos = nearest
-        lines.append(pos)
-    return lines
-
-
-def _lattice_count_1d(
-    proj: NDArray,
-    span: int,
-    *,
-    n_min: int = 4,
-    n_max: int = 64,
-    band: int | None = None,
-    weak_pct: int = 15,
-    ratio: float = 2.0,
-    floor: float = 0.02,
-) -> int | None:
-    """Count cells along one axis by fitting a uniform grid to the ink projection.
-
-    Because step-2 gives a reliable axis-aligned border, the ``count-1`` interior
-    grid lines sit at fixed phase ``i*span/count``. For each candidate count we lay
-    that uniform "comb" and require the *weakest* tooth (the ``weak_pct``-percentile
-    of per-tooth peak ink) to clearly beat the off-tooth background. Among all
-    counts that pass, we keep the **largest** — which is what makes this immune to
-    the octave traps that defeat peak-counting and plain contrast scoring:
-
-    - An overtone (2N) drops half its teeth into empty cell interiors, so its weak
-      tooth is near-zero and it fails the test.
-    - A sub-harmonic (N/2) passes the test, but so does the true N, and N > N/2, so
-      "largest passing" discards it.
-
-    Unlike peak detection, this reads the *raw* projection, so clue clutter (which
-    does not sit on a consistent pitch) cannot inject spurious lines. Returns
-    ``None`` when no count qualifies (e.g. a bowed/curved scan where the ink no
-    longer lands at a single uniform phase); callers fall back to peak detection.
-    """
-    passing = _lattice_candidates_1d(
-        proj, span, n_min=n_min, n_max=n_max, band=band,
-        weak_pct=weak_pct, ratio=ratio, floor=floor,
-    )
-    return max(passing) if passing else None
-
-
 def _lattice_candidates_1d(
     proj: NDArray,
     span: int,
@@ -978,7 +702,24 @@ def _lattice_candidates_1d(
     ratio: float = 2.0,
     floor: float = 0.02,
 ) -> list[int]:
-    """Every cell count whose uniform comb passes the weak-tooth test (see above)."""
+    """Every cell count whose uniform comb passes the weak-tooth test.
+
+    Because step-2 gives a reliable axis-aligned border, the ``count-1`` interior
+    grid lines sit at fixed phase ``i*span/count``. For each candidate count we lay
+    that uniform "comb" and require the *weakest* tooth (the ``weak_pct``-percentile
+    of per-tooth peak ink) to clearly beat the off-tooth background. The caller
+    picks among the counts that pass (``find_grid_lines``: the one nearest the
+    autocorrelation pitch). Why the test itself resists octave traps:
+
+    - An overtone (2N) drops half its teeth into empty cell interiors, so its weak
+      tooth is near-zero and it fails the test.
+    - A sub-harmonic (N/2) passes the test, but so does the true N.
+
+    Unlike peak detection, this reads the *raw* projection, so clue clutter (which
+    does not sit on a consistent pitch) cannot inject spurious lines. Returns
+    ``[]`` when no count qualifies (e.g. a bowed scan where the ink no longer
+    lands at a single uniform phase).
+    """
     if band is None:
         # Boards arrive at ~TARGET_CELL_PX per cell (rectify_board), so a fixed
         # band is a fixed fraction of a cell: ~5.5%. The old 2px band was tuned
@@ -1122,28 +863,6 @@ def _border_follow_ink(proj: NDArray, lines: list[int]) -> list[int]:
     first = int(np.argmax(smooth[: tol + 1]))
     last = n - 1 - tol + int(np.argmax(smooth[n - 1 - tol:]))
     return [first, *lines[1:-1], last]
-
-
-def detect_grid_dimensions(
-    binary: NDArray,
-) -> tuple[int | None, int | None]:
-    """Detect (rows, cols) via uniform-lattice fitting on the ink projection.
-
-    Reads a binary ink mask (255 = ink), projects onto each axis, and fits the
-    best uniform grid count per axis with :func:`_lattice_count_1d`. Returns
-    ``(rows, cols)`` where either may be ``None`` if that axis does not admit a
-    confident uniform fit — the caller should then fall back to peak-based line
-    detection for that axis. This is the shared count detector for the uniform
-    step-4 pipeline; it does not locate individual lines (use :func:`uniform_grid`
-    to synthesise them once the count is known).
-    """
-    ink = (binary > 0).astype(np.float32)
-    h, w = ink.shape
-    col_proj = ink.sum(axis=0)   # vertical lines -> column count
-    row_proj = ink.sum(axis=1)   # horizontal lines -> row count
-    cols = _lattice_count_1d(col_proj, w)
-    rows = _lattice_count_1d(row_proj, h)
-    return rows, cols
 
 
 def uniform_grid(span: int, count: int) -> list[int]:
