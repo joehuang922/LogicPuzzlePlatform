@@ -2,7 +2,7 @@
 
 Heyawake boards are divided into rectangular rooms by thick borders; the
 internal cell divider lines are thin. Both are solid, so we use
-``detect_grid_lines`` and then classify each internal border by thickness. The
+the shared ``find_grid_lines`` and then classify each internal border by thickness. The
 resulting thick-border map is converted into rectangular rooms by the parser.
 
 Unlike LITS, some rooms carry a printed number (the clue), which the parser

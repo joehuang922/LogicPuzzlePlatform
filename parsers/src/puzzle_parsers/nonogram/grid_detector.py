@@ -16,7 +16,7 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
-from puzzle_parsers.grid_utils import detect_grid_lines, reconcile_square_lines
+from puzzle_parsers.grid_utils import find_grid_lines
 
 
 @dataclass
@@ -235,15 +235,12 @@ def _detect(
     grid_w = outer_w - grid_x_start
     grid_h = outer_h - grid_y_start
 
-    # Determine rows/cols from grid lines within the playable area.
-    # Nonogram cells are square, so detect lines on both axes then reconcile:
-    # a soft-focus/faint scan can under-detect one axis (e.g. only the bold
-    # every-5 separators survive on the horizontal axis -> 5 rows), which
-    # inflates that axis's pitch. reconcile_square_lines spots the divergent
-    # pitch and re-derives both counts from the reliable (smaller) one. See
-    # [[grid-parser-robustness]].
+    # Determine rows/cols from the grid lines within the playable area with the
+    # shared grid finder. Its square-cell recount keeps a soft or downscaled
+    # scan, where only the bold every-5 separators survive on one axis, from
+    # reading 25 rows as 5.
     playable_gray = gray[grid_y : grid_y + grid_h, grid_x : grid_x + grid_w]
-    rows, cols = _count_cells_square(playable_gray, grid_w, grid_h)
+    rows, cols = _count_cells(playable_gray)
 
     cell_w = grid_w / cols
     cell_h = grid_h / rows
@@ -277,31 +274,10 @@ def _detect(
     )
 
 
-def _count_cells_square(
-    playable_gray: NDArray, grid_w: int, grid_h: int,
-) -> tuple[int, int]:
-    """Count (rows, cols) of the playable grid, assuming square cells.
-
-    Detects grid lines on both axes with the shared, kernel-sweeping
-    :func:`detect_grid_lines`, then repairs under-detection via
-    :func:`reconcile_square_lines`. On a soft-focus scan the thin interior
-    lines can blur below the detection threshold on one axis, leaving only the
-    bold every-5 separators — which collapses that axis's count (a 25-row board
-    reads as 5). Because missing lines only ever *inflate* an axis's pitch, the
-    reconcile step adopts the reliable (smaller) pitch for both axes and
-    re-derives both counts. When the two pitches already agree it is a no-op, so
-    sharp scans are unaffected. See [[grid-parser-robustness]].
-    """
-    h_lines, v_lines = detect_grid_lines(playable_gray, grid_w, grid_h)
-    h_lines, v_lines = reconcile_square_lines(h_lines, v_lines, grid_h, grid_w)
-
-    rows = len(h_lines) - 1
-    cols = len(v_lines) - 1
-    if rows < 2 or cols < 2:
-        # Degenerate detection: fall back to a square estimate from the aspect
-        # ratio and the median cell pitch, rather than returning nonsense.
-        return max(2, rows), max(2, cols)
-    return rows, cols
+def _count_cells(playable_gray: NDArray) -> tuple[int, int]:
+    """Count (rows, cols) of the playable grid with the shared grid finder."""
+    h_lines, v_lines = find_grid_lines(playable_gray)
+    return max(2, len(h_lines) - 1), max(2, len(v_lines) - 1)
 
 
 def _find_line_positions(projection: NDArray, threshold: float) -> list[int]:

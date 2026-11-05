@@ -1,8 +1,8 @@
 """LITS grid detection — thin orchestrator over shared grid_utils.
 
 LITS boards are pre-divided into regions by thick borders; the internal cell
-divider lines are thin. Both are solid, so we use ``detect_grid_lines`` and then
-classify each internal border by thickness.
+divider lines are thin. Both are solid, so we use the shared ``find_grid_lines`` and
+then classify each internal border by thickness.
 """
 from __future__ import annotations
 

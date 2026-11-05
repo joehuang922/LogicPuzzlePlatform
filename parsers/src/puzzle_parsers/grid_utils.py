@@ -517,147 +517,6 @@ def preprocess_dashed_lines(
     return cv2.bitwise_or(h_closed, v_closed)
 
 
-# Max fraction by which the two per-axis pitches may differ before we treat one
-# axis as genuinely under-detected (rather than merely non-square from warp).
-# Warp leaves cells a few percent off square; a faint/broken axis is off by tens
-# of percent. 0.15 cleanly separates the two regimes on real Nikoli scans.
-_RECONCILE_DIVERGE_TOL = 0.15
-
-
-def reconcile_square_lines(
-    h_lines: list[int], v_lines: list[int], warp_h: int, warp_w: int,
-    *, diverge_tol: float = _RECONCILE_DIVERGE_TOL,
-) -> tuple[list[int], list[int]]:
-    """Re-derive both axis line sets from detected pitches, assuming square cells.
-
-    Companion to :func:`detect_grid_lines` (nonogram): it fixes the row/column
-    *count* once lines are detected. Two failure modes to guard against:
-
-    1. **Under-detection.** A faint/broken axis can lose lines, which only ever
-       *inflates* that axis's estimated cell size (you cannot detect more lines
-       than exist). When the two per-axis pitches diverge a lot, the smaller is
-       the reliable one — we adopt it for both axes to rescue the bad one.
-    2. **Non-square-from-warp.** On a gently warped scan the cells land a few
-       percent off square (e.g. row pitch 78px vs column 75px). Forcing the
-       *smaller* pitch onto both axes then over-counts the longer axis — a 4%
-       error accumulates into ghost rows on a tall board. So when the pitches
-       are *close* (within ``diverge_tol``), each axis keeps its own pitch.
-
-    The split is by pitch divergence: close pitches → per-axis (preserve the
-    true count on near-square warped boards); far-apart pitches → shared smaller
-    pitch (rescue a genuinely under-detected axis). Either way cells stay
-    uniform. See [[grid-parser-robustness]] for the original square-cell rescue.
-    """
-    new_h, new_v = _reconcile_by_pitch(h_lines, v_lines, warp_h, warp_w, diverge_tol)
-    # An axis whose raw peaks already form a complete, regular comb needs no
-    # rescue: re-deriving its count from the *median* gap is what hurts there.
-    # On a curled page the gaps drift (Q65: 75-81px, median 79 vs true 77.6),
-    # so span/median rounds a 30-row board down to 29.
-    #
-    # But only when its pitch agrees with the other axis. Bold every-5 lines
-    # alone also form a complete comb: on a downscaled 60-row nonogram (~20px
-    # cells, as the Android client uploads) only the bold columns survived and
-    # the comb kept them, reading the board as 8 columns wide. A comb 5x coarser than the
-    # other axis is an under-detected axis, which the pitch rescue handles.
-    h_cell = _cell_size_from_lines(h_lines)
-    v_cell = _cell_size_from_lines(v_lines)
-    if _is_complete_comb(h_lines, warp_h) and _pitch_agrees(h_cell, v_cell, diverge_tol):
-        new_h = list(h_lines)
-    if _is_complete_comb(v_lines, warp_w) and _pitch_agrees(v_cell, h_cell, diverge_tol):
-        new_v = list(v_lines)
-    return new_h, new_v
-
-
-def _pitch_agrees(own: float | None, other: float | None, tol: float) -> bool:
-    """False when ``own`` is much coarser than ``other`` (``own`` lost lines)."""
-    if own is None or other is None:
-        return True
-    return own <= other * (1 + tol)
-
-
-# Raw gaps must sit within this fraction of the median gap for the axis to be
-# trusted as-is. Partial edge rows on a slightly tight border run ~0.75 of a
-# cell; a missed line doubles a gap and a spurious one roughly halves it.
-_COMB_GAP_TOL = 0.4
-
-
-def _is_complete_comb(lines: list[int], span: int) -> bool:
-    """True when ``lines`` covers ``span`` with no missing or spurious line."""
-    if len(lines) < 4:
-        return False
-    gaps = np.diff(np.asarray(lines))
-    med = float(np.median(gaps))
-    if med <= 0 or np.any(np.abs(gaps - med) > _COMB_GAP_TOL * med):
-        return False
-    return lines[0] <= 0.5 * med and lines[-1] >= span - 0.5 * med
-
-
-def _reconcile_by_pitch(
-    h_lines: list[int], v_lines: list[int], warp_h: int, warp_w: int,
-    diverge_tol: float,
-) -> tuple[list[int], list[int]]:
-    h_cell = _cell_size_from_lines(h_lines)
-    v_cell = _cell_size_from_lines(v_lines)
-
-    candidates = [c for c in (h_cell, v_cell) if c is not None]
-    if not candidates:
-        return h_lines, v_lines
-
-    if h_cell is not None and v_cell is not None:
-        ratio = max(h_cell, v_cell) / min(h_cell, v_cell)
-        if ratio <= 1 + diverge_tol:
-            # Close pitches: near-square warp, trust each axis's own pitch.
-            n_rows = max(2, round(warp_h / h_cell))
-            n_cols = max(2, round(warp_w / v_cell))
-            new_h = _uniform_grid_snapped(np.asarray(h_lines), warp_h, n_rows)
-            new_v = _uniform_grid_snapped(np.asarray(v_lines), warp_w, n_cols)
-            return new_h, new_v
-
-    # One axis missing, or pitches far apart: adopt the smaller (least
-    # under-detected) pitch for both axes.
-    cell = min(candidates)
-    n_rows = max(2, round(warp_h / cell))
-    n_cols = max(2, round(warp_w / cell))
-
-    new_h = _uniform_grid_snapped(np.asarray(h_lines), warp_h, n_rows)
-    new_v = _uniform_grid_snapped(np.asarray(v_lines), warp_w, n_cols)
-    return new_h, new_v
-
-
-def _cell_size_from_lines(lines: list[int]) -> float | None:
-    """Estimate cell size (px) from the median spacing of detected lines."""
-    if len(lines) < 3:
-        return None
-    spacings = np.diff(np.asarray(lines))
-    med = float(np.median(spacings))
-    good = spacings[spacings > med * 0.5]
-    if len(good) == 0:
-        return None
-    return float(np.median(good))
-
-
-def _uniform_grid_snapped(
-    peaks: NDArray, total_span: int, n_cells: int
-) -> list[int]:
-    """Generate a uniform grid and snap each position to the nearest peak."""
-    cell_size = total_span / n_cells
-    tolerance = int(cell_size * 0.25)
-
-    result: list[int] = []
-    for i in range(n_cells + 1):
-        expected = int(i * cell_size)
-        if len(peaks) > 0:
-            dists = np.abs(peaks - expected)
-            min_dist = int(np.min(dists))
-            if min_dist < tolerance:
-                result.append(int(peaks[np.argmin(dists)]))
-            else:
-                result.append(expected)
-        else:
-            result.append(expected)
-    return result
-
-
 def _projection_pitch(proj: NDArray) -> float | None:
     """Grid pitch (px) from the autocorrelation of an ink projection.
 
@@ -763,6 +622,9 @@ def find_grid_lines(
        (hitori 8x8 read 8x16).
     3. No count passes (rows of black cells, a bowed page): count from the
        pitch. One axis still unknown: square cells give it.
+    3b. Cells are square, so one axis's cells far larger than the other's
+       mean that axis lost lines; it is recounted from the finer axis (see
+       ``_square_cell_recount``).
     4. Lines start evenly spaced, then each follows the ink within 12% of a
        cell (a curved page drifts ~0.1 cell).
 
@@ -789,15 +651,18 @@ def find_grid_lines(
     projs = (ink.sum(axis=1), ink.sum(axis=0))
     work_pitch = pitch * scale if pitch else None
 
+    spans = (wh, ww)
+    cands = [_lattice_candidates_1d(proj, span) for proj, span in zip(projs, spans)]
     counts: list[int | None] = []
-    for proj, span in zip(projs, (wh, ww)):
-        cands = _lattice_candidates_1d(proj, span)
-        if cands:
+    for c, span in zip(cands, spans):
+        if c:
             counts.append(
-                min(cands, key=lambda n: abs(n - span / work_pitch)) if work_pitch else max(cands)
+                min(c, key=lambda n: abs(n - span / work_pitch)) if work_pitch else max(c)
             )
         else:
             counts.append(max(2, round(span / work_pitch)) if work_pitch else None)
+    if size is None:
+        counts = _square_cell_recount(counts, cands, spans, projs)
     rows, cols = size if size else (counts[0], counts[1])
     if rows is None and cols is not None:
         rows = max(2, round(wh / (ww / cols)))
@@ -812,6 +677,46 @@ def find_grid_lines(
     h_lines = [int(round(y * sy)) for y in h_work]
     v_lines = [int(round(x * sx)) for x in v_work]
     return h_lines, v_lines
+
+
+# Two axes whose cells differ by more than this are not both right: missing
+# lines only ever make cells look larger, so the finer axis wins. Below it a
+# gently warped scan keeps each axis's own count (cells a few % off square).
+_SQUARE_CELL_TOL = 0.15
+
+
+def _square_cell_recount(
+    counts: list[int | None],
+    cands: list[list[int]],
+    spans: tuple[int, int],
+    projs: tuple[NDArray, NDArray],
+) -> list[int | None]:
+    """Recount an axis whose cells come out far larger than the other axis's.
+
+    When only the bold every-5 separators pass the lattice test on one axis
+    (a soft or downscaled nonogram: 25x5), its only passing count is a
+    sub-multiple and implies cells 5x the other axis's. Recount that axis at
+    its own autocorrelation pitch when that agrees with the finer axis's
+    cells (a scan's cells can be a few % off square: nonogram-medium is 75 x
+    73 px, and the other axis's size rounds 24.6 columns down), else at the
+    finer axis's cell size: the passing count nearest it, else span over it.
+    Boards whose axes agree are untouched.
+    """
+    if counts[0] is None or counts[1] is None:
+        return counts
+    cells = [spans[i] / counts[i] for i in (0, 1)]
+    if max(cells) <= min(cells) * (1 + _SQUARE_CELL_TOL):
+        return counts
+    coarse = int(cells[1] > cells[0])
+    cell = min(cells)
+    own = _projection_pitch(projs[coarse])
+    if own and abs(own - cell) <= _SQUARE_CELL_TOL * cell:
+        cell = own
+    target = spans[coarse] / cell
+    near = [n for n in cands[coarse] if abs(n - target) <= _SQUARE_CELL_TOL * target]
+    out = list(counts)
+    out[coarse] = min(near, key=lambda n: abs(n - target)) if near else max(2, round(target))
+    return out
 
 
 def _track_ink(proj: NDArray, lines: list[int]) -> list[int]:

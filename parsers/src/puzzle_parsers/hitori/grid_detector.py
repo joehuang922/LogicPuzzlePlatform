@@ -2,9 +2,7 @@
 
 Hitori boards are a plain rectangular grid with no regions, and every cell holds
 a printed number. The thin dividers are crisp solid rulings inside a thick outer
-border, so we locate geometry with ``detect_grid_lines`` (morphological
-projection for solid lines) and guard against an under-detected axis with
-square-cell reconciliation.
+border, so we locate geometry with the shared ``find_grid_lines``.
 
 The magazine pages photograph several puzzles at once: partial neighbouring
 boards, a worked example, and black-boxed puzzle numbers all sit beside the

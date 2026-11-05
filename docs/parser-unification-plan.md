@@ -40,8 +40,8 @@ places that do the same job their own way today and should switch to the home.
 | 3 | Normalise to a standard cell size | `grid_utils.rectify_board` / `normalize_cell_scale` (72–160 px/cell band; grid found on the normalised board, clues read at native resolution via `RectifiedBoard.to_native`) | none (masyu's own 180 px rescale removed with row 8) | **done** |
 | 4 | Find the grid lines | `grid_utils.find_grid_lines` (lattice candidates chosen by the autocorrelation pitch, at exactly 72 px/cell; lines follow the ink) | batch 1 (dashed: fillomino, hell_golf, norinori, number_link, nurikabe, pencils, ripple_effect, shakashaka, shikaku) and batch 2 (solid: akari, choco_banana, heyawake, hitori, lits, nurimaze, nuritwin, picto_link, slalom, yajilin) and batch 3 (dots/circles: tentaishow, kuralin) and batch 4 (double_choco, sudoku) migrated, then kakuro and masyu after `flatten_board` (row 8); outer lines sit on the border's ink and inner lines are tracked one pitch at a time from each border | **done** |
 | 5 | Count cells when lines are unreliable | `find_grid_lines` (lattice fit) | `tentaishow._count_cells` deleted with batch 3 | **done** |
-| 6 | Make an evenly spaced line list | `grid_utils.uniform_grid` | none in parsers (double_choco's and slalom's copies removed with row 4; pencils' removed); `grid_utils._uniform_grid_snapped` still backs the legacy `reconcile_square_lines` (nonogram only) | parsers done |
-| 7 | Enforce square-ish cells | `grid_utils.reconcile_square_lines` | used by 5 parsers; the lattice fit has its own square-cell rescue | to unify |
+| 6 | Make an evenly spaced line list | `grid_utils.uniform_grid` | none in parsers (double_choco's and slalom's copies removed with row 4; pencils' removed) | **done** |
+| 7 | Enforce square-ish cells | `find_grid_lines` (`_square_cell_recount`: an axis whose cells come out >15% larger than the other's lost lines and is recounted at its own autocorrelation pitch; one axis with no count takes the other's) | none (`reconcile_square_lines` and its five helpers deleted; nonogram's playable grid moved to `find_grid_lines`; `tests/test_nonogram_grid.py`) | **done** |
 | 8 | Follow a curved page | `flatten.flatten_board(image, board)` (traces every line through strips, remaps so they come out straight and even; flat boards pass through unchanged), called by kakuro, masyu, picto_link, fillomino | none (masyu's tracer moved here; `grid_utils.detect_uniform_grid` and its pitch + snap fallback deleted; `tests/test_flatten.py`) | **done** |
 | 9 | Trim a neighbouring puzzle's title band | `flatten._dominant_extent` (on traced lines only) | — | in flatten; straight boards rely on the border finder |
 | 10 | Hold the grid result | `board_grid.BoardGrid` | none (kuralin and tentaishow geometries now hold a `BoardGrid` plus their circles/dots) | **done** for 24 detectors |
@@ -97,6 +97,17 @@ Notes on specific rows:
   either), and every count/placement fallback that fixed it moved
   fillomino, picto_link or kakuro's own edge cells. Masyu's line finder is
   its flattening step. Both move with row 8.
+- **Row 7 (shipped).** `reconcile_square_lines` (nonogram only) worked from
+  detected peaks and mostly guarded that input's flaws (median gaps on a
+  curled page, bold every-5 lines posing as a full comb); its one idea the
+  shared finder lacked was the cross-axis check. Without it, `find_grid_lines`
+  read nonogram's playable grid as 25x5 / 35x7 on 5 of 8 runs (only the bold
+  separators passed the lattice test), the same trap as masyu-big's 5x31
+  before flattening. With `_square_cell_recount` all 8 nonogram runs read
+  right and its geometry is identical to before; the other 124 runs are
+  identical and the recount never fires on them. `detect_grid_lines` (peak
+  finder) stays only as `find_grid_lines`' last resort when no pitch and no
+  lattice count exist; it fired on none of the 132 runs.
 - **Row 8 (shipped).** Masyu's tracer, generalised, is now
   `flatten.flatten_board`: it works at 72 px/cell on a re-warp of the photo
   with a 0.75-cell margin, keeps only line-like ink (cell-sized blobs such as

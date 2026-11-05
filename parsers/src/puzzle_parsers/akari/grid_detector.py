@@ -1,8 +1,8 @@
 """Akari (Light Up) grid detection — thin orchestrator over shared grid_utils.
 
 Akari boards are a plain rectangular grid of cells with solid grid lines and no
-regions. We reuse ``detect_grid_lines`` (solid-line detection); there are no
-thick internal borders to classify.
+regions. We use the shared ``find_grid_lines``; there are no thick
+internal borders to classify.
 """
 from __future__ import annotations
 
