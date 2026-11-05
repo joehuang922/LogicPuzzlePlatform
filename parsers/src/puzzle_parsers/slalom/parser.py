@@ -304,25 +304,23 @@ class SlalomParser(PuzzleParser):
                     x2 = geom.v_lines[c + 1]
                     cv2.rectangle(vis, (x1, y1), (x2, y2), (0, 0, 200), 2)
 
-        # Draw start cell
-        sr, sc = start["row"], start["col"]
-        cx = (geom.v_lines[sc] + geom.v_lines[sc + 1]) // 2
-        cy = (geom.h_lines[sr] + geom.h_lines[sr + 1]) // 2
-        cv2.circle(vis, (cx, cy), int(geom.cell_w * 0.3), (0, 200, 0), 2)
+        # Positions through the shared doubled coordinates (odd = cell centre,
+        # even = grid line): gates run through cell centres, from the top/left
+        # line of their first cell to the bottom/right line of their last.
+        def px(dr: int, dc: int) -> tuple[int, int]:
+            x, y = geom.point(dr, dc)
+            return int(round(x)), int(round(y))
 
-        # Draw gates
+        sr, sc = start["row"], start["col"]
+        cv2.circle(vis, px(2 * sr + 1, 2 * sc + 1), int(geom.cell_w * 0.3), (0, 200, 0), 2)
+
         for gate in gates:
             color = (200, 0, 200) if gate.number else (200, 200, 0)
+            mid, lo, hi = 2 * gate.line + 1, 2 * gate.from_, 2 * gate.to + 2
             if gate.orientation == "v":
-                x = geom.v_lines[gate.line]
-                y1 = geom.h_lines[gate.from_]
-                y2 = geom.h_lines[gate.to + 1] if gate.to + 1 < len(geom.h_lines) else geom.h_lines[-1]
-                cv2.line(vis, (x, y1), (x, y2), color, 2)
+                cv2.line(vis, px(lo, mid), px(hi, mid), color, 2)
             else:
-                y = geom.h_lines[gate.line]
-                x1 = geom.v_lines[gate.from_]
-                x2 = geom.v_lines[gate.to + 1] if gate.to + 1 < len(geom.v_lines) else geom.v_lines[-1]
-                cv2.line(vis, (x1, y), (x2, y), color, 2)
+                cv2.line(vis, px(mid, lo), px(mid, hi), color, 2)
 
         cv2.imwrite(str(debug_path / "05_parsed.png"), vis)
 
