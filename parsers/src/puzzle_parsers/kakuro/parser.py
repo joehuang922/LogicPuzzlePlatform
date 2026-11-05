@@ -16,7 +16,7 @@ from puzzle_parsers.kakuro.grid_detector import (
 )
 from puzzle_parsers.kakuro.models import KakuroBoard, KakuroClueCell, KakuroEmptyCell
 from puzzle_parsers.recognition import CellRecognizer, GeminiRecognizer
-from puzzle_parsers.recognition_schemas import DUAL_INT_CELL_PROMPT
+from puzzle_parsers.cell_classify import DualInteger, DualIntegerTarget, classify_cells
 from puzzle_parsers.cell_ocr import crop_cell
 
 # A clue cell is grey-shaded (with a white diagonal and white clue discs), not
@@ -24,36 +24,6 @@ from puzzle_parsers.cell_ocr import crop_cell
 # black-dark. Mean brightness separates the two cleanly: shaded cells <= ~171,
 # plain >= ~241 on every sample at full and Android size.
 BLACK_THRESHOLD = 200
-
-
-def _coerce_int(value: object) -> int:
-    """Best-effort parse of a single clue number to a non-negative int."""
-    if isinstance(value, bool):
-        return 0
-    if isinstance(value, int):
-        return value if value > 0 else 0
-    if isinstance(value, str):
-        value = value.strip()
-        return int(value) if value.isdigit() else 0
-    return 0
-
-
-def _parse_dual_int(result: object) -> tuple[int, int]:
-    """Decode one clue cell into (top_right, bottom_left) numbers.
-
-    The recognizer emits the compact ``"TR/BL"`` string form (e.g. ``"3/5"``,
-    ``"7/0"``). A dict of ``{"top_right", "bottom_left"}`` is still accepted so a
-    model that ignores the format instruction, or an older cached response, keeps
-    working.
-    """
-    if isinstance(result, str):
-        parts = result.split("/", 1)
-        top_right = _coerce_int(parts[0])
-        bottom_left = _coerce_int(parts[1]) if len(parts) > 1 else 0
-        return top_right, bottom_left
-    if isinstance(result, dict):
-        return _coerce_int(result.get("top_right")), _coerce_int(result.get("bottom_left"))
-    return 0, 0
 
 
 class KakuroParser(PuzzleParser):
@@ -119,36 +89,24 @@ class KakuroParser(PuzzleParser):
                     row.append(KakuroEmptyCell())
             cells.append(row)
 
-        # Use LLM to read numbers in clue cells
+        # Read the clue numbers with the shared classifier. Crops are inverted
+        # (white-on-grey clue -> dark-on-light) but NOT binarized: Otsu
+        # destroys the faint, soft-focus strokes of multi-digit clues (18->1,
+        # 29->2), and inversion turns dark edge-bleed from neighbouring cells
+        # into white rather than readable strokes. Plain cells stay blank so
+        # the classifier skips them.
         if clue_cell_crops:
-            # Invert (white-on-dark clue -> dark-on-light) but DON'T binarize:
-            # Otsu thresholding destroys the faint, soft-focus pen strokes of
-            # multi-digit clues, collapsing e.g. 18->1 or 29->2. Keeping the
-            # grayscale gradient roughly doubled exact-cell OCR accuracy and
-            # eliminated run-to-run variance. Inversion still turns any dark
-            # edge-bleed from neighbouring cells into white (which blends into
-            # the montage canvas) rather than readable strokes.
-            inverted_crops = [cv2.bitwise_not(crop) for crop in clue_cell_crops]
-            cols_per_row = min(10, len(inverted_crops))
-            crop_grid: list[list[NDArray]] = []
-            for i in range(0, len(inverted_crops), cols_per_row):
-                batch = inverted_crops[i : i + cols_per_row]
-                while len(batch) < cols_per_row:
-                    batch.append(np.ones_like(inverted_crops[0]) * 255)
-                crop_grid.append(batch)
-
-            raw = self._recognizer.recognize(crop_grid, DUAL_INT_CELL_PROMPT)
-            flat_results: list[dict] = []
-            for grid_row in raw:
-                flat_results.extend(grid_row)
-
-            for i, (r, c) in enumerate(clue_cell_coords):
-                if i >= len(flat_results):
-                    break
-                top_right, bottom_left = _parse_dual_int(flat_results[i])
-                right_val = top_right if top_right > 0 else None
-                down_val = bottom_left if bottom_left > 0 else None
-                cells[r][c] = KakuroClueCell(right=right_val, down=down_val)
+            blank = np.full_like(clue_cell_crops[0], 255)
+            crops = [[blank] * cols for _ in range(rows)]
+            for (r, c), crop in zip(clue_cell_coords, clue_cell_crops):
+                crops[r][c] = cv2.bitwise_not(crop)
+            read = classify_cells(self._recognizer, crops, [DualIntegerTarget()])
+            for r, c in clue_cell_coords:
+                cls = read[r][c]
+                if isinstance(cls, DualInteger):
+                    cells[r][c] = KakuroClueCell(
+                        right=cls.top_right or None, down=cls.bottom_left or None
+                    )
 
         # Post-process: fix single-number clue cells using structural constraints.
         # A cell can only have right if there's an empty cell to its right,

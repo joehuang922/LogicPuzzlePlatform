@@ -46,11 +46,11 @@ places that do the same job their own way today and should switch to the home.
 | 9 | Trim a neighbouring puzzle's title band | `flatten._dominant_extent` (on traced lines only) | — | in flatten; straight boards rely on the border finder |
 | 10 | Hold the grid result | `board_grid.BoardGrid` | none (kuralin and tentaishow geometries now hold a `BoardGrid` plus their circles/dots) | **done** for 24 detectors |
 | 11 | Crop a cell | `cell_ocr.crop_cell(image, y1, y2, x1, x2, margin=)` (margin is where the puzzle puts content: 0 = full cell for kakuro's corner numbers, pencils, slalom; 0.1-0.25 for symbols and centre fill tests; default = the OCR crop) | none (17 hand slices in akari, double_choco, hell_golf, kakuro, masyu, nurimaze, pencils, shakashaka, shikaku, slalom, yajilin moved; nonogram's clue strips and slitherlink's dot lattice are out of scope; `tests/test_cell_ocr_contract.py`) | **done** |
-| 12 | Is this cell empty? | `recognition._is_blank` (contrast of a blurred 64 px copy; empty ≤ ~50, faintest digit ~127, cutoff 90) for every OCR cell | heyawake's ink fraction removed; shikaku dark fraction (clue disc detection) | done for OCR cells |
+| 12 | Is this cell empty? | `recognition._is_blank` for every OCR cell; `cell_classify._is_cell_non_empty` for every Gemini cell (dark fraction of the crop's centre) | heyawake's ink fraction removed; pencils' and yajilin's own tests removed with row 15; shikaku dark fraction (clue disc detection) | **done** |
 | 13 | Is this cell black / filled? | `cell_fill.is_filled` (dark fraction > 0.35): akari, shakashaka, slalom | none. Kakuro's clue cells are grey-shaded, not black (13-31% black-dark), so it keeps mean < 200 (shaded <= ~171, plain >= ~241); "is this cell shaded" is a separate job, see row 13b | **done** |
 | 13b | Is this cell shaded (light grey vs white)? | `cell_fill.shaded_cells(crops)` (60th percentile of each crop averaged to 24 px, i.e. the paper and not the digit; Otsu split alternating with a plane fit of the white-paper lighting): double_choco | none. Kakuro keeps its fixed mean < 200: its clue cells are dark grey, separated by ~70 grey levels, and the adaptive split broke on its big photo | **done** |
 | 14 | Read a plain number in a cell | `cell_ocr.read_grid_clues` / `read_cells` (EasyOCR recogniser on a located glyph; clue rules `allow_multi_digits`, `allow_zero`, `max_value`) | none: akari, heyawake, nuritwin, shakashaka, shikaku, slitherlink moved off Gemini | **done** for 17 |
-| 15 | Read composite cell content (arrows, two numbers, symbols, white-on-black) | `recognition.GeminiRecognizer` montage + `cell_classify` + prompts in `recognition_schemas.py` | — | shared; confirm all callers |
+| 15 | Read composite cell content (arrows, two numbers, symbols, white-on-black) | `cell_classify.classify_cells` (empty-cell skip, labelled 64 px montage in batches of 30, prompt from target types, answers matched by label; Gemini's timeout and fallback): kakuro, nurimaze, pencils, yajilin, slalom, hell_golf | none (kakuro, nurimaze, pencils, yajilin each built their own montage, prompt and answer parsing; `tests/test_cell_classify.py`) | **done** |
 | 16 | Measure room-wall thickness | `grid_utils.classify_border_thickness(gray, grid)` (width of the run through the line, sub-pixel, 40th percentile of 7 points; Otsu split; dead-end repair) | none (the six `classify_borders` wrappers deleted; `tests/test_wall_contract.py`) | **done** |
 | 17 | Find circles and dots | `ring_probe.probe_ring` / `fill_ratio` (ring test at lattice points; kuralin and tentaishow) | masyu `_detect_circles` (3x3 ink topology per cell) | 2 done; masyu next |
 | 18 | Address cells, edges and corners | `BoardGrid.point(dr, dc)` / `BoardGrid.doubled(x, y)` (doubled coordinates through the found lines; kuralin, tentaishow, slalom's overlay) | none in parsing: slalom finds gates cell by cell (`detect_gate_cells`), and the remaining hand-computed centres are debug overlays (row 19) | **done** |
@@ -98,6 +98,25 @@ Notes on specific rows:
   either), and every count/placement fallback that fixed it moved
   fillomino, picto_link or kakuro's own edge cells. Masyu's line finder is
   its flattening step. Both move with row 8.
+- **Rows 12 + 15 (shipped).** Kakuro, nurimaze, pencils and yajilin called
+  the raw recognizer with their own montage, prompt, empty-cell test and
+  answer decoding; they now use `classify_cells` like slalom and hell_golf.
+  Getting there changed the shared pipeline: it now goes through Gemini's
+  timeout and model fallback (it called the model directly) and retries
+  malformed JSON (a HEAD yajilin run crashed on it); answers carry their
+  cell label and are matched by it (any separator: a kakuro batch came back
+  as "6.10"); tiles are drawn at 64 px (yajilin-big crops are ~22 px and the
+  labels overran them); and batches hold 30 cells. That last one mattered
+  most: yajilin-big's 181 arrow clues in one montage came back with 25-40
+  directions wrong on every run, while HEAD sent nearly every cell (1373,
+  mostly empty) in batches of 200 and stayed within 2-10 of itself; at
+  20-60 per batch the new path matches it. Nurimaze needed a 0.1 crop: at
+  0.2 the shared empty test missed hollow circles (3 of 6, 11 of 50).
+  Real Gemini runs, every sample at full and Android size: kakuro big keys
+  5-7 -> 5 errors on all eight runs, medium and small 0; pencils (key 0),
+  nurimaze, slalom, hell_golf identical to HEAD; yajilin medium and small
+  identical, big 5 / 9 cells differ and by eye the new read is right on 12
+  of them, HEAD on 1, both wrong on 1. Total time 379 s -> 303 s.
 - **Row 13 (shipped).** Slalom's wall test (dark < 128 over 40%) moved to
   `is_filled`: walls measure 0.57+ dark and empty cells 0.33 or less, so
   every slalom run (and every kakuro run, untouched) is identical. Kakuro

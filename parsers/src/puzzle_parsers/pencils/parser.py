@@ -11,7 +11,13 @@ from puzzle_parsers.debug_overlay import save_cell_labels
 from puzzle_parsers.base import PuzzleParser
 from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.recognition import GeminiRecognizer, CellRecognizer
-from puzzle_parsers.recognition_schemas import PENCILS_CLUE_PROMPT
+from puzzle_parsers.cell_classify import (
+    Integer,
+    IntegerTarget,
+    PencilHead,
+    PencilHeadTarget,
+    classify_cells,
+)
 from puzzle_parsers.pencils.grid_detector import detect_pencils_grid
 from puzzle_parsers.pencils.models import PencilsBoard
 from puzzle_parsers.cell_ocr import crop_cell
@@ -88,64 +94,9 @@ class PencilsParser(PuzzleParser):
         return PencilsBoard(cells=cells)
 
     def _recognize_with_montage(self, cell_crops: list[list[np.ndarray]]) -> list[list[int]]:
-        """Recognize cells using the shared filtered-montage strategy.
-
-        Filters out empty cells using a pixel heuristic, packs the non-empty
-        crops into a compact rectangular montage, and delegates to the shared
-        ``recognizer.recognize`` path (row-batched, per-row length-validated).
-        Results are mapped back to the full grid by coordinate. This mirrors the
-        shikaku/heyawake parsers and avoids the fragility of asking the model to
-        emit one exact-length flat array for hundreds of tiles at once.
-        """
-        num_rows = len(cell_crops)
-        num_cols = len(cell_crops[0])
-
-        # Identify non-empty cells using central ROI pixel density.
-        non_empty_coords: list[tuple[int, int]] = []
-        non_empty_crops: list[np.ndarray] = []
-        for r in range(num_rows):
-            for c in range(num_cols):
-                cell = cell_crops[r][c]
-                h, w = cell.shape[:2]
-                center = crop_cell(cell, 0, h, 0, w, margin=0.15)
-                nonwhite = np.sum(center < 200)
-                if nonwhite / center.size > 0.02:
-                    non_empty_coords.append((r, c))
-                    non_empty_crops.append(cell)
-
-        # Initialize grid with zeros (empty cells).
-        grid = [[0] * num_cols for _ in range(num_rows)]
-
-        if not non_empty_crops:
-            return grid
-
-        # Pack candidate crops into a compact grid montage (~10 columns). The
-        # last row is padded to a full rectangle by repeating a real crop (never
-        # a blank tile): PENCILS_CLUE_PROMPT tells the model every cell has
-        # content, so padding with blanks would make the model return a short
-        # final row and fail recognize()'s rectangularity check. The extra
-        # recognized values map past non_empty_coords and are ignored below.
-        cols_per_row = min(10, len(non_empty_crops))
-        crop_grid: list[list[np.ndarray]] = []
-        for i in range(0, len(non_empty_crops), cols_per_row):
-            row_crops = non_empty_crops[i : i + cols_per_row]
-            while len(row_crops) < cols_per_row:
-                row_crops.append(non_empty_crops[0])
-            crop_grid.append(row_crops)
-
-        raw = self.recognizer.recognize(crop_grid, PENCILS_CLUE_PROMPT)
-        flat: list[int] = []
-        for row in raw:
-            flat.extend(row)
-
-        for i, (r, c) in enumerate(non_empty_coords):
-            if i >= len(flat):
-                break
-            val = flat[i]
-            if isinstance(val, int) and val >= -4 and val != 0:
-                grid[r][c] = val
-
-        return grid
+        """Read clue numbers and pencil heads with the shared classifier."""
+        read = classify_cells(self.recognizer, cell_crops, [IntegerTarget(), PencilHeadTarget()])
+        return [[_cell_value(cls) for cls in row] for row in read]
 
     def validate(self, data: PuzzleData) -> bool:
         if data.puzzle_type != self.puzzle_type:
@@ -158,3 +109,16 @@ class PencilsParser(PuzzleParser):
             return True
         except Exception:
             return False
+
+
+# A pencil head is stored as a negative int by the direction its tip points.
+_HEAD_VALUE = {"up": -1, "down": -2, "left": -3, "right": -4}
+
+
+def _cell_value(cls: object) -> int:
+    """Board value of one classified cell: clue number, head (-1..-4) or 0."""
+    if isinstance(cls, Integer) and cls.value > 0:
+        return cls.value
+    if isinstance(cls, PencilHead):
+        return _HEAD_VALUE.get(cls.direction, 0)
+    return 0

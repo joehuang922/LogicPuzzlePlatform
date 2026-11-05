@@ -17,8 +17,17 @@ from puzzle_parsers.nurimaze.grid_detector import (
 )
 from puzzle_parsers.nurimaze.models import NurimazeBoard, NurimazeGrids
 from puzzle_parsers.recognition import CellRecognizer, GeminiRecognizer
-from puzzle_parsers.recognition_schemas import SYMBOL_CELL_PROMPT
+from puzzle_parsers.cell_classify import Symbol, SymbolTarget, classify_cells
 from puzzle_parsers.cell_ocr import crop_cell
+
+
+# Cell values: 0 empty, 1 circle, 2 triangle, 3 start (S), 4 goal (G).
+_SYMBOLS = SymbolTarget({
+    1: "circle (hollow ring)",
+    2: "triangle (hollow triangle)",
+    3: "the letter S (start)",
+    4: "the letter G (goal)",
+})
 
 
 class NurimazeParser(PuzzleParser):
@@ -68,14 +77,15 @@ class NurimazeParser(PuzzleParser):
             [
                 crop_cell(
                     warped_gray, geom.h_lines[r], geom.h_lines[r + 1],
-                    geom.v_lines[c], geom.v_lines[c + 1], margin=0.2,
+                    geom.v_lines[c], geom.v_lines[c + 1], margin=0.1,
                 )
                 for c in range(cols)
             ]
             for r in range(rows)
         ]
 
-        return self._recognizer.recognize(cell_crops, SYMBOL_CELL_PROMPT)
+        read = classify_cells(self._recognizer, cell_crops, [_SYMBOLS])
+        return [[cls.code if isinstance(cls, Symbol) else 0 for cls in row] for row in read]
 
     def validate(self, data: PuzzleData) -> bool:
         if data.puzzle_type != self.puzzle_type:

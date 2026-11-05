@@ -372,6 +372,11 @@ class GeminiRecognizer(CellRecognizer):
         response = self._generate([pil_image, prompt])
         return parse_json_response(response.text)
 
+    def recognize_image(self, image: Image.Image, prompt: str) -> object:
+        """One in-memory image under the same timeout and model fallback."""
+        response = self._generate([image, prompt])
+        return parse_json_response(response.text)
+
 
 class ClaudeRecognizer(CellRecognizer):
     """Cell recognizer using Anthropic Claude Vision API."""

@@ -14,10 +14,16 @@ from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.yajilin.grid_detector import detect_yajilin_grid
 from puzzle_parsers.yajilin.models import YajilinBoard, YajilinClue
 from puzzle_parsers.recognition import CellRecognizer, GeminiRecognizer
-from puzzle_parsers.recognition_schemas import DIRECTED_INT_CELL_PROMPT
+from puzzle_parsers.cell_classify import (
+    DirectedInteger,
+    DirectedIntegerTarget,
+    Integer,
+    IntegerTarget,
+    classify_cells,
+)
 from puzzle_parsers.cell_ocr import crop_cell
 
-EMPTY_THRESHOLD = 0.02
+_DIRECTIONS = ("up", "down", "left", "right")
 
 
 class YajilinParser(PuzzleParser):
@@ -54,63 +60,30 @@ class YajilinParser(PuzzleParser):
         rows = geom.rows
         cols = geom.cols
 
-        # Extract cell crops and identify which cells have content
-        cell_crops: list[list[NDArray]] = []
-        content_mask: list[list[bool]] = []
-        for r in range(rows):
-            crop_row = []
-            mask_row = []
-            for c in range(cols):
-                # Shrink slightly to avoid grid line artifacts
-                cell = crop_cell(
+        # Shrink slightly to avoid grid line artifacts.
+        cell_crops = [
+            [
+                crop_cell(
                     geom.warped_gray, geom.h_lines[r], geom.h_lines[r + 1],
                     geom.v_lines[c], geom.v_lines[c + 1], margin=0.1,
                 )
-                _, binary = cv2.threshold(cell, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-                has_content = np.sum(binary > 0) / binary.size > EMPTY_THRESHOLD
-                crop_row.append(cell)
-                mask_row.append(has_content)
-            cell_crops.append(crop_row)
-            content_mask.append(mask_row)
-
-        # Collect non-empty cells for LLM recognition
-        clue_coords: list[tuple[int, int]] = []
-        clue_crops: list[NDArray] = []
+                for c in range(cols)
+            ]
+            for r in range(rows)
+        ]
+        read = classify_cells(
+            self._recognizer, cell_crops, [DirectedIntegerTarget(), IntegerTarget()]
+        )
+        cells: list[list[Optional[YajilinClue]]] = [[None] * cols for _ in range(rows)]
         for r in range(rows):
             for c in range(cols):
-                if content_mask[r][c]:
-                    clue_coords.append((r, c))
-                    clue_crops.append(cell_crops[r][c])
-
-        cells: list[list[Optional[YajilinClue]]] = [[None] * cols for _ in range(rows)]
-
-        if clue_crops:
-            # Assemble into grid for batch recognition
-            cols_per_row = min(10, len(clue_crops))
-            crop_grid: list[list[NDArray]] = []
-            for i in range(0, len(clue_crops), cols_per_row):
-                batch = clue_crops[i:i + cols_per_row]
-                while len(batch) < cols_per_row:
-                    batch.append(np.ones_like(clue_crops[0]) * 255)
-                crop_grid.append(batch)
-
-            raw = self._recognizer.recognize(crop_grid, DIRECTED_INT_CELL_PROMPT)
-            flat_results: list[dict] = []
-            for grid_row in raw:
-                flat_results.extend(grid_row)
-
-            for i, (r, c) in enumerate(clue_coords):
-                if i >= len(flat_results):
-                    break
-                result = flat_results[i]
-                if isinstance(result, dict):
-                    value = result.get("value", 0)
-                    direction = result.get("direction", "")
-                    if isinstance(value, int) and direction in ("up", "down", "left", "right"):
-                        cells[r][c] = YajilinClue(dir=direction, num=value)
-                    elif isinstance(value, int) and value > 0:
-                        # Has a number but direction not recognized — mark as clue anyway
-                        cells[r][c] = YajilinClue(dir="right", num=value)
+                cls = read[r][c]
+                if isinstance(cls, DirectedInteger) and cls.direction in _DIRECTIONS:
+                    cells[r][c] = YajilinClue(dir=cls.direction, num=cls.value)
+                elif isinstance(cls, (DirectedInteger, Integer)) and cls.value > 0:
+                    # A number whose arrow wasn't read: keep the clue, the
+                    # editor fixes the direction.
+                    cells[r][c] = YajilinClue(dir="right", num=cls.value)
 
         if debug_path:
             save_cell_labels(

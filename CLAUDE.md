@@ -42,7 +42,11 @@ This is a solo project. Do not create pull requests or feature branches.
   on light (white on black, on a disc) converts its crop to dark-on-light first.
 - Gemini stays only for cells EasyOCR can't represent: arrows, symbols, two
   numbers per cell, circled vs plain numbers (pencils, yajilin, nurimaze,
-  hell_golf, kakuro, slalom).
+  hell_golf, kakuro, slalom). Those cells go through
+  `cell_classify.classify_cells(recognizer, crops, targets)` with its target
+  types (`DualIntegerTarget`, `DirectedIntegerTarget`, `SymbolTarget`, ...);
+  no parser builds its own montage, prompt or empty-cell test. Blank a crop
+  to white to keep a cell out. The same contract tests enforce it.
 - Such a parser's type id must be in `_OCR_TYPES` in `parsers/lambda_handler.py`.
   `parsers/tests/test_cell_ocr_contract.py` enforces both rules.
 - Every parser crops a cell with `cell_ocr.crop_cell(image, y1, y2, x1, x2,

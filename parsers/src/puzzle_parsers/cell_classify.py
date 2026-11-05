@@ -20,7 +20,9 @@ from __future__ import annotations
 
 import io
 import json
+import re
 from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Generic, TypeVar
 
@@ -29,15 +31,20 @@ import numpy as np
 from numpy.typing import NDArray
 from PIL import Image
 
-from puzzle_parsers.llm_vision import parse_json_response
-from puzzle_parsers.recognition import (
-    CellRecognizer,
-    ClaudeRecognizer,
-    GeminiRecognizer,
-    log_gemini_usage,
-)
+from puzzle_parsers.recognition import CellRecognizer
 
 T = TypeVar("T")
+
+
+def _nonneg_int(value: object) -> int:
+    """A model's number as a non-negative int; anything unreadable is 0."""
+    if isinstance(value, bool):
+        return 0
+    if isinstance(value, (int, float)):
+        return max(0, int(value))
+    if isinstance(value, str) and value.strip().isdigit():
+        return int(value.strip())
+    return 0
 
 
 # ─── Result types ───
@@ -137,7 +144,7 @@ class IntegerTarget(TargetSpec[Integer]):
         )
 
     def parse(self, raw: dict) -> Integer:
-        return Integer(value=int(raw["value"]))
+        return Integer(value=_nonneg_int(raw.get("value")))
 
 
 class CircledIntegerTarget(TargetSpec[CircledInteger]):
@@ -153,7 +160,7 @@ class CircledIntegerTarget(TargetSpec[CircledInteger]):
         )
 
     def parse(self, raw: dict) -> CircledInteger:
-        return CircledInteger(value=int(raw["value"]))
+        return CircledInteger(value=_nonneg_int(raw.get("value")))
 
 
 class DirectedIntegerTarget(TargetSpec[DirectedInteger]):
@@ -164,13 +171,14 @@ class DirectedIntegerTarget(TargetSpec[DirectedInteger]):
     @property
     def prompt_fragment(self) -> str:
         return (
-            "A number with a directional arrow (↑↓←→) indicating a direction. "
-            "The arrow may appear above, below, or beside the number. "
+            "A number with an arrow (↑↓←→). The direction is the way the "
+            "arrowhead POINTS, never where the arrow sits: an arrow drawn above "
+            "the number and pointing right is \"right\", not \"up\". "
             'Report as {"type":"directed_integer","value":N,"direction":"up"|"down"|"left"|"right"}.'
         )
 
     def parse(self, raw: dict) -> DirectedInteger:
-        return DirectedInteger(value=int(raw["value"]), direction=raw["direction"])
+        return DirectedInteger(value=_nonneg_int(raw.get("value")), direction=str(raw.get("direction", "")))
 
 
 class DualIntegerTarget(TargetSpec[DualInteger]):
@@ -182,12 +190,17 @@ class DualIntegerTarget(TargetSpec[DualInteger]):
     def prompt_fragment(self) -> str:
         return (
             "A cell split by a diagonal line from upper-left to lower-right, "
-            "with a number in the top-right half and a number in the bottom-left half. "
+            "with a number in the top-right half and/or a number in the bottom-left half. "
+            "Use 0 for a half with no number; a lone number not split by a diagonal "
+            "counts as top-right. "
             'Report as {"type":"dual_integer","top_right":N,"bottom_left":M}.'
         )
 
     def parse(self, raw: dict) -> DualInteger:
-        return DualInteger(top_right=int(raw["top_right"]), bottom_left=int(raw["bottom_left"]))
+        return DualInteger(
+            top_right=_nonneg_int(raw.get("top_right")),
+            bottom_left=_nonneg_int(raw.get("bottom_left")),
+        )
 
 
 class PencilHeadTarget(TargetSpec[PencilHead]):
@@ -205,7 +218,7 @@ class PencilHeadTarget(TargetSpec[PencilHead]):
         )
 
     def parse(self, raw: dict) -> PencilHead:
-        return PencilHead(direction=raw["direction"])
+        return PencilHead(direction=str(raw.get("direction", "")))
 
 
 class DashedGateTarget(TargetSpec[DashedGate]):
@@ -250,7 +263,7 @@ class SymbolTarget(TargetSpec[Symbol]):
         return "\n".join(lines)
 
     def parse(self, raw: dict) -> Symbol:
-        return Symbol(code=int(raw["code"]))
+        return Symbol(code=_nonneg_int(raw.get("code")))
 
 
 # ─── Prompt assembly ───
@@ -267,7 +280,9 @@ _PROMPT_TEMPLATE = (
     "{target_descriptions}\n\n"
     "There are {num_cells} cells to classify. "
     "Respond with ONLY a flat JSON array of {num_cells} objects, "
-    "in the order shown (left-to-right, top-to-bottom). "
+    "in the order shown (left-to-right, top-to-bottom). Every object also "
+    "carries \"cell\": the row,col label printed above its box, copied exactly "
+    "(e.g. {{\"cell\":\"12,5\",\"type\":\"empty\"}}). "
     "No explanation, just the JSON array."
 )
 
@@ -312,6 +327,9 @@ def _is_cell_non_empty(cell: NDArray, threshold: float = 0.02) -> bool:
     return (nonwhite / center.size) > threshold
 
 
+_TILE_PX = 64
+
+
 def _build_montage(
     non_empty: list[tuple[int, int, NDArray]],
     cols_per_row: int = 10,
@@ -320,9 +338,11 @@ def _build_montage(
     num_cells = len(non_empty)
     num_montage_rows = (num_cells + cols_per_row - 1) // cols_per_row
 
-    sample = non_empty[0][2]
-    native_h, native_w = sample.shape[:2]
-    tile_size = min(64, native_h, native_w)
+    # Every tile is drawn at 64 px: small crops are scaled up so the model
+    # sees the glyph (yajilin-big crops are ~22 px, and at native size its
+    # arrows were misread run after run) and so a "row,col" label fits above
+    # its own tile instead of running into the next one.
+    tile_size = _TILE_PX
     border = 2
     label_h = 14
     cell_w = tile_size + border * 2
@@ -351,11 +371,11 @@ def _build_montage(
         cv2.rectangle(canvas, (bx0, by0), (bx1, by1), (0, 0, 200), border)
 
         ch, cw = cell.shape[:2]
-        if ch > tile_size or cw > tile_size:
-            scale = min(tile_size / ch, tile_size / cw)
-            resized = cv2.resize(cell, (int(cw * scale), int(ch * scale)))
-        else:
-            resized = cell
+        scale = min(tile_size / ch, tile_size / cw)
+        size = (max(1, int(cw * scale)), max(1, int(ch * scale)))
+        resized = cv2.resize(
+            cell, size, interpolation=cv2.INTER_AREA if scale < 1 else cv2.INTER_CUBIC
+        )
         if len(resized.shape) == 2:
             resized = cv2.cvtColor(resized, cv2.COLOR_GRAY2BGR)
         new_h, new_w = resized.shape[:2]
@@ -375,31 +395,50 @@ def _build_montage(
 
 
 def _call_recognizer(recognizer: CellRecognizer, montage_bytes: bytes, prompt: str) -> list:
-    """Send a pre-built montage image to the recognizer and get parsed JSON back."""
-    import base64
+    """Send a montage through the recognizer (Gemini: its timeout and fallback)."""
+    return recognizer.recognize_image(Image.open(io.BytesIO(montage_bytes)), prompt)
 
-    montage_image = Image.open(io.BytesIO(montage_bytes))
 
-    if isinstance(recognizer, GeminiRecognizer):
-        response = recognizer._model.generate_content([montage_image, prompt])
-        log_gemini_usage(response, recognizer._model, label="classify")
-        return parse_json_response(response.text)
-    elif isinstance(recognizer, ClaudeRecognizer):
-        b64_image = base64.b64encode(montage_bytes).decode("utf-8")
-        response = recognizer._client.messages.create(
-            model=recognizer._model,
-            max_tokens=4096,
-            messages=[{
-                "role": "user",
-                "content": [
-                    {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": b64_image}},
-                    {"type": "text", "text": prompt},
-                ],
-            }],
-        )
-        return parse_json_response(response.content[0].text)
-    else:
-        raise TypeError(f"Unsupported recognizer type: {type(recognizer).__name__}")
+def _classify_batch(
+    recognizer: CellRecognizer,
+    batch: list[tuple[int, int, NDArray]],
+    targets: list[TargetSpec],
+) -> list[CellClassification]:
+    montage_bytes = _build_montage(batch)
+    prompt = _build_prompt(targets, len(batch))
+    # The model occasionally returns malformed JSON; one retry usually clears it.
+    try:
+        raw = _call_recognizer(recognizer, montage_bytes, prompt)
+    except json.JSONDecodeError as e:
+        print(f"  [classify_cells] malformed JSON from recognizer ({e}); retrying once")
+        raw = _call_recognizer(recognizer, montage_bytes, prompt)
+    if not isinstance(raw, list):
+        raise ValueError(f"Expected list of results, got {type(raw)}")
+    return [_parse_result(item, targets) for item in _align_answers(raw, batch)]
+
+
+def _align_answers(raw: list, batch: list[tuple[int, int, NDArray]]) -> list:
+    """One answer per batch cell, matched by the ``cell`` label it carries.
+
+    In a flat list of answers the model sometimes skips or repeats one, and
+    matching by position then shifts every later answer onto the wrong cell.
+    Answers are matched by their label's two numbers, whatever the separator
+    (a whole kakuro batch came back as "6.10"). When under half the batch
+    matches that way, position order is used instead; a cell left without an
+    answer reads as empty.
+    """
+    index = {(r, c): i for i, (r, c, _) in enumerate(batch)}
+    out: list = [None] * len(batch)
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        nums = re.findall(r"\d+", str(item.get("cell", "")))
+        i = index.get((int(nums[0]), int(nums[1]))) if len(nums) == 2 else None
+        if i is not None and out[i] is None:
+            out[i] = item
+    if sum(x is not None for x in out) * 2 < len(batch):
+        out = list(raw[: len(batch)]) + [None] * max(0, len(batch) - len(raw))
+    return [x if x is not None else {"type": "empty"} for x in out]
 
 
 # ─── Main API ───
@@ -411,6 +450,7 @@ def classify_cells(
     targets: list[TargetSpec],
     *,
     empty_threshold: float = 0.02,
+    max_cells_per_batch: int = 30,
 ) -> list[list[CellClassification]]:
     """Classify cell contents using LLM vision.
 
@@ -423,6 +463,9 @@ def classify_cells(
         cell_crops: 2D list of cell ROI images.
         targets: Which content types to detect.
         empty_threshold: Pixel density threshold for non-empty detection.
+            A cell the caller must not have read (e.g. a plain wall) can be
+            blanked to white, which this filter always skips.
+        max_cells_per_batch: Most cells sent in one montage.
 
     Returns:
         2D list matching input dimensions, with a CellClassification per cell.
@@ -447,29 +490,22 @@ def classify_cells(
     if not non_empty:
         return grid
 
-    # Build montage and prompt
-    montage_bytes = _build_montage(non_empty)
-    prompt = _build_prompt(targets, len(non_empty))
+    # Small batches, sent concurrently. A montage packed with content tiles
+    # overloads the model: yajilin-big's 181 arrow clues in one call came back
+    # with 25-40 directions wrong, run after run; in batches of 20-60 its
+    # reads match the old one-call-per-200-cells path (2-5 cells, within that
+    # path's own run-to-run spread) and finish faster. The parse waits only
+    # for the slowest batch.
+    n_batches = -(-len(non_empty) // max_cells_per_batch)
+    size = -(-len(non_empty) // n_batches)
+    batches = [non_empty[i : i + size] for i in range(0, len(non_empty), size)]
+    if len(batches) == 1:
+        results = [_classify_batch(recognizer, batches[0], targets)]
+    else:
+        with ThreadPoolExecutor(max_workers=len(batches)) as pool:
+            results = list(pool.map(lambda b: _classify_batch(recognizer, b, targets), batches))
 
-    # Call LLM. The model occasionally returns malformed JSON; one retry
-    # usually clears it, and otherwise the parse fails as before.
-    try:
-        raw_results = _call_recognizer(recognizer, montage_bytes, prompt)
-    except json.JSONDecodeError as e:
-        print(f"  [classify_cells] malformed JSON from recognizer ({e}); retrying once")
-        raw_results = _call_recognizer(recognizer, montage_bytes, prompt)
-
-    if not isinstance(raw_results, list):
-        raise ValueError(
-            f"Expected list of results, got {type(raw_results)}"
-        )
-
-    # Tolerate slight count mismatch from LLM (truncate excess, pad missing)
-    if len(raw_results) < len(non_empty):
-        raw_results.extend([{"type": "empty"}] * (len(non_empty) - len(raw_results)))
-
-    # Map back to grid
-    for idx, (r, c, _) in enumerate(non_empty):
-        grid[r][c] = _parse_result(raw_results[idx], targets)
-
+    for batch, batch_results in zip(batches, results):
+        for (r, c, _), cls in zip(batch, batch_results):
+            grid[r][c] = cls
     return grid
