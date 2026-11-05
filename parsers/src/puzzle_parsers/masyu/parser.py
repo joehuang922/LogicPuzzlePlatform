@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 from PIL import Image
 
+from puzzle_parsers.debug_overlay import save_cell_labels
 from puzzle_parsers.base import PuzzleParser
 from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.masyu.grid_detector import detect_masyu_grid
@@ -60,19 +61,8 @@ class MasyuParser(PuzzleParser):
         )
 
         if debug_path:
-            vis = geom.warped.copy()
-            labels = {0: ".", 1: "W", 2: "B"}
-            for r in range(rows):
-                for c in range(cols):
-                    val = cells[r][c]
-                    label = labels.get(val, "?")
-                    cx = (geom.v_lines[c] + geom.v_lines[c + 1]) // 2
-                    cy = (geom.h_lines[r] + geom.h_lines[r + 1]) // 2
-                    cv2.putText(
-                        vis, label, (cx - 5, cy + 5),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255), 1,
-                    )
-            cv2.imwrite(str(debug_path / "04_classified.png"), vis)
+            labels = [[{0: '.', 1: 'W', 2: 'B'}.get(v, '?') for v in row] for row in cells]
+            save_cell_labels(geom, labels, debug_path / "04_classified.png")
 
         return MasyuBoard(cells=cells)
 

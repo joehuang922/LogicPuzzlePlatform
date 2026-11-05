@@ -8,6 +8,7 @@ import numpy as np
 from numpy.typing import NDArray
 from PIL import Image
 
+from puzzle_parsers.debug_overlay import save_cell_labels, RED, GREEN
 from puzzle_parsers.base import PuzzleParser
 from puzzle_parsers.models import PuzzleData
 from puzzle_parsers.yajilin.grid_detector import detect_yajilin_grid
@@ -112,24 +113,12 @@ class YajilinParser(PuzzleParser):
                         cells[r][c] = YajilinClue(dir="right", num=value)
 
         if debug_path:
-            vis = geom.warped.copy()
-            for r in range(rows):
-                for c in range(cols):
-                    cx = (geom.v_lines[c] + geom.v_lines[c + 1]) // 2
-                    cy = (geom.h_lines[r] + geom.h_lines[r + 1]) // 2
-                    clue = cells[r][c]
-                    if clue:
-                        label = f"{clue.num}{clue.dir[0]}"
-                        cv2.putText(
-                            vis, label, (cx - 10, cy + 5),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 255), 1,
-                        )
-                    else:
-                        cv2.putText(
-                            vis, ".", (cx - 2, cy + 2),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0, 200, 0), 1,
-                        )
-            cv2.imwrite(str(debug_path / "03_classified.png"), vis)
+            save_cell_labels(
+                geom,
+                [[f"{v.num}{v.dir[0]}" if v else '.' for v in row] for row in cells],
+                debug_path / "03_classified.png",
+                colors=[[RED if v else GREEN for v in row] for row in cells],
+            )
 
         return YajilinBoard(cells=cells)
 

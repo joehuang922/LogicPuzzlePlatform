@@ -54,7 +54,7 @@ places that do the same job their own way today and should switch to the home.
 | 16 | Measure room-wall thickness | `grid_utils.classify_border_thickness(gray, grid)` (width of the run through the line, sub-pixel, 40th percentile of 7 points; Otsu split; dead-end repair) | none (the six `classify_borders` wrappers deleted; `tests/test_wall_contract.py`) | **done** |
 | 17 | Find circles and dots | `ring_probe.probe_ring` / `fill_ratio` (ring test at lattice points; kuralin and tentaishow) | masyu `_detect_circles` (3x3 ink topology per cell) | 2 done; masyu next |
 | 18 | Address cells, edges and corners | `BoardGrid.point(dr, dc)` / `BoardGrid.doubled(x, y)` (doubled coordinates through the found lines; kuralin, tentaishow, slalom's overlay) | none in parsing: slalom finds gates cell by cell (`detect_gate_cells`), and the remaining hand-computed centres are debug overlays (row 19) | **done** |
-| 19 | Draw debug overlays | — | 9 copies of the `04_cells.png` digit overlay | to extract |
+| 19 | Draw debug overlays | `debug_overlay.save_cell_labels(grid, labels, path, colors=)` (label in each cell's top-left corner, scaled to the cell) | none (12 hand-drawn copies in choco_banana, double_choco, fillomino, hitori, masyu, number_link, nurikabe, pencils, picto_link, ripple_effect, shikaku, yajilin replaced; slitherlink and combo_sudoku out of scope; `tests/test_debug_overlay.py`) | **done** |
 | 20 | Read title/author around the board | `PuzzleParser` + `metadata_extract` | — | shared |
 | 21 | Report parse-quality problems | — | none (see "Sanity checks") | new |
 

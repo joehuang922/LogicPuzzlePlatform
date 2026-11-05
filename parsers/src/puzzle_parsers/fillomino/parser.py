@@ -8,6 +8,7 @@ import cv2
 import numpy as np
 from PIL import Image
 
+from puzzle_parsers.debug_overlay import save_cell_labels
 from puzzle_parsers.base import PuzzleParser, timed
 from puzzle_parsers.cell_ocr import read_grid_clues
 from puzzle_parsers.models import PuzzleData
@@ -48,8 +49,6 @@ class FillominoParser(PuzzleParser):
             geom = detect_fillomino_grid(img_array, debug_dir=debug_dir)
         warped_gray = cv2.cvtColor(geom.warped, cv2.COLOR_BGR2GRAY)
 
-        rows = geom.rows
-        cols = geom.cols
         h_lines = geom.h_lines
         v_lines = geom.v_lines
 
@@ -60,23 +59,10 @@ class FillominoParser(PuzzleParser):
         )
 
         if debug_path:
-            vis = geom.warped.copy()
-            for r in range(rows):
-                for c in range(cols):
-                    num = cells[r][c]
-                    if num > 0:
-                        y1 = h_lines[r]
-                        x1 = v_lines[c]
-                        cv2.putText(
-                            vis,
-                            str(num),
-                            (x1 + 5, y1 + 20),
-                            cv2.FONT_HERSHEY_SIMPLEX,
-                            0.4,
-                            (0, 0, 255),
-                            1,
-                        )
-            cv2.imwrite(str(debug_path / "04_cells.png"), vis)
+            save_cell_labels(
+                geom, [[str(v) if v > 0 else None for v in row] for row in cells],
+                debug_path / "04_cells.png",
+            )
 
         return FillominoBoard(cells=cells)
 

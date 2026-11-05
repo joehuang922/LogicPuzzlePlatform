@@ -8,6 +8,7 @@ import cv2
 import numpy as np
 from PIL import Image
 
+from puzzle_parsers.debug_overlay import save_cell_labels
 from puzzle_parsers.base import PuzzleParser
 from puzzle_parsers.cell_fill import shaded_cells
 from puzzle_parsers.cell_ocr import crop_cell, read_cells
@@ -79,15 +80,8 @@ class DoubleChocoParser(PuzzleParser):
         ]
 
         if debug_path:
-            vis = geom.warped.copy()
-            for r in range(rows):
-                for c in range(cols):
-                    color, num = cells[r][c]
-                    y1 = h_lines[r]
-                    x1 = v_lines[c]
-                    label = f"{'G' if color == 1 else 'W'}{num if num > 0 else ''}"
-                    cv2.putText(vis, label, (x1 + 5, y1 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255), 1)
-            cv2.imwrite(str(debug_path / "04_cells.png"), vis)
+            labels = [[('G' if col else 'W') + (str(n) if n > 0 else '') for col, n in row] for row in cells]
+            save_cell_labels(geom, labels, debug_path / "04_cells.png")
 
         return DoubleChocoBoard(cells=cells)
 

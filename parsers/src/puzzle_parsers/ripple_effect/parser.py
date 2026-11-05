@@ -8,6 +8,7 @@ import cv2
 import numpy as np
 from PIL import Image
 
+from puzzle_parsers.debug_overlay import save_cell_labels
 from puzzle_parsers.board_grid import BoardGrid
 from puzzle_parsers.base import PuzzleParser
 from puzzle_parsers.cell_ocr import read_grid_clues
@@ -68,7 +69,6 @@ class RippleEffectParser(PuzzleParser):
         geom: BoardGrid,
         debug_dir: str | None = None,
     ) -> list[list[int]]:
-        rows, cols = geom.rows, geom.cols
         h_lines, v_lines = geom.h_lines, geom.v_lines
 
         cells = read_grid_clues(
@@ -76,22 +76,10 @@ class RippleEffectParser(PuzzleParser):
         )
 
         if debug_dir:
-            debug_path = Path(debug_dir)
-            vis = geom.warped.copy()
-            for r in range(rows):
-                for c in range(cols):
-                    num = cells[r][c]
-                    if num > 0:
-                        cv2.putText(
-                            vis,
-                            str(num),
-                            (v_lines[c] + 5, h_lines[r] + 20),
-                            cv2.FONT_HERSHEY_SIMPLEX,
-                            0.4,
-                            (0, 0, 255),
-                            1,
-                        )
-            cv2.imwrite(str(debug_path / "05_cells.png"), vis)
+            save_cell_labels(
+                geom, [[str(v) if v > 0 else None for v in row] for row in cells],
+                Path(debug_dir) / "05_cells.png",
+            )
 
         return cells
 

@@ -9,6 +9,7 @@ import numpy as np
 from numpy.typing import NDArray
 from PIL import Image
 
+from puzzle_parsers.debug_overlay import save_cell_labels
 from puzzle_parsers.board_grid import BoardGrid
 from puzzle_parsers.base import PuzzleParser
 from puzzle_parsers.models import PuzzleData
@@ -91,20 +92,10 @@ class ShikakuParser(PuzzleParser):
                 cells[r][c] = val
 
         if debug_dir:
-            vis = geom.warped.copy()
-            for r in range(rows):
-                for c in range(cols):
-                    if cells[r][c] > 0:
-                        cv2.putText(
-                            vis,
-                            str(cells[r][c]),
-                            (geom.v_lines[c] + 5, geom.h_lines[r] + 20),
-                            cv2.FONT_HERSHEY_SIMPLEX,
-                            0.4,
-                            (0, 0, 255),
-                            1,
-                        )
-            cv2.imwrite(str(Path(debug_dir) / "04_cells.png"), vis)
+            save_cell_labels(
+                geom, [[str(v) if v > 0 else None for v in row] for row in cells],
+                Path(debug_dir) / "04_cells.png",
+            )
 
         return cells
 
