@@ -60,7 +60,7 @@ export function nextPlacement(puzzleType: number, canon: unknown, values: CellVa
         technique: "next-answer",
         focusCells: [cell],
         placement: step.placement,
-        explanation: plugin.describePlacement?.(cell, value) ?? step.explanation,
+        explanation: plugin.describePlacement?.(board, cell, value) ?? step.explanation,
         depth,
       };
     }

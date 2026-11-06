@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { classify, countSolutions, solve } from "../../drivers";
 import { gate } from "../../gate";
+import { nextPlacement } from "../../hint";
+import { comboGeometry } from "./board";
 import { ComboSudokuModel, ComboSudokuCanon, ComboSudokuSolution } from "./model";
 // The parser's sample keys (docs/combo-sudoku): 4 to 14 boards in stacked, cross, X,
 // staircase and spread layouts, each a published puzzle with one solution.
@@ -111,5 +113,52 @@ describe("gate() end-to-end", () => {
     const sol = result!.solution as ComboSudokuSolution;
     expect(sol.subboards.map(({ x, y }) => [x, y])).toEqual(board7.subboards.map(({ x, y }) => [x, y]));
     expect(isValidSolution(board7, sol)).toBe(true);
+  });
+});
+
+describe("hints (nextPlacement on the sudoku ladder)", () => {
+  /** Play `canon` from empty by hints alone; returns the depths used. */
+  function playByHints(canon: ComboSudokuCanon): number[] {
+    const sol = solve(ComboSudokuModel.fromCanon(canon))!;
+    const want = new Map<string, number>();
+    for (const sb of sol.subboards) {
+      sb.answers.forEach((row, r) => row.forEach((v, c) => want.set(`${3 * sb.x + c},${3 * sb.y + r}`, v)));
+    }
+    const geo = comboGeometry(canon);
+    const givens = new Set<string>();
+    for (const sb of canon.subboards) {
+      sb.hints.forEach((row, r) => row.forEach((v, c) => v && givens.add(`${3 * sb.x + c},${3 * sb.y + r}`)));
+    }
+    const values: Record<string, number> = {};
+    const depths: number[] = [];
+    for (;;) {
+      const step = nextPlacement(2, canon, values);
+      if (!step) break;
+      const key = geo.key(step.placement!.cell);
+      expect(givens.has(key) || key in values).toBe(false); // an open cell
+      expect(step.placement!.value).toBe(want.get(key)); // the right digit
+      values[key] = step.placement!.value;
+      depths.push(step.depth);
+    }
+    expect(Object.keys(values).length + givens.size).toBe(geo.size); // solved by hints alone
+    return depths;
+  }
+
+  it("carries a 5-board staircase from empty to solved, through every rung", () => {
+    expect(new Set(playByHints(board7))).toEqual(new Set([0, 1, 2, 3, 4]));
+  });
+
+  it("carries a stacked layout from empty to solved", () => {
+    playByHints(board2);
+  });
+
+  it("gives every board's shared cell one id and labels units by board", () => {
+    // board2: four boards; shared rooms are one box unit each.
+    const geo = comboGeometry(board2);
+    expect(geo.size).toBe(216);
+    expect(geo.units.filter((_, u) => geo.kinds[u] === "box").length).toBe(216 / 9);
+    expect(geo.unitLabel(0)).toBe("board 1 row 1");
+    const single = comboGeometry({ subboards: [{ x: 0, y: 0, hints: empty() }] });
+    expect(single.unitLabel(9)).toBe("column 1");
   });
 });

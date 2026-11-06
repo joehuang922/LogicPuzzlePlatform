@@ -284,17 +284,22 @@ fun PlayScreen(
                                     liveValidate = state.liveValidate,
                                     selectedCell = state.selectedCell,
                                     onSelectCell = vm::selectCell,
-                                    hintCell = (h as? HintView.NextCell)?.let { SudokuHinter.cellKey(it.cell) },
+                                    hintCell = (h as? HintView.NextCell)?.key,
                                 )
                                 HintControls(hint = h, onRequest = vm::requestHint, onApply = vm::applyHint, onClear = vm::clearHint, onShowCells = {})
                             }
-                            2 -> ComboSudokuBoard(
-                                puzzle = puzzle,
-                                userValues = state.userValues,
-                                liveValidate = state.liveValidate,
-                                selectedCell = state.selectedCell,
-                                onSelectCell = vm::selectCell,
-                            )
+                            2 -> {
+                                val h = state.hint
+                                ComboSudokuBoard(
+                                    puzzle = puzzle,
+                                    userValues = state.userValues,
+                                    liveValidate = state.liveValidate,
+                                    selectedCell = state.selectedCell,
+                                    onSelectCell = vm::selectCell,
+                                    hintCell = (h as? HintView.NextCell)?.key,
+                                )
+                                HintControls(hint = h, onRequest = vm::requestHint, onApply = vm::applyHint, onClear = vm::clearHint, onShowCells = {})
+                            }
                             12 -> KakuroBoard(
                                 puzzle = puzzle,
                                 userValues = state.userValues,
@@ -606,8 +611,7 @@ private fun HintControls(
         val applyLabel: String?
         when (hint) {
             is HintView.NextCell -> {
-                val label = SudokuHinter.cellLabel(hint.cell)
-                explanation = "Next cell: $label. Its digit can be worked out from the board as it stands."
+                explanation = "Next cell: ${hint.label}. Its digit can be worked out from the board as it stands."
                 applyLabel = null
             }
             is HintView.Lines -> {

@@ -89,6 +89,14 @@ All cells across the combined grid are filled AND no conflicts exist in any row,
 - Peer highlighting spans across all sub-boards that contain the selected cell.
 - Cells not belonging to any sub-board are not interactive.
 - Desktop: radial digit picker (1-9 + erase). Mobile: digit bar.
+- **Hint** (web and Android, offline): highlights the next cell to fill, never its
+  digit, exactly like the sudoku hint. It runs the same technique ladder (singles,
+  locked candidates, naked pairs, contradiction) over the whole layout: a shared cell
+  belongs to every overlapping board's row and column, and a shared room is one box,
+  so a deduction in one board carries into the next. Candidate-only steps are worked
+  through internally until a cell's digit is settled. Every sample (`board_2` ...
+  `board_8`) plays from empty to solved by hints alone, slowest hint ~6 ms on the
+  14-board spread. Asks to fix conflicting cells first.
 
 ### Progress calculation
 

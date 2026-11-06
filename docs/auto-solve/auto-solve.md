@@ -143,6 +143,10 @@ Generic drivers:
   (pointing/claiming) → naked pair → contradiction (a cell where every candidate but one
   dies by propagating naked + hidden singles; the catch-all last rung, which carries all
   127 production puzzles from empty to solved, slowest hint ~4 ms).
+- The ladder is written over a unit geometry (`plugins/sudoku/units.ts`: cells, units,
+  peers), not the 9x9 grid, so combo sudoku reuses it unchanged with its own geometry
+  (`plugins/combo-sudoku/board.ts`). Android mirrors this: `UnitHinter` holds the ladder,
+  `SudokuHinter` and `ComboSudokuHinter` supply the geometry.
 - Difficulty = max `depth` reached by `solve`-via-techniques (backtracking is the gate, not
   the difficulty measure).
 

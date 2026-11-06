@@ -108,5 +108,5 @@ export interface SolverPlugin<Canon = unknown, Board = unknown, Solution = numbe
    */
   withEliminations?(board: Board, eliminations: { cell: number; digits: number[] }[]): Board;
   /** Text for a placement reached through eliminations, e.g. "R4C5 is 7." */
-  describePlacement?(cell: number, value: number): string;
+  describePlacement?(board: Board, cell: number, value: number): string;
 }

@@ -7,6 +7,8 @@ import com.puzzleplatform.player.data.ServiceLocator
 import com.puzzleplatform.player.data.model.AchievementUnlock
 import com.puzzleplatform.player.data.model.Puzzle
 import com.puzzleplatform.player.data.model.SnapshotSummary
+import com.puzzleplatform.player.puzzle.ComboSudokuEngine
+import com.puzzleplatform.player.puzzle.ComboSudokuHinter
 import com.puzzleplatform.player.puzzle.NonogramEngine
 import com.puzzleplatform.player.puzzle.NonogramHinter
 import com.puzzleplatform.player.puzzle.PuzzleEngine
@@ -65,13 +67,14 @@ data class PlayUiState(
 
 /**
  * A hint surfaced to the player. Mirrors the web client's HintView:
- *  - [NextCell] Sudoku: the next cell to fill, highlighted without its digit,
+ *  - [NextCell] Sudoku / combo sudoku: the next cell to fill ("col,row" [key], human
+ *    [label]), highlighted without its digit,
  *  - [Lines] a Nonogram step: highlight its focus lines; the cells it settles stay hidden
  *    until [Lines.showCells] (a reveal is a one-cell step here),
  *  - [Message] an informational note (e.g. conflicts present, or no step available).
  */
 sealed interface HintView {
-    data class NextCell(val cell: Int) : HintView
+    data class NextCell(val key: String, val label: String) : HintView
     data class Lines(val step: NonogramHinter.Step, val showCells: Boolean = false) : HintView
     data class Message(val text: String) : HintView
 }
@@ -161,9 +164,9 @@ class PlayViewModel(
     fun toggleNoteMode() = _state.update { it.copy(noteMode = !it.noteMode) }
 
     /**
-     * Compute and show the next offline hint for Sudoku (type 1) or Nonogram (type 6).
-     * Sudoku highlights the next cell whose digit can be worked out (never the digit);
-     * Nonogram points at a line. No-op for types without a hinter.
+     * Compute and show the next offline hint for Sudoku (type 1), combo sudoku (type 2)
+     * or Nonogram (type 6). The sudokus highlight the next cell whose digit can be worked
+     * out (never the digit); Nonogram points at a line. No-op for types without a hinter.
      */
     fun requestHint() {
         val puzzle = _state.value.puzzle ?: return
@@ -171,22 +174,30 @@ class PlayViewModel(
             requestNonogramHint(puzzle)
             return
         }
-        if (puzzle.puzzleType != SudokuEngine.puzzleType) return
+        val sudoku = puzzle.puzzleType == SudokuEngine.puzzleType
+        if (!sudoku && puzzle.puzzleType != ComboSudokuEngine.puzzleType) return
+        val engine: PuzzleEngine = if (sudoku) SudokuEngine else ComboSudokuEngine
         val values = _state.value.userValues
 
         // A contradictory board makes candidate reasoning meaningless; ask the player to
         // fix conflicts first (mirrors the web client's guard).
-        if (SudokuEngine.findConflicts(puzzle, values).isNotEmpty()) {
+        val conflicts = if (sudoku) SudokuEngine.findConflicts(puzzle, values) else ComboSudokuEngine.findConflicts(puzzle, values)
+        if (conflicts.isNotEmpty()) {
             _state.update {
                 it.copy(hint = HintView.Message("Fix the conflicting cells first, then ask for a hint."))
             }
             return
         }
 
-        val placement = SudokuHinter.nextPlacement(puzzle, values)?.placement
+        val next: Pair<String, String>? = if (sudoku) {
+            SudokuHinter.nextPlacement(puzzle, values)?.placement
+                ?.let { SudokuHinter.cellKey(it.cell) to SudokuHinter.cellLabel(it.cell) }
+        } else {
+            ComboSudokuHinter.nextCell(puzzle, values)
+        }
         val hint = when {
-            placement != null -> HintView.NextCell(placement.cell)
-            SudokuEngine.isComplete(puzzle, values) -> HintView.Message("The board is already complete.")
+            next != null -> HintView.NextCell(next.first, next.second)
+            engine.isComplete(puzzle, values) -> HintView.Message("The board is already complete.")
             else -> HintView.Message("No hint is available from here.")
         }
         _state.update { it.copy(hint = hint) }

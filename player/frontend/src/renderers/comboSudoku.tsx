@@ -39,7 +39,7 @@ export const comboSudokuRenderer: PuzzleRenderer = {
     const canonRepr = (typeof puzzle.canonRepr === "string" ? JSON.parse(puzzle.canonRepr) : puzzle.canonRepr) as ComboSudokuCanon;
     const savedAnswer = state.playerGrid as { subboards?: AnswerSubboard[] } | undefined;
     const initialUserValues = extractUserValues(canonRepr, savedAnswer);
-    return <ComboSudokuBoard subboards={canonRepr.subboards} initialUserValues={initialUserValues} onValuesChange={onValuesChange} onComplete={onComplete} />;
+    return <ComboSudokuBoard subboards={canonRepr.subboards} initialUserValues={initialUserValues} onValuesChange={onValuesChange} onComplete={onComplete} hintable />;
   },
 
   handleInput(state: PuzzleState, _action: PlayerAction) {

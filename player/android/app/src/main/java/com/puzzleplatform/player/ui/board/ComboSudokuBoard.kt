@@ -26,6 +26,7 @@ private val COMBO_CONFLICT = Color(0xFFD32F2F)
 private val COMBO_SELECT = Color(0x9963A4FF)
 private val COMBO_PEER = Color(0x33BBDEFB)
 private val COMBO_FOCUS_BOARD = Color(0xFFFFA000)
+private val COMBO_HINT = Color(0xFFFFF59D) // the hinted next cell, amber like SudokuBoard
 private val MINI_PROBLEM_TINT = Color(0x33D32F2F)
 
 /**
@@ -48,6 +49,8 @@ fun ComboSudokuBoard(
     onSelectCell: (String?) -> Unit,
     modifier: Modifier = Modifier,
     focusBoard: Int? = null,
+    // The hinted next cell ("col,row"), or null when no hint is shown.
+    hintCell: String? = null,
 ) {
     val layout = remember(puzzle.id, puzzle.canonRepr) { ComboSudokuEngine.layout(puzzle) }
     val conflicts = if (liveValidate) layout.conflicts(userValues) else emptySet()
@@ -67,6 +70,7 @@ fun ComboSudokuBoard(
             val (c, r) = key.split(",").map { it.toInt() }
             drawRect(COMBO_BG, Offset(c * cell, r * cell), Size(cell, cell))
         }
+        hintCell?.let { fillCell(it, cell, COMBO_HINT) }
         selectedCell?.let { sel ->
             for (peer in layout.peers[sel].orEmpty()) fillCell(peer, cell, COMBO_PEER)
             fillCell(sel, cell, COMBO_SELECT)

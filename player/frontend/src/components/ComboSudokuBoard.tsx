@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useIsMobile } from "../hooks/useIsMobile";
 import DigitBar from "./DigitBar";
 import RadialInput from "./RadialInput";
+import { comboGeometry, nextPlacement } from "@puzzle/solver";
 
 interface Subboard {
   x: number;
@@ -14,7 +15,12 @@ interface ComboSudokuBoardProps {
   initialUserValues?: Record<string, number>;
   onValuesChange?: (values: Record<string, number>) => void;
   onComplete?: () => void;
+  /** Show the Hint button (the play page; not the admin previews). */
+  hintable?: boolean;
 }
+
+// The hint: the next cell to fill (its digit is never shown), or a plain message.
+type HintView = { kind: "cell"; key: string; label: string } | { kind: "message"; text: string };
 
 const CELL_SIZE = 40;
 const PAD = CELL_SIZE;
@@ -22,7 +28,7 @@ const THIN = 1;
 const MEDIUM = 2;
 const THICK = 3;
 
-export default function ComboSudokuBoard({ subboards, initialUserValues, onValuesChange, onComplete }: ComboSudokuBoardProps) {
+export default function ComboSudokuBoard({ subboards, initialUserValues, onValuesChange, onComplete, hintable }: ComboSudokuBoardProps) {
   const isMobile = useIsMobile();
   const totalCols = Math.max(...subboards.map((sb) => 3 * sb.x + 9));
   const totalRows = Math.max(...subboards.map((sb) => 3 * sb.y + 9));
@@ -112,6 +118,19 @@ export default function ComboSudokuBoard({ subboards, initialUserValues, onValue
     return set;
   }, [subboards]);
 
+  /** Givens by global "col,row" key, merged across boards. */
+  const givens = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const sb of subboards) {
+      sb.hints.forEach((line, row) =>
+        line.forEach((v, col) => {
+          if (v > 0) map.set(`${3 * sb.x + col},${3 * sb.y + row}`, v);
+        })
+      );
+    }
+    return map;
+  }, [subboards]);
+
   const cellsInBoard = useMemo(() => {
     const set = new Set<string>();
     for (const sb of subboards) {
@@ -157,6 +176,39 @@ export default function ComboSudokuBoard({ subboards, initialUserValues, onValue
     }
     return map;
   }, [subboards]);
+
+  // --- Hint (docs/combo-sudoku) -------------------------------------------------
+  // The sudoku ladder over the whole layout (nextPlacement on type 2): highlights the
+  // next cell whose digit can be worked out, never the digit itself.
+  const [hint, setHint] = useState<HintView | null>(null);
+
+  const requestHint = useCallback(() => {
+    // Hints take the entries as right, so a clash makes them unsound: fix it first.
+    const valueAt = (key: string) => givens.get(key) ?? userValues[key] ?? 0;
+    for (const key of Object.keys(userValues)) {
+      const val = valueAt(key);
+      if (val > 0 && [...(peerMap.get(key) ?? [])].some((peer) => valueAt(peer) === val)) {
+        setHint({ kind: "message", text: "Fix the conflicting cells first — hints assume your entries are correct." });
+        return;
+      }
+    }
+    const canon = { subboards };
+    const step = nextPlacement(2, canon, userValues);
+    if (step?.placement) {
+      const geo = comboGeometry(canon);
+      setHint({ kind: "cell", key: geo.key(step.placement.cell), label: geo.cellLabel(step.placement.cell) });
+      return;
+    }
+    const complete = [...cellsInBoard].every((k) => hintCells.has(k) || (userValues[k] ?? 0) > 0);
+    setHint({ kind: "message", text: complete ? "The board is already complete." : "No hint is available from here." });
+  }, [userValues, peerMap, givens, hintCells, cellsInBoard, subboards]);
+
+  // A hint reflects a specific board; once the player changes it, drop the stale hint.
+  const userValuesAtHint = useRef(userValues);
+  useEffect(() => {
+    if (hint && userValues !== userValuesAtHint.current) setHint(null);
+    userValuesAtHint.current = userValues;
+  }, [userValues, hint]);
 
   const highlightSource = activeCell ?? hoveredCell;
   const highlightedCells = useMemo(() => {
@@ -209,6 +261,40 @@ export default function ComboSudokuBoard({ subboards, initialUserValues, onValue
 
   return (
     <div style={{ maxWidth: width, width: "100%", paddingBottom: isMobile && activeCell ? 60 : 0 }}>
+      {hintable && (
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
+          <button onClick={requestHint} style={hintButtonStyle} title="Highlight the next cell whose digit can be worked out">
+            Hint
+          </button>
+          {hint && (
+            <button onClick={() => setHint(null)} style={clearButtonStyle}>
+              Clear hint
+            </button>
+          )}
+        </div>
+      )}
+      {hint && (
+        <div
+          style={{
+            marginBottom: "0.6rem",
+            padding: "0.6rem 0.8rem",
+            background: hint.kind === "message" ? "#fff8e1" : "#e3f2fd",
+            border: `1px solid ${hint.kind === "message" ? "#ffe082" : "#90caf9"}`,
+            borderRadius: 6,
+            fontSize: "0.85rem",
+            lineHeight: 1.4,
+          }}
+        >
+          {hint.kind === "cell" ? (
+            <>
+              <div style={{ fontWeight: 600, marginBottom: "0.2rem" }}>Next cell: {hint.label}</div>
+              <div style={{ color: "#333" }}>Its digit can be worked out from the board as it stands.</div>
+            </>
+          ) : (
+            <div style={{ color: "#333" }}>{hint.text}</div>
+          )}
+        </div>
+      )}
       <svg
         width="100%"
         viewBox={`0 0 ${width} ${height}`}
@@ -222,6 +308,20 @@ export default function ComboSudokuBoard({ subboards, initialUserValues, onValue
         }}
       >
         <g transform={`translate(${PAD},${PAD})`}>
+        {/* Hint highlight: the next cell to fill, in amber. */}
+        {hint?.kind === "cell" && (() => {
+          const [col, row] = hint.key.split(",").map(Number);
+          return (
+            <rect
+              x={col * CELL_SIZE + 1}
+              y={row * CELL_SIZE + 1}
+              width={CELL_SIZE - 2}
+              height={CELL_SIZE - 2}
+              fill="#fff59d"
+              fillOpacity={0.8}
+            />
+          );
+        })()}
         {/* Highlight layer (behind grid lines) */}
         {highlightSource && (
           <g>
@@ -394,3 +494,22 @@ export default function ComboSudokuBoard({ subboards, initialUserValues, onValue
     </div>
   );
 }
+
+const hintButtonStyle: React.CSSProperties = {
+  fontSize: "0.85rem",
+  padding: "0.35rem 0.9rem",
+  background: "#1976d2",
+  color: "white",
+  border: "none",
+  borderRadius: 4,
+  cursor: "pointer",
+};
+
+const clearButtonStyle: React.CSSProperties = {
+  fontSize: "0.85rem",
+  padding: "0.35rem 0.9rem",
+  background: "#f0f0f0",
+  border: "1px solid #ccc",
+  borderRadius: 4,
+  cursor: "pointer",
+};

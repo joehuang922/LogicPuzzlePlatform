@@ -73,7 +73,7 @@ class SudokuHinterTest {
         assertNotNull(step)
         assertEquals("naked-single", step!!.technique)
         assertEquals(listOf(8), step.focusCells)
-        assertEquals(SudokuHinter.Placement(8, 9), step.placement)
+        assertEquals(UnitHinter.Placement(8, 9), step.placement)
     }
 
     // -- hidden single (depth 1) -------------------------------------------
@@ -87,7 +87,7 @@ class SudokuHinterTest {
         val step = SudokuHinter.nextHint(puzzle, emptyMap())
         assertNotNull(step)
         assertEquals("hidden-single", step!!.technique)
-        assertEquals(SudokuHinter.Placement(0, 5), step.placement)
+        assertEquals(UnitHinter.Placement(0, 5), step.placement)
     }
 
     // -- locked candidates (depth 2) ---------------------------------------
@@ -102,8 +102,8 @@ class SudokuHinterTest {
         assertEquals(listOf(1, 2), step.focusCells)
         assertEquals(
             listOf(
-                SudokuHinter.Elimination(4, listOf(6)),
-                SudokuHinter.Elimination(5, listOf(6)),
+                UnitHinter.Elimination(4, listOf(6)),
+                UnitHinter.Elimination(5, listOf(6)),
             ),
             step.eliminations,
         )

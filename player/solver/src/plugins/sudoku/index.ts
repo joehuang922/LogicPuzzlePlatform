@@ -11,7 +11,7 @@ export const sudokuPlugin: SolverPlugin<SudokuCanon, SudokuBoard> = {
   buildBoard: (canon, values) => SudokuBoard.build(canon, values),
   techniques: SUDOKU_TECHNIQUES,
   withEliminations: (board, eliminations) => board.withEliminations(eliminations),
-  describePlacement: (cell, value) => `${cellLabel(cell)} is ${value}.`,
+  describePlacement: (_board, cell, value) => `${cellLabel(cell)} is ${value}.`,
 };
 
 export type { SudokuCanon };
