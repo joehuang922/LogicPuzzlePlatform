@@ -65,15 +65,13 @@ data class PlayUiState(
 
 /**
  * A hint surfaced to the player. Mirrors the web client's HintView:
- *  - [NextCell] Sudoku: the next cell to fill, highlighted without its digit. [logical]:
- *    the hinter's ladder reaches it from the board as it stands; otherwise it's the first
- *    open cell, picked when the ladder runs dry,
+ *  - [NextCell] Sudoku: the next cell to fill, highlighted without its digit,
  *  - [Lines] a Nonogram step: highlight its focus lines; the cells it settles stay hidden
  *    until [Lines.showCells] (a reveal is a one-cell step here),
  *  - [Message] an informational note (e.g. conflicts present, or no step available).
  */
 sealed interface HintView {
-    data class NextCell(val cell: Int, val logical: Boolean) : HintView
+    data class NextCell(val cell: Int) : HintView
     data class Lines(val step: NonogramHinter.Step, val showCells: Boolean = false) : HintView
     data class Message(val text: String) : HintView
 }
@@ -187,20 +185,11 @@ class PlayViewModel(
 
         val placement = SudokuHinter.nextPlacement(puzzle, values)?.placement
         val hint = when {
-            placement != null -> HintView.NextCell(placement.cell, logical = true)
-            // No step the ladder knows: point at the first open cell.
-            else -> firstOpenCell(puzzle, values)?.let { HintView.NextCell(it, logical = false) }
-                ?: HintView.Message("The board is already complete.")
+            placement != null -> HintView.NextCell(placement.cell)
+            SudokuEngine.isComplete(puzzle, values) -> HintView.Message("The board is already complete.")
+            else -> HintView.Message("No hint is available from here.")
         }
         _state.update { it.copy(hint = hint) }
-    }
-
-    /** The first open (no given, no entry) cell, row by row; null when the board is full. */
-    private fun firstOpenCell(puzzle: Puzzle, values: Map<String, Int>): Int? {
-        val hints = SudokuEngine.parseHints(puzzle)
-        return (0 until 81).firstOrNull { id ->
-            hints[id / 9][id % 9] == 0 && (values["${id % 9},${id / 9}"] ?: 0) == 0
-        }
     }
 
     /**

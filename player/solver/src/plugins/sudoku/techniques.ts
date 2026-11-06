@@ -1,5 +1,6 @@
 import { Step, Technique } from "../../types";
 import { SudokuBoard, UNITS, boxOf, cellLabel, unitLabel } from "./board";
+import { PEERS } from "./peers";
 
 const BOX_UNITS = UNITS.slice(18); // the 9 box units, box index 0..8
 const LINE_UNITS = UNITS.slice(0, 18); // 9 rows then 9 columns
@@ -177,9 +178,91 @@ const nakedPair: Technique<SudokuBoard> = {
   },
 };
 
+const isSingle = (mask: number) => mask !== 0 && (mask & (mask - 1)) === 0;
+
+/**
+ * Fill in forced digits on bitmask domains until nothing changes: a solved cell's digit
+ * leaves its peers (naked single), a digit with one place left in a unit goes there
+ * (hidden single). Mutates `dom`; false on a contradiction (a cell with no digit left,
+ * or a digit with no place left in a unit).
+ */
+function propagateSingles(dom: number[]): boolean {
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let id = 0; id < 81; id++) {
+      const m = dom[id];
+      if (m === 0) return false;
+      if (!isSingle(m)) continue;
+      for (const p of PEERS[id]) {
+        if (dom[p] & m) {
+          dom[p] &= ~m;
+          if (dom[p] === 0) return false;
+          changed = true;
+        }
+      }
+    }
+    for (const unit of UNITS) {
+      for (let v = 1; v <= 9; v++) {
+        const b = 1 << v;
+        let place = -1;
+        let count = 0;
+        for (const id of unit) {
+          if (dom[id] & b) {
+            place = id;
+            count++;
+          }
+        }
+        if (count === 0) return false;
+        if (count === 1 && dom[place] !== b) {
+          dom[place] = b;
+          changed = true;
+        }
+      }
+    }
+  }
+  return true;
+}
+
+/**
+ * Depth 4: contradiction. A cell where every candidate but one, once assumed, runs into
+ * a contradiction by filling in singles alone. The last rung: it finds the cell when
+ * the pattern techniques above run dry (all production puzzles' dead ends, at the time
+ * of writing), and a player can follow it ("if it were anything else, X breaks").
+ */
+const contradiction: Technique<SudokuBoard> = {
+  name: "contradiction",
+  depth: 4,
+  apply(board) {
+    const base = board.values.map((v, id) =>
+      v !== 0 ? 1 << v : board.candidates[id].reduce((m, d) => m | (1 << d), 0)
+    );
+    for (let id = 0; id < 81; id++) {
+      if (!board.isEmpty(id) || board.candidates[id].length < 2) continue;
+      const survivors = board.candidates[id].filter((v) => {
+        const dom = base.slice();
+        dom[id] = 1 << v;
+        return propagateSingles(dom);
+      });
+      if (survivors.length !== 1) continue;
+      const value = survivors[0];
+      const others = board.candidates[id].filter((d) => d !== value);
+      return {
+        technique: "contradiction",
+        focusCells: [id],
+        placement: { cell: id, value },
+        explanation: `Putting ${others.join(", ")} in ${cellLabel(id)} leads to a contradiction, so it is ${value}.`,
+        depth: 4,
+      };
+    }
+    return null;
+  },
+};
+
 export const SUDOKU_TECHNIQUES: Technique<SudokuBoard>[] = [
   nakedSingle,
   hiddenSingle,
   lockedCandidates,
   nakedPair,
+  contradiction,
 ];

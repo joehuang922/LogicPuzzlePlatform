@@ -16,10 +16,9 @@ interface SudokuBoardProps {
 }
 
 // The hint affordance's view model: the next cell to fill (its digit is never shown),
-// or a plain message. `logical`: the solver's ladder reaches it from the board as it
-// stands; otherwise it's the first open cell, picked when the ladder runs dry.
+// or a plain message.
 type HintView =
-  | { kind: "cell"; cellId: number; logical: boolean }
+  | { kind: "cell"; cellId: number }
   | { kind: "message"; text: string };
 
 const idToKey = (id: number) => `${id % 9},${Math.floor(id / 9)}`;
@@ -177,8 +176,7 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, on
   // --- Hint affordance (docs/auto-solve, Phase 4) -------------------------------
   // Runs the client-side solver on the committed board to find the next cell whose
   // digit can be worked out (nextPlacement: candidate-only steps are worked through
-  // internally) and highlights it, without its digit. When the ladder runs dry, it
-  // points at the first open cell instead.
+  // internally) and highlights it, without its digit.
   const [hint, setHint] = useState<HintView | null>(null);
 
   const requestHint = useCallback(() => {
@@ -191,19 +189,11 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, on
     const canon = { hints };
     const step = nextPlacement(1, canon, userValues);
     if (step?.placement) {
-      setHint({ kind: "cell", cellId: step.placement.cell, logical: true });
+      setHint({ kind: "cell", cellId: step.placement.cell });
       return;
     }
-    // No step the ladder knows: point at the first open cell.
-    for (let id = 0; id < 81; id++) {
-      const r = Math.floor(id / 9);
-      const c = id % 9;
-      if ((hints[r]?.[c] ?? 0) === 0 && (userValues[`${c},${r}`] ?? 0) === 0) {
-        setHint({ kind: "cell", cellId: id, logical: false });
-        return;
-      }
-    }
-    setHint({ kind: "message", text: "The board is already complete." });
+    const complete = hints.every((row, r) => row.every((v, c) => v > 0 || (userValues[`${c},${r}`] ?? 0) > 0));
+    setHint({ kind: "message", text: complete ? "The board is already complete." : "No hint is available from here." });
   }, [conflictCells, hints, userValues]);
 
   // A hint reflects a specific board; once the player changes it, drop the stale hint.
@@ -374,11 +364,7 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, on
           {hint.kind === "cell" && (
             <>
               <div style={{ fontWeight: 600, marginBottom: "0.2rem" }}>Next cell: {cellLabel(hint.cellId)}</div>
-              <div style={{ color: "#333" }}>
-                {hint.logical
-                  ? "Its digit can be worked out from the board as it stands."
-                  : "No simple step was found from here; try working on this cell."}
-              </div>
+              <div style={{ color: "#333" }}>Its digit can be worked out from the board as it stands.</div>
             </>
           )}
           {hint.kind === "message" && <div style={{ color: "#333" }}>{hint.text}</div>}

@@ -122,12 +122,13 @@ describe("ladder ordering", () => {
     expect(depths).toEqual([...depths].sort((a, b) => a - b));
   });
 
-  it("covers the four v1 rungs", () => {
+  it("covers the four v1 rungs, then contradiction", () => {
     expect(SUDOKU_TECHNIQUES.map((t) => t.name)).toEqual([
       "naked-single",
       "hidden-single",
       "locked-candidates",
       "naked-pair",
+      "contradiction",
     ]);
   });
 });

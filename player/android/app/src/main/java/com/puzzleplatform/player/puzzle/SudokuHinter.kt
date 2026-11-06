@@ -285,9 +285,85 @@ object SudokuHinter {
         return null
     }
 
-    /** The v1 ladder, ordered easiest-first by depth. */
+    private fun isSingle(mask: Int): Boolean = mask != 0 && (mask and (mask - 1)) == 0
+
+    /**
+     * Fill in forced digits on bitmask domains until nothing changes: a solved cell's
+     * digit leaves its peers (naked single), a digit with one place left in a unit goes
+     * there (hidden single). Mutates [dom]; false on a contradiction.
+     */
+    private fun propagateSingles(dom: IntArray): Boolean {
+        var changed = true
+        while (changed) {
+            changed = false
+            for (id in 0 until CELLS) {
+                val m = dom[id]
+                if (m == 0) return false
+                if (!isSingle(m)) continue
+                for (p in PEERS[id]) {
+                    if (dom[p] and m != 0) {
+                        dom[p] = dom[p] and m.inv()
+                        if (dom[p] == 0) return false
+                        changed = true
+                    }
+                }
+            }
+            for (unit in UNITS) {
+                for (v in 1..N) {
+                    val b = 1 shl v
+                    var place = -1
+                    var count = 0
+                    for (id in unit) {
+                        if (dom[id] and b != 0) {
+                            place = id
+                            count++
+                        }
+                    }
+                    if (count == 0) return false
+                    if (count == 1 && dom[place] != b) {
+                        dom[place] = b
+                        changed = true
+                    }
+                }
+            }
+        }
+        return true
+    }
+
+    /**
+     * Depth 4: contradiction. A cell where every candidate but one, once assumed, runs
+     * into a contradiction by filling in singles alone. The last rung, for when the
+     * pattern techniques above run dry.
+     */
+    private fun contradiction(board: Board): Step? {
+        val base = IntArray(CELLS) { id ->
+            if (board.values[id] != 0) 1 shl board.values[id]
+            else board.candidates[id].fold(0) { m, d -> m or (1 shl d) }
+        }
+        for (id in 0 until CELLS) {
+            if (!board.isEmpty(id) || board.candidates[id].size < 2) continue
+            val survivors = board.candidates[id].filter { v ->
+                val dom = base.copyOf()
+                dom[id] = 1 shl v
+                propagateSingles(dom)
+            }
+            if (survivors.size != 1) continue
+            val value = survivors[0]
+            val others = board.candidates[id].filter { it != value }
+            return Step(
+                technique = "contradiction",
+                focusCells = listOf(id),
+                placement = Placement(id, value),
+                explanation = "Putting ${others.joinToString(", ")} in ${cellLabel(id)} leads to a contradiction, so it is $value.",
+                depth = 4,
+            )
+        }
+        return null
+    }
+
+    /** The v1 ladder, ordered easiest-first by depth, then contradiction. */
     private val LADDER: List<(Board) -> Step?> =
-        listOf(::nakedSingle, ::hiddenSingle, ::lockedCandidates, ::nakedPair)
+        listOf(::nakedSingle, ::hiddenSingle, ::lockedCandidates, ::nakedPair, ::contradiction)
 
     /**
      * Return the shallowest pedagogical hint for the player's current board, or null when

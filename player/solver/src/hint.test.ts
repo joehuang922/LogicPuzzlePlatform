@@ -127,3 +127,39 @@ describe("nextPlacement — always the next answer", () => {
     expect(Object.keys(values).length).toBe(81 - givens);
   });
 });
+
+// A published puzzle (production) where the pattern rungs run dry mid-solve: with these
+// entries, only the contradiction rung (depth 4) finds the next cell.
+const DEAD_END_PUZZLE =
+  "000010023001009000000200400900070000067000510000030004009005000000300700470020000";
+const DEAD_END_ENTRIES: CellValues = {
+  "8,2": 1, "0,4": 3, "1,1": 3, "0,1": 2, "5,2": 3, "7,5": 7,
+  "0,2": 7, "3,6": 7, "5,0": 7, "8,1": 7, "2,8": 3, "8,8": 5,
+};
+
+describe("contradiction rung", () => {
+  it("finds the next cell where the pattern rungs run dry", () => {
+    const canon = parseGrid(DEAD_END_PUZZLE);
+    const solution = solve(SudokuModel.fromCanon(canon))!;
+    const step = nextPlacement(1, canon, DEAD_END_ENTRIES)!;
+    expect(step.depth).toBe(4);
+    expect(step.placement).toEqual({ cell: 0, value: solution[0][0] });
+  });
+
+  it("carries that puzzle from empty to solved, every placement right", () => {
+    const canon = parseGrid(DEAD_END_PUZZLE);
+    const solution = solve(SudokuModel.fromCanon(canon))!;
+    const values: CellValues = {};
+    let deepest = 0;
+    for (;;) {
+      const step = nextPlacement(1, canon, values);
+      if (!step) break;
+      deepest = Math.max(deepest, step.depth);
+      const { cell, value } = step.placement!;
+      expect(value).toBe(solution[Math.floor(cell / 9)][cell % 9]);
+      values[rc(cell)] = value;
+    }
+    expect(deepest).toBe(4);
+    expect(Object.keys(values).length).toBe(81 - canon.hints.flat().filter((v) => v > 0).length);
+  });
+});

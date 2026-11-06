@@ -607,11 +607,7 @@ private fun HintControls(
         when (hint) {
             is HintView.NextCell -> {
                 val label = SudokuHinter.cellLabel(hint.cell)
-                explanation = if (hint.logical) {
-                    "Next cell: $label. Its digit can be worked out from the board as it stands."
-                } else {
-                    "No simple step was found from here. Try working on $label."
-                }
+                explanation = "Next cell: $label. Its digit can be worked out from the board as it stands."
                 applyLabel = null
             }
             is HintView.Lines -> {

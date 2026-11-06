@@ -71,11 +71,12 @@ All 81 cells are filled AND no conflicts exist (no duplicate digits in any row, 
 - Conflicts (duplicate digits in a group) are shown in red.
 - **Hint** (web and Android, offline): highlights the next cell to fill, never its
   digit. The cell is one whose digit can be worked out from the board as it stands: the
-  solver's technique ladder (singles, locked candidates, naked pairs) works through
-  candidate-only steps internally (`nextPlacement`, `docs/auto-solve`) until it reaches
-  a placement. When the ladder can't reach one, it points at the first open cell
-  instead. It reasons from the entered digits as if they're right, and asks to fix
-  conflicting cells first.
+  solver's technique ladder (singles, locked candidates, naked pairs, then
+  contradiction: every other digit there runs into a contradiction by filling in
+  singles) works through candidate-only steps internally (`nextPlacement`,
+  `docs/auto-solve`) until it reaches a placement. It carries every production puzzle
+  from empty to solved. If it ever can't, the hint says none is available. It reasons
+  from the entered digits as if they're right, and asks to fix conflicting cells first.
 
 ### Progress calculation
 

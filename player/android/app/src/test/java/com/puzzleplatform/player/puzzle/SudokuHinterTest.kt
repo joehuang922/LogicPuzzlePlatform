@@ -232,4 +232,37 @@ class SudokuHinterTest {
         assertEquals(tsPlacements, seen)
     }
 
+
+    // -- contradiction rung (depth 4) -----------------------------------------
+
+    // A published puzzle where the pattern rungs run dry mid-solve. Same fixture as
+    // hint.test.ts; the sequence is the TS engine's ("cell:value:depth").
+    private val deadEndPuzzle =
+        "000010023001009000000200400900070000067000510000030004009005000000300700470020000"
+    private val deadEndSolution =
+        "594617823231489657786253491945172386367894512128536974619745238852361749473928165"
+    private val deadEndTsSequence = (
+        "26:1:1 36:3:1 10:3:1 9:2:1 23:3:1 52:7:1 18:7:1 57:7:1 5:7:1 17:7:1 74:3:1 80:5:2 " +
+            "0:5:4 1:9:4 19:8:0 20:6:0 2:4:0 22:5:0 25:9:0 16:5:1 28:4:1 12:4:4 3:6:4 6:8:0 " +
+            "13:8:0 15:6:0 50:6:1 79:6:1 35:6:1 29:5:4 48:5:1 51:9:1 78:1:0 77:8:0 75:9:0 " +
+            "39:8:0 30:1:0 32:2:0 33:3:0 34:8:0 41:4:0 40:9:0 44:2:0 60:2:0 55:1:0 46:2:0 " +
+            "47:8:0 45:1:0 62:8:0 54:6:0 58:4:0 61:3:0 63:8:0 64:5:0 65:2:0 67:6:0 68:1:0 " +
+            "70:4:0 71:9:0"
+        ).split(" ")
+
+    @Test
+    fun nextPlacement_contradictionCarriesADeadEndPuzzleAndMatchesTs() {
+        val puzzle = puzzleFromString(deadEndPuzzle)
+        val values = mutableMapOf<String, Int>()
+        val seen = mutableListOf<String>()
+        while (true) {
+            val step = SudokuHinter.nextPlacement(puzzle, values) ?: break
+            val placement = step.placement!!
+            assertEquals(deadEndSolution[placement.cell] - '0', placement.value)
+            seen += "${placement.cell}:${placement.value}:${step.depth}"
+            values[SudokuHinter.cellKey(placement.cell)] = placement.value
+        }
+        assertEquals(deadEndTsSequence, seen)
+    }
+
 }

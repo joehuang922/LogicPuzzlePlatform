@@ -139,8 +139,10 @@ Generic drivers:
 ### 4.2 Sudoku plugin (pilot)
 
 - `buildModel`: 81 variables, domain 1–9, constraints = 9 rows + 9 cols + 9 boxes all-different.
-- `techniques` (initial ladder): naked single → hidden single → locked candidates
-  (pointing/claiming) → naked/hidden pairs. X-Wing and beyond are follow-on rungs.
+- `techniques` (ladder): naked single → hidden single → locked candidates
+  (pointing/claiming) → naked pair → contradiction (a cell where every candidate but one
+  dies by propagating naked + hidden singles; the catch-all last rung, which carries all
+  127 production puzzles from empty to solved, slowest hint ~4 ms).
 - Difficulty = max `depth` reached by `solve`-via-techniques (backtracking is the gate, not
   the difficulty measure).
 
