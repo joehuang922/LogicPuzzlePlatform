@@ -3,34 +3,26 @@ import { useBoardUiState } from "../hooks/useBoardUiState";
 import { useIsMobile } from "../hooks/useIsMobile";
 import DigitBar from "./DigitBar";
 import RadialInput from "./RadialInput";
-import { nextPlacement, cellLabel, Step } from "@puzzle/solver";
+import { nextPlacement, cellLabel } from "@puzzle/solver";
 
 interface SudokuBoardProps {
   hints: number[][];
   initialUserValues?: Record<string, number>;
   // Pencil-mark candidates keyed by "col,row"; each an ascending digit list.
   initialNotes?: Record<string, number[]>;
-  // The gate-computed solution grid, when stored. Backs the "reveal" hint fallback
-  // for boards where no logical next step is found. See docs/auto-solve.
-  solution?: number[][] | null;
   onValuesChange?: (values: Record<string, number>) => void;
   onComplete?: () => void;
   liveValidate?: boolean;
 }
 
-// The hint affordance's view model: a logical step, a revealed cell, or a plain message.
+// The hint affordance's view model: the next cell to fill (its digit is never shown),
+// or a plain message. `logical`: the solver's ladder reaches it from the board as it
+// stands; otherwise it's the first open cell, picked when the ladder runs dry.
 type HintView =
-  | { kind: "step"; step: Step }
-  | { kind: "reveal"; cellId: number; value: number }
+  | { kind: "cell"; cellId: number; logical: boolean }
   | { kind: "message"; text: string };
 
 const idToKey = (id: number) => `${id % 9},${Math.floor(id / 9)}`;
-
-// Title-case a technique slug, e.g. "naked-single" -> "Naked single".
-function techniqueLabel(name: string): string {
-  const spaced = name.replace(/-/g, " ");
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
-}
 
 const CELL_SIZE = 40;
 const PAD = CELL_SIZE;
@@ -48,7 +40,7 @@ function notesFromInitial(initial?: Record<string, number[]>): Record<string, Se
   return map;
 }
 
-export default function SudokuBoard({ hints, initialUserValues, initialNotes, solution, onValuesChange, onComplete, liveValidate }: SudokuBoardProps) {
+export default function SudokuBoard({ hints, initialUserValues, initialNotes, onValuesChange, onComplete, liveValidate }: SudokuBoardProps) {
   const isMobile = useIsMobile();
   const width = 9 * CELL_SIZE + PAD * 2;
   const height = 9 * CELL_SIZE + PAD * 2;
@@ -183,9 +175,10 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, so
   }, [highlightSource, peerMap]);
 
   // --- Hint affordance (docs/auto-solve, Phase 4) -------------------------------
-  // Runs the client-side solver on the committed board to find the next digit to
-  // place (nextPlacement: candidate-only steps are worked through internally, never
-  // shown); falls back to revealing one cell from the stored solution.
+  // Runs the client-side solver on the committed board to find the next cell whose
+  // digit can be worked out (nextPlacement: candidate-only steps are worked through
+  // internally) and highlights it, without its digit. When the ladder runs dry, it
+  // points at the first open cell instead.
   const [hint, setHint] = useState<HintView | null>(null);
 
   const requestHint = useCallback(() => {
@@ -197,48 +190,21 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, so
     }
     const canon = { hints };
     const step = nextPlacement(1, canon, userValues);
-    if (step) {
-      setHint({ kind: "step", step });
+    if (step?.placement) {
+      setHint({ kind: "cell", cellId: step.placement.cell, logical: true });
       return;
     }
-    // No logical step the ladder knows: reveal the first unfilled cell, if we have
-    // a stored solution to draw from.
-    if (solution) {
-      for (let id = 0; id < 81; id++) {
-        const r = Math.floor(id / 9);
-        const c = id % 9;
-        const filled = (hints[r]?.[c] ?? 0) > 0 || (userValues[`${c},${r}`] ?? 0) > 0;
-        const sol = solution[r]?.[c] ?? 0;
-        if (!filled && sol > 0) {
-          setHint({ kind: "reveal", cellId: id, value: sol });
-          return;
-        }
+    // No step the ladder knows: point at the first open cell.
+    for (let id = 0; id < 81; id++) {
+      const r = Math.floor(id / 9);
+      const c = id % 9;
+      if ((hints[r]?.[c] ?? 0) === 0 && (userValues[`${c},${r}`] ?? 0) === 0) {
+        setHint({ kind: "cell", cellId: id, logical: false });
+        return;
       }
-      setHint({ kind: "message", text: "The board is already complete." });
-      return;
     }
-    setHint({ kind: "message", text: "No further hints are available for this puzzle." });
-  }, [conflictCells, hints, userValues, solution]);
-
-  // Commit the hinted cell (placement step or reveal).
-  const applyHint = useCallback(() => {
-    const placement =
-      hint?.kind === "reveal"
-        ? { cell: hint.cellId, value: hint.value }
-        : hint?.kind === "step"
-        ? hint.step.placement
-        : undefined;
-    if (!placement) return;
-    const key = `${placement.cell % 9},${Math.floor(placement.cell / 9)}`;
-    setUserValues((prev) => ({ ...prev, [key]: placement.value }));
-    setNotes((prev) => {
-      if (!prev[key]) return prev;
-      const next = { ...prev };
-      delete next[key];
-      return next;
-    });
-    setHint(null);
-  }, [hint]);
+    setHint({ kind: "message", text: "The board is already complete." });
+  }, [conflictCells, hints, userValues]);
 
   // A hint reflects a specific board; once the player changes it, drop the stale hint.
   const userValuesAtHint = useRef(userValues);
@@ -250,9 +216,7 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, so
   // Cells to tint for the current hint.
   const hintFocusKeys = useMemo(() => {
     if (!hint) return new Set<string>();
-    if (hint.kind === "reveal") return new Set([idToKey(hint.cellId)]);
-    if (hint.kind === "step") return new Set(hint.step.focusCells.map(idToKey));
-    return new Set<string>();
+    return hint.kind === "cell" ? new Set([idToKey(hint.cellId)]) : new Set<string>();
   }, [hint]);
 
   // A cell that already holds a committed answer can't take notes: force answer
@@ -400,48 +364,24 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, so
           style={{
             marginBottom: "0.6rem",
             padding: "0.6rem 0.8rem",
-            background: hint.kind === "reveal" ? "#e8f5e9" : hint.kind === "message" ? "#fff8e1" : "#e3f2fd",
-            border: `1px solid ${hint.kind === "reveal" ? "#a5d6a7" : hint.kind === "message" ? "#ffe082" : "#90caf9"}`,
+            background: hint.kind === "message" ? "#fff8e1" : "#e3f2fd",
+            border: `1px solid ${hint.kind === "message" ? "#ffe082" : "#90caf9"}`,
             borderRadius: 6,
             fontSize: "0.85rem",
             lineHeight: 1.4,
           }}
         >
-          {hint.kind === "step" && (
+          {hint.kind === "cell" && (
             <>
-              <div style={{ fontWeight: 600, marginBottom: "0.2rem" }}>
-                {techniqueLabel(hint.step.technique)}
-              </div>
-              <div style={{ color: "#333" }}>{hint.step.explanation}</div>
-            </>
-          )}
-          {hint.kind === "reveal" && (
-            <>
-              <div style={{ fontWeight: 600, marginBottom: "0.2rem" }}>Revealed cell</div>
+              <div style={{ fontWeight: 600, marginBottom: "0.2rem" }}>Next cell: {cellLabel(hint.cellId)}</div>
               <div style={{ color: "#333" }}>
-                No simple logical step was found, so here's one cell from the solution:{" "}
-                {cellLabel(hint.cellId)} is {hint.value}.
+                {hint.logical
+                  ? "Its digit can be worked out from the board as it stands."
+                  : "No simple step was found from here; try working on this cell."}
               </div>
             </>
           )}
           {hint.kind === "message" && <div style={{ color: "#333" }}>{hint.text}</div>}
-          {(hint.kind === "reveal" || (hint.kind === "step" && hint.step.placement)) && (
-            <button
-              onClick={applyHint}
-              style={{
-                marginTop: "0.5rem",
-                fontSize: "0.8rem",
-                padding: "0.3rem 0.8rem",
-                background: hint.kind === "reveal" ? "#43a047" : "#1976d2",
-                color: "white",
-                border: "none",
-                borderRadius: 4,
-                cursor: "pointer",
-              }}
-            >
-              {hint.kind === "reveal" ? "Fill it in" : "Place it"}
-            </button>
-          )}
         </div>
       )}
 
@@ -458,10 +398,9 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, so
         }}
       >
         <g transform={`translate(${PAD},${PAD})`}>
-          {/* Hint highlight layer: amber for the pattern/placement cells, red for
-              cells a hint says to eliminate candidates from. Drawn beneath the
+          {/* Hint highlight: the next cell to fill, in amber. Drawn beneath the
               peer-highlight so an active cell still reads clearly. */}
-          {hint && (hint.kind === "step" || hint.kind === "reveal") && (
+          {hint?.kind === "cell" && (
             <g>
               {Array.from(hintFocusKeys).map((key) => {
                 const [col, row] = key.split(",").map(Number);
@@ -472,7 +411,7 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, so
                     y={row * CELL_SIZE + 1}
                     width={CELL_SIZE - 2}
                     height={CELL_SIZE - 2}
-                    fill={hint.kind === "reveal" ? "#c8e6c9" : "#fff59d"}
+                    fill="#fff59d"
                     fillOpacity={0.8}
                   />
                 );

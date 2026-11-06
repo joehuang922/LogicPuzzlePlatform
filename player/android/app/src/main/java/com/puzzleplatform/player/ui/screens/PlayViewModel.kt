@@ -65,16 +65,16 @@ data class PlayUiState(
 
 /**
  * A hint surfaced to the player. Mirrors the web client's HintView:
- *  - [Step] a teachable technique (highlight focus cells, optional placement/eliminations),
- *  - [Reveal] the solution-backed "give up" fallback (one correct cell),
+ *  - [NextCell] Sudoku: the next cell to fill, highlighted without its digit. [logical]:
+ *    the hinter's ladder reaches it from the board as it stands; otherwise it's the first
+ *    open cell, picked when the ladder runs dry,
  *  - [Lines] a Nonogram step: highlight its focus lines; the cells it settles stay hidden
  *    until [Lines.showCells] (a reveal is a one-cell step here),
  *  - [Message] an informational note (e.g. conflicts present, or no step available).
  */
 sealed interface HintView {
-    data class Step(val step: SudokuHinter.Step) : HintView
+    data class NextCell(val cell: Int, val logical: Boolean) : HintView
     data class Lines(val step: NonogramHinter.Step, val showCells: Boolean = false) : HintView
-    data class Reveal(val cell: Int, val value: Int) : HintView
     data class Message(val text: String) : HintView
 }
 
@@ -164,8 +164,8 @@ class PlayViewModel(
 
     /**
      * Compute and show the next offline hint for Sudoku (type 1) or Nonogram (type 6).
-     * Prefers a teachable technique; falls back to a solution-backed reveal of one correct
-     * cell; otherwise shows an informational message. No-op for types without a hinter.
+     * Sudoku highlights the next cell whose digit can be worked out (never the digit);
+     * Nonogram points at a line. No-op for types without a hinter.
      */
     fun requestHint() {
         val puzzle = _state.value.puzzle ?: return
@@ -185,38 +185,22 @@ class PlayViewModel(
             return
         }
 
-        val step = SudokuHinter.nextPlacement(puzzle, values)
-        if (step != null) {
-            _state.update { it.copy(hint = HintView.Step(step)) }
-            return
+        val placement = SudokuHinter.nextPlacement(puzzle, values)?.placement
+        val hint = when {
+            placement != null -> HintView.NextCell(placement.cell, logical = true)
+            // No step the ladder knows: point at the first open cell.
+            else -> firstOpenCell(puzzle, values)?.let { HintView.NextCell(it, logical = false) }
+                ?: HintView.Message("The board is already complete.")
         }
-
-        // No logical step: reveal one correct cell from the stored solution, if any.
-        val reveal = firstRevealCell(puzzle, values)
-        _state.update {
-            it.copy(
-                hint = reveal
-                    ?: HintView.Message("No simple next step from here — try a different cell, or keep going."),
-            )
-        }
+        _state.update { it.copy(hint = hint) }
     }
 
-    /**
-     * The first empty, non-hint cell whose stored-solution digit is known — the "give up"
-     * reveal target. Null when the puzzle has no stored solution or the board is full.
-     */
-    private fun firstRevealCell(puzzle: Puzzle, values: Map<String, Int>): HintView.Reveal? {
-        val solution = SudokuEngine.parseSolution(puzzle) ?: return null
+    /** The first open (no given, no entry) cell, row by row; null when the board is full. */
+    private fun firstOpenCell(puzzle: Puzzle, values: Map<String, Int>): Int? {
         val hints = SudokuEngine.parseHints(puzzle)
-        for (id in 0 until 81) {
-            val row = id / 9
-            val col = id % 9
-            if (hints[row][col] != 0) continue
-            if ((values["$col,$row"] ?: 0) > 0) continue
-            val value = solution[row][col]
-            if (value > 0) return HintView.Reveal(id, value)
+        return (0 until 81).firstOrNull { id ->
+            hints[id / 9][id % 9] == 0 && (values["${id % 9},${id / 9}"] ?: 0) == 0
         }
-        return null
     }
 
     /**
@@ -263,29 +247,14 @@ class PlayViewModel(
 
     /** Commit a hint's placement (a step placement or a reveal) and dismiss the hint. */
     fun applyHint() {
-        val hint = _state.value.hint
-        if (hint is HintView.Lines) {
-            // Nonogram: commit every settled cell as one move (one undo step).
-            val cols = _state.value.puzzle?.let { NonogramEngine.parseClues(it).cols } ?: return
-            val next = _state.value.userValues +
-                hint.step.placements.associate { NonogramHinter.cellKey(it.cell, cols) to it.value }
-            _state.update { it.copy(hint = null) }
-            updateValues(next, clearSelection = false)
-            return
-        }
-        val placement: SudokuHinter.Placement = when (hint) {
-            is HintView.Reveal -> SudokuHinter.Placement(hint.cell, hint.value)
-            is HintView.Step -> hint.step.placement ?: return
-            else -> return // Message or null: nothing to apply
-        }
-        val col = placement.cell % 9
-        val row = placement.cell / 9
-        val key = "$col,$row"
-        val values = _state.value.userValues
-        // Commit the digit and clear that cell's pencil marks (matches enterDigit).
-        val next = values.filterKeys { !it.startsWith("n:$key:") } + (key to placement.value)
+        // Only a Nonogram step has cells to commit (a Sudoku hint never shows its digit):
+        // every settled cell as one move (one undo step).
+        val hint = _state.value.hint as? HintView.Lines ?: return
+        val cols = _state.value.puzzle?.let { NonogramEngine.parseClues(it).cols } ?: return
+        val next = _state.value.userValues +
+            hint.step.placements.associate { NonogramHinter.cellKey(it.cell, cols) to it.value }
         _state.update { it.copy(hint = null) }
-        updateValues(next, clearSelection = true)
+        updateValues(next, clearSelection = false)
     }
 
     fun clearHint() = _state.update { it.copy(hint = null) }

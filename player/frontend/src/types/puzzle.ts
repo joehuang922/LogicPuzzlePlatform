@@ -14,7 +14,7 @@ export interface PuzzleDefinition {
   srcCollectionName: string | null;
   srcCollectionCoverSrc: string | null;
   // Auto-solve gate output (docs/auto-solve). Present for gated types; null otherwise.
-  // solutionRepr backs the "reveal" hint fallback when no logical step is found.
+  // solutionRepr backs the on-track check and Nonogram's reveal hint fallback.
   solutionRepr?: Record<string, unknown> | null;
   validationStatus?: "unique" | "multiple" | "none" | "unknown" | null;
 }

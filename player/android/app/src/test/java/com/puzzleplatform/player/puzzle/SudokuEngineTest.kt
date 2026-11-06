@@ -355,33 +355,6 @@ class SudokuEngineTest {
         assertTrue(grid.all { row -> row.size == 9 && row.all { it == 0 } })
     }
 
-    // -- parseSolution (auto-solve reveal source) --------------------------
-
-    @Test
-    fun parseSolution_nullWhenNoStoredSolution() {
-        val puzzle = puzzleWithHints(emptyGrid)
-        assertNull(SudokuEngine.parseSolution(puzzle))
-    }
-
-    @Test
-    fun parseSolution_readsSolutionReprHintsGrid() {
-        val rows = solution.map { row -> JsonArray(row.map { JsonPrimitive(it) }) }
-        val solutionRepr = JsonObject(mapOf("hints" to JsonArray(rows)))
-        val puzzle = Puzzle(
-            id = "p1",
-            puzzleType = 1,
-            puzzleTypeName = "sudoku",
-            puzzleTypeJpLabel = "数独",
-            difficulty = 3,
-            canonRepr = JsonObject(mapOf("hints" to JsonArray(emptyGrid.map { row -> JsonArray(row.map { JsonPrimitive(it) }) }))),
-            solutionRepr = solutionRepr,
-        )
-        val grid = SudokuEngine.parseSolution(puzzle)
-        assertNotNull(grid)
-        assertEquals(solution[0][0], grid!![0][0])
-        assertEquals(solution[8][8], grid[8][8])
-    }
-
     @Test
     fun parseHints_raggedRowsPadWithZeros() {
         // A canonRepr with a short row and a missing row; both must pad to 0.

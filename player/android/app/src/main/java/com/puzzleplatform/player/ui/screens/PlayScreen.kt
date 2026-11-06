@@ -278,16 +278,13 @@ fun PlayScreen(
                         when (puzzle.puzzleType) {
                             1 -> {
                                 val h = state.hint
-                                val step = (h as? HintView.Step)?.step
-                                val reveal = h as? HintView.Reveal
                                 SudokuBoard(
                                     puzzle = puzzle,
                                     userValues = state.userValues,
                                     liveValidate = state.liveValidate,
                                     selectedCell = state.selectedCell,
                                     onSelectCell = vm::selectCell,
-                                    hintFocusCells = step?.focusCells?.map { SudokuHinter.cellKey(it) }?.toSet() ?: emptySet(),
-                                    hintRevealCell = reveal?.let { SudokuHinter.cellKey(it.cell) },
+                                    hintCell = (h as? HintView.NextCell)?.let { SudokuHinter.cellKey(it.cell) },
                                 )
                                 HintControls(hint = h, onRequest = vm::requestHint, onApply = vm::applyHint, onClear = vm::clearHint, onShowCells = {})
                             }
@@ -608,13 +605,14 @@ private fun HintControls(
         val explanation: String
         val applyLabel: String?
         when (hint) {
-            is HintView.Step -> {
-                explanation = hint.step.explanation
-                applyLabel = if (hint.step.placement != null) "Place it" else null
-            }
-            is HintView.Reveal -> {
-                explanation = "No simple next step was found. The answer here is ${hint.value}."
-                applyLabel = "Fill it in"
+            is HintView.NextCell -> {
+                val label = SudokuHinter.cellLabel(hint.cell)
+                explanation = if (hint.logical) {
+                    "Next cell: $label. Its digit can be worked out from the board as it stands."
+                } else {
+                    "No simple step was found from here. Try working on $label."
+                }
+                applyLabel = null
             }
             is HintView.Lines -> {
                 explanation = hint.step.explanation

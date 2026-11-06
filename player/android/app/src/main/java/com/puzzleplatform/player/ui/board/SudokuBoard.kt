@@ -22,9 +22,8 @@ private val NOTE_COLOR = Color(0xFF999999)
 private val CONFLICT_COLOR = Color(0xFFD32F2F)
 private val SELECT_FILL = Color(0x9963A4FF)
 private val PEER_FILL = Color(0x33BBDEFB)
-// Hint highlights (docs/auto-solve): amber focus, green reveal, red elimination target.
+// Hint highlight (docs/auto-solve): the next cell to fill, in amber.
 private val HINT_FOCUS_FILL = Color(0xFFFFF59D)
-private val HINT_REVEAL_FILL = Color(0xFFC8E6C9)
 
 /**
  * Compose Canvas renderer for Sudoku, the analog of
@@ -48,9 +47,8 @@ fun SudokuBoard(
     selectedCell: String?,
     onSelectCell: (String?) -> Unit,
     modifier: Modifier = Modifier,
-    // Hint highlights (docs/auto-solve), all keyed "col,row". Empty when no hint is shown.
-    hintFocusCells: Set<String> = emptySet(),
-    hintRevealCell: String? = null,
+    // The hinted next cell ("col,row"), or null when no hint is shown.
+    hintCell: String? = null,
 ) {
     val hints = remember(puzzle.id) { SudokuEngine.parseHints(puzzle) }
     val conflicts = if (liveValidate) SudokuEngine.findConflicts(puzzle, userValues) else emptySet()
@@ -69,10 +67,9 @@ fun SudokuBoard(
         val boardSize = SIZE * cell
         drawRect(color = GRID_BG, size = androidx.compose.ui.geometry.Size(boardSize, boardSize))
 
-        // Hint highlights, drawn under the selection/peer layer so a selected cell still
-        // reads as selected. Focus first, then the reveal cell.
-        for (key in hintFocusCells) key.toColRow()?.let { (c, r) -> drawCellFill(c, r, cell, HINT_FOCUS_FILL) }
-        hintRevealCell?.toColRow()?.let { (c, r) -> drawCellFill(c, r, cell, HINT_REVEAL_FILL) }
+        // Hint highlight, drawn under the selection/peer layer so a selected cell still
+        // reads as selected.
+        hintCell?.toColRow()?.let { (c, r) -> drawCellFill(c, r, cell, HINT_FOCUS_FILL) }
 
         // Highlight selected cell + peers.
         selectedCell?.let { key ->
