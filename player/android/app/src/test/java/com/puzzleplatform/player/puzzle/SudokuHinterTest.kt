@@ -184,4 +184,52 @@ class SudokuHinterTest {
         // The engine advanced: the next placement is a different cell.
         assertTrue(afterFirst!!.placement!!.cell != first.placement!!.cell)
     }
+
+    // -- nextPlacement (always the next answer) -------------------------------
+
+    // A published puzzle whose solve needs locked candidates / naked pairs: the plain
+    // ladder stops at candidate-only steps along the way. Same fixture as hint.test.ts.
+    private val needsEliminations =
+        "008000903050200000060940000090001500000000000001800060000023070000005040706000200"
+    private val needsEliminationsSolution =
+        "478516923159237684263948715897461532645372891321859467584623179912785346736194258"
+
+    // The TS engine's nextPlacement sequence playing it from empty ("cell:value", "*" =
+    // reached through eliminations, technique "next-answer").
+    private val tsPlacements = (
+        "13:3 7:2* 0:4* 1:7* 5:6 11:9 9:1 16:8 14:7 23:8 34:3 73:3 65:2 20:3 18:2 35:2 27:8 " +
+            "63:9 54:5 45:3 36:6 56:4 29:7 31:6 30:4 38:5 75:1 3:5 4:1 57:6 66:7 39:3 67:8 64:1 " +
+            "55:8 60:1 24:7 51:4 15:6 17:4 42:8 46:2 37:4 50:9 40:7 41:2 49:5 53:7 62:9 44:1 " +
+            "26:5 25:1 43:9 69:3 71:6 76:9 77:4 79:5 80:8"
+        ).split(" ")
+
+    @Test
+    fun nextPlacement_keepsAPlainSingle() {
+        val puzzle = puzzleFromString("123456780" + "0".repeat(72))
+        assertEquals(SudokuHinter.nextHint(puzzle, emptyMap()), SudokuHinter.nextPlacement(puzzle, emptyMap()))
+    }
+
+    @Test
+    fun nextPlacement_alwaysPlacesARightDigitAndMatchesTheTsSequence() {
+        val puzzle = puzzleFromString(needsEliminations)
+        val values = mutableMapOf<String, Int>()
+        val seen = mutableListOf<String>()
+        while (true) {
+            val step = SudokuHinter.nextPlacement(puzzle, values) ?: break
+            val placement = step.placement
+            assertNotNull(placement)
+            assertTrue(step.eliminations.isEmpty())
+            assertEquals(listOf(placement!!.cell), step.focusCells)
+            assertEquals(needsEliminationsSolution[placement.cell] - '0', placement.value)
+            val carried = step.technique == "next-answer"
+            if (carried) {
+                assertTrue(SudokuHinter.nextHint(puzzle, values)!!.placement == null)
+                assertEquals("${SudokuHinter.cellLabel(placement.cell)} is ${placement.value}.", step.explanation)
+            }
+            seen += "${placement.cell}:${placement.value}" + if (carried) "*" else ""
+            values[SudokuHinter.cellKey(placement.cell)] = placement.value
+        }
+        assertEquals(tsPlacements, seen)
+    }
+
 }

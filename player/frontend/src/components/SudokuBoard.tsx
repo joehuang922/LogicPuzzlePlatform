@@ -3,7 +3,7 @@ import { useBoardUiState } from "../hooks/useBoardUiState";
 import { useIsMobile } from "../hooks/useIsMobile";
 import DigitBar from "./DigitBar";
 import RadialInput from "./RadialInput";
-import { nextHint, cellLabel, Step } from "@puzzle/solver";
+import { nextPlacement, cellLabel, Step } from "@puzzle/solver";
 
 interface SudokuBoardProps {
   hints: number[][];
@@ -183,8 +183,9 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, so
   }, [highlightSource, peerMap]);
 
   // --- Hint affordance (docs/auto-solve, Phase 4) -------------------------------
-  // Runs the client-side solver on the committed board to surface the shallowest
-  // logical next step; falls back to revealing one cell from the stored solution.
+  // Runs the client-side solver on the committed board to find the next digit to
+  // place (nextPlacement: candidate-only steps are worked through internally, never
+  // shown); falls back to revealing one cell from the stored solution.
   const [hint, setHint] = useState<HintView | null>(null);
 
   const requestHint = useCallback(() => {
@@ -195,7 +196,7 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, so
       return;
     }
     const canon = { hints };
-    const step = nextHint(1, canon, userValues);
+    const step = nextPlacement(1, canon, userValues);
     if (step) {
       setHint({ kind: "step", step });
       return;
@@ -219,8 +220,7 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, so
     setHint({ kind: "message", text: "No further hints are available for this puzzle." });
   }, [conflictCells, hints, userValues, solution]);
 
-  // Commit the hinted cell (placement step or reveal). Elimination hints have no
-  // placement to apply — they're informational and only dismissed.
+  // Commit the hinted cell (placement step or reveal).
   const applyHint = useCallback(() => {
     const placement =
       hint?.kind === "reveal"
@@ -247,23 +247,12 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, so
     userValuesAtHint.current = userValues;
   }, [userValues, hint]);
 
-  // Cells to tint for the current hint, and candidate digits struck through for
-  // elimination hints (keyed "col,row" -> digits removed).
+  // Cells to tint for the current hint.
   const hintFocusKeys = useMemo(() => {
     if (!hint) return new Set<string>();
     if (hint.kind === "reveal") return new Set([idToKey(hint.cellId)]);
     if (hint.kind === "step") return new Set(hint.step.focusCells.map(idToKey));
     return new Set<string>();
-  }, [hint]);
-
-  const hintStrikes = useMemo(() => {
-    const map = new Map<string, Set<number>>();
-    if (hint?.kind === "step" && hint.step.eliminations) {
-      for (const { cell, digits } of hint.step.eliminations) {
-        map.set(idToKey(cell), new Set(digits));
-      }
-    }
-    return map;
   }, [hint]);
 
   // A cell that already holds a committed answer can't take notes: force answer
@@ -488,20 +477,6 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, so
                   />
                 );
               })}
-              {Array.from(hintStrikes.keys()).map((key) => {
-                const [col, row] = key.split(",").map(Number);
-                return (
-                  <rect
-                    key={`hint-elim-${key}`}
-                    x={col * CELL_SIZE + 1}
-                    y={row * CELL_SIZE + 1}
-                    width={CELL_SIZE - 2}
-                    height={CELL_SIZE - 2}
-                    fill="#ffcdd2"
-                    fillOpacity={0.7}
-                  />
-                );
-              })}
             </g>
           )}
 
@@ -609,42 +584,6 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, so
             });
           })}
 
-          {/* Hint candidate strikes: for elimination hints, show the removed digits
-              as small red struck-through marks in the 3x3 sub-layout, so the player
-              sees which candidates the technique rules out. Only on empty cells. */}
-          {Array.from(hintStrikes.entries()).map(([key, digits]) => {
-            const [col, row] = key.split(",").map(Number);
-            if (hintCells.has(key) || (userValues[key] ?? 0) > 0) return null;
-            const third = CELL_SIZE / 3;
-            return Array.from(digits).map((digit) => {
-              const sub = digit - 1;
-              const sx = col * CELL_SIZE + ((sub % 3) + 0.5) * third;
-              const sy = row * CELL_SIZE + (Math.floor(sub / 3) + 0.5) * third;
-              return (
-                <g key={`strike-${key}-${digit}`} pointerEvents="none">
-                  <text
-                    x={sx}
-                    y={sy}
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    fontSize={third * 0.8}
-                    fontFamily="sans-serif"
-                    fill="#d32f2f"
-                  >
-                    {digit}
-                  </text>
-                  <line
-                    x1={sx - third * 0.35}
-                    y1={sy + third * 0.35}
-                    x2={sx + third * 0.35}
-                    y2={sy - third * 0.35}
-                    stroke="#d32f2f"
-                    strokeWidth={1}
-                  />
-                </g>
-              );
-            });
-          })}
 
           {/* User-entered values */}
           {Object.entries(userValues).map(([key, val]) => {

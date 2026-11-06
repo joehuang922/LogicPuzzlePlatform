@@ -10,6 +10,8 @@ export const sudokuPlugin: SolverPlugin<SudokuCanon, SudokuBoard> = {
   serializeSolution: (grid) => ({ hints: grid }),
   buildBoard: (canon, values) => SudokuBoard.build(canon, values),
   techniques: SUDOKU_TECHNIQUES,
+  withEliminations: (board, eliminations) => board.withEliminations(eliminations),
+  describePlacement: (cell, value) => `${cellLabel(cell)} is ${value}.`,
 };
 
 export type { SudokuCanon };

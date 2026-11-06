@@ -69,6 +69,12 @@ All 81 cells are filled AND no conflicts exist (no duplicate digits in any row, 
 - On mobile: a digit bar appears at the bottom with 1-9 and clear.
 - Hovering a cell highlights its row, column, and 3x3 box peers.
 - Conflicts (duplicate digits in a group) are shown in red.
+- **Hint** (web and Android, offline): highlights the next cell to fill and its digit,
+  with "Place it" to commit it. It always points at an answer, never at notes: the
+  solver's technique ladder (singles, locked candidates, naked pairs) works through
+  candidate-only steps internally (`nextPlacement`, `docs/auto-solve`). When the ladder
+  can't reach a placement, it reveals one cell from the stored solution. It reasons from
+  the entered digits as if they're right, and asks to fix conflicting cells first.
 
 ### Progress calculation
 

@@ -129,6 +129,11 @@ Generic drivers:
 - `solve(model)` → full solution (used at registration to produce `solution_repr`).
 - `nextHint(model, currentBoard)` → run propagation, then walk `techniques` in `depth`
   order; return the first `Step` that fires, else `null` ("give up" / reveal fallback).
+- `nextPlacement(puzzleType, canon, values)` → the player-facing sudoku hint: like
+  `nextHint`, but a candidate-only step (locked candidates, naked pair) is applied to a
+  scratch copy of the candidates (`withEliminations`) and the ladder runs again until
+  it places a digit. The player is only shown that placement ("R4C5 is 7.", technique
+  `next-answer`), never a notes-only step. Ported to `SudokuHinter.nextPlacement`.
 
 ### 4.2 Sudoku plugin (pilot)
 

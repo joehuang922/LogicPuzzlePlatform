@@ -50,6 +50,15 @@ export class SudokuBoard {
   isEmpty(id: number): boolean {
     return this.values[id] === 0;
   }
+
+  /** A copy with `eliminations` struck from the candidates (values unchanged). */
+  withEliminations(eliminations: { cell: number; digits: number[] }[]): SudokuBoard {
+    const candidates = this.candidates.map((c) => c.slice());
+    for (const { cell, digits } of eliminations) {
+      candidates[cell] = candidates[cell].filter((d) => !digits.includes(d));
+    }
+    return new SudokuBoard(this.values, candidates);
+  }
 }
 
 /** Row/col/box unit index helpers. Each returns the 9 cell ids of that unit. */

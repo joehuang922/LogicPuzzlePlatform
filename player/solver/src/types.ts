@@ -102,4 +102,11 @@ export interface SolverPlugin<Canon = unknown, Board = unknown, Solution = numbe
   buildBoard?(canon: Canon, values: CellValues): Board;
   /** Ordered hint ladder (easiest first by `depth`). */
   techniques?: Technique<Board>[];
+  /**
+   * A copy of `board` with a step's eliminations removed from its candidates. Lets
+   * `nextPlacement` carry on past a candidate-only step to the placement it leads to.
+   */
+  withEliminations?(board: Board, eliminations: { cell: number; digits: number[] }[]): Board;
+  /** Text for a placement reached through eliminations, e.g. "R4C5 is 7." */
+  describePlacement?(cell: number, value: number): string;
 }

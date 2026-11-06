@@ -3,7 +3,7 @@ export { countSolutions, solve, classify, SearchBudgetExceeded } from "./drivers
 export type { Verdict, SearchBudget } from "./drivers";
 export { gate, DEFAULT_GATE_BUDGET_MS } from "./gate";
 export type { GateResult } from "./gate";
-export { nextHint } from "./hint";
+export { nextHint, nextPlacement } from "./hint";
 export { getPlugin } from "./registry";
 export { sudokuPlugin, SudokuModel, SudokuBoard, cellLabel } from "./plugins/sudoku";
 export type { SudokuCanon } from "./plugins/sudoku";

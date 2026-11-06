@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { nextHint } from "./hint";
+import { nextHint, nextPlacement } from "./hint";
 import { solve } from "./drivers";
 import { SudokuModel } from "./plugins/sudoku";
 import { parseGrid, INKALA_HARDEST } from "./plugins/sudoku/fixtures";
@@ -81,5 +81,49 @@ describe("nextHint — give-up case", () => {
     // Inkala's hardest puzzle has no naked/hidden single at the start.
     const step = nextHint(1, parseGrid(INKALA_HARDEST), {});
     expect(step).toBeNull();
+  });
+});
+
+// A published puzzle (production) whose solve needs locked candidates / naked pairs:
+// from an empty board the plain ladder stops at candidate-only steps along the way.
+const NEEDS_ELIMINATIONS =
+  "008000903050200000060940000090001500000000000001800060000023070000005040706000200";
+
+describe("nextPlacement — always the next answer", () => {
+  it("returns null for an unsupported puzzle type", () => {
+    expect(nextPlacement(999, {}, {})).toBeNull();
+  });
+
+  it("keeps a plain single's own step", () => {
+    const canon = parseGrid("123456780" + "0".repeat(72));
+    expect(nextPlacement(1, canon, {})).toEqual(nextHint(1, canon, {}));
+  });
+
+  it("carries candidate-only steps through to a placement, and every placement is right", () => {
+    const canon = parseGrid(NEEDS_ELIMINATIONS);
+    const solution = solve(SudokuModel.fromCanon(canon))!;
+    const values: CellValues = {};
+    let passedThroughEliminations = 0;
+    for (;;) {
+      const step = nextPlacement(1, canon, values);
+      if (!step) break;
+      const plain = nextHint(1, canon, values)!;
+      expect(step.placement).toBeDefined();
+      expect(step.eliminations).toBeUndefined();
+      expect(step.focusCells).toEqual([step.placement!.cell]);
+      if (!plain.placement) {
+        passedThroughEliminations++;
+        expect(step.depth).toBeGreaterThanOrEqual(plain.depth);
+        expect(step.technique).toBe("next-answer");
+        expect(step.explanation).toMatch(/^R\dC\d is \d\.$/);
+      }
+      const { cell, value } = step.placement!;
+      expect(value).toBe(solution[Math.floor(cell / 9)][cell % 9]);
+      values[rc(cell)] = value;
+    }
+    expect(passedThroughEliminations).toBeGreaterThan(0);
+    // The ladder carries this puzzle all the way: every empty cell got placed.
+    const givens = canon.hints.flat().filter((v) => v > 0).length;
+    expect(Object.keys(values).length).toBe(81 - givens);
   });
 });

@@ -288,10 +288,6 @@ fun PlayScreen(
                                     onSelectCell = vm::selectCell,
                                     hintFocusCells = step?.focusCells?.map { SudokuHinter.cellKey(it) }?.toSet() ?: emptySet(),
                                     hintRevealCell = reveal?.let { SudokuHinter.cellKey(it.cell) },
-                                    hintElimCells = step?.eliminations?.map { SudokuHinter.cellKey(it.cell) }?.toSet() ?: emptySet(),
-                                    hintStrikes = step?.eliminations
-                                        ?.associate { SudokuHinter.cellKey(it.cell) to it.digits.toSet() }
-                                        ?: emptyMap(),
                                 )
                                 HintControls(hint = h, onRequest = vm::requestHint, onApply = vm::applyHint, onClear = vm::clearHint, onShowCells = {})
                             }

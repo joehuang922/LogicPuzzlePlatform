@@ -105,6 +105,13 @@ object SudokuHinter {
     private class Board(val values: IntArray, val candidates: Array<IntArray>) {
         fun isEmpty(id: Int): Boolean = values[id] == 0
 
+        /** A copy with [eliminations] struck from the candidates (values unchanged). */
+        fun withEliminations(eliminations: List<Elimination>): Board {
+            val next = candidates.copyOf()
+            for ((cell, digits) in eliminations) next[cell] = next[cell].filter { it !in digits }.toIntArray()
+            return Board(values, next)
+        }
+
         companion object {
             fun build(hints: Array<IntArray>, entered: Map<String, Int>): Board {
                 val values = IntArray(CELLS)
@@ -296,4 +303,42 @@ object SudokuHinter {
         }
         return null
     }
+
+    /**
+     * The next *answer* for the player's board, the port of the TS `nextPlacement`: like
+     * [nextHint], but a step that only rules out candidates (locked candidates, naked
+     * pair) is applied to a scratch copy of the candidates and the ladder runs again,
+     * until a rung places a digit. The result is that placement alone, technique
+     * "next-answer" ("R4C5 is 7."; focus on its cell; depth = deepest rung used), so the
+     * player is shown where the next digit goes, not the candidate bookkeeping. A single
+     * found without eliminations is returned as [nextHint] gives it. Null when the
+     * ladder runs dry first (the caller reveals a cell from the stored solution).
+     */
+    fun nextPlacement(puzzle: Puzzle, userValues: Map<String, Int>): Step? {
+        var board = Board.build(SudokuEngine.parseHints(puzzle), userValues)
+        var depth = 0
+        var eliminated = false
+        // Every elimination step strikes at least one candidate, so this ends; the cap
+        // is a backstop against a technique reporting a no-op.
+        repeat(1000) {
+            val step = LADDER.firstNotNullOfOrNull { it(board) } ?: return null
+            depth = maxOf(depth, step.depth)
+            val placement = step.placement
+            if (placement != null) {
+                if (!eliminated) return step
+                return Step(
+                    technique = "next-answer",
+                    focusCells = listOf(placement.cell),
+                    placement = placement,
+                    explanation = "${cellLabel(placement.cell)} is ${placement.value}.",
+                    depth = depth,
+                )
+            }
+            if (step.eliminations.isEmpty()) return null
+            board = board.withEliminations(step.eliminations)
+            eliminated = true
+        }
+        return null
+    }
+
 }

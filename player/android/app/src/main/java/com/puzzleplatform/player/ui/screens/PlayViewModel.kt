@@ -185,7 +185,7 @@ class PlayViewModel(
             return
         }
 
-        val step = SudokuHinter.nextHint(puzzle, values)
+        val step = SudokuHinter.nextPlacement(puzzle, values)
         if (step != null) {
             _state.update { it.copy(hint = HintView.Step(step)) }
             return
