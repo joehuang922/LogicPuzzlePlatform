@@ -81,6 +81,7 @@ import com.puzzleplatform.player.ui.board.ShakashakaBoard
 import com.puzzleplatform.player.ui.board.ShikakuBoard
 import com.puzzleplatform.player.ui.board.SlalomBoard
 import com.puzzleplatform.player.ui.board.SlitherlinkBoard
+import com.puzzleplatform.player.ui.board.ComboSudokuBoard
 import com.puzzleplatform.player.ui.board.SudokuBoard
 import com.puzzleplatform.player.ui.board.TentaishowBoard
 import com.puzzleplatform.player.ui.board.YajilinBoard
@@ -150,9 +151,10 @@ fun PlayScreen(
                         onDismiss = { vm.selectCell(null) },
                     )
                 } else {
-                    // Only Sudoku (type 1) offers pencil-mark notes; a cell that already
-                    // holds a committed answer can't take notes, so disable the toggle.
-                    val notesEnabled = type == 1
+                    // Only Sudoku and Combo Sudoku (types 1, 2) offer pencil-mark notes; a
+                    // cell that already holds a committed answer can't take notes, so
+                    // disable the toggle.
+                    val notesEnabled = type == 1 || type == 2
                     val cellHasAnswer = (state.userValues[selected] ?: 0) > 0
                     DigitBar(
                         onDigit = vm::enterDigit,
@@ -268,6 +270,13 @@ fun PlayScreen(
                             )
                             HintControls(hint = h, onRequest = vm::requestHint, onApply = vm::applyHint, onClear = vm::clearHint, onShowCells = {})
                         }
+                        2 -> ComboSudokuBoard(
+                            puzzle = puzzle,
+                            userValues = state.userValues,
+                            liveValidate = state.liveValidate,
+                            selectedCell = state.selectedCell,
+                            onSelectCell = vm::selectCell,
+                        )
                         12 -> KakuroBoard(
                             puzzle = puzzle,
                             userValues = state.userValues,

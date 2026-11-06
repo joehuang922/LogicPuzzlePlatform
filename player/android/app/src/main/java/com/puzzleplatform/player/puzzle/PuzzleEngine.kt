@@ -56,6 +56,7 @@ interface PuzzleEngine {
 object PuzzleEngines {
     private val engines: Map<Int, PuzzleEngine> = listOf(
         SudokuEngine,
+        ComboSudokuEngine,
         KakuroEngine,
         MasyuEngine,
         NonogramEngine,

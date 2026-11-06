@@ -91,6 +91,7 @@ object BatchRules {
  */
 enum class AuthoringType(val label: String, val jpLabel: String, val puzzleType: Int) {
     SUDOKU("Sudoku", "数独", SudokuAuthoring.PUZZLE_TYPE),
+    COMBO_SUDOKU("Combo Sudoku", "合体数独", ComboSudokuAuthoring.PUZZLE_TYPE),
     NONOGRAM("Nonogram", "お絵かきロジック", NonogramAuthoring.PUZZLE_TYPE),
     KAKURO("Kakuro", "カックロ", KakuroAuthoring.PUZZLE_TYPE),
     SLITHERLINK("Slitherlink", "スリザーリンク", SlitherlinkAuthoring.PUZZLE_TYPE),

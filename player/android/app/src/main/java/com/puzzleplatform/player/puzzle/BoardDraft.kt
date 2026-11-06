@@ -13,6 +13,7 @@ import kotlinx.serialization.json.JsonObject
  */
 data class BoardDraft(
     val userValues: Map<String, Int> = emptyMap(),
+    val comboSudoku: ComboSudokuDraft = ComboSudokuDraft(),
     val nonogram: NonogramDraft = NonogramDraft(),
     val kakuro: KakuroDraft = KakuroDraft(),
     val slitherlink: SlitherlinkDraft = SlitherlinkDraft(),
@@ -38,6 +39,7 @@ data class BoardDraft(
      */
     fun problems(type: AuthoringType): List<String> = when (type) {
         AuthoringType.SUDOKU -> emptyList()
+        AuthoringType.COMBO_SUDOKU -> ComboSudokuAuthoring.problems(comboSudoku)
         AuthoringType.NONOGRAM -> NonogramAuthoring.problems(nonogram)
         AuthoringType.KAKURO -> KakuroAuthoring.problems(kakuro)
         AuthoringType.SLITHERLINK -> SlitherlinkAuthoring.problems(slitherlink)
@@ -60,11 +62,13 @@ data class BoardDraft(
 
     /**
      * The part of [problems] that makes the board unrepresentable as its type's canon
-     * (heyawake rooms that aren't rectangles, ripple effect or norinori walls that end
+     * (combo sudoku boards that are stacked or disagree on a shared cell, heyawake rooms
+     * that aren't rectangles, ripple effect or norinori walls that end
      * inside a room, a slalom gate with two numbers). Unlike the rest these can't be overridden: the
      * board can't be created or saved until they're fixed.
      */
     fun formatProblems(type: AuthoringType): List<String> = when (type) {
+        AuthoringType.COMBO_SUDOKU -> ComboSudokuAuthoring.formatProblems(comboSudoku)
         AuthoringType.HEYAWAKE -> HeyawakeAuthoring.formatProblems(heyawake)
         AuthoringType.RIPPLE_EFFECT -> RippleEffectAuthoring.formatProblems(rippleEffect)
         AuthoringType.SLALOM -> SlalomAuthoring.formatProblems(slalom)
@@ -78,6 +82,11 @@ data class BoardDraft(
             SudokuAuthoring.canonFromUserValues(userValues),
             SudokuAuthoring.SIZE,
             SudokuAuthoring.SIZE,
+        )
+        AuthoringType.COMBO_SUDOKU -> CanonBoard(
+            ComboSudokuAuthoring.canonFromDraft(comboSudoku),
+            comboSudoku.layout.cols,
+            comboSudoku.layout.rows,
         )
         AuthoringType.NONOGRAM ->
             CanonBoard(NonogramAuthoring.canonFromDraft(nonogram), nonogram.cols, nonogram.rows)
@@ -121,6 +130,7 @@ data class BoardDraft(
         /** Seed a board of [type] from a canon (a parser result or a stored question's). */
         fun fromCanon(type: AuthoringType, canon: JsonObject): BoardDraft = when (type) {
             AuthoringType.SUDOKU -> BoardDraft(userValues = SudokuAuthoring.userValuesFromCanon(canon))
+            AuthoringType.COMBO_SUDOKU -> BoardDraft(comboSudoku = ComboSudokuAuthoring.draftFromCanon(canon))
             AuthoringType.NONOGRAM -> BoardDraft(nonogram = NonogramAuthoring.draftFromCanon(canon))
             AuthoringType.KAKURO -> BoardDraft(kakuro = KakuroAuthoring.draftFromCanon(canon))
             AuthoringType.SLITHERLINK -> BoardDraft(slitherlink = SlitherlinkAuthoring.draftFromCanon(canon))

@@ -229,6 +229,10 @@ fun AdminQuestionScreen(
                                 AuthoringType.SUDOKU ->
                                     "Tap a tile to review its photo and grid side by side, fix mis-read " +
                                         "digits, and set its title."
+                                AuthoringType.COMBO_SUDOKU ->
+                                    "Tap a tile to review its photo and boards side by side, fix mis-read " +
+                                        "digits or a misplaced board, and set its title. A red tile has " +
+                                        "digits repeated in a row, column or box."
                                 AuthoringType.NONOGRAM ->
                                     "Tap a tile to review its photo and clues side by side, fix mis-read " +
                                         "clues or phantom lines, and set its title. A red tile has clues " +
@@ -476,6 +480,9 @@ private fun ReviewScreen(
                     AuthoringType.SUDOKU ->
                         "Compare the photo with the grid — pinch to zoom the photo, tap a cell to fix a " +
                             "mis-read digit. Conflicts show in red."
+                    AuthoringType.COMBO_SUDOKU ->
+                        "Compare the photo with the boards — pinch to zoom either, tap a cell to fix a " +
+                            "mis-read digit, or pick a board to move or remove it. Conflicts show in red."
                     AuthoringType.NONOGRAM ->
                         "Compare the photo with the clues — pinch to zoom the photo, edit a line's clue " +
                             "as numbers separated by spaces, delete a phantom line, or add a missed one."

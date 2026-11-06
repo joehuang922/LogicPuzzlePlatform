@@ -14,6 +14,7 @@ import com.puzzleplatform.player.puzzle.ShikakuAuthoring
 import com.puzzleplatform.player.puzzle.SudokuAuthoring
 import com.puzzleplatform.player.ui.board.AkariBoard
 import com.puzzleplatform.player.ui.board.BlackCellMiniBoard
+import com.puzzleplatform.player.ui.board.ComboSudokuMiniBoard
 import com.puzzleplatform.player.ui.board.ClueGridMiniBoard
 import com.puzzleplatform.player.ui.board.DigitBar
 import com.puzzleplatform.player.ui.board.DoubleChocoMiniBoard
@@ -40,6 +41,7 @@ import com.puzzleplatform.player.ui.board.YajilinMiniBoard
  * The editor for a [BoardDraft] of [type], shared by the batch review and the question
  * editor: for sudoku the interactive player board (reused verbatim; an all-zero-hints
  * puzzle keeps every cell editable, the givens ride in as userValues) with a digit bar;
+ * for combo sudoku [ComboSudokuEditor] (the same, plus moving boards);
  * for nonogram [NonogramClueEditor]; for kakuro [KakuroCellEditor]; for slitherlink
  * [SlitherlinkClueEditor]; for nurikabe [NurikabeClueEditor]; for heyawake
  * [HeyawakeRoomEditor]; for picto link [PictoLinkClueEditor]; for yajilin
@@ -79,6 +81,12 @@ fun BoardDraftEditor(
                 )
             }
         }
+        AuthoringType.COMBO_SUDOKU -> ComboSudokuEditor(
+            draft = board.comboSudoku,
+            selectedCell = selectedCell,
+            onSelectCell = onSelectCell,
+            onChange = { t -> onChange { it.copy(comboSudoku = t(it.comboSudoku)) } },
+        )
         AuthoringType.NONOGRAM -> NonogramClueEditor(
             draft = board.nonogram,
             onChange = { t -> onChange { it.copy(nonogram = t(it.nonogram)) } },
@@ -246,6 +254,8 @@ fun BoardDraftMiniBoard(type: AuthoringType, board: BoardDraft, size: Dp) {
     val hasProblems = board.problems(type).isNotEmpty()
     when (type) {
         AuthoringType.SUDOKU -> SudokuMiniBoard(givens = board.userValues, size = size)
+        AuthoringType.COMBO_SUDOKU ->
+            ComboSudokuMiniBoard(layout = board.comboSudoku.layout, hasProblems = hasProblems, size = size)
         AuthoringType.NONOGRAM -> NonogramMiniBoard(
             rows = board.nonogram.rows,
             cols = board.nonogram.cols,
