@@ -10,8 +10,8 @@ from puzzle_parsers.board_grid import BoardGrid
 from puzzle_parsers.debug_overlay import save_cell_labels
 
 PKG = Path(__file__).resolve().parent.parent / "src" / "puzzle_parsers"
-# Out of the plan's scope: slitherlink's dot lattice, combo_sudoku's sub-boards.
-_EXEMPT = {"slitherlink", "combo_sudoku"}
+# Out of the plan's scope: slitherlink's dot lattice.
+_EXEMPT = {"slitherlink"}
 
 
 def test_parsers_draw_cell_labels_with_the_shared_helper():

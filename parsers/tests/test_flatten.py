@@ -21,6 +21,9 @@ from puzzle_parsers.grid_utils import find_grid_lines, rectify_board
 PKG = Path(__file__).resolve().parent.parent / "src" / "puzzle_parsers"
 CURVED_PAGE_PARSERS = {"kakuro", "masyu", "picto_link", "fillomino"}
 _OWN_FLATTENING = re.compile(r"^def \w*(trace_lines|remap|flatten)\w*\(", re.M)
+# Combo sudoku's board is no rectangle, so rectify_board/flatten_board can't
+# take it; it warps each 3x3 room flat from that room's own grid junctions.
+_OWN_FLATTENING_OK = {"combo_sudoku/parser.py: def flatten_rooms("}
 
 
 def test_curved_page_parsers_flatten_with_the_shared_function():
@@ -35,6 +38,7 @@ def test_no_parser_defines_its_own_flattening():
         for p in PKG.rglob("*.py")
         if p.name != "flatten.py"
         for m in _OWN_FLATTENING.finditer(p.read_text())
+        if f"{p.relative_to(PKG)}: {m.group(0)}" not in _OWN_FLATTENING_OK
     ]
     assert not offenders, "Use flatten.flatten_board:\n" + "\n".join(offenders)
 

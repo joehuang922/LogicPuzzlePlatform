@@ -70,7 +70,7 @@ def test_classify_cells_skips_blanks_batches_and_maps_back():
 def test_cell_parsers_read_composite_cells_through_classify_cells():
     # A parser that sends cell crops to the vision model goes through
     # classify_cells, not the raw recognizer (whole-image readers excepted).
-    exempt = {"nonogram", "sudoku", "combo_sudoku"}
+    exempt = {"nonogram", "sudoku"}
     offenders = [
         str(p.relative_to(PKG))
         for p in sorted(PKG.glob("*/parser.py"))

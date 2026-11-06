@@ -131,7 +131,7 @@ def _instrument(backend) -> list[dict]:
     """Wrap ``recognize_cells`` to capture (crops, predictions) per call.
 
     Returns a list that fills in as the parse runs — one entry per
-    ``recognize_cells`` invocation (combo_sudoku calls it several times).
+    ``recognize_cells`` invocation.
     """
     captures: list[dict] = []
     original = backend.recognize_cells

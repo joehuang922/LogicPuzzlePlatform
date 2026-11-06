@@ -106,12 +106,27 @@ All cells across the combined grid are filled AND no conflicts exist in any row,
 
 ## Puzzle Parser
 
-- Supports two modes: explicit layout (known sub-board positions) or auto-detect via bold-bordered 9x9 grid detection.
-- Auto-detect finds individual sub-board borders, warps each, then determines room-coordinate positions.
-- Cross-validates overlapping regions between adjacent sub-boards (resolves 0-vs-nonzero conflicts).
-- OCR via Gemini full-image recognition or cell-by-cell extraction.
-- Validates that each sub-board is a 9x9 grid with values 0-9.
-- Each sub-board is always 9x9 cells. Positions are in room-coordinates (multiply by 3 for cell-coordinates).
+- Handles any arrangement of 9x9 sub-boards with no fixed shapes or board
+  count: cross, staircase, pinwheel, samurai, irregular one- or two-room
+  overlaps, and the 14-board two-page spread (`board_2` ... `board_8`,
+  `sample_warped`; keys in `board_*_ans.json`).
+- Layout (`combo_sudoku/layout.py`): find grid-line crossings on a
+  straightened, Android-sized copy, index them on one cell lattice by
+  walking neighbour to neighbour (so tilt, keystone and a page fold only
+  matter locally), mark the 3x3 rooms whose crossings are there (gaps and
+  enclosed holes have no inner lines), then pick the fewest 3x3-room blocks
+  that cover exactly those rooms.
+- Reading: each room is warped flat onto one canvas at native resolution and
+  every cell is read once with the shared `read_grid_clues` (EasyOCR), then
+  the canvas is sliced into sub-boards. Cells two boards share are read once.
+- If the shape fits more than one set of boards, the set whose clues break no
+  sudoku rule wins; if the clues can't tell them apart, or no set of boards
+  explains the shape, the parse fails with a clear message instead of
+  guessing.
+- Known limit: two boards overlapping by two room-columns draw the same
+  outline as three boards in a row. The parser picks the fewest boards.
+- Debug: `python -m puzzle_parsers.combo_sudoku <image> --debug <dir>` writes
+  the crossing lattice, the flattened canvas with every read, and the JSON.
 
 # Misc
 
