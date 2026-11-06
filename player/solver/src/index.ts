@@ -15,3 +15,5 @@ export { slitherlinkPlugin, SlitherlinkModel } from "./plugins/slitherlink";
 export type { SlitherlinkCanon, SlitherlinkEdges } from "./plugins/slitherlink";
 export { nonogramPlugin, NonogramModel, NonogramBoard, nonogramRevealStep } from "./plugins/nonogram";
 export type { NonogramCanon } from "./plugins/nonogram";
+export { comboSudokuPlugin, ComboSudokuModel } from "./plugins/combo-sudoku";
+export type { ComboSudokuCanon, ComboSudokuSolution } from "./plugins/combo-sudoku";

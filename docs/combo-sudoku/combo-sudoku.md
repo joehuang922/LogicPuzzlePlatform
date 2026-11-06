@@ -94,6 +94,20 @@ All cells across the combined grid are filled AND no conflicts exist in any row,
 
 `(cells assigned by the player / total empty cells that need assignment) * 100`. Across all sub-boards, cells that were originally empty (hint = 0) are counted. Overlapping cells shared between sub-boards are deduplicated (counted once). A cell is "assigned" once the player enters any digit 1-9.
 
+### Auto-solve
+
+Creating or editing a question runs the registration gate (`docs/auto-solve`) with
+`player/solver/src/plugins/combo-sudoku`. It treats the whole layout as one puzzle: a
+shared cell's peers come from every board covering it, and a box two boards share is
+one unit. Propagation uses naked and hidden singles. Hidden singles are what carry
+information across boards through the shared boxes. Without them one 5-board sample
+needed ~477k search nodes; with them every sample needs under 40 and is solved in a
+few milliseconds. A board misread by OCR or placed one room off usually comes out with
+no solution or several, so the gate also catches those mistakes.
+
+A unique puzzle stores its solution in the answer's shape,
+`{ "subboards": [{ "x", "y", "answers" }] }`. No hint ladder yet.
+
 ## Puzzle Editor
 
 ### Interactions
