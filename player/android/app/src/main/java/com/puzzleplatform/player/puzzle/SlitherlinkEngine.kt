@@ -219,4 +219,17 @@ object SlitherlinkEngine : PuzzleEngine {
         }
         return visitedCount == loopDotCount
     }
+
+    /** Every line is on the solution's loop (`solutionRepr.edges`), every cross is off it. */
+    override fun matchesSolution(puzzle: Puzzle, userValues: Map<String, Int>): Boolean? {
+        val (rows, cols) = dims(parseCells(puzzle))
+        val edges = puzzle.solutionRepr?.get("edges") as? JsonObject ?: return null
+        val h = SolutionCheck.grid(edges["h"], rows + 1, cols) ?: return null
+        val v = SolutionCheck.grid(edges["v"], rows, cols + 1) ?: return null
+        val checkH = SolutionCheck.onOff(h, "h:", LINE, CROSS, rowFirst = true)
+        val checkV = SolutionCheck.onOff(v, "v:", LINE, CROSS, rowFirst = true)
+        return SolutionCheck.matches(userValues) { key, value ->
+            if (key.startsWith("h:")) checkH.check(key, value) else checkV.check(key, value)
+        }
+    }
 }

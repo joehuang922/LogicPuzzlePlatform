@@ -211,4 +211,10 @@ object SudokuEngine : PuzzleEngine {
     }
 
     private fun JsonPrimitive.intOrZero(): Int = this.content.toIntOrNull() ?: 0
+
+    /** Every digit entered is the solution's digit there; pencil marks don't count. */
+    override fun matchesSolution(puzzle: Puzzle, userValues: Map<String, Int>): Boolean? {
+        val solution = SolutionCheck.grid(puzzle.solutionRepr?.get("hints"), SIZE, SIZE) ?: return null
+        return SolutionCheck.matches(userValues, SolutionCheck.digits(solution))
+    }
 }

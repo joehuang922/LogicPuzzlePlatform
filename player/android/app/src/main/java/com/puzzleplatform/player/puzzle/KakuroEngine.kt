@@ -213,4 +213,12 @@ object KakuroEngine : PuzzleEngine {
         }
         return true
     }
+
+    /** Every digit entered is the solution's (`solutionRepr.values`, rows x cols) there. */
+    override fun matchesSolution(puzzle: Puzzle, userValues: Map<String, Int>): Boolean? {
+        val cells = parseCells(puzzle)
+        val cols = cells.firstOrNull()?.size ?: return null
+        val solution = SolutionCheck.grid(puzzle.solutionRepr?.get("values"), cells.size, cols) ?: return null
+        return SolutionCheck.matches(userValues, SolutionCheck.digits(solution))
+    }
 }

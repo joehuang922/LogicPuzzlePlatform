@@ -161,6 +161,7 @@ validation_status VARCHAR(16) NULL    -- 'unique' | 'multiple' | 'none' | 'unsup
 | Ship solution | `PUZZLE_SELECT` + `mapRecord` in `puzzles.ts` | Include `solution_repr`, `validation_status` in the puzzle payload. |
 | Web hint UI | `player/frontend/src/renderers/sudoku.tsx` + `SudokuBoard.tsx` | "Hint" button → `nextHint(model, currentBoard)` → highlight `focusCells`, show `explanation`. Reuses existing `conflictCells` highlight machinery. |
 | Android hint | `SudokuEngine.kt` (+ board UI) | Port propagation + ladder; `nextHint` on device; reveal via shipped `solution_repr`. |
+| On-track check | `player/frontend/src/utils/solutionCheck.ts` + Play page; Android `PuzzleEngine.matchesSolution` (`puzzle/SolutionCheck.kt`) + play-screen chip | Opt-in toggle beside Undo/Redo, for every type with a stored solution (sudoku, combo sudoku, slitherlink, nonogram, kakuro, LITS): "✓ On track" while every mark the player made agrees with `solution_repr` (digits equal; fills/shades/lines on, crosses/marks off), "✗ Off track" otherwise. Never says which cell; the player steps back with Undo until it turns green. Hidden when the puzzle has no stored solution. A new solver type adds its case to both. |
 | Backfill | new batch script (TS, uses `db.sh` / Data API) | Iterate registered types; write `validation_status` + `solution_repr`. |
 | Editorial review | `player/frontend/src/pages/Admin.tsx` | Filter/flag list on `validation_status IN ('multiple','none')`. |
 

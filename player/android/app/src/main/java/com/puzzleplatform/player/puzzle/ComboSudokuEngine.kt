@@ -198,4 +198,27 @@ object ComboSudokuEngine : PuzzleEngine {
             List(9) { c -> (row?.getOrNull(c) as? JsonPrimitive)?.content?.toIntOrNull() ?: 0 }
         }
     }
+
+    /**
+     * Every digit entered is the solution's there. The solution (`solutionRepr`) is the
+     * answer's shape, `{subboards:[{x,y,answers}]}`, one board per canon board.
+     */
+    override fun matchesSolution(puzzle: Puzzle, userValues: Map<String, Int>): Boolean? {
+        val boards = parseSubboards(puzzle.canonRepr)
+        val solved = puzzle.solutionRepr?.get("subboards") as? JsonArray ?: return null
+        if (solved.size != boards.size) return null
+        val byCell = HashMap<String, Int>()
+        for ((i, el) in solved.withIndex()) {
+            val sb = el as? JsonObject ?: return null
+            val x = (sb["x"] as? JsonPrimitive)?.content?.toIntOrNull() ?: return null
+            val y = (sb["y"] as? JsonPrimitive)?.content?.toIntOrNull() ?: return null
+            if (x != boards[i].x || y != boards[i].y) return null
+            val answers = SolutionCheck.grid(sb["answers"], 9, 9) ?: return null
+            for (r in 0 until 9) for (c in 0 until 9) byCell["${3 * x + c},${3 * y + r}"] = answers[r][c]
+        }
+        return SolutionCheck.matches(userValues) { key, value ->
+            val want = byCell[key]
+            if (want == null || value !in 1..9) null else want == value
+        }
+    }
 }

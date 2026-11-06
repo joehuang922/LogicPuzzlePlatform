@@ -9,6 +9,7 @@ import { computeProgress } from "../progress";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { BoardUiMemoryProvider } from "../hooks/useBoardUiState";
 import { MoveHistory, sameValues, type Values } from "../utils/moveHistory";
+import { matchesSolution } from "../utils/solutionCheck";
 
 function formatElapsed(seconds: number): string {
   const h = Math.floor(seconds / 3600);
@@ -113,6 +114,23 @@ export default function Play() {
   const strokeIdRef = useRef(0);
   const boardUiMemory = useMemo(() => new Map<string, unknown>(), [id]);
 
+  // "On track" check against the stored solution (utils/solutionCheck). Off by
+  // default: it spoils the solve, so the player opts in when hunting a mistake.
+  // Hidden when the puzzle has no stored solution (an empty board always agrees with
+  // one, so null there means "no check"). Computed only while on.
+  const hasSolutionCheck = useMemo(() => !!puzzle && matchesSolution(puzzle, {}) !== null, [puzzle]);
+  const solutionCheckRef = useRef(false);
+  const [solutionCheck, setSolutionCheck] = useState(false);
+  const [onTrack, setOnTrack] = useState<boolean | null>(null);
+  const updateOnTrack = useCallback((values: Values) => {
+    setOnTrack(solutionCheckRef.current && puzzle ? matchesSolution(puzzle, values) : null);
+  }, [puzzle]);
+  const toggleSolutionCheck = useCallback(() => {
+    solutionCheckRef.current = !solutionCheckRef.current;
+    setSolutionCheck(solutionCheckRef.current);
+    updateOnTrack(userValuesRef.current);
+  }, [updateOnTrack]);
+
   const syncHistory = useCallback(() => {
     setCanUndo(historyRef.current.canUndo);
     setCanRedo(historyRef.current.canRedo);
@@ -127,11 +145,12 @@ export default function Play() {
       syncHistory();
     }
     userValuesRef.current = values;
+    updateOnTrack(values);
     if (puzzle) {
       setProgress(computeProgress(puzzle, values));
       setDebugJson(JSON.stringify(extractAnswer(puzzle, values), null, 2));
     }
-  }, [puzzle, syncHistory]);
+  }, [puzzle, syncHistory, updateOnTrack]);
 
   /** Show a history snapshot: remount the board on it without recording a move. */
   const restoreValues = useCallback((values: Values) => {
@@ -143,8 +162,9 @@ export default function Play() {
     setRestoreKey((k) => k + 1);
     setProgress(computeProgress(puzzle, values));
     setDebugJson(JSON.stringify(extractAnswer(puzzle, values), null, 2));
+    updateOnTrack(values);
     syncHistory();
-  }, [puzzle, syncHistory]);
+  }, [puzzle, syncHistory, updateOnTrack]);
 
   const handleUndo = useCallback(() => {
     const prev = historyRef.current.undo(userValuesRef.current);
@@ -410,6 +430,20 @@ export default function Play() {
         <button onClick={handleRedo} disabled={!canRedo} style={canRedo ? btnStyle : btnDisabled} title="Redo (Ctrl+Shift+Z)">
           ↷ Redo
         </button>
+        {hasSolutionCheck && (
+          <button
+            onClick={toggleSolutionCheck}
+            style={{
+              ...btnStyle,
+              marginLeft: "auto",
+              fontWeight: onTrack === null ? undefined : "bold",
+              backgroundColor: onTrack === true ? "#2e7d32" : onTrack === false ? "#c62828" : "#9e9e9e",
+            }}
+            title="Whether every mark so far agrees with the solution (not which one is wrong): step back with Undo until it turns green"
+          >
+            {solutionCheck ? (onTrack ? "✓ On track" : "✗ Off track") : "Check: Off"}
+          </button>
+        )}
       </div>
       <BoardUiMemoryProvider memory={boardUiMemory}>
         <div onPointerDownCapture={handleBoardPointerDown}>

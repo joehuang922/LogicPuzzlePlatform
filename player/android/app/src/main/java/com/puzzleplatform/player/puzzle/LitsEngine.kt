@@ -350,4 +350,11 @@ object LitsEngine : ShadeMarkEngine {
             .sortedWith(compareBy({ it.first }, { it.second }))
             .joinToString(";") { (r, c) -> "$r,$c" }
     }
+
+    /** Every shaded cell is shaded in the solution (`solutionRepr.shaded`), every marked one isn't. */
+    override fun matchesSolution(puzzle: Puzzle, userValues: Map<String, Int>): Boolean? {
+        val grids = parseGrids(puzzle)
+        val solution = SolutionCheck.grid(puzzle.solutionRepr?.get("shaded"), grids.rows, grids.cols) ?: return null
+        return SolutionCheck.matches(userValues, SolutionCheck.onOff(solution, "c:", SHADED, MARKED, rowFirst = false))
+    }
 }
