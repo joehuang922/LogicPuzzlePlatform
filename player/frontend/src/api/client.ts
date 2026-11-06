@@ -358,6 +358,13 @@ export function getProfile(player: number) {
 
 const PARSER_URL = import.meta.env.VITE_PARSER_URL ?? `${API_BASE}/parse`;
 
+// The deployed parser Lambda gives up after 2 minutes, so waiting longer is
+// pointless. VITE_PARSER_URL means the local parser (`make author-ui`), which
+// exists to parse boards too large for that limit: no client deadline there.
+const PARSE_TIMEOUT_MS: number | null = import.meta.env.VITE_PARSER_URL
+  ? null
+  : 120_000;
+
 export interface ParseImageResponse {
   canon: Record<string, unknown>;
   /** Best-effort title/author read from around the board; absent on older parsers. */
@@ -365,11 +372,21 @@ export interface ParseImageResponse {
 }
 
 export async function parseImage(image: string, puzzleType: number) {
-  const res = await fetch(PARSER_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ image, puzzleType }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(PARSER_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image, puzzleType }),
+      signal:
+        PARSE_TIMEOUT_MS === null ? undefined : AbortSignal.timeout(PARSE_TIMEOUT_MS),
+    });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "TimeoutError") {
+      throw new Error("Parsing timed out (2min). Cold start may take a while — try again.");
+    }
+    throw err;
+  }
   if (!res.ok) {
     let detail = res.statusText;
     try {

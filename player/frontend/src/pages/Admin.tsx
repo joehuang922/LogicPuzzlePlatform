@@ -131,8 +131,6 @@ function CollectionForm({ onCreated }: { onCreated: () => void }) {
   );
 }
 
-const PARSE_TIMEOUT_MS = 120_000;
-
 function QuestionForm({
   puzzleTypes,
   collections,
@@ -329,15 +327,7 @@ function QuestionForm({
 
       try {
         const base64 = extractBase64(dataUrl);
-
-        const timeout = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Parsing timed out (2min). Cold start may take a while — try again.")), PARSE_TIMEOUT_MS)
-        );
-
-        const res = await Promise.race([
-          parseImage(base64, Number(puzzleType)),
-          timeout,
-        ]);
+        const res = await parseImage(base64, Number(puzzleType));
         setCanonRepr(JSON.stringify(res.canon, null, 2));
         // Pre-fill from the scan, but never overwrite what the admin typed.
         setTitle((t) => t || res.metadata?.title || "");

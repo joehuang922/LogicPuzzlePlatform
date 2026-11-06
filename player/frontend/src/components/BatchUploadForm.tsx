@@ -10,7 +10,6 @@ import PuzzleEditorModal, { hasVisualEditor } from "./PuzzleEditorModal";
 
 const MAX_IMAGES = 50;
 const PARSE_CONCURRENCY = 3;
-const PARSE_TIMEOUT_MS = 120_000;
 const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp"]);
 
 interface BatchItem {
@@ -387,15 +386,7 @@ export default function BatchUploadForm({
       const blob = new Blob([data]);
       const dataUrl = await blobToDataUrl(blob);
       const base64 = extractBase64(dataUrl);
-
-      const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Timed out (2min)")), PARSE_TIMEOUT_MS)
-      );
-
-      const res = await Promise.race([
-        parseImage(base64, Number(puzzleType)),
-        timeout,
-      ]);
+      const res = await parseImage(base64, Number(puzzleType));
 
       // Pre-fill title/author from the scan, but never overwrite what the admin typed.
       setItems((prev) => prev.map((item) => item.id === itemId ? {
