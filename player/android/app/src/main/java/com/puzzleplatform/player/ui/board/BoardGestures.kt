@@ -5,8 +5,11 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 
 /**
@@ -95,3 +98,27 @@ suspend fun PointerInputScope.detectBoardGestures(
         }
     }
 }
+
+/**
+ * Brackets every touch gesture inside this node — a tap or a whole drag, on any board —
+ * with [onStart]/[onEnd], without consuming anything, so the play screen can group a
+ * gesture's moves into one undo step whatever input model the board below uses.
+ *
+ * [onStart] runs on the first finger down, in the Initial pass (before any board sees
+ * it); [onEnd] runs once the last finger lifts, in the Final pass (after the board has
+ * handled the release, so a tap's or drag-end's change still lands inside the gesture).
+ */
+fun Modifier.groupGestures(onStart: () -> Unit, onEnd: () -> Unit): Modifier =
+    pointerInput(onStart, onEnd) {
+        awaitEachGesture {
+            awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            onStart()
+            try {
+                do {
+                    val event = awaitPointerEvent(PointerEventPass.Final)
+                } while (event.changes.any { it.pressed })
+            } finally {
+                onEnd()
+            }
+        }
+    }

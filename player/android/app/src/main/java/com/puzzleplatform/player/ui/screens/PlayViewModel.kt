@@ -52,7 +52,7 @@ data class PlayUiState(
     val reloading: Boolean = false,
     // Offline Sudoku / Nonogram hint (docs/auto-solve). Null when none is being shown.
     val hint: HintView? = null,
-    // Reverse (undo/redo) history — a pilot wired for Nonogram. These reflect
+    // Reverse (undo/redo) history, for every puzzle type. These reflect
     // whether a move can be stepped backward / forward from the current state.
     val canUndo: Boolean = false,
     val canRedo: Boolean = false,
@@ -90,14 +90,12 @@ class PlayViewModel(
     private var timerJob: Job? = null
     private var completed = false
 
-    // Reverse (undo/redo) history, a Nonogram pilot: a drag is one reverse step, a
-    // fresh move drops the redo future, capped at 100 moves. The engine is [MoveHistory]
-    // (pure, unit-tested); this ViewModel only feeds it snapshots and mirrors its
-    // canUndo/canRedo into UI state.
+    // Reverse (undo/redo) history for every puzzle type: one touch gesture (a tap or a
+    // whole drag, grouped by the play screen via [beginStroke]/[endStroke]) is one
+    // reverse step, a fresh move drops the redo future, capped at 100 moves. The engine
+    // is [MoveHistory] (pure, unit-tested); this ViewModel only feeds it snapshots and
+    // mirrors its canUndo/canRedo into UI state.
     private val history = MoveHistory(maxDepth = 100)
-
-    /** History is a pilot limited to Nonogram (type 6). */
-    private fun historyEnabled(): Boolean = _state.value.puzzle?.puzzleType == 6
 
     private val engine: PuzzleEngine?
         get() = _state.value.puzzle?.let { PuzzleEngines.forType(it.puzzleType) }
@@ -433,7 +431,7 @@ class PlayViewModel(
         val eng = engine
         // Record a reverse snapshot before mutating (drag mutations collapse into one
         // step inside MoveHistory via the stroke hooks).
-        if (historyEnabled()) history.record(_state.value.userValues)
+        history.record(_state.value.userValues)
         val progress = eng?.computeProgress(puzzle, newValues) ?: 0.0
         _state.update {
             it.copy(
@@ -453,19 +451,14 @@ class PlayViewModel(
     }
 
     /**
-     * Mark the start of a drag stroke so every cell it paints collapses into a single
-     * reverse step; [endStroke] closes the group. A tap uses neither and records
-     * per-move.
+     * Mark the start of a touch gesture (the play screen calls these around every tap or
+     * drag on the board) so all the changes it makes collapse into a single reverse step;
+     * [endStroke] closes the group. Input outside the board (the digit bar, a hint's
+     * Apply) records one step per change.
      */
-    fun beginStroke() {
-        if (!historyEnabled()) return
-        history.beginStroke(_state.value.userValues)
-    }
+    fun beginStroke() = history.beginStroke(_state.value.userValues)
 
-    fun endStroke() {
-        if (!historyEnabled()) return
-        history.endStroke()
-    }
+    fun endStroke() = history.endStroke()
 
     /** Step one move backward: restore the last pre-move snapshot, saving the current one for redo. */
     fun undo() {

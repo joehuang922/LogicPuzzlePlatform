@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useBoardUiState } from "../hooks/useBoardUiState";
 import { useIsMobile } from "../hooks/useIsMobile";
 import DigitBar from "./DigitBar";
 import RadialInput from "./RadialInput";
@@ -54,7 +55,7 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, so
 
   const [userValues, setUserValues] = useState<Record<string, number>>(initialUserValues ?? {});
   const [notes, setNotes] = useState<Record<string, Set<number>>>(() => notesFromInitial(initialNotes));
-  const [noteMode, setNoteMode] = useState(false);
+  const [noteMode, setNoteMode] = useBoardUiState("sudoku.noteMode", false);
   const [activeCell, setActiveCell] = useState<string | null>(null);
   const [hoveredCell, setHoveredCell] = useState<string | null>(null);
 

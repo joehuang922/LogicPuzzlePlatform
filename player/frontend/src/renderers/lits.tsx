@@ -20,7 +20,8 @@ export const litsRenderer: PuzzleRenderer = {
   render(puzzle: PuzzleDefinition, state: PuzzleState, onValuesChange?: (values: Record<string, number>) => void, onComplete?: () => void) {
     const canonRepr = (typeof puzzle.canonRepr === "string" ? JSON.parse(puzzle.canonRepr) : puzzle.canonRepr) as LitsCanon;
     const savedAnswer = state.playerGrid as unknown as LitsAnswer | undefined;
-    const initialUserValues = extractUserValues(savedAnswer);
+    // The saved answer keeps only shading; an undo/redo restore keeps the marks too.
+    const initialUserValues = state.restoreValues ?? extractUserValues(savedAnswer);
     return <LitsBoard canon={canonRepr} initialUserValues={initialUserValues} onValuesChange={onValuesChange} onComplete={onComplete} />;
   },
 

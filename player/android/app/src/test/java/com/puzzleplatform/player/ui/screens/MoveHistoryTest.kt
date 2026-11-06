@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Unit tests for the Nonogram reverse (undo/redo) pilot's engine. A "move" is one tap
+ * Unit tests for the reverse (undo/redo) history engine shared by every puzzle type. A "move" is one tap
  * or one whole drag; a fresh move drops the redo future; depth is capped at 100.
  *
  * These drive [MoveHistory] the way [PlayViewModel] does: before each move the live

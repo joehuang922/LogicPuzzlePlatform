@@ -62,6 +62,7 @@ import com.puzzleplatform.player.ui.board.DigitBar
 import com.puzzleplatform.player.ui.board.DoubleChocoBoard
 import com.puzzleplatform.player.ui.board.FillominoBoard
 import com.puzzleplatform.player.ui.board.FillominoMode
+import com.puzzleplatform.player.ui.board.groupGestures
 import com.puzzleplatform.player.ui.board.NumberPad
 import com.puzzleplatform.player.ui.board.HellGolfBoard
 import com.puzzleplatform.player.ui.board.HeyawakeBoard
@@ -249,269 +250,274 @@ fun PlayScreen(
                         Text("%.1f %%".format(state.progress), fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
                     }
 
-                    // Board, dispatched by puzzle type.
-                    when (puzzle.puzzleType) {
-                        1 -> {
-                            val h = state.hint
-                            val step = (h as? HintView.Step)?.step
-                            val reveal = h as? HintView.Reveal
-                            SudokuBoard(
-                                puzzle = puzzle,
-                                userValues = state.userValues,
-                                liveValidate = state.liveValidate,
-                                selectedCell = state.selectedCell,
-                                onSelectCell = vm::selectCell,
-                                hintFocusCells = step?.focusCells?.map { SudokuHinter.cellKey(it) }?.toSet() ?: emptySet(),
-                                hintRevealCell = reveal?.let { SudokuHinter.cellKey(it.cell) },
-                                hintElimCells = step?.eliminations?.map { SudokuHinter.cellKey(it.cell) }?.toSet() ?: emptySet(),
-                                hintStrikes = step?.eliminations
-                                    ?.associate { SudokuHinter.cellKey(it.cell) to it.digits.toSet() }
-                                    ?: emptyMap(),
-                            )
-                            HintControls(hint = h, onRequest = vm::requestHint, onApply = vm::applyHint, onClear = vm::clearHint, onShowCells = {})
-                        }
-                        2 -> ComboSudokuBoard(
+                    // Reverse (undo/redo) controls, for every puzzle type: they step back
+                    // and forth through the last 100 moves and sit above the board, clear
+                    // of the frequently-tapped controls below it. A FlowRow so the check
+                    // chip wraps below on narrow phones.
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = vm::undo, enabled = state.canUndo) { Text("↶ Undo") }
+                        OutlinedButton(onClick = vm::redo, enabled = state.canRedo) { Text("↷ Redo") }
+                        // Sits with undo/redo on purpose: with it on, step back until it
+                        // reads "On track" to land on the move where a mistake began.
+                        // Hidden for types without a stored-solution check.
+                        SolutionCheckChip(
                             puzzle = puzzle,
                             userValues = state.userValues,
-                            liveValidate = state.liveValidate,
-                            selectedCell = state.selectedCell,
-                            onSelectCell = vm::selectCell,
+                            enabled = state.solutionCheck,
+                            onToggle = vm::toggleSolutionCheck,
+                            modifier = Modifier.align(Alignment.CenterVertically),
                         )
-                        12 -> KakuroBoard(
-                            puzzle = puzzle,
-                            userValues = state.userValues,
-                            liveValidate = state.liveValidate,
-                            selectedCell = state.selectedCell,
-                            onSelectCell = vm::selectCell,
-                        )
-                        7 -> MasyuBoard(
-                            puzzle = puzzle,
-                            userValues = state.userValues,
-                            liveValidate = state.liveValidate,
-                            onSetEdge = vm::setUserValue,
-                        )
-                        5 -> SlitherlinkBoard(
-                            puzzle = puzzle,
-                            userValues = state.userValues,
-                            // Edges are tri-state (0 empty, 1 line, 2 cross); putUserValue
-                            // sets the explicit state and drops the key when it cycles to 0.
-                            onCycleEdge = { key, next -> vm.putUserValue(key, next) },
-                        )
-                        // Shade/mark puzzles (LITS, Nurikabe, Nuritwin, Nurimaze) all share
-                        // tap-to-cycle input: the engine decides what a tap covers (one cell,
-                        // a whole room, or nothing for a clue) and tapShadeCell applies it.
-                        3 -> NurimazeBoard(
-                            puzzle = puzzle,
-                            userValues = state.userValues,
-                            onTapCell = vm::tapShadeCell,
-                        )
-                        9 -> NuritwinBoard(
-                            puzzle = puzzle,
-                            userValues = state.userValues,
-                            onTapCell = vm::tapShadeCell,
-                        )
-                        21 -> HeyawakeBoard(
-                            puzzle = puzzle,
-                            userValues = state.userValues,
-                            onTapCell = vm::tapShadeCell,
-                        )
-                        23 -> NorinoriBoard(
-                            puzzle = puzzle,
-                            userValues = state.userValues,
-                            onTapCell = vm::tapShadeCell,
-                        )
-                        14 -> {
-                            var fillominoMode by remember(puzzle.id) { mutableStateOf(FillominoMode.NUMBER) }
-                            FillominoBoard(
-                                puzzle = puzzle,
-                                userValues = state.userValues,
-                                mode = fillominoMode,
-                                selectedCell = state.selectedCell,
-                                onSelectCell = vm::selectCell,
-                                onSetEdge = vm::setUserValue,
-                            )
-                            // Number / Wall input-mode toggle (one is numbers, the other
-                            // draws room borders). Leaving Number mode drops any cell
-                            // selection so the digit pad hides.
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                FilterChip(
-                                    selected = fillominoMode == FillominoMode.NUMBER,
-                                    onClick = { fillominoMode = FillominoMode.NUMBER },
-                                    label = { Text("Number") },
-                                )
-                                FilterChip(
-                                    selected = fillominoMode == FillominoMode.WALL,
-                                    onClick = {
-                                        fillominoMode = FillominoMode.WALL
-                                        vm.selectCell(null)
-                                    },
-                                    label = { Text("Wall") },
-                                )
-                            }
-                        }
-                        17 -> NumberLinkBoard(
-                            puzzle = puzzle,
-                            userValues = state.userValues,
-                            // Edge-based paths keyed "h:r,c"/"v:r,c"; putUserValue writes the
-                            // segment and drops the key when it's erased (0).
-                            onSetEdge = { key, state -> vm.putUserValue(key, state) },
-                        )
-                        27 -> PictoLinkBoard(
-                            puzzle = puzzle,
-                            userValues = state.userValues,
-                            // Segments "h:r,c"/"v:r,c" and filled 1-clues "s:r,c" -> 1; a tap
-                            // that clears a path cell's segments lands as one batch.
-                            onApplyChanges = vm::putUserValues,
-                            liveValidate = state.liveValidate,
-                        )
-                        19 -> HellGolfBoard(
-                            puzzle = puzzle,
-                            userValues = state.userValues,
-                            onPutValue = vm::putUserValue,
-                        )
-                        20 -> TentaishowBoard(
-                            puzzle = puzzle,
-                            userValues = state.userValues,
-                            // Walls keyed "h:r,c"/"v:r,c" -> 1 (web convention); setUserValue
-                            // drops the key when a wall is toggled off.
-                            onSetEdge = vm::setUserValue,
-                        )
-                        4 -> DoubleChocoBoard(
-                            puzzle = puzzle,
-                            userValues = state.userValues,
-                            // Borders keyed "h:r,c"/"v:r,c" -> 1 (web convention); setUserValue
-                            // drops the key when a border is toggled off.
-                            onSetEdge = vm::setUserValue,
-                        )
-                        25 -> RippleEffectBoard(
-                            puzzle = puzzle,
-                            userValues = state.userValues,
-                            // The room partition is fixed in the canon, so there's no wall
-                            // mode: tap a non-clue cell to select it, then the DigitBar
-                            // enters a (multi-digit) value keyed "col,row".
-                            selectedCell = state.selectedCell,
-                            onSelectCell = vm::selectCell,
-                        )
-                        22 -> ShikakuBoard(
-                            puzzle = puzzle,
-                            userValues = state.userValues,
-                            // Rectangles keyed "rect:r,c" -> encodeWH(w,h); draw/resize/erase
-                            // apply as an atomic batch (a 0 value drops the key), so a resize
-                            // that moves the top-left can retire the old key in one update.
-                            onApplyChanges = vm::putUserValues,
-                        )
-                        11 -> ShakashakaBoard(
-                            puzzle = puzzle,
-                            userValues = state.userValues,
-                            // Triangles/marks keyed "col,row" -> 1..5; the board picks the
-                            // next state from the tapped quadrant, putUserValue drops 0.
-                            onPutValue = vm::putUserValue,
-                        )
-                        24 -> NurikabeBoard(
-                            puzzle = puzzle,
-                            userValues = state.userValues,
-                            onTapCell = vm::tapShadeCell,
-                        )
-                        26 -> HitoriBoard(
-                            puzzle = puzzle,
-                            userValues = state.userValues,
-                            onTapCell = vm::tapShadeCell,
-                        )
-                        18 -> AkariBoard(
-                            puzzle = puzzle,
-                            userValues = state.userValues,
-                            liveValidate = state.liveValidate,
-                            onTapCell = vm::tapShadeCell,
-                        )
-                        6 -> {
-                            var nonogramMode by remember(puzzle.id) { mutableStateOf(NonogramMode.FILL) }
-                            // Reverse (undo/redo) controls sit ABOVE the board — the Nonogram
-                            // pilot steps back and forth through the last 100 moves, and these
-                            // are kept clear of the frequently-tapped Fill/Cross chips below.
-                            // A FlowRow so the check chip wraps below on narrow phones.
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedButton(onClick = vm::undo, enabled = state.canUndo) { Text("↶ Undo") }
-                                OutlinedButton(onClick = vm::redo, enabled = state.canRedo) { Text("↷ Redo") }
-                                // Sits with undo/redo on purpose: with it on, step back until it
-                                // reads "On track" to land on the move where a mistake began.
-                                SolutionCheckChip(
+                    }
+
+                    // Board, dispatched by puzzle type. Every touch gesture in here (a tap
+                    // or a whole drag, whatever the board does with it) is one undo step.
+                    Column(
+                        Modifier.fillMaxWidth().groupGestures(onStart = vm::beginStroke, onEnd = vm::endStroke),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        when (puzzle.puzzleType) {
+                            1 -> {
+                                val h = state.hint
+                                val step = (h as? HintView.Step)?.step
+                                val reveal = h as? HintView.Reveal
+                                SudokuBoard(
                                     puzzle = puzzle,
                                     userValues = state.userValues,
-                                    enabled = state.solutionCheck,
-                                    onToggle = vm::toggleSolutionCheck,
-                                    modifier = Modifier.align(Alignment.CenterVertically),
+                                    liveValidate = state.liveValidate,
+                                    selectedCell = state.selectedCell,
+                                    onSelectCell = vm::selectCell,
+                                    hintFocusCells = step?.focusCells?.map { SudokuHinter.cellKey(it) }?.toSet() ?: emptySet(),
+                                    hintRevealCell = reveal?.let { SudokuHinter.cellKey(it.cell) },
+                                    hintElimCells = step?.eliminations?.map { SudokuHinter.cellKey(it.cell) }?.toSet() ?: emptySet(),
+                                    hintStrikes = step?.eliminations
+                                        ?.associate { SudokuHinter.cellKey(it.cell) to it.digits.toSet() }
+                                        ?: emptyMap(),
                                 )
+                                HintControls(hint = h, onRequest = vm::requestHint, onApply = vm::applyHint, onClear = vm::clearHint, onShowCells = {})
                             }
-                            val lines = state.hint as? HintView.Lines
-                            NonogramBoard(
+                            2 -> ComboSudokuBoard(
                                 puzzle = puzzle,
                                 userValues = state.userValues,
                                 liveValidate = state.liveValidate,
-                                mode = nonogramMode,
-                                hintLines = lines?.step?.focusLines ?: emptyList(),
-                                hintCells = if (lines != null && lines.showCells) {
-                                    val cols = NonogramEngine.parseClues(puzzle).cols
-                                    lines.step.placements.associate { NonogramHinter.cellKey(it.cell, cols) to it.value }
-                                } else {
-                                    emptyMap()
-                                },
-                                onSetCell = vm::setCellState,
-                                // Group a whole drag into one reverse (undo/redo) step.
-                                onStrokeStart = vm::beginStroke,
-                                onStrokeEnd = vm::endStroke,
+                                selectedCell = state.selectedCell,
+                                onSelectCell = vm::selectCell,
                             )
-                            // Fill / cross paint-mode toggle (touch has no right-click), kept
-                            // next to the board where paint-mode switching happens.
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                FilterChip(
-                                    selected = nonogramMode == NonogramMode.FILL,
-                                    onClick = { nonogramMode = NonogramMode.FILL },
-                                    label = { Text("■ Fill") },
+                            12 -> KakuroBoard(
+                                puzzle = puzzle,
+                                userValues = state.userValues,
+                                liveValidate = state.liveValidate,
+                                selectedCell = state.selectedCell,
+                                onSelectCell = vm::selectCell,
+                            )
+                            7 -> MasyuBoard(
+                                puzzle = puzzle,
+                                userValues = state.userValues,
+                                liveValidate = state.liveValidate,
+                                onSetEdge = vm::setUserValue,
+                            )
+                            5 -> SlitherlinkBoard(
+                                puzzle = puzzle,
+                                userValues = state.userValues,
+                                // Edges are tri-state (0 empty, 1 line, 2 cross); putUserValue
+                                // sets the explicit state and drops the key when it cycles to 0.
+                                onCycleEdge = { key, next -> vm.putUserValue(key, next) },
+                            )
+                            // Shade/mark puzzles (LITS, Nurikabe, Nuritwin, Nurimaze) all share
+                            // tap-to-cycle input: the engine decides what a tap covers (one cell,
+                            // a whole room, or nothing for a clue) and tapShadeCell applies it.
+                            3 -> NurimazeBoard(
+                                puzzle = puzzle,
+                                userValues = state.userValues,
+                                onTapCell = vm::tapShadeCell,
+                            )
+                            9 -> NuritwinBoard(
+                                puzzle = puzzle,
+                                userValues = state.userValues,
+                                onTapCell = vm::tapShadeCell,
+                            )
+                            21 -> HeyawakeBoard(
+                                puzzle = puzzle,
+                                userValues = state.userValues,
+                                onTapCell = vm::tapShadeCell,
+                            )
+                            23 -> NorinoriBoard(
+                                puzzle = puzzle,
+                                userValues = state.userValues,
+                                onTapCell = vm::tapShadeCell,
+                            )
+                            14 -> {
+                                var fillominoMode by remember(puzzle.id) { mutableStateOf(FillominoMode.NUMBER) }
+                                FillominoBoard(
+                                    puzzle = puzzle,
+                                    userValues = state.userValues,
+                                    mode = fillominoMode,
+                                    selectedCell = state.selectedCell,
+                                    onSelectCell = vm::selectCell,
+                                    onSetEdge = vm::setUserValue,
                                 )
-                                FilterChip(
-                                    selected = nonogramMode == NonogramMode.CROSS,
-                                    onClick = { nonogramMode = NonogramMode.CROSS },
-                                    label = { Text("✕ Cross") },
+                                // Number / Wall input-mode toggle (one is numbers, the other
+                                // draws room borders). Leaving Number mode drops any cell
+                                // selection so the digit pad hides.
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    FilterChip(
+                                        selected = fillominoMode == FillominoMode.NUMBER,
+                                        onClick = { fillominoMode = FillominoMode.NUMBER },
+                                        label = { Text("Number") },
+                                    )
+                                    FilterChip(
+                                        selected = fillominoMode == FillominoMode.WALL,
+                                        onClick = {
+                                            fillominoMode = FillominoMode.WALL
+                                            vm.selectCell(null)
+                                        },
+                                        label = { Text("Wall") },
+                                    )
+                                }
+                            }
+                            17 -> NumberLinkBoard(
+                                puzzle = puzzle,
+                                userValues = state.userValues,
+                                // Edge-based paths keyed "h:r,c"/"v:r,c"; putUserValue writes the
+                                // segment and drops the key when it's erased (0).
+                                onSetEdge = { key, state -> vm.putUserValue(key, state) },
+                            )
+                            27 -> PictoLinkBoard(
+                                puzzle = puzzle,
+                                userValues = state.userValues,
+                                // Segments "h:r,c"/"v:r,c" and filled 1-clues "s:r,c" -> 1; a tap
+                                // that clears a path cell's segments lands as one batch.
+                                onApplyChanges = vm::putUserValues,
+                                liveValidate = state.liveValidate,
+                            )
+                            19 -> HellGolfBoard(
+                                puzzle = puzzle,
+                                userValues = state.userValues,
+                                onPutValue = vm::putUserValue,
+                            )
+                            20 -> TentaishowBoard(
+                                puzzle = puzzle,
+                                userValues = state.userValues,
+                                // Walls keyed "h:r,c"/"v:r,c" -> 1 (web convention); setUserValue
+                                // drops the key when a wall is toggled off.
+                                onSetEdge = vm::setUserValue,
+                            )
+                            4 -> DoubleChocoBoard(
+                                puzzle = puzzle,
+                                userValues = state.userValues,
+                                // Borders keyed "h:r,c"/"v:r,c" -> 1 (web convention); setUserValue
+                                // drops the key when a border is toggled off.
+                                onSetEdge = vm::setUserValue,
+                            )
+                            25 -> RippleEffectBoard(
+                                puzzle = puzzle,
+                                userValues = state.userValues,
+                                // The room partition is fixed in the canon, so there's no wall
+                                // mode: tap a non-clue cell to select it, then the DigitBar
+                                // enters a (multi-digit) value keyed "col,row".
+                                selectedCell = state.selectedCell,
+                                onSelectCell = vm::selectCell,
+                            )
+                            22 -> ShikakuBoard(
+                                puzzle = puzzle,
+                                userValues = state.userValues,
+                                // Rectangles keyed "rect:r,c" -> encodeWH(w,h); draw/resize/erase
+                                // apply as an atomic batch (a 0 value drops the key), so a resize
+                                // that moves the top-left can retire the old key in one update.
+                                onApplyChanges = vm::putUserValues,
+                            )
+                            11 -> ShakashakaBoard(
+                                puzzle = puzzle,
+                                userValues = state.userValues,
+                                // Triangles/marks keyed "col,row" -> 1..5; the board picks the
+                                // next state from the tapped quadrant, putUserValue drops 0.
+                                onPutValue = vm::putUserValue,
+                            )
+                            24 -> NurikabeBoard(
+                                puzzle = puzzle,
+                                userValues = state.userValues,
+                                onTapCell = vm::tapShadeCell,
+                            )
+                            26 -> HitoriBoard(
+                                puzzle = puzzle,
+                                userValues = state.userValues,
+                                onTapCell = vm::tapShadeCell,
+                            )
+                            18 -> AkariBoard(
+                                puzzle = puzzle,
+                                userValues = state.userValues,
+                                liveValidate = state.liveValidate,
+                                onTapCell = vm::tapShadeCell,
+                            )
+                            6 -> {
+                                var nonogramMode by remember(puzzle.id) { mutableStateOf(NonogramMode.FILL) }
+                                val lines = state.hint as? HintView.Lines
+                                NonogramBoard(
+                                    puzzle = puzzle,
+                                    userValues = state.userValues,
+                                    liveValidate = state.liveValidate,
+                                    mode = nonogramMode,
+                                    hintLines = lines?.step?.focusLines ?: emptyList(),
+                                    hintCells = if (lines != null && lines.showCells) {
+                                        val cols = NonogramEngine.parseClues(puzzle).cols
+                                        lines.step.placements.associate { NonogramHinter.cellKey(it.cell, cols) to it.value }
+                                    } else {
+                                        emptyMap()
+                                    },
+                                    onSetCell = vm::setCellState,
+                                )
+                                // Fill / cross paint-mode toggle (touch has no right-click), kept
+                                // next to the board where paint-mode switching happens.
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    FilterChip(
+                                        selected = nonogramMode == NonogramMode.FILL,
+                                        onClick = { nonogramMode = NonogramMode.FILL },
+                                        label = { Text("■ Fill") },
+                                    )
+                                    FilterChip(
+                                        selected = nonogramMode == NonogramMode.CROSS,
+                                        onClick = { nonogramMode = NonogramMode.CROSS },
+                                        label = { Text("✕ Cross") },
+                                    )
+                                }
+                                HintControls(
+                                    hint = state.hint,
+                                    onRequest = vm::requestHint,
+                                    onApply = vm::applyHint,
+                                    onClear = vm::clearHint,
+                                    onShowCells = vm::showHintCells,
                                 )
                             }
-                            HintControls(
-                                hint = state.hint,
-                                onRequest = vm::requestHint,
-                                onApply = vm::applyHint,
-                                onClear = vm::clearHint,
-                                onShowCells = vm::showHintCells,
+                            15 -> LitsBoard(
+                                puzzle = puzzle,
+                                userValues = state.userValues,
+                                onTapCell = vm::tapShadeCell,
                             )
+                            // Yajilin: a tap shades (shared shade/mark cycle), a drag draws the
+                            // loop; a loop step and the marks it clears land as one batch.
+                            // Slalom: drag-only trail drawing ("h:r,c"/"v:r,c" -> 1), applied
+                            // as batches like Yajilin's loop.
+                            10 -> SlalomBoard(
+                                puzzle = puzzle,
+                                userValues = state.userValues,
+                                onApplyChanges = vm::putUserValues,
+                            )
+                            13 -> YajilinBoard(
+                                puzzle = puzzle,
+                                userValues = state.userValues,
+                                onTapCell = vm::tapShadeCell,
+                                onApplyChanges = vm::putUserValues,
+                            )
+                            // Kuralin: Yajilin's input (tap shades, drag draws the loop), with
+                            // live validation outlining circles whose count has failed.
+                            28 -> KuralinBoard(
+                                puzzle = puzzle,
+                                userValues = state.userValues,
+                                onTapCell = vm::tapShadeCell,
+                                onApplyChanges = vm::putUserValues,
+                                liveValidate = state.liveValidate,
+                            )
+                            else -> Text("This puzzle type isn't playable in this version yet.")
                         }
-                        15 -> LitsBoard(
-                            puzzle = puzzle,
-                            userValues = state.userValues,
-                            onTapCell = vm::tapShadeCell,
-                        )
-                        // Yajilin: a tap shades (shared shade/mark cycle), a drag draws the
-                        // loop; a loop step and the marks it clears land as one batch.
-                        // Slalom: drag-only trail drawing ("h:r,c"/"v:r,c" -> 1), applied
-                        // as batches like Yajilin's loop.
-                        10 -> SlalomBoard(
-                            puzzle = puzzle,
-                            userValues = state.userValues,
-                            onApplyChanges = vm::putUserValues,
-                        )
-                        13 -> YajilinBoard(
-                            puzzle = puzzle,
-                            userValues = state.userValues,
-                            onTapCell = vm::tapShadeCell,
-                            onApplyChanges = vm::putUserValues,
-                        )
-                        // Kuralin: Yajilin's input (tap shades, drag draws the loop), with
-                        // live validation outlining circles whose count has failed.
-                        28 -> KuralinBoard(
-                            puzzle = puzzle,
-                            userValues = state.userValues,
-                            onTapCell = vm::tapShadeCell,
-                            onApplyChanges = vm::putUserValues,
-                            liveValidate = state.liveValidate,
-                        )
-                        else -> Text("This puzzle type isn't playable in this version yet.")
                     }
                 }
             }

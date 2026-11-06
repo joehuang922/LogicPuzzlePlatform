@@ -13,12 +13,14 @@ export function getRenderer(puzzleType: number): PuzzleRenderer | undefined {
 interface PuzzleBoardProps {
   puzzle: PuzzleDefinition;
   initialAnswer?: Record<string, unknown> | null;
+  /** Exact values to seed the board with (undo/redo); see PuzzleState.restoreValues. */
+  restoreValues?: Record<string, number> | null;
   onValuesChange?: (values: Record<string, number>) => void;
   onComplete?: () => void;
   liveValidate?: boolean;
 }
 
-export default function PuzzleBoard({ puzzle, initialAnswer, onValuesChange, onComplete, liveValidate }: PuzzleBoardProps) {
+export default function PuzzleBoard({ puzzle, initialAnswer, restoreValues, onValuesChange, onComplete, liveValidate }: PuzzleBoardProps) {
   const renderer = getRenderer(puzzle.puzzleType);
 
   if (!renderer) {
@@ -33,5 +35,5 @@ export default function PuzzleBoard({ puzzle, initialAnswer, onValuesChange, onC
     );
   }
 
-  return <>{renderer.render(puzzle, { puzzleId: puzzle.id, playerGrid: initialAnswer ?? {}, startedAt: "", lastUpdatedAt: "" }, onValuesChange, onComplete, liveValidate)}</>;
+  return <>{renderer.render(puzzle, { puzzleId: puzzle.id, playerGrid: initialAnswer ?? {}, restoreValues: restoreValues ?? undefined, startedAt: "", lastUpdatedAt: "" }, onValuesChange, onComplete, liveValidate)}</>;
 }

@@ -1,8 +1,8 @@
 package com.puzzleplatform.player.ui.screens
 
 /**
- * Reverse (undo/redo) history over full answer snapshots — the Nonogram pilot's
- * engine, kept pure (no Android/ViewModel deps) so it can be unit-tested directly.
+ * Reverse (undo/redo) history over full answer snapshots, used by every puzzle
+ * type's play screen, kept pure (no Android/ViewModel deps) so it can be unit-tested directly.
  *
  * Each entry is a `userValues` map captured *before* a move. A "move" is one tap or
  * one whole drag: a drag is bracketed by [beginStroke]/[endStroke] so only its first

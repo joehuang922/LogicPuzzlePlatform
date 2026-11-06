@@ -1,4 +1,5 @@
-import { useRef, useState, useLayoutEffect, useEffect, useCallback, type ReactNode } from "react";
+import { useRef, useLayoutEffect, useEffect, useCallback, type ReactNode } from "react";
+import { useBoardUiMemory, useBoardUiState } from "../hooks/useBoardUiState";
 
 /**
  * Wraps a fixed-viewBox SVG board and gives it two sizing modes:
@@ -66,9 +67,27 @@ export default function BoardViewport({
 }: BoardViewportProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
-  const [mode, setMode] = useState<"fit" | "pan">("fit");
-  const [zoom, setZoom] = useState(DEFAULT_PAN_CELL_PX / cellSize);
-  const [modeDecided, setModeDecided] = useState(false);
+  // Mode, zoom and scroll live in the board UI memory so an undo/redo (which
+  // remounts the board) keeps the player's view where it was.
+  const [mode, setMode] = useBoardUiState<"fit" | "pan">("viewport.mode", "fit");
+  const [zoom, setZoom] = useBoardUiState("viewport.zoom", DEFAULT_PAN_CELL_PX / cellSize);
+  const [modeDecided, setModeDecided] = useBoardUiState("viewport.modeDecided", false);
+  const uiMemory = useBoardUiMemory();
+
+  // Restore the remembered scroll offset on mount; remember it as the player pans.
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    const saved = uiMemory?.get("viewport.scroll") as { left: number; top: number } | undefined;
+    if (!el || !saved) return;
+    el.scrollLeft = saved.left;
+    el.scrollTop = saved.top;
+    // Mount only: later scrolls are the player's own.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const onScroll = () => {
+    const el = scrollRef.current;
+    if (el) uiMemory?.set("viewport.scroll", { left: el.scrollLeft, top: el.scrollTop });
+  };
 
   // Anchor for zoom-to-point: after a zoom change re-renders the SVG at its new
   // size, restore scroll so the intrinsic point stays under the cursor/pinch.
@@ -261,6 +280,7 @@ export default function BoardViewport({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
+        onScroll={onScroll}
         style={{
           // In fill mode a scrollable ancestor handles overflow, so this stays
           // visible to avoid a nested scrollbar.

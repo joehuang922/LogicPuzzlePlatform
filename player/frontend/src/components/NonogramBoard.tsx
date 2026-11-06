@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useBoardUiState } from "../hooks/useBoardUiState";
 import { nextHint, nonogramRevealStep, Step } from "@puzzle/solver";
 import { NonogramCanon, NonogramAnswer } from "../types/canon";
 import { analyzeLineStatus, getColLine, ClueStatus, CellState } from "../liveValidators/nonogram";
@@ -102,13 +103,13 @@ export default function NonogramBoard({
   const [cells, setCells] = useState<CellState[][]>(
     () => (initialAnswer?.cells as CellState[][]) ?? emptyCells()
   );
-  const [drawMode, setDrawMode] = useState<DrawMode>("fill");
+  const [drawMode, setDrawMode] = useBoardUiState<DrawMode>("nonogram.drawMode", "fill");
   const [isDragging, setIsDragging] = useState(false);
   const dragTargetState = useRef<CellState>(1);
   const completedRef = useRef(false);
   const [hoverCell, setHoverCell] = useState<{ r: number; c: number } | null>(null);
-  const [showHighlight, setShowHighlight] = useState(true);
-  const [showCoords, setShowCoords] = useState(true);
+  const [showHighlight, setShowHighlight] = useBoardUiState("nonogram.showHighlight", true);
+  const [showCoords, setShowCoords] = useBoardUiState("nonogram.showCoords", true);
 
   useEffect(() => {
     const answer: NonogramAnswer = { cells };

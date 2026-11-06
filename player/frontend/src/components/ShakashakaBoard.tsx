@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useBoardUiState } from "../hooks/useBoardUiState";
 import { ShakashakaCanon } from "../types/canon";
 
 interface ShakashakaBoardProps {
@@ -329,7 +330,7 @@ export default function ShakashakaBoard({
   }, [initialUserValues, rows, cols]);
 
   const [stateGrid, setStateGrid] = useState<CellValue[][]>(initialStates);
-  const [drawMode, setDrawMode] = useState<DrawMode>("triangle");
+  const [drawMode, setDrawMode] = useBoardUiState<DrawMode>("shakashaka.drawMode", "triangle");
   const completedRef = useRef(false);
   const svgRef = useRef<SVGSVGElement>(null);
 

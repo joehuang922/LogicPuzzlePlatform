@@ -2,12 +2,25 @@ import { PuzzleDefinition, PuzzleRenderer, PuzzleState, PlayerAction } from "../
 import { NonogramCanon, NonogramAnswer } from "../types/canon";
 import NonogramBoard from "../components/NonogramBoard";
 
+/** Board cells (0 empty, 1 filled, 2 crossed) from "col,row" values. */
+function answerFromValues(canon: NonogramCanon, values: Record<string, number>): NonogramAnswer {
+  const cells = canon.rowClues.map(() => canon.colClues.map(() => 0));
+  for (const [key, v] of Object.entries(values)) {
+    const [c, r] = key.split(",").map(Number);
+    if (cells[r] && c >= 0 && c < cells[r].length) cells[r][c] = v;
+  }
+  return { cells };
+}
+
 export const nonogramRenderer: PuzzleRenderer = {
   puzzleType: 6,
 
   render(puzzle: PuzzleDefinition, state: PuzzleState, onValuesChange?: (values: Record<string, number>) => void, onComplete?: () => void, liveValidate?: boolean) {
     const canonRepr = (typeof puzzle.canonRepr === "string" ? JSON.parse(puzzle.canonRepr) : puzzle.canonRepr) as NonogramCanon;
-    const savedAnswer = state.playerGrid as unknown as NonogramAnswer | undefined;
+    // The saved answer keeps only filled cells; an undo/redo restore keeps crosses too.
+    const savedAnswer = state.restoreValues
+      ? answerFromValues(canonRepr, state.restoreValues)
+      : (state.playerGrid as unknown as NonogramAnswer | undefined);
     // Gate-computed solution for the reveal hint fallback. Stored as { cells: grid }.
     const solutionRepr = (typeof puzzle.solutionRepr === "string" ? JSON.parse(puzzle.solutionRepr) : puzzle.solutionRepr) as { cells?: number[][] } | null | undefined;
 

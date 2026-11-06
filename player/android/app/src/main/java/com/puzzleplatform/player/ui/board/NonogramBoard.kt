@@ -91,10 +91,6 @@ fun NonogramBoard(
     liveValidate: Boolean,
     mode: NonogramMode,
     onSetCell: (col: Int, row: Int, state: Int) -> Unit,
-    // Stroke grouping for the reverse (undo/redo) history: a whole drag collapses into
-    // a single reverse step. Called at the start/end of a one-finger paint gesture.
-    onStrokeStart: () -> Unit = {},
-    onStrokeEnd: () -> Unit = {},
     // Hint highlights: the lines a hint points at (tinted across clue band and grid), and
     // the cells it settles once the player asks to see them ("col,row" -> 1 fill / 2 cross).
     hintLines: List<NonogramHinter.Line> = emptyList(),
@@ -123,8 +119,6 @@ fun NonogramBoard(
     val valuesState = rememberUpdatedState(userValues)
     val onSet = rememberUpdatedState(onSetCell)
     val modeState = rememberUpdatedState(mode)
-    val onStrokeStartState = rememberUpdatedState(onStrokeStart)
-    val onStrokeEndState = rememberUpdatedState(onStrokeEnd)
 
     val density = LocalDensity.current
 
@@ -171,11 +165,10 @@ fun NonogramBoard(
                         }
                     },
                     onDragStart = { off ->
-                        onStrokeStartState.value()
                         drag.start(transform.cellAt(off.x, off.y), modeState.value, valuesState.value) { c, r, st -> onSet.value(c, r, st) }
                     },
                     onDrag = { off -> drag.moveTo(transform.cellAt(off.x, off.y), valuesState.value) { c, r, st -> onSet.value(c, r, st) } },
-                    onDragEnd = { drag.end(); onStrokeEndState.value() },
+                    onDragEnd = { drag.end() },
                     onTransform = { centroid, pan, zoom ->
                         transform.transform(centroid.x, centroid.y, pan.x, pan.y, zoom)
                         version++

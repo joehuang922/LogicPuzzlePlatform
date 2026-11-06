@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback, useImperativeHandle, forwardRef } from "react";
+import { useEffect, useMemo, useState, useRef, useCallback, useImperativeHandle, forwardRef } from "react";
 import { useParams, useLocation, useSearchParams, Link } from "react-router-dom";
 import { getPuzzle, saveSnapshot, listSnapshots, getSnapshotById, SnapshotSummary, AchievementUnlock } from "../api/client";
 import { PuzzleDefinition } from "../types/puzzle";
@@ -7,6 +7,8 @@ import { DIFFICULTY_LABELS } from "../constants";
 import { extractAnswer } from "../extractors";
 import { computeProgress } from "../progress";
 import { useIsMobile } from "../hooks/useIsMobile";
+import { BoardUiMemoryProvider } from "../hooks/useBoardUiState";
+import { MoveHistory, sameValues, type Values } from "../utils/moveHistory";
 
 function formatElapsed(seconds: number): string {
   const h = Math.floor(seconds / 3600);
@@ -92,14 +94,103 @@ export default function Play() {
 
   const timerRef = useRef<TimerHandle>(null);
   const userValuesRef = useRef<Record<string, number>>({});
+  const completedRef = useRef(false);
+
+  // Reverse (undo/redo) history for every puzzle type, the web twin of the Android
+  // play screen's: one tap, key press or whole drag is one step, a fresh move drops
+  // the redo future, capped at 100 moves. Boards own their cell state (seeded once
+  // from an answer), so a step is restored by remounting the board on the restored
+  // answer (restoreKey); toggles a board keeps in useBoardUiState survive that.
+  const historyRef = useRef(new MoveHistory(100));
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+  const [restoreKey, setRestoreKey] = useState(0);
+  const [restoredValues, setRestoredValues] = useState<Values | null>(null);
+  // Every board reports its values when it mounts; that first report is the
+  // baseline of a fresh/remounted board, not a move.
+  const baselinePendingRef = useRef(true);
+  // Ends a pointer gesture's step once the board has reported its last change.
+  const strokeIdRef = useRef(0);
+  const boardUiMemory = useMemo(() => new Map<string, unknown>(), [id]);
+
+  const syncHistory = useCallback(() => {
+    setCanUndo(historyRef.current.canUndo);
+    setCanRedo(historyRef.current.canRedo);
+  }, []);
 
   const handleValuesChange = useCallback((values: Record<string, number>) => {
+    const before = userValuesRef.current;
+    if (baselinePendingRef.current) {
+      baselinePendingRef.current = false;
+    } else if (!sameValues(before, values)) {
+      historyRef.current.record(before);
+      syncHistory();
+    }
     userValuesRef.current = values;
     if (puzzle) {
       setProgress(computeProgress(puzzle, values));
       setDebugJson(JSON.stringify(extractAnswer(puzzle, values), null, 2));
     }
-  }, [puzzle]);
+  }, [puzzle, syncHistory]);
+
+  /** Show a history snapshot: remount the board on it without recording a move. */
+  const restoreValues = useCallback((values: Values) => {
+    if (!puzzle) return;
+    userValuesRef.current = values;
+    baselinePendingRef.current = true;
+    setCurrentAnswer(extractAnswer(puzzle, values));
+    setRestoredValues(values);
+    setRestoreKey((k) => k + 1);
+    setProgress(computeProgress(puzzle, values));
+    setDebugJson(JSON.stringify(extractAnswer(puzzle, values), null, 2));
+    syncHistory();
+  }, [puzzle, syncHistory]);
+
+  const handleUndo = useCallback(() => {
+    const prev = historyRef.current.undo(userValuesRef.current);
+    if (prev) restoreValues(prev);
+  }, [restoreValues]);
+
+  const handleRedo = useCallback(() => {
+    const next = historyRef.current.redo(userValuesRef.current);
+    if (next) restoreValues(next);
+  }, [restoreValues]);
+
+  // A pointer gesture on the board (tap or whole drag) is one step. It ends a beat
+  // after release, so a change the board commits on release (and reports from an
+  // effect) still lands in the same step.
+  const handleBoardPointerDown = useCallback(() => {
+    const strokeId = ++strokeIdRef.current;
+    historyRef.current.beginStroke(userValuesRef.current);
+    const end = () => {
+      window.removeEventListener("pointerup", end, true);
+      window.removeEventListener("pointercancel", end, true);
+      setTimeout(() => {
+        if (strokeIdRef.current === strokeId) historyRef.current.endStroke();
+      }, 100);
+    };
+    window.addEventListener("pointerup", end, true);
+    window.addEventListener("pointercancel", end, true);
+  }, []);
+
+  // Ctrl/⌘+Z undoes; Ctrl/⌘+Shift+Z or Ctrl+Y redoes (not while typing in a field).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      const k = e.key.toLowerCase();
+      if (k === "z" && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      } else if ((k === "z" && e.shiftKey) || k === "y") {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [handleUndo, handleRedo]);
 
   // Persist the finished snapshot. saveSnapshot retries transient failures
   // (e.g. Aurora resuming from a paused state); if it still fails we record the
@@ -131,6 +222,9 @@ export default function Play() {
 
   const handleComplete = useCallback(async () => {
     if (!puzzle || !attemptId) return;
+    // Undo/redo can step back into the solved state; it counts once per attempt.
+    if (completedRef.current) return;
+    completedRef.current = true;
     const elapsedSeconds = timerRef.current?.getElapsed() ?? 0;
     timerRef.current?.stop();
     setFinalTime(elapsedSeconds);
@@ -203,7 +297,12 @@ export default function Play() {
       ? JSON.parse(snapshot.currentAnswer)
       : snapshot.currentAnswer;
     setCurrentAnswer(answer);
+    setRestoredValues(null);
     setTimerOffset(snapshot.elapsedSeconds);
+    historyRef.current.reset();
+    baselinePendingRef.current = true;
+    completedRef.current = false;
+    syncHistory();
     setBoardKey((k) => k + 1);
     setShowLoadDialog(false);
   }
@@ -304,7 +403,19 @@ export default function Play() {
           {toast}
         </div>
       )}
-      <PuzzleBoard key={boardKey} puzzle={puzzle} initialAnswer={currentAnswer} onValuesChange={handleValuesChange} onComplete={handleComplete} liveValidate={liveValidate} />
+      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
+        <button onClick={handleUndo} disabled={!canUndo} style={canUndo ? btnStyle : btnDisabled} title="Undo (Ctrl+Z)">
+          ↶ Undo
+        </button>
+        <button onClick={handleRedo} disabled={!canRedo} style={canRedo ? btnStyle : btnDisabled} title="Redo (Ctrl+Shift+Z)">
+          ↷ Redo
+        </button>
+      </div>
+      <BoardUiMemoryProvider memory={boardUiMemory}>
+        <div onPointerDownCapture={handleBoardPointerDown}>
+          <PuzzleBoard key={`${boardKey}:${restoreKey}`} puzzle={puzzle} initialAnswer={currentAnswer} restoreValues={restoredValues} onValuesChange={handleValuesChange} onComplete={handleComplete} liveValidate={liveValidate} />
+        </div>
+      </BoardUiMemoryProvider>
 
       <div style={{ marginTop: "1rem" }}>
         <button
@@ -472,6 +583,12 @@ const btnStyle: React.CSSProperties = {
   border: "none",
   borderRadius: 4,
   cursor: "pointer",
+};
+
+const btnDisabled: React.CSSProperties = {
+  ...btnStyle,
+  backgroundColor: "#bdbdbd",
+  cursor: "default",
 };
 
 const toastStyle: React.CSSProperties = {

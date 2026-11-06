@@ -22,6 +22,13 @@ export interface PuzzleDefinition {
 export interface PuzzleState {
   puzzleId: string;
   playerGrid: Record<string, unknown>;
+  /**
+   * Exact board values to restore (undo/redo on the Play page), alongside
+   * `playerGrid` (their saved answer). Only a renderer whose saved answer drops
+   * state its board keeps (Nonogram crosses, LITS marks) needs to read it; every
+   * other renderer restores losslessly from `playerGrid`.
+   */
+  restoreValues?: Record<string, number>;
   startedAt: string;
   lastUpdatedAt: string;
 }
