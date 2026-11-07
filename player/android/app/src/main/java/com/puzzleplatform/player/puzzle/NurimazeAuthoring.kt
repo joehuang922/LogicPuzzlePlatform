@@ -1,8 +1,6 @@
 package com.puzzleplatform.player.puzzle
 
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Pure helpers for authoring a nurimaze question in the Admin screen, the analog of
@@ -41,35 +39,11 @@ object NurimazeAuthoring {
     }
 
     /** Read a parser canon into a draft: ragged or missing grids read as no wall, unknown symbols as none. */
-    fun draftFromCanon(canon: JsonObject): RippleEffectDraft {
-        val cells = WallRoomsAuthoring.intGrid(canon["cells"])
-        val grids = canon["grids"] as? JsonObject
-        val height = cells.size
-        val width = cells.maxOfOrNull { it.size } ?: 0
-        val draft = WallRoomsAuthoring.wallDraft(
-            width,
-            height,
-            WallRoomsAuthoring.intGrid(grids?.get("h")),
-            WallRoomsAuthoring.intGrid(grids?.get("v")),
-        )
-        if (draft.width <= 0) return draft
-        val clues = mutableMapOf<Pair<Int, Int>, Int>()
-        for (r in 0 until height) for (c in 0 until width) {
-            val v = cells[r].getOrNull(c) ?: 0
-            if (v in SYMBOLS) clues[r to c] = v
-        }
-        return draft.copy(clues = clues)
-    }
+    fun draftFromCanon(canon: JsonObject): RippleEffectDraft =
+        WallRoomsAuthoring.cellsAndWallsDraft(canon) { it in SYMBOLS }
 
     /** The canon `{ cells, grids: { h, v } }` to POST. */
-    fun canonFromDraft(draft: RippleEffectDraft): JsonObject = JsonObject(
-        mapOf(
-            "cells" to JsonArray(List(draft.height) { r ->
-                JsonArray(List(draft.width) { c -> JsonPrimitive(draft.clues[r to c] ?: 0) })
-            }),
-            "grids" to WallRoomsAuthoring.wallGrids(draft),
-        )
-    )
+    fun canonFromDraft(draft: RippleEffectDraft): JsonObject = WallRoomsAuthoring.cellsAndWallsCanon(draft)
 
     /** Set the symbol of (col, row); null clears it. */
     fun setSymbol(draft: RippleEffectDraft, col: Int, row: Int, symbol: Int?): RippleEffectDraft =

@@ -11,6 +11,7 @@ import com.puzzleplatform.player.puzzle.HitoriAuthoring
 import com.puzzleplatform.player.puzzle.LitsAuthoring
 import com.puzzleplatform.player.puzzle.NorinoriAuthoring
 import com.puzzleplatform.player.puzzle.NurimazeAuthoring
+import com.puzzleplatform.player.puzzle.NuritwinAuthoring
 import com.puzzleplatform.player.puzzle.RippleEffectDraft
 import com.puzzleplatform.player.puzzle.NumberLinkAuthoring
 import com.puzzleplatform.player.puzzle.ShakashakaAuthoring
@@ -40,6 +41,7 @@ import com.puzzleplatform.player.ui.board.SlalomMiniBoard
 import com.puzzleplatform.player.ui.board.SlitherlinkMiniBoard
 import com.puzzleplatform.player.ui.board.SudokuBoard
 import com.puzzleplatform.player.ui.board.SudokuMiniBoard
+import com.puzzleplatform.player.ui.board.TentaishowMiniBoard
 import com.puzzleplatform.player.ui.board.YajilinMiniBoard
 
 /**
@@ -54,8 +56,9 @@ import com.puzzleplatform.player.ui.board.YajilinMiniBoard
  * [MasyuCircleEditor]; for slalom [SlalomGateEditor]; for shakashaka and akari
  * [BlackCellEditor]; for number link, shikaku and fillomino [ClueGridEditor]; for kuralin
  * [KuralinCircleEditor]; for norinori and LITS [RippleEffectRoomEditor] without numbers
- * and for nurimaze with its symbols; for double choco [DoubleChocoCellEditor]; for hitori
- * [ClueGridEditor], each on its own player
+ * and for nurimaze and nuritwin with their symbols / group sizes; for double choco
+ * [DoubleChocoCellEditor]; for hitori [ClueGridEditor]; for tentaishow
+ * [TentaishowDotEditor], each on its own player
  * board (whose play input has nothing to write into here, so it's dropped). Each lists
  * its own problems.
  */
@@ -271,6 +274,23 @@ fun BoardDraftEditor(
                 cellEditor = { d, col, row -> NurimazeSymbolChips(d, col, row, change) },
             )
         }
+        AuthoringType.NURITWIN -> {
+            val change: ((RippleEffectDraft) -> RippleEffectDraft) -> Unit =
+                { t -> onChange { it.copy(nuritwin = t(it.nuritwin)) } }
+            RippleEffectRoomEditor(
+                draft = board.nuritwin,
+                selectedCell = selectedCell,
+                onSelectCell = onSelectCell,
+                onChange = change,
+                formatProblems = NuritwinAuthoring::formatProblems,
+                problems = NuritwinAuthoring::problems,
+                cellEditor = { d, col, row -> NuritwinClueField(d, col, row, change) },
+            )
+        }
+        AuthoringType.TENTAISHOW -> TentaishowDotEditor(
+            draft = board.tentaishow,
+            onChange = { t -> onChange { it.copy(tentaishow = t(it.tentaishow)) } },
+        )
         AuthoringType.HITORI -> ClueGridEditor(
             authoring = HitoriAuthoring,
             draft = board.hitori,
@@ -342,5 +362,9 @@ fun BoardDraftMiniBoard(type: AuthoringType, board: BoardDraft, size: Dp) {
             clueText = NurimazeAuthoring::symbolText,
         )
         AuthoringType.HITORI -> ClueGridMiniBoard(draft = board.hitori, hasProblems = hasProblems, size = size)
+        AuthoringType.NURITWIN ->
+            RippleEffectMiniBoard(draft = board.nuritwin, hasProblems = hasProblems, size = size)
+        AuthoringType.TENTAISHOW ->
+            TentaishowMiniBoard(draft = board.tentaishow, hasProblems = hasProblems, size = size)
     }
 }

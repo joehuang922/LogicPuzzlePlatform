@@ -118,6 +118,19 @@ class BoardDraftTest {
     }
 
     @Test
+    fun nuritwinAndTentaishowRoundTripWithTheirSize() {
+        val twin = json("""{"cells":[[1,0,0],[0,0,2]],"grids":{"h":[[1,1,0]],"v":[[0,1],[0,1]]}}""")
+        val twinBoard = BoardDraft.fromCanon(AuthoringType.NURITWIN, twin)
+        assertEquals(BoardDraft(nuritwin = twinBoard.nuritwin), twinBoard)
+        assertEquals(CanonBoard(twin, 3, 2), twinBoard.toCanon(AuthoringType.NURITWIN))
+
+        val galaxy = json("""{"width":3,"height":2,"dots":[{"dr":1,"dc":1,"color":0}]}""")
+        val galaxyBoard = BoardDraft.fromCanon(AuthoringType.TENTAISHOW, galaxy)
+        assertEquals(BoardDraft(tentaishow = galaxyBoard.tentaishow), galaxyBoard)
+        assertEquals(CanonBoard(galaxy, 3, 2), galaxyBoard.toCanon(AuthoringType.TENTAISHOW))
+    }
+
+    @Test
     fun sudokuHasNoProblemCheck() {
         assertTrue(BoardDraft().problems(AuthoringType.SUDOKU).isEmpty())
         assertTrue(BoardDraft().formatProblems(AuthoringType.SUDOKU).isEmpty())

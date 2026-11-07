@@ -35,6 +35,8 @@ data class BoardDraft(
     val lits: RippleEffectDraft = RippleEffectDraft(),
     val nurimaze: RippleEffectDraft = RippleEffectDraft(),
     val hitori: ClueGridDraft = ClueGridDraft(),
+    val nuritwin: RippleEffectDraft = RippleEffectDraft(),
+    val tentaishow: TentaishowDraft = TentaishowDraft(),
 ) {
     /**
      * What the type's misread check finds wrong with this board — the list that turns
@@ -64,13 +66,16 @@ data class BoardDraft(
         AuthoringType.LITS -> LitsAuthoring.problems(lits)
         AuthoringType.NURIMAZE -> NurimazeAuthoring.problems(nurimaze)
         AuthoringType.HITORI -> HitoriAuthoring.problems(hitori)
+        AuthoringType.NURITWIN -> NuritwinAuthoring.problems(nuritwin)
+        AuthoringType.TENTAISHOW -> TentaishowAuthoring.problems(tentaishow)
     }
 
     /**
      * The part of [problems] that makes the board unrepresentable as its type's canon
      * (combo sudoku boards that are stacked or disagree on a shared cell, heyawake rooms
-     * that aren't rectangles, ripple effect, norinori, LITS or nurimaze walls that end
-     * inside a room, a slalom gate with two numbers, a blank hitori cell). Unlike the rest
+     * that aren't rectangles, ripple effect, norinori, LITS, nurimaze or nuritwin walls
+     * that end inside a room, a slalom gate with two numbers, a blank hitori cell, a
+     * tentaishow with no dots). Unlike the rest
      * these can't be overridden: the
      * board can't be created or saved until they're fixed.
      */
@@ -83,6 +88,8 @@ data class BoardDraft(
         AuthoringType.LITS -> LitsAuthoring.formatProblems(lits)
         AuthoringType.NURIMAZE -> NurimazeAuthoring.formatProblems(nurimaze)
         AuthoringType.HITORI -> HitoriAuthoring.formatProblems(hitori)
+        AuthoringType.NURITWIN -> NuritwinAuthoring.formatProblems(nuritwin)
+        AuthoringType.TENTAISHOW -> TentaishowAuthoring.formatProblems(tentaishow)
         else -> emptyList()
     }
 
@@ -138,6 +145,10 @@ data class BoardDraft(
         AuthoringType.NURIMAZE ->
             CanonBoard(NurimazeAuthoring.canonFromDraft(nurimaze), nurimaze.width, nurimaze.height)
         AuthoringType.HITORI -> CanonBoard(HitoriAuthoring.canonFromDraft(hitori), hitori.cols, hitori.rows)
+        AuthoringType.NURITWIN ->
+            CanonBoard(NuritwinAuthoring.canonFromDraft(nuritwin), nuritwin.width, nuritwin.height)
+        AuthoringType.TENTAISHOW ->
+            CanonBoard(TentaishowAuthoring.canonFromDraft(tentaishow), tentaishow.cols, tentaishow.rows)
     }
 
     companion object {
@@ -166,6 +177,8 @@ data class BoardDraft(
             AuthoringType.LITS -> BoardDraft(lits = LitsAuthoring.draftFromCanon(canon))
             AuthoringType.NURIMAZE -> BoardDraft(nurimaze = NurimazeAuthoring.draftFromCanon(canon))
             AuthoringType.HITORI -> BoardDraft(hitori = HitoriAuthoring.draftFromCanon(canon))
+            AuthoringType.NURITWIN -> BoardDraft(nuritwin = NuritwinAuthoring.draftFromCanon(canon))
+            AuthoringType.TENTAISHOW -> BoardDraft(tentaishow = TentaishowAuthoring.draftFromCanon(canon))
         }
     }
 }

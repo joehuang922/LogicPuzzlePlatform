@@ -134,13 +134,24 @@ const semanticChecks: Record<number, (data: any) => void> = {
   },
   // Nurimaze: the symbol grid fixes the size; the walls must fit it and every one must
   // separate two rooms.
-  3: (data: { cells: number[][]; grids: { h: number[][]; v: number[][] } }) => {
-    const { cells, grids } = data;
-    const cols = cells[0].length;
-    if (cols === 0 || !cells.every((line) => line.length === cols)) {
-      throw new Error("Invalid nurimaze: cells rows must be non-empty and equal in length");
+  3: (data: { cells: number[][]; grids: { h: number[][]; v: number[][] } }) =>
+    checkCellsAndRoomWalls("nurimaze", data),
+  // Nuritwin: as nurimaze, with room numbers in the cells.
+  9: (data: { cells: number[][]; grids: { h: number[][]; v: number[][] } }) =>
+    checkCellsAndRoomWalls("nuritwin", data),
+  // Tentaishow: every dot must sit inside the grid (a cell center, interior edge midpoint
+  // or interior corner), and no two dots may share a spot.
+  20: (data: { width: number; height: number; dots: { dr: number; dc: number }[] }) => {
+    const { width, height, dots } = data;
+    const seen = new Set<string>();
+    for (const { dr, dc } of dots) {
+      if (dr > 2 * height - 1 || dc > 2 * width - 1) {
+        throw new Error(`Invalid tentaishow: dot at (${dr}, ${dc}) is outside the ${width}x${height} grid`);
+      }
+      const key = `${dr},${dc}`;
+      if (seen.has(key)) throw new Error(`Invalid tentaishow: two dots at (${dr}, ${dc})`);
+      seen.add(key);
     }
-    checkRoomWalls("nurimaze", cells.length, cols, grids.h, grids.v);
   },
   // LITS: as norinori, the walls are the board's format.
   15: (data: { grids: { h: number[][]; v: number[][] } }) => {
@@ -186,6 +197,19 @@ const semanticChecks: Record<number, (data: any) => void> = {
     }
   },
 };
+
+/** A `{ cells, grids: { h, v } }` board: the cells must be a rectangle the walls fit. */
+function checkCellsAndRoomWalls(
+  name: string,
+  data: { cells: number[][]; grids: { h: number[][]; v: number[][] } }
+): void {
+  const { cells, grids } = data;
+  const cols = cells[0].length;
+  if (cols === 0 || !cells.every((line) => line.length === cols)) {
+    throw new Error(`Invalid ${name}: cells rows must be non-empty and equal in length`);
+  }
+  checkRoomWalls(name, cells.length, cols, grids.h, grids.v);
+}
 
 /**
  * The wall grids of a rooms-by-walls board — h: (rows-1) x cols, the wall under each cell;

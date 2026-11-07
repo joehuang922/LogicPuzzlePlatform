@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import com.puzzleplatform.player.data.model.Puzzle
+import com.puzzleplatform.player.puzzle.TentaishowAuthoring
 import com.puzzleplatform.player.puzzle.TentaishowEngine
 
 private val LINE = Color.Black
@@ -33,6 +34,10 @@ private val DOT_DARK = Color(0xFF111111)
  * thick solid walls and border, and the dots on top at their doubled coordinates (cell
  * center, edge midpoint, or corner). Above the board sits a small live preview of the
  * emerging picture — the same cells the collection thumbnail shows once solved.
+ *
+ * The Admin review editor passes [onTapPoint]: taps then snap to the nearest dot point
+ * (doubled (dr, dc), see [TentaishowAuthoring.nearestPoint]) and go there instead of
+ * toggling walls, and the picture preview is hidden.
  */
 @Composable
 fun TentaishowBoard(
@@ -40,8 +45,10 @@ fun TentaishowBoard(
     userValues: Map<String, Int>,
     onSetEdge: (key: String, on: Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    onTapPoint: ((dr: Int, dc: Int) -> Unit)? = null,
 ) {
-    val board = remember(puzzle.id) { TentaishowEngine.parseBoard(puzzle) }
+    // Keyed on the canon too: the Admin review editor changes it under a stable id.
+    val board = remember(puzzle.id, puzzle.canonRepr) { TentaishowEngine.parseBoard(puzzle) }
     val rows = board.rows
     val cols = board.cols
     if (rows == 0 || cols == 0) return
@@ -50,6 +57,7 @@ fun TentaishowBoard(
     // when these change), so read the freshest values/callback through state.
     val valuesState = rememberUpdatedState(userValues)
     val onSet = rememberUpdatedState(onSetEdge)
+    val onPoint = rememberUpdatedState(onTapPoint)
 
     // One flood-fill per input change, shared by the preview and the board shading.
     val picture = remember(board, userValues) { TentaishowEngine.pictureCells(board, userValues) }
@@ -59,7 +67,7 @@ fun TentaishowBoard(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        PicturePreview(picture, rows, cols, TentaishowEngine.GROUND_ARGB)
+        if (onTapPoint == null) PicturePreview(picture, rows, cols, TentaishowEngine.GROUND_ARGB)
 
         ZoomableBoard(
             cols = cols,
@@ -67,6 +75,10 @@ fun TentaishowBoard(
             resetKey = puzzle.id,
             onTapCell = { _, _ -> },
             onTapPrecise = { fx, fy ->
+                onPoint.value?.let { cb ->
+                    TentaishowAuthoring.nearestPoint(fx, fy, rows, cols)?.let { (dr, dc) -> cb(dr, dc) }
+                    return@ZoomableBoard
+                }
                 val key = wallKeyAt(fx, fy, rows, cols) ?: return@ZoomableBoard
                 onSet.value(key, valuesState.value[key] != 1)
             },

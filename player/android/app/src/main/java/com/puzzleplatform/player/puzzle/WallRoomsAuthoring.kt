@@ -70,6 +70,37 @@ open class WallRoomsAuthoring(
                 vWalls = List(height) { r -> List(width - 1) { c -> v.getOrNull(r)?.getOrNull(c) == 1 } },
             )
 
+        /**
+         * A draft from a `{ cells, grids: { h, v } }` canon (nurimaze, nuritwin): the cells
+         * fix the size, and each cell value [keep] accepts becomes a clue on it.
+         */
+        fun cellsAndWallsDraft(canon: JsonObject, keep: (Int) -> Boolean): RippleEffectDraft {
+            val cells = intGrid(canon["cells"])
+            val grids = canon["grids"] as? JsonObject
+            val draft = wallDraft(
+                cells.maxOfOrNull { it.size } ?: 0,
+                cells.size,
+                intGrid(grids?.get("h")),
+                intGrid(grids?.get("v")),
+            )
+            val clues = mutableMapOf<Pair<Int, Int>, Int>()
+            for (r in 0 until draft.height) for (c in 0 until draft.width) {
+                val v = cells[r].getOrNull(c) ?: 0
+                if (keep(v)) clues[r to c] = v
+            }
+            return draft.copy(clues = clues)
+        }
+
+        /** The `{ cells, grids: { h, v } }` canon of a draft: each cell holds its clue, or 0. */
+        fun cellsAndWallsCanon(draft: RippleEffectDraft): JsonObject = JsonObject(
+            mapOf(
+                "cells" to JsonArray(List(draft.height) { r ->
+                    JsonArray(List(draft.width) { c -> JsonPrimitive(draft.clues[r to c] ?: 0) })
+                }),
+                "grids" to wallGrids(draft),
+            )
+        )
+
         /** The draft's walls as the canon's `{ h, v }` (1 = wall). */
         fun wallGrids(draft: RippleEffectDraft): JsonObject {
             fun grid(lines: List<List<Boolean>>) =
