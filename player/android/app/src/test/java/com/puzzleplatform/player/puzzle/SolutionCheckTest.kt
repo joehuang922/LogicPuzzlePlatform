@@ -72,6 +72,15 @@ class SolutionCheckTest {
     }
 
     @Test
+    fun `nurimaze painted rooms black and marked rooms white`() {
+        val p = puzzle(3, """{"cells":[[3,0],[0,4]],"grids":{"h":[[1,1]],"v":[[1],[1]]}}""", """{"states":[[2,1],[2,2]]}""")
+        assertEquals(true, NurimazeEngine.matchesSolution(p, mapOf("1,0" to 1, "0,1" to 2)))
+        assertEquals(false, NurimazeEngine.matchesSolution(p, mapOf("1,0" to 2)))
+        assertEquals(false, NurimazeEngine.matchesSolution(p, mapOf("0,1" to 1)))
+        assertNull(NurimazeEngine.matchesSolution(puzzle(3, """{"cells":[[3,4]],"grids":{"h":[],"v":[[1]]}}""", null), emptyMap()))
+    }
+
+    @Test
     fun `slitherlink lines and crosses on both edge grids`() {
         val p = puzzle(5, """{"cells":[[4]]}""", """{"edges":{"h":[[1],[1]],"v":[[1,1]]}}""")
         assertEquals(true, SlitherlinkEngine.matchesSolution(p, mapOf("h:0,0" to 1, "v:0,1" to 1)))

@@ -107,6 +107,10 @@ settled by deduction alone (45x31 in ~0.35 s), the 17x17 needs some search (~2 s
 misread board is usually proven impossible, and propagation names where it breaks,
 which is how the 45x31 photo's parser errors were found.
 
+The stored solution also backs the on-track check (web and Android, off by default, a
+toggle beside Undo/Redo): "✓ On track" while every painted room is black in the
+solution and every marked room white, "✗ Off track" otherwise, never saying which.
+
 ## Puzzle Parser
 
 - Detects the grid using perspective warping, then `flatten_board`: the giant

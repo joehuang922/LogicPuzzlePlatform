@@ -329,4 +329,22 @@ object NurimazeEngine : ShadeMarkEngine {
     }
 
     private val DIRS = listOf(-1 to 0, 1 to 0, 0 to -1, 0 to 1)
+
+    /**
+     * On-track check: every painted room is black in the stored solution
+     * (`solutionRepr.states`, 1 black / 2 white) and every marked room is white there.
+     */
+    override fun matchesSolution(puzzle: Puzzle, userValues: Map<String, Int>): Boolean? {
+        val canon = parseCanon(puzzle)
+        if (canon.rows == 0 || canon.cols == 0) return null
+        val solution = SolutionCheck.grid(puzzle.solutionRepr?.get("states"), canon.rows, canon.cols) ?: return null
+        return SolutionCheck.matches(userValues) { key, value ->
+            val (c, r) = SolutionCheck.pair(key) ?: return@matches null
+            when (value) {
+                BLACK -> solution[r][c] == 1
+                MARKED -> solution[r][c] == 2
+                else -> null
+            }
+        }
+    }
 }

@@ -92,6 +92,19 @@ const CHECKS: Record<number, (canon: Json, solution: Json) => Expect | null> = {
     }
     return (key, value) => (byCell.has(key) && value >= 1 && value <= 9 ? byCell.get(key) === value : null);
   },
+  // Nurimaze: { states: rows x cols, 1 black, 2 white }; "col,row" -> 1 black, 2 marked
+  // white (the same values).
+  3: (canon, s) => {
+    const cells = canon.cells as unknown[][] | undefined;
+    if (!Array.isArray(cells) || !Array.isArray(cells[0])) return null;
+    const sol = grid(s.states, cells.length, cells[0].length);
+    if (!sol) return null;
+    return (key, value) => {
+      const cr = pair(key);
+      if (!cr || (value !== 1 && value !== 2)) return null;
+      return sol[cr[1]]?.[cr[0]] === value;
+    };
+  },
   // Slitherlink: { edges: { h: (rows+1) x cols, v: rows x (cols+1) } }; "h:row,col" /
   // "v:row,col" -> 1 line, 2 cross.
   5: (canon, s) => {

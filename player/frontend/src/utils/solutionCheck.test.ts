@@ -83,6 +83,13 @@ describe("matchesSolution", () => {
     expect(matchesSolution(p, { "c:0,0": 2 })).toBe(false);
   });
 
+  it("nurimaze: painted rooms black, marked rooms white", () => {
+    const p = puzzle(3, { cells: [[3, 0], [0, 4]] }, { states: [[2, 1], [2, 2]] });
+    expect(matchesSolution(p, { "1,0": 1, "0,1": 2 })).toBe(true);
+    expect(matchesSolution(p, { "1,0": 2 })).toBe(false);
+    expect(matchesSolution(p, { "0,1": 1 })).toBe(false);
+  });
+
   it("slitherlink: lines and crosses on both edge grids", () => {
     // One cell: its loop is all four edges.
     const p = puzzle(5, { cells: [[4]] }, { edges: { h: [[1], [1]], v: [[1, 1]] } });
