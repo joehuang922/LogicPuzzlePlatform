@@ -130,6 +130,18 @@ function validateSolution(
   }
   if (visitedCount !== nonBlackCells.length) return false;
 
+  // 3b. No loops: connected non-black cells form a tree exactly when they have one
+  // edge fewer than cells (so the S -> G route below is the only one).
+  let edges = 0;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (stateGrid[r][c] === 1) continue;
+      if (r + 1 < rows && stateGrid[r + 1][c] !== 1) edges++;
+      if (c + 1 < cols && stateGrid[r][c + 1] !== 1) edges++;
+    }
+  }
+  if (edges !== nonBlackCells.length - 1) return false;
+
   // 4. BFS shortest path from S to G must pass all circles and no triangles
   let sPos: [number, number] | null = null;
   let gPos: [number, number] | null = null;

@@ -63,9 +63,10 @@ The answer is a per-cell state grid indicating which rooms are painted black, wh
 - Paint each room entirely black or mark it entirely white (room-level operation — all cells in a room share the same state).
 - Rooms containing special symbols (S, G, circle, triangle) cannot be painted black; they can only be marked white.
 - No 2x2 block of cells may be all the same state (all-black or all-non-black).
-- All white/marked cells must form a single connected region.
-- The shortest path from S to G (through non-black cells) must pass through ALL circle cells.
-- The shortest path from S to G must NOT pass through any triangle cells.
+- All white/marked cells must form a single connected region with no loop (the maze is
+  a tree; dead ends are fine). So there is exactly one route from S to G.
+- The route from S to G (through non-black cells) must pass through ALL circle cells.
+- The route from S to G must NOT pass through any triangle cells.
 
 ### Success finishing criteria
 
@@ -93,6 +94,18 @@ All rooms are assigned a state (no unset rooms remain) AND all rules above are s
 - Rows/Cols shown as read-only fields (determined by the JSON).
 - Legend: 0=empty, 1=circle, 2=triangle, 3=S, 4=G.
 - JSON textarea is the source of truth; visual edits update it bidirectionally.
+
+## Auto-solve
+
+`player/solver/src/plugins/nurimaze` gates creates and edits (docs/auto-solve). Rooms are
+black or white; propagation applies the no-2x2, no-loop and connected rules (a room
+that would close a loop goes black, a room that is the only link between white rooms
+goes white), and the route rule on partial boards (S still reaches G avoiding
+triangles; each circle keeps two separate paths, to S and to G). Each undecided room is
+then tried both ways before guessing. Production boards: 10x10 and the 45x31 photo are
+settled by deduction alone (45x31 in ~0.35 s), the 17x17 needs some search (~2 s). A
+misread board is usually proven impossible, and propagation names where it breaks,
+which is how the 45x31 photo's parser errors were found.
 
 ## Puzzle Parser
 

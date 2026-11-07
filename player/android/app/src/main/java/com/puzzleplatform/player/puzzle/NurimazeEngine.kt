@@ -14,8 +14,9 @@ import kotlinx.serialization.json.intOrNull
  *    frontend/src/components/NurimazeBoard.tsx (computeRooms / validateSolution).
  *
  * The grid is pre-divided into rooms by thick borders. The player paints each room
- * entirely black or marks it white to carve a maze; the shortest path from S to G must
- * pass every circle and no triangle (plus a no-2x2 and single-white-region rule).
+ * entirely black or marks it white to carve a maze; the route from S to G must pass
+ * every circle and no triangle (plus a no-2x2 rule, and the white cells form one
+ * connected region with no loop, so the route is unique).
  *
  * canonRepr: { cells: number[][], grids: { h: number[][], v: number[][] } }
  *   - cells: rows x cols. 0 = empty, 1 = circle, 2 = triangle, 3 = S, 4 = G.
@@ -196,7 +197,7 @@ object NurimazeEngine : ShadeMarkEngine {
      * NurimazeBoard.tsx validateSolution):
      *  1. every room is assigned a non-unset state,
      *  2. no 2x2 block of cells is all-black or all-non-black,
-     *  3. all non-black (white/marked) cells form one connected region,
+     *  3. all non-black (white/marked) cells form one connected region with no loop,
      *  4. the shortest path from S to G through non-black cells passes every circle and
      *     no triangle.
      */
@@ -263,6 +264,18 @@ object NurimazeEngine : ShadeMarkEngine {
             }
         }
         if (visitedCount != nonBlack.size) return false
+
+        // 3b. No loops: connected non-black cells form a tree exactly when they have one
+        // edge fewer than cells (so the S -> G route below is the only one).
+        var edges = 0
+        for (r in 0 until rows) {
+            for (c in 0 until cols) {
+                if (stateGrid[r][c] == BLACK) continue
+                if (r + 1 < rows && stateGrid[r + 1][c] != BLACK) edges++
+                if (c + 1 < cols && stateGrid[r][c + 1] != BLACK) edges++
+            }
+        }
+        if (edges != nonBlack.size - 1) return false
 
         // 4. Shortest path S -> G (through non-black) covers all circles, no triangles.
         var sPos: Pair<Int, Int>? = null

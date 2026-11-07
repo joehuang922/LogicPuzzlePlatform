@@ -145,6 +145,15 @@ class NurimazeEngineTest {
     }
 
     @Test
+    fun isComplete_falseWhenWhiteCellsFormALoop() {
+        // 3x3 of one-cell rooms: a white ring round a black centre has no 2x2 of one
+        // colour and is connected, but it is a loop (two routes from S to G).
+        val rings = """{"cells":[[3,0,0],[0,0,0],[0,0,4]],"grids":{"h":[[1,1,1],[1,1,1]],"v":[[1,1],[1,1],[1,1]]}}"""
+        val ring = (0 until 9).associate { "${it % 3},${it / 3}" to if (it == 4) 1 else 2 }
+        assertFalse(NurimazeEngine.isComplete(puzzle(rings), ring))
+    }
+
+    @Test
     fun isComplete_falseWhenShortestPathHitsTriangle() {
         // Same geometry/states, but the forced S->G chain now passes a triangle at (1,1).
         assertFalse(NurimazeEngine.isComplete(puzzle(canon3x3Triangle), solved))
