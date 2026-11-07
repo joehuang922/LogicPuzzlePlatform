@@ -1170,8 +1170,10 @@ def _measure_border_width_gray(
 
 
 # Smoothing for the thick/thin width histogram, as a fraction of the gap between
-# the two class means (see _valley_between_classes).
-_VALLEY_BANDWIDTH = 0.12
+# the two class means (see _valley_between_classes). Wider smoothing drifts the
+# valley toward the thick class: at 0.12 the 45x31 nurimaze photo's 5.21 px wall
+# fell under a 5.29 px cut and the solver proved the board impossible.
+_VALLEY_BANDWIDTH = 0.08
 
 
 def _find_thickness_threshold(widths: list[float]) -> float:

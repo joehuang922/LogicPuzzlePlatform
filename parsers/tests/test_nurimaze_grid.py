@@ -52,9 +52,11 @@ def test_giant_photo_keeps_its_thick_walls(images, android):
     Their widths (5.4-5.8 px at full size) sit in the thick class (5-11 px,
     thin 2-4 px), but Otsu cut at 6.1 px inside it; the density valley cuts at
     ~5 px and closes rooms better, so it wins. h[r][c] is the wall below cell
-    (r, c); the solver found the board impossible without them.
+    (r, c); the solver found the board impossible without them. h[3][20]
+    (5.21 px) is the closest call: the valley's smoothing must stay narrow
+    enough to keep it thick.
     """
     img = images["board-nurimaze-45x31-photo.jpg"]
     geom = detect_nurimaze_grid(_android(img) if android else img)
     h, _ = classify_border_thickness(cv2.cvtColor(geom.warped, cv2.COLOR_BGR2GRAY), geom)
-    assert [h[2][13], h[2][14], h[0][14], h[4][10]] == [1, 1, 1, 1]
+    assert [h[2][13], h[2][14], h[0][14], h[4][10], h[3][20]] == [1, 1, 1, 1, 1]
