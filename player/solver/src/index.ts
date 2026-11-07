@@ -17,3 +17,5 @@ export { nonogramPlugin, NonogramModel, NonogramBoard, nonogramRevealStep } from
 export type { NonogramCanon } from "./plugins/nonogram";
 export { comboSudokuPlugin, ComboSudokuModel, comboGeometry } from "./plugins/combo-sudoku";
 export type { ComboSudokuCanon, ComboSudokuSolution } from "./plugins/combo-sudoku";
+export { nurimazePlugin, NurimazeModel } from "./plugins/nurimaze";
+export type { NurimazeCanon } from "./plugins/nurimaze";

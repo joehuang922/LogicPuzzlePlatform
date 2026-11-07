@@ -5,6 +5,7 @@ import { litsPlugin } from "./plugins/lits";
 import { slitherlinkPlugin } from "./plugins/slitherlink";
 import { nonogramPlugin } from "./plugins/nonogram";
 import { comboSudokuPlugin } from "./plugins/combo-sudoku";
+import { nurimazePlugin } from "./plugins/nurimaze";
 
 // A registered plugin with its type parameters erased. The registry is the boundary where
 // per-type Canon/Board/Solution shapes meet the generic drivers, so `any` here is
@@ -26,6 +27,7 @@ register(litsPlugin);
 register(slitherlinkPlugin);
 register(nonogramPlugin);
 register(comboSudokuPlugin);
+register(nurimazePlugin);
 
 export function getPlugin(puzzleType: number): AnyPlugin | undefined {
   return registry.get(puzzleType);
