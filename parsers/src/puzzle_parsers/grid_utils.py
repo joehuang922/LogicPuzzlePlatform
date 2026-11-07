@@ -989,7 +989,9 @@ def classify_border_thickness(
     """Classify each internal wall of a room board as thick (1) or thin (0).
 
     1. Measure every wall's width (sub-pixel, on the run through the line).
-    2. Split widths into two classes (Otsu on this board's widths).
+    2. Split widths into two classes: Otsu on this board's widths, or the
+       density valley between Otsu's two classes, whichever leaves fewer thick
+       walls dead-ending mid-board (see ``_valley_between_classes``).
     3. Rooms are closed, so a thick wall can't end in the middle of the board:
        where one does, flip the least certain wall at that corner (see
        ``_close_dangling_walls``).
@@ -1022,11 +1024,18 @@ def classify_border_thickness(
         ]
         for r in range(rows)
     ]
-    threshold = _find_thickness_threshold(
-        [w for row in h_widths for w in row] + [w for row in v_widths for w in row]
-    )
-    h_borders = [[int(w > threshold) for w in row] for row in h_widths]
-    v_borders = [[int(w > threshold) for w in row] for row in v_widths]
+    widths = [w for row in h_widths for w in row] + [w for row in v_widths for w in row]
+    otsu = _find_thickness_threshold(widths)
+    # Two candidate cuts; rooms are closed, so keep the one that leaves fewer thick
+    # walls dead-ending mid-board (ties keep Otsu).
+    best: tuple[int, float, list[list[int]], list[list[int]]] | None = None
+    for threshold in (otsu, _valley_between_classes(np.array([w for w in widths if w > 0]), otsu)):
+        h_try = [[int(w > threshold) for w in row] for row in h_widths]
+        v_try = [[int(w > threshold) for w in row] for row in v_widths]
+        dangling = len(_dangling_corners(h_try, v_try))
+        if best is None or dangling < best[0]:
+            best = (dangling, threshold, h_try, v_try)
+    _, threshold, h_borders, v_borders = best
     _close_dangling_walls(h_borders, v_borders, h_widths, v_widths, threshold)
 
     if debug_dir:
@@ -1160,6 +1169,11 @@ def _measure_border_width_gray(
     return float(np.percentile(samples, _WALL_PCT)) if samples else 0.0
 
 
+# Smoothing for the thick/thin width histogram, as a fraction of the gap between
+# the two class means (see _valley_between_classes).
+_VALLEY_BANDWIDTH = 0.12
+
+
 def _find_thickness_threshold(widths: list[float]) -> float:
     """Find threshold to separate thick from thin borders using Otsu's method.
 
@@ -1198,3 +1212,32 @@ def _find_thickness_threshold(widths: list[float]) -> float:
             best_thresh = t
 
     return best_thresh
+
+
+def _valley_between_classes(arr: NDArray, otsu: float) -> float:
+    """Move Otsu's cut to the emptiest point between the two class means.
+
+    Otsu minimises within-class variance, so a wide, heavy class pulls the cut
+    into itself: on the 45x31 nurimaze photo thick walls measure 5-11 px and
+    thin ones 2-4 px, with only 8 of ~2,700 walls in the 4-5 px gap, yet Otsu
+    cut at 6.1 px and called a hundred thick walls thin. The density valley
+    between the class means is where the classes actually part. It is only a
+    candidate: on a noisy scan with a wide, sparse gap (norinori-medium) any
+    point of the gap is a valley and Otsu's cut is the right one, so
+    ``classify_border_thickness`` keeps whichever closes rooms better. The histogram
+    is smoothed with a bandwidth relative to the class separation, so the cut
+    doesn't depend on the photo's resolution; a flat-bottomed valley takes its
+    middle.
+    """
+    lo_cls, hi_cls = arr[arr <= otsu], arr[arr > otsu]
+    if len(lo_cls) == 0 or len(hi_cls) == 0:
+        return otsu
+    m0, m1 = float(lo_cls.mean()), float(hi_cls.mean())
+    if m1 - m0 <= 0:
+        return otsu
+    bw = max(0.15, _VALLEY_BANDWIDTH * (m1 - m0))
+    xs = np.linspace(m0, m1, 200)
+    density = np.exp(-0.5 * ((xs[:, None] - arr[None, :]) / bw) ** 2).sum(axis=1)
+    lowest = density.min()
+    flat = xs[density <= lowest * 1.0001 + 1e-9]
+    return float((flat[0] + flat[-1]) / 2)

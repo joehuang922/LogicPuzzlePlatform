@@ -96,8 +96,12 @@ All rooms are assigned a state (no unset rooms remain) AND all rules above are s
 
 ## Puzzle Parser
 
-- Detects the grid using perspective warping.
-- Classifies borders as thick or thin to determine room structure.
+- Detects the grid using perspective warping, then `flatten_board`: the giant
+  boards (45x31) are photos of a curved page whose grid lines drift up to half a
+  cell (`board-nurimaze-45x31-photo.jpg`, `board-nurimaze-17x17-photo.jpg`).
+- Classifies borders as thick or thin to determine room structure (shared
+  `classify_border_thickness`; its cut is Otsu's or the density valley between
+  the classes, whichever closes rooms better).
 - Uses LLM-based cell recognizer (Gemini) to identify symbols in each cell (empty, circle, triangle, S, G).
 - Validates dimensions, cell value ranges (0-4), and grid border consistency.
 

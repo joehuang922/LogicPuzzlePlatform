@@ -64,7 +64,7 @@ This is a solo project. Do not create pull requests or feature branches.
 # Parser curved pages
 
 - A parser whose boards arrive as photos of a curved page or leaning scans
-  (kakuro, masyu, picto_link, fillomino) straightens them with
+  (kakuro, masyu, picto_link, fillomino, nurimaze) straightens them with
   `flatten.flatten_board(image, rectify_board(image))` before
   `find_grid_lines`; no per-parser line tracing or remap.
   `parsers/tests/test_flatten.py` enforces it. Opt a parser in only after

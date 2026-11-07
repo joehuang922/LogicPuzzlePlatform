@@ -2,7 +2,7 @@
 
 Masyu used to trace and remap its own lines while ``grid_utils`` snapped
 straight lines onto a bowed page; now every parser that gets curved pages
-(kakuro, masyu, picto_link, fillomino) calls ``flatten_board`` between
+(kakuro, masyu, picto_link, fillomino, nurimaze) calls ``flatten_board`` between
 ``rectify_board`` and ``find_grid_lines``. These checks pin that, and pin the
 two behaviours: a bowed grid comes out straight, a flat board passes through
 untouched.
@@ -19,7 +19,7 @@ from puzzle_parsers.flatten import flatten_board
 from puzzle_parsers.grid_utils import find_grid_lines, rectify_board
 
 PKG = Path(__file__).resolve().parent.parent / "src" / "puzzle_parsers"
-CURVED_PAGE_PARSERS = {"kakuro", "masyu", "picto_link", "fillomino"}
+CURVED_PAGE_PARSERS = {"kakuro", "masyu", "picto_link", "fillomino", "nurimaze"}
 _OWN_FLATTENING = re.compile(r"^def \w*(trace_lines|remap|flatten)\w*\(", re.M)
 # Combo sudoku's board is no rectangle, so rectify_board/flatten_board can't
 # take it; it warps each 3x3 room flat from that room's own grid junctions.

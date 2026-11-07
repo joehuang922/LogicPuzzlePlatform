@@ -18,7 +18,7 @@ Tracing reads only line-like ink, so it copes with dashed or solid rulings,
 clue circles, digits and black cells. It does count lines on its own, and on
 boards with a title band inside the border, halftone shading or a heavy frame
 that count can be wrong. That is why a parser opts in (kakuro, masyu,
-picto_link, fillomino: every sample of theirs traces to the right size) rather
+picto_link, fillomino, nurimaze: every sample of theirs traces to the right size) rather
 than every board going through it.
 """
 from __future__ import annotations
@@ -48,6 +48,9 @@ _MIN_LINE_SUPPORT = 0.5
 # is left as it is. At 0.10 cell (masyu's 45x31 scan) the straight grid
 # already let a black circle's rim poke into the cell above.
 _MIN_MISFIT_CELLS = 0.05
+# A traced outer line this far (in cells) outside the border quad at both of
+# the board's corners is not the border (see _drop_outside).
+_OUTSIDE_CELLS = 0.35
 # Ink thicker than this across the line direction is a black cell or a filled
 # disc, not a ruling; only its rim (which sits on the cell's lines) is kept.
 _THIN_CELLS = 0.2
@@ -100,8 +103,8 @@ def flatten_board(
             break
         pitch = measured
 
-    h_tracks = _trim_tracks(h_tracks, pitch)
-    v_tracks = _trim_tracks(v_tracks, pitch)
+    h_tracks = _drop_outside(_trim_tracks(h_tracks, pitch), margin, margin + nh * to_work, pitch)
+    v_tracks = _drop_outside(_trim_tracks(v_tracks, pitch), margin, margin + nw * to_work, pitch)
     if len(h_tracks) < 3 or len(v_tracks) < 3:
         return board
     if max(_misfit(h_tracks), _misfit(v_tracks)) < _MIN_MISFIT_CELLS * pitch:
@@ -349,6 +352,32 @@ def _trim_tracks(tracks: NDArray, pitch: float) -> NDArray:
     means = tracks.mean(axis=1)
     lo, hi = _dominant_extent(list(means), pitch)
     return tracks[(means >= lo - 1e-6) & (means <= hi + 1e-6)]
+
+
+def _drop_outside(tracks: NDArray, lo: float, hi: float, pitch: float) -> NDArray:
+    """Drop outermost lines that lie off the board at both of its corners.
+
+    ``lo``/``hi`` are the border quad's edges across the lines. The quad is
+    fitted to the border's corners, so the real border line meets it at both
+    end strips even on a bowed page (the bow is mid-edge). A line the margin
+    let in that sits ``_OUTSIDE_CELLS`` beyond the quad at both ends is page
+    clutter: a divider rule under the board, the page edge, a neighbouring
+    board. ``_dominant_extent`` would re-attach it as a foreshortened edge row
+    (the 17x17 nurimaze photo's divider, 0.6 cell below; the 45x31 one's page
+    edge, 0.75 cell left).
+    """
+    off = _OUTSIDE_CELLS * pitch
+
+    def outside(t: NDArray) -> bool:
+        ends = t[[0, -1]]
+        return bool(np.all(ends < lo - off) or np.all(ends > hi + off))
+
+    a, b = 0, len(tracks)
+    while b - a > 3 and outside(tracks[a]):
+        a += 1
+    while b - a > 3 and outside(tracks[b - 1]):
+        b -= 1
+    return tracks[a:b]
 
 
 def _misfit(tracks: NDArray) -> float:

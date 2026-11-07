@@ -76,3 +76,24 @@ def test_dead_end_wall_is_closed_by_the_least_certain_flip():
     vw = [[2.0, 2.0], [2.0, 2.0], [2.0, 2.0]]
     _close_dangling_walls(h, v, hw, vw, threshold=5.0)
     assert h == [[1, 1, 1], [0, 0, 0]] and v == [[0, 0], [0, 0], [0, 0]]
+
+
+def test_wall_cut_keeps_rooms_closed():
+    """The thick/thin cut is Otsu's or the valley between its classes, whichever
+    leaves fewer dead-end walls. heyawake-medium: Otsu called the thin edge below
+    rows 7-8 cols 1-2 thick; norinori-medium: the valley alone (a wide, sparse
+    gap) called the thin wall right of row 18 col 1 thick. Both stay thin.
+    """
+    import cv2
+    from pathlib import Path
+    from puzzle_parsers.grid_utils import classify_border_thickness
+    from puzzle_parsers.heyawake.grid_detector import detect_heyawake_grid
+    from puzzle_parsers.norinori.grid_detector import detect_norinori_grid
+
+    docs = Path(__file__).parents[2] / "docs"
+    g = detect_heyawake_grid(cv2.imread(str(docs / "heyawake" / "board-heyawake-medium.png")))
+    h, _ = classify_border_thickness(cv2.cvtColor(g.warped, cv2.COLOR_BGR2GRAY), g)
+    assert (h[6][0], h[6][1]) == (0, 0)
+    g = detect_norinori_grid(cv2.imread(str(docs / "norinori" / "board-norinori-medium.png")))
+    _, v = classify_border_thickness(cv2.cvtColor(g.warped, cv2.COLOR_BGR2GRAY), g)
+    assert v[17][0] == 0

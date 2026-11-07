@@ -1,4 +1,10 @@
-"""Nurimaze grid detection — thin orchestrator over shared grid_utils."""
+"""Nurimaze grid detection: the shared board finder, flattening and grid finder.
+
+The giant boards (45x31) are photos of a curved magazine page: grid lines bow by
+up to half a cell down the page, so a straight grid puts thick walls on the
+wrong cell edges. ``flatten_board`` straightens them first; flat boards pass
+through it unchanged.
+"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -7,6 +13,7 @@ import cv2
 from numpy.typing import NDArray
 
 from puzzle_parsers.board_grid import BoardGrid
+from puzzle_parsers.flatten import flatten_board
 from puzzle_parsers.grid_utils import (
     find_grid_lines,
     rectify_board,
@@ -22,7 +29,7 @@ def detect_nurimaze_grid(
     if debug_path:
         debug_path.mkdir(parents=True, exist_ok=True)
 
-    board = rectify_board(image)
+    board = flatten_board(image, rectify_board(image), debug_dir=debug_dir)
 
     warped, border_pts = board.warped, board.quad
 
