@@ -151,6 +151,7 @@ fun RippleEffectDraftBoard(
     onTapCell: (col: Int, row: Int) -> Unit,
     modifier: Modifier = Modifier,
     selectedCell: String? = null,
+    clueText: (Int) -> String = { it.toString() },
 ) {
     val rows = draft.height
     val cols = draft.width
@@ -163,6 +164,7 @@ fun RippleEffectDraftBoard(
     val badState = rememberUpdatedState(badRegions)
     val onTap = rememberUpdatedState(onTapCell)
     val selectedState = rememberUpdatedState(selectedCell)
+    val clueTextState = rememberUpdatedState(clueText)
 
     ZoomableBoard(
         cols = cols,
@@ -215,7 +217,7 @@ fun RippleEffectDraftBoard(
 
         for ((at, clue) in d.clues) {
             val (r, c) = at
-            if (r in 0 until rows && c in 0 until cols) drawNumber(clue, c, r, cell, CLUE_COLOR, bold = true)
+            if (r in 0 until rows && c in 0 until cols) drawLabel(clueTextState.value(clue), c, r, cell, CLUE_COLOR, bold = true)
         }
     }
 }
@@ -230,8 +232,12 @@ private fun String.toCellColRow(): Pair<Int, Int>? {
 }
 
 /** Draw a (possibly multi-digit) number centered in cell (col, row). */
-private fun DrawScope.drawNumber(value: Int, col: Int, row: Int, cell: Float, color: Color, bold: Boolean) {
-    val digits = value.toString().length
+private fun DrawScope.drawNumber(value: Int, col: Int, row: Int, cell: Float, color: Color, bold: Boolean) =
+    drawLabel(value.toString(), col, row, cell, color, bold)
+
+/** Draw [text] (a number or a symbol) centered in cell (col, row), smaller the longer it is. */
+private fun DrawScope.drawLabel(text: String, col: Int, row: Int, cell: Float, color: Color, bold: Boolean) {
+    val digits = text.length
     val textSize = cell * when {
         digits <= 1 -> 0.5f
         digits == 2 -> 0.38f
@@ -251,5 +257,5 @@ private fun DrawScope.drawNumber(value: Int, col: Int, row: Int, cell: Float, co
     val cx = col * cell + cell / 2
     val fm = paint.fontMetrics
     val cy = row * cell + cell / 2 - (fm.ascent + fm.descent) / 2
-    drawContext.canvas.nativeCanvas.drawText(value.toString(), cx, cy, paint)
+    drawContext.canvas.nativeCanvas.drawText(text, cx, cy, paint)
 }

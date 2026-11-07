@@ -216,3 +216,36 @@ object FillominoAuthoring : ClueGridAuthoring(14, "fillomino", "フィルオミ�
         return size
     }
 }
+
+/**
+ * Authoring for hitori (type 26): every cell holds a number, so a blank cell is a format
+ * problem (the canon has no way to say it). A number bigger than both the row and the
+ * column it sits in is a likely mis-read ("1" read as "11"), but stays overridable.
+ */
+object HitoriAuthoring : ClueGridAuthoring(26, "hitori", "ひとりにしてくれ") {
+    const val PUZZLE_TYPE = 26
+
+    /** Blank cells: the canon needs a number in every one. Creating is refused while any remain. */
+    fun formatProblems(draft: ClueGridDraft): List<String> = buildList {
+        if (draft.rows == 0 || draft.cols == 0) {
+            add("No cells")
+            return@buildList
+        }
+        val blanks = buildList {
+            for (r in 0 until draft.rows) for (c in 0 until draft.cols) if (draft.cells[r][c] <= 0) add(at(r, c))
+        }
+        when {
+            blanks.isEmpty() -> {}
+            blanks.size <= 5 -> add("Every cell needs a number; blank: ${blanks.joinToString(", ")}")
+            else -> add("Every cell needs a number; ${blanks.size} are blank, first ${blanks.take(5).joinToString(", ")}")
+        }
+    }
+
+    override fun clueProblems(draft: ClueGridDraft): List<String> = formatProblems(draft) + buildList {
+        val longest = maxOf(draft.rows, draft.cols)
+        for (r in 0 until draft.rows) for (c in 0 until draft.cols) {
+            val n = draft.cells[r][c]
+            if (n > longest) add("${at(r, c)}: $n is more than the grid's longest line ($longest)")
+        }
+    }
+}

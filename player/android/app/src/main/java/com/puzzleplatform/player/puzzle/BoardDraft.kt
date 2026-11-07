@@ -32,6 +32,9 @@ data class BoardDraft(
     val kuralin: KuralinDraft = KuralinDraft(),
     val norinori: RippleEffectDraft = RippleEffectDraft(),
     val doubleChoco: DoubleChocoDraft = DoubleChocoDraft(),
+    val lits: RippleEffectDraft = RippleEffectDraft(),
+    val nurimaze: RippleEffectDraft = RippleEffectDraft(),
+    val hitori: ClueGridDraft = ClueGridDraft(),
 ) {
     /**
      * What the type's misread check finds wrong with this board — the list that turns
@@ -58,13 +61,17 @@ data class BoardDraft(
         AuthoringType.KURALIN -> KuralinAuthoring.problems(kuralin)
         AuthoringType.NORINORI -> NorinoriAuthoring.problems(norinori)
         AuthoringType.DOUBLE_CHOCO -> DoubleChocoAuthoring.problems(doubleChoco)
+        AuthoringType.LITS -> LitsAuthoring.problems(lits)
+        AuthoringType.NURIMAZE -> NurimazeAuthoring.problems(nurimaze)
+        AuthoringType.HITORI -> HitoriAuthoring.problems(hitori)
     }
 
     /**
      * The part of [problems] that makes the board unrepresentable as its type's canon
      * (combo sudoku boards that are stacked or disagree on a shared cell, heyawake rooms
-     * that aren't rectangles, ripple effect or norinori walls that end
-     * inside a room, a slalom gate with two numbers). Unlike the rest these can't be overridden: the
+     * that aren't rectangles, ripple effect, norinori, LITS or nurimaze walls that end
+     * inside a room, a slalom gate with two numbers, a blank hitori cell). Unlike the rest
+     * these can't be overridden: the
      * board can't be created or saved until they're fixed.
      */
     fun formatProblems(type: AuthoringType): List<String> = when (type) {
@@ -73,6 +80,9 @@ data class BoardDraft(
         AuthoringType.RIPPLE_EFFECT -> RippleEffectAuthoring.formatProblems(rippleEffect)
         AuthoringType.SLALOM -> SlalomAuthoring.formatProblems(slalom)
         AuthoringType.NORINORI -> NorinoriAuthoring.formatProblems(norinori)
+        AuthoringType.LITS -> LitsAuthoring.formatProblems(lits)
+        AuthoringType.NURIMAZE -> NurimazeAuthoring.formatProblems(nurimaze)
+        AuthoringType.HITORI -> HitoriAuthoring.formatProblems(hitori)
         else -> emptyList()
     }
 
@@ -124,6 +134,10 @@ data class BoardDraft(
             CanonBoard(NorinoriAuthoring.canonFromDraft(norinori), norinori.width, norinori.height)
         AuthoringType.DOUBLE_CHOCO ->
             CanonBoard(DoubleChocoAuthoring.canonFromDraft(doubleChoco), doubleChoco.cols, doubleChoco.rows)
+        AuthoringType.LITS -> CanonBoard(LitsAuthoring.canonFromDraft(lits), lits.width, lits.height)
+        AuthoringType.NURIMAZE ->
+            CanonBoard(NurimazeAuthoring.canonFromDraft(nurimaze), nurimaze.width, nurimaze.height)
+        AuthoringType.HITORI -> CanonBoard(HitoriAuthoring.canonFromDraft(hitori), hitori.cols, hitori.rows)
     }
 
     companion object {
@@ -149,6 +163,9 @@ data class BoardDraft(
             AuthoringType.KURALIN -> BoardDraft(kuralin = KuralinAuthoring.draftFromCanon(canon))
             AuthoringType.NORINORI -> BoardDraft(norinori = NorinoriAuthoring.draftFromCanon(canon))
             AuthoringType.DOUBLE_CHOCO -> BoardDraft(doubleChoco = DoubleChocoAuthoring.draftFromCanon(canon))
+            AuthoringType.LITS -> BoardDraft(lits = LitsAuthoring.draftFromCanon(canon))
+            AuthoringType.NURIMAZE -> BoardDraft(nurimaze = NurimazeAuthoring.draftFromCanon(canon))
+            AuthoringType.HITORI -> BoardDraft(hitori = HitoriAuthoring.draftFromCanon(canon))
         }
     }
 }

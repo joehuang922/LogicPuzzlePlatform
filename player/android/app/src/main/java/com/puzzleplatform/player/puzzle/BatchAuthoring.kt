@@ -110,6 +110,9 @@ enum class AuthoringType(val label: String, val jpLabel: String, val puzzleType:
     KURALIN("Kuralin", "クラリン", KuralinAuthoring.PUZZLE_TYPE),
     NORINORI("Norinori", "のりのり", NorinoriAuthoring.PUZZLE_TYPE),
     DOUBLE_CHOCO("Double Choco", "ダブルチョコ", DoubleChocoAuthoring.PUZZLE_TYPE),
+    LITS("LITS", "LITS", LitsAuthoring.PUZZLE_TYPE),
+    NURIMAZE("Nurimaze", "ぬりめいず", NurimazeAuthoring.PUZZLE_TYPE),
+    HITORI("Hitori", "ひとりにしてくれ", HitoriAuthoring.PUZZLE_TYPE),
     ;
 
     companion object {

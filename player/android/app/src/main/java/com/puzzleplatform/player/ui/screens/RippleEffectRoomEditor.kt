@@ -35,7 +35,8 @@ import com.puzzleplatform.player.ui.board.RippleEffectDraftBoard
  * is a format problem: listed (and tinted on the board) and a block on creating the
  * question until it's fixed.
  *
- * Norinori reuses it with [numbers] off (its canon is only walls) and its own
+ * Norinori and LITS reuse it with no [cellEditor] (their canon is only walls), and
+ * nurimaze with a symbol picker and [clueText] drawing its symbols; each passes its own
  * [formatProblems] / [problems].
  */
 @OptIn(ExperimentalLayoutApi::class)
@@ -45,9 +46,13 @@ fun RippleEffectRoomEditor(
     selectedCell: String?,
     onSelectCell: (String?) -> Unit,
     onChange: ((RippleEffectDraft) -> RippleEffectDraft) -> Unit,
-    numbers: Boolean = true,
     formatProblems: (RippleEffectDraft) -> List<String> = RippleEffectAuthoring::formatProblems,
     problems: (RippleEffectDraft) -> List<String> = RippleEffectAuthoring::problems,
+    clueText: (Int) -> String = { it.toString() },
+    cellHint: String = "Tap a cell to edit its number or walls.",
+    cellEditor: (@Composable (draft: RippleEffectDraft, col: Int, row: Int) -> Unit)? = { d, col, row ->
+        RippleEffectNumberField(d, col, row, onChange)
+    },
 ) {
     val selected = selectedCell?.split(",")?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 2 }
     val selCol = selected?.get(0)?.takeIf { it < draft.width }
@@ -80,12 +85,13 @@ fun RippleEffectRoomEditor(
                     onSelectCell(if (selectedCell == key) null else key)
                 },
                 selectedCell = selectedCell?.takeIf { selCol != null && selRow != null },
+                clueText = clueText,
             )
         }
 
         if (selCol == null || selRow == null) {
             Text(
-                if (numbers) "Tap a cell to edit its number or walls." else "Tap a cell to edit its walls.",
+                cellHint,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -93,7 +99,7 @@ fun RippleEffectRoomEditor(
             // One panel per cell: a new selection builds it afresh, so its wall chips read
             // and toggle the newly selected cell, never the one picked before.
             key(selCol, selRow) {
-                SelectedCellPanel(draft, selCol, selRow, numbers, onSelectCell, onChange)
+                SelectedCellPanel(draft, selCol, selRow, cellEditor, onSelectCell, onChange)
             }
         }
 
@@ -120,25 +126,14 @@ private fun SelectedCellPanel(
     draft: RippleEffectDraft,
     col: Int,
     row: Int,
-    numbers: Boolean,
+    cellEditor: (@Composable (draft: RippleEffectDraft, col: Int, row: Int) -> Unit)?,
     onSelectCell: (String?) -> Unit,
     onChange: ((RippleEffectDraft) -> RippleEffectDraft) -> Unit,
 ) {
     Text("Row ${row + 1}, column ${col + 1}", fontWeight = FontWeight.Medium)
     val roomSize = draft.regionAt(col, row)?.size ?: 0
-    if (numbers) {
-        val clue = draft.clues[row to col]
-        ClueNumberField(
-            label = "Number (room of $roomSize, blank for none)",
-            clue = clue,
-            parse = RippleEffectAuthoring::parseClue,
-            onClue = { v -> onChange { RippleEffectAuthoring.setClue(it, col, row, v) } },
-            isError = (clue ?: 0) > roomSize,
-            modifier = Modifier.fillMaxWidth(),
-        )
-    } else {
-        Text("Room of $roomSize", style = MaterialTheme.typography.bodySmall)
-    }
+    Text("Room of $roomSize", style = MaterialTheme.typography.bodySmall)
+    cellEditor?.invoke(draft, col, row)
     Text("Walls", style = MaterialTheme.typography.bodySmall)
     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         for ((side, label) in WALL_LABELS) {
@@ -166,6 +161,26 @@ private fun SelectedCellPanel(
             enabled = draft.width > 1,
         ) { Text("Delete column ${col + 1}") }
     }
+}
+
+/** Ripple effect's cell editor: the given number, red when bigger than its room. */
+@Composable
+private fun RippleEffectNumberField(
+    draft: RippleEffectDraft,
+    col: Int,
+    row: Int,
+    onChange: ((RippleEffectDraft) -> RippleEffectDraft) -> Unit,
+) {
+    val roomSize = draft.regionAt(col, row)?.size ?: 0
+    val clue = draft.clues[row to col]
+    ClueNumberField(
+        label = "Number (blank for none)",
+        clue = clue,
+        parse = RippleEffectAuthoring::parseClue,
+        onClue = { v -> onChange { RippleEffectAuthoring.setClue(it, col, row, v) } },
+        isError = (clue ?: 0) > roomSize,
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 private val WALL_LABELS = listOf(

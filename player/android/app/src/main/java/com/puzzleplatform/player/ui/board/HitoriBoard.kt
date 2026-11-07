@@ -38,6 +38,9 @@ private val MARK_COLOR = Color.Black
  * -> marked -> empty, and the caller applies it via [onTapCell]. Shaded cells fill black
  * with a white number; marked cells draw a circle around the number. Two fingers pan/zoom
  * via [ZoomableBoard].
+ *
+ * The Admin review editor passes [selectedCell] ("col,row") to outline the cell its taps
+ * select.
  */
 @Composable
 fun HitoriBoard(
@@ -45,8 +48,10 @@ fun HitoriBoard(
     userValues: Map<String, Int>,
     onTapCell: (col: Int, row: Int) -> Unit,
     modifier: Modifier = Modifier,
+    selectedCell: String? = null,
 ) {
-    val cells = remember(puzzle.id) { HitoriEngine.parseCells(puzzle) }
+    // Keyed on the canon too: the Admin review editor changes it under a stable id.
+    val cells = remember(puzzle.id, puzzle.canonRepr) { HitoriEngine.parseCells(puzzle) }
     val rows = cells.size
     val cols = cells.maxOfOrNull { it.size } ?: 0
     if (rows == 0 || cols == 0) return
@@ -55,6 +60,7 @@ fun HitoriBoard(
     // restart when these change), so read the freshest values/callback through state.
     val valuesState = rememberUpdatedState(userValues)
     val onTap = rememberUpdatedState(onTapCell)
+    val selectedState = rememberUpdatedState(selectedCell)
 
     ZoomableBoard(
         cols = cols,
@@ -127,6 +133,7 @@ fun HitoriBoard(
                 drawNumber(value, c, r, cell, if (shaded) SHADE_TEXT else NUM_COLOR)
             }
         }
+        drawCellSelection(selectedState.value, cell)
     }
 }
 

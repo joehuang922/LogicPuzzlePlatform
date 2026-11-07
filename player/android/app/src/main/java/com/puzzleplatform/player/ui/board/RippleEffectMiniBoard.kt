@@ -22,7 +22,8 @@ private val MINI_PROBLEM = Color(0xFFDD3333)
 
 /**
  * A tiny, non-interactive ripple effect preview for an Admin batch tile: the draft's
- * walls and given numbers, framed in red when [hasProblems].
+ * walls and given numbers ([clueText] turns a clue into its label, e.g. a nurimaze
+ * symbol), framed in red when [hasProblems].
  */
 @Composable
 fun RippleEffectMiniBoard(
@@ -30,6 +31,7 @@ fun RippleEffectMiniBoard(
     hasProblems: Boolean,
     modifier: Modifier = Modifier,
     size: Dp = 104.dp,
+    clueText: (Int) -> String = { it.toString() },
 ) {
     Canvas(modifier.size(size)) {
         val rows = draft.height
@@ -69,7 +71,7 @@ fun RippleEffectMiniBoard(
             val (r, c) = at
             if (r !in 0 until rows || c !in 0 until cols) continue
             drawContext.canvas.nativeCanvas.drawText(
-                clue.toString(),
+                clueText(clue),
                 left + (c + 0.5f) * cell,
                 top + (r + 0.5f) * cell + baseline,
                 paint,

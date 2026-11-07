@@ -7,7 +7,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class NorinoriAuthoringTest {
+class WallRoomsAuthoringTest {
 
     private fun json(s: String): JsonObject = Json.parseToJsonElement(s).jsonObject
 
@@ -57,5 +57,14 @@ class NorinoriAuthoringTest {
         // Splits the top-left room into two one-cell rooms.
         assertTrue(NorinoriAuthoring.formatProblems(draft).isEmpty())
         assertEquals(2, NorinoriAuthoring.problems(draft).size)
+    }
+
+    @Test
+    fun litsNeedsFourCellRooms() {
+        val draft = LitsAuthoring.draftFromCanon(canon)
+        assertEquals(canon, LitsAuthoring.canonFromDraft(draft))
+        // Three 2-cell rooms: each too small for a tetromino, but none a format problem.
+        assertTrue(LitsAuthoring.formatProblems(draft).isEmpty())
+        assertEquals(3, LitsAuthoring.problems(draft).size)
     }
 }

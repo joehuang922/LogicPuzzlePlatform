@@ -132,6 +132,22 @@ const semanticChecks: Record<number, (data: any) => void> = {
       }
     }
   },
+  // Nurimaze: the symbol grid fixes the size; the walls must fit it and every one must
+  // separate two rooms.
+  3: (data: { cells: number[][]; grids: { h: number[][]; v: number[][] } }) => {
+    const { cells, grids } = data;
+    const cols = cells[0].length;
+    if (cols === 0 || !cells.every((line) => line.length === cols)) {
+      throw new Error("Invalid nurimaze: cells rows must be non-empty and equal in length");
+    }
+    checkRoomWalls("nurimaze", cells.length, cols, grids.h, grids.v);
+  },
+  // LITS: as norinori, the walls are the board's format.
+  15: (data: { grids: { h: number[][]; v: number[][] } }) => {
+    const { h, v } = data.grids;
+    if (v.length === 0) throw new Error("Invalid LITS: no cells");
+    checkRoomWalls("LITS", v.length, v[0].length + 1, h, v);
+  },
   // Norinori: the walls are the board's format; every one must separate two rooms. Editors
   // may hold a wall that stops halfway through a room; this keeps one from ever being stored.
   23: (data: { grids: { h: number[][]; v: number[][] } }) => {

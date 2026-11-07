@@ -100,6 +100,24 @@ class BoardDraftTest {
     }
 
     @Test
+    fun litsNurimazeAndHitoriRoundTripWithTheirSize() {
+        val lits = json("""{"grids":{"h":[[1,1,0]],"v":[[0,1],[0,1]]}}""")
+        val litsBoard = BoardDraft.fromCanon(AuthoringType.LITS, lits)
+        assertEquals(BoardDraft(lits = litsBoard.lits), litsBoard)
+        assertEquals(CanonBoard(lits, 3, 2), litsBoard.toCanon(AuthoringType.LITS))
+
+        val maze = json("""{"cells":[[3,0,1],[2,0,4]],"grids":{"h":[[1,1,0]],"v":[[0,1],[0,1]]}}""")
+        val mazeBoard = BoardDraft.fromCanon(AuthoringType.NURIMAZE, maze)
+        assertEquals(BoardDraft(nurimaze = mazeBoard.nurimaze), mazeBoard)
+        assertEquals(CanonBoard(maze, 3, 2), mazeBoard.toCanon(AuthoringType.NURIMAZE))
+
+        val hitori = json("""{"cells":[[1,2,2],[2,1,3]]}""")
+        val hitoriBoard = BoardDraft.fromCanon(AuthoringType.HITORI, hitori)
+        assertEquals(BoardDraft(hitori = hitoriBoard.hitori), hitoriBoard)
+        assertEquals(CanonBoard(hitori, 3, 2), hitoriBoard.toCanon(AuthoringType.HITORI))
+    }
+
+    @Test
     fun sudokuHasNoProblemCheck() {
         assertTrue(BoardDraft().problems(AuthoringType.SUDOKU).isEmpty())
         assertTrue(BoardDraft().formatProblems(AuthoringType.SUDOKU).isEmpty())

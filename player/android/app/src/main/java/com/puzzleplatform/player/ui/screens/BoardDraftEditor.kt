@@ -7,7 +7,11 @@ import com.puzzleplatform.player.puzzle.AuthoringType
 import com.puzzleplatform.player.puzzle.AkariAuthoring
 import com.puzzleplatform.player.puzzle.BoardDraft
 import com.puzzleplatform.player.puzzle.FillominoAuthoring
+import com.puzzleplatform.player.puzzle.HitoriAuthoring
+import com.puzzleplatform.player.puzzle.LitsAuthoring
 import com.puzzleplatform.player.puzzle.NorinoriAuthoring
+import com.puzzleplatform.player.puzzle.NurimazeAuthoring
+import com.puzzleplatform.player.puzzle.RippleEffectDraft
 import com.puzzleplatform.player.puzzle.NumberLinkAuthoring
 import com.puzzleplatform.player.puzzle.ShakashakaAuthoring
 import com.puzzleplatform.player.puzzle.ShikakuAuthoring
@@ -21,6 +25,7 @@ import com.puzzleplatform.player.ui.board.DoubleChocoMiniBoard
 import com.puzzleplatform.player.ui.board.FillominoBoard
 import com.puzzleplatform.player.ui.board.FillominoMode
 import com.puzzleplatform.player.ui.board.HeyawakeMiniBoard
+import com.puzzleplatform.player.ui.board.HitoriBoard
 import com.puzzleplatform.player.ui.board.KakuroMiniBoard
 import com.puzzleplatform.player.ui.board.KuralinMiniBoard
 import com.puzzleplatform.player.ui.board.MasyuMiniBoard
@@ -48,8 +53,9 @@ import com.puzzleplatform.player.ui.board.YajilinMiniBoard
  * [YajilinClueEditor]; for ripple effect [RippleEffectRoomEditor]; for masyu
  * [MasyuCircleEditor]; for slalom [SlalomGateEditor]; for shakashaka and akari
  * [BlackCellEditor]; for number link, shikaku and fillomino [ClueGridEditor]; for kuralin
- * [KuralinCircleEditor]; for norinori [RippleEffectRoomEditor] without numbers; for
- * double choco [DoubleChocoCellEditor], each on its own player
+ * [KuralinCircleEditor]; for norinori and LITS [RippleEffectRoomEditor] without numbers
+ * and for nurimaze with its symbols; for double choco [DoubleChocoCellEditor]; for hitori
+ * [ClueGridEditor], each on its own player
  * board (whose play input has nothing to write into here, so it's dropped). Each lists
  * its own problems.
  */
@@ -235,10 +241,51 @@ fun BoardDraftEditor(
             selectedCell = selectedCell,
             onSelectCell = onSelectCell,
             onChange = { t -> onChange { it.copy(norinori = t(it.norinori)) } },
-            numbers = false,
             formatProblems = NorinoriAuthoring::formatProblems,
             problems = NorinoriAuthoring::problems,
+            cellHint = "Tap a cell to edit its walls.",
+            cellEditor = null,
         )
+        AuthoringType.LITS -> RippleEffectRoomEditor(
+            draft = board.lits,
+            selectedCell = selectedCell,
+            onSelectCell = onSelectCell,
+            onChange = { t -> onChange { it.copy(lits = t(it.lits)) } },
+            formatProblems = LitsAuthoring::formatProblems,
+            problems = LitsAuthoring::problems,
+            cellHint = "Tap a cell to edit its walls.",
+            cellEditor = null,
+        )
+        AuthoringType.NURIMAZE -> {
+            val change: ((RippleEffectDraft) -> RippleEffectDraft) -> Unit =
+                { t -> onChange { it.copy(nurimaze = t(it.nurimaze)) } }
+            RippleEffectRoomEditor(
+                draft = board.nurimaze,
+                selectedCell = selectedCell,
+                onSelectCell = onSelectCell,
+                onChange = change,
+                formatProblems = NurimazeAuthoring::formatProblems,
+                problems = NurimazeAuthoring::problems,
+                clueText = NurimazeAuthoring::symbolText,
+                cellHint = "Tap a cell to edit its symbol or walls.",
+                cellEditor = { d, col, row -> NurimazeSymbolChips(d, col, row, change) },
+            )
+        }
+        AuthoringType.HITORI -> ClueGridEditor(
+            authoring = HitoriAuthoring,
+            draft = board.hitori,
+            clueLabel = "Number",
+            selectedCell = selectedCell,
+            onSelectCell = onSelectCell,
+            onChange = { t -> onChange { it.copy(hitori = t(it.hitori)) } },
+        ) { puzzle, onTap, selected ->
+            HitoriBoard(
+                puzzle = puzzle,
+                userValues = emptyMap(),
+                onTapCell = onTap,
+                selectedCell = selected,
+            )
+        }
         AuthoringType.DOUBLE_CHOCO -> DoubleChocoCellEditor(
             draft = board.doubleChoco,
             selectedCell = selectedCell,
@@ -287,5 +334,13 @@ fun BoardDraftMiniBoard(type: AuthoringType, board: BoardDraft, size: Dp) {
             RippleEffectMiniBoard(draft = board.norinori, hasProblems = hasProblems, size = size)
         AuthoringType.DOUBLE_CHOCO ->
             DoubleChocoMiniBoard(draft = board.doubleChoco, hasProblems = hasProblems, size = size)
+        AuthoringType.LITS -> RippleEffectMiniBoard(draft = board.lits, hasProblems = hasProblems, size = size)
+        AuthoringType.NURIMAZE -> RippleEffectMiniBoard(
+            draft = board.nurimaze,
+            hasProblems = hasProblems,
+            size = size,
+            clueText = NurimazeAuthoring::symbolText,
+        )
+        AuthoringType.HITORI -> ClueGridMiniBoard(draft = board.hitori, hasProblems = hasProblems, size = size)
     }
 }

@@ -68,7 +68,7 @@ import com.puzzleplatform.player.ui.board.ZoomableImage
 
 /**
  * Create one *or many* questions from album photos. The puzzle type (sudoku,
- * nonogram, kakuro, slitherlink, nurikabe, heyawake, picto link, yajilin, ripple effect, masyu, slalom, shakashaka, akari, number link, shikaku, fillomino, kuralin, norinori or double choco, see [AuthoringType]) is picked from a dropdown and applies to the whole
+ * nonogram, kakuro, slitherlink, nurikabe, heyawake, picto link, yajilin, ripple effect, masyu, slalom, shakashaka, akari, number link, shikaku, fillomino, kuralin, norinori, double choco, LITS, nurimaze or hitori, see [AuthoringType]) is picked from a dropdown and applies to the whole
  * batch. A single pick is just a batch of one — same flow throughout. Steps:
  * pick images → Parse all (OCR each) → review/fix any tile (full-screen, with the
  * source photo beside it: sudoku on the real player board, nonogram as editable clue
@@ -305,6 +305,18 @@ fun AdminQuestionScreen(
                                     "Tap a tile to review its photo and grid side by side, fix mis-read " +
                                         "colors, numbers or phantom lines, and set its title. A red tile " +
                                         "has colors or numbers that can't be right."
+                                AuthoringType.LITS ->
+                                    "Tap a tile to review its photo and rooms side by side, fix mis-read " +
+                                        "walls or phantom lines, and set its title. A red tile has " +
+                                        "walls or rooms that can't be right."
+                                AuthoringType.NURIMAZE ->
+                                    "Tap a tile to review its photo and rooms side by side, fix mis-read " +
+                                        "walls, symbols or phantom lines, and set its title. A red tile has " +
+                                        "walls or a start/goal that can't be right."
+                                AuthoringType.HITORI ->
+                                    "Tap a tile to review its photo and grid side by side, fix mis-read " +
+                                        "numbers or phantom lines, and set its title. A red tile has " +
+                                        "blank cells or numbers that can't be right."
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -538,6 +550,15 @@ private fun ReviewScreen(
                     AuthoringType.DOUBLE_CHOCO ->
                         "Compare the photo with the grid — pinch to zoom the photo, tap a cell to make " +
                             "it white or gray or fix its number, delete a phantom line, or add a missed one."
+                    AuthoringType.LITS ->
+                        "Compare the photo with the rooms — pinch to zoom the photo, tap a cell to fix " +
+                            "its walls, delete a phantom line, or add a missed one."
+                    AuthoringType.NURIMAZE ->
+                        "Compare the photo with the rooms — pinch to zoom the photo, tap a cell to fix " +
+                            "its symbol (S, G, circle, triangle) or walls, delete a phantom line, or add a missed one."
+                    AuthoringType.HITORI ->
+                        "Compare the photo with the grid — pinch to zoom the photo, tap a cell to fix " +
+                            "its number, delete a phantom line, or add a missed one."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
