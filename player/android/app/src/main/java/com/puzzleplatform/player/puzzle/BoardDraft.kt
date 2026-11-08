@@ -37,6 +37,7 @@ data class BoardDraft(
     val hitori: ClueGridDraft = ClueGridDraft(),
     val nuritwin: RippleEffectDraft = RippleEffectDraft(),
     val tentaishow: TentaishowDraft = TentaishowDraft(),
+    val unequalSudoku: UnequalSudokuDraft = UnequalSudokuDraft(),
 ) {
     /**
      * What the type's misread check finds wrong with this board — the list that turns
@@ -68,6 +69,7 @@ data class BoardDraft(
         AuthoringType.HITORI -> HitoriAuthoring.problems(hitori)
         AuthoringType.NURITWIN -> NuritwinAuthoring.problems(nuritwin)
         AuthoringType.TENTAISHOW -> TentaishowAuthoring.problems(tentaishow)
+        AuthoringType.UNEQUAL_SUDOKU -> UnequalSudokuAuthoring.problems(unequalSudoku)
     }
 
     /**
@@ -149,6 +151,11 @@ data class BoardDraft(
             CanonBoard(NuritwinAuthoring.canonFromDraft(nuritwin), nuritwin.width, nuritwin.height)
         AuthoringType.TENTAISHOW ->
             CanonBoard(TentaishowAuthoring.canonFromDraft(tentaishow), tentaishow.cols, tentaishow.rows)
+        AuthoringType.UNEQUAL_SUDOKU -> CanonBoard(
+            UnequalSudokuAuthoring.canonFromDraft(unequalSudoku),
+            UnequalSudokuEngine.SIZE,
+            UnequalSudokuEngine.SIZE,
+        )
     }
 
     companion object {
@@ -179,6 +186,7 @@ data class BoardDraft(
             AuthoringType.HITORI -> BoardDraft(hitori = HitoriAuthoring.draftFromCanon(canon))
             AuthoringType.NURITWIN -> BoardDraft(nuritwin = NuritwinAuthoring.draftFromCanon(canon))
             AuthoringType.TENTAISHOW -> BoardDraft(tentaishow = TentaishowAuthoring.draftFromCanon(canon))
+            AuthoringType.UNEQUAL_SUDOKU -> BoardDraft(unequalSudoku = UnequalSudokuAuthoring.draftFromCanon(canon))
         }
     }
 }

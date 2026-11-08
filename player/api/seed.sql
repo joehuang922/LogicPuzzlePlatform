@@ -97,7 +97,8 @@ INSERT INTO puzzle_types (id, name, jp_label, rule) VALUES
   (25, 'ripple-effect', '波及効果', 'The grid is divided into rooms. Fill every cell so each room of size N contains the numbers 1 to N exactly once. If the same number K appears more than once in a row or column, those equal numbers must be at least K cells apart.'),
   (26, 'hitori', 'ひとりにしてくれ', 'Shade some cells so that no number appears more than once among the unshaded cells of any row or column. Shaded cells may not touch each other orthogonally. All unshaded cells must form one orthogonally connected group.'),
   (27, 'picto-link', 'ピクトリンク', 'Link each pair of matching numbers with a path of cells. The path length (counting both endpoints) equals the number. A 1 is a single cell on its own. Paths may not cross or overlap, and the filled cells reveal a picture.'),
-  (28, 'kuralin', 'クラリン', 'Draw a single loop through cell centers and blacken every cell the loop does not pass through. The loop never crosses itself, branches, or visits a cell twice. A black circle touches more black cells than white cells, a white circle touches more white cells than black cells, and a gray circle touches equal numbers of each.');
+  (28, 'kuralin', 'クラリン', 'Draw a single loop through cell centers and blacken every cell the loop does not pass through. The loop never crosses itself, branches, or visits a cell twice. A black circle touches more black cells than white cells, a white circle touches more white cells than black cells, and a gray circle touches equal numbers of each.'),
+  (29, 'unequal-sudoku', '不等号ナンプレ', 'Fill every cell with a digit from 1 to 9 so that each row, column and 3x3 box contains every digit exactly once. Every inequality sign between two neighbouring cells must hold: the sign points at the smaller digit.');
 
 -- Seed sample puzzle: sudoku (difficulty 4 = hard)
 INSERT INTO puzzle_questions (id, puzzle_type, title, difficulty, width, height, canon_repr) VALUES (

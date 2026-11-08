@@ -27,6 +27,7 @@ import { computeRippleEffectProgress } from "./rippleEffect";
 import { computeHitoriProgress } from "./hitori";
 import { computePictoLinkProgress } from "./pictoLink";
 import { computeKuralinProgress } from "./kuralin";
+import { computeUnequalSudokuProgress } from "./unequalSudoku";
 
 export interface ProgressCalculator {
   puzzleType: number;
@@ -67,6 +68,7 @@ register(computeRippleEffectProgress);
 register(computeHitoriProgress);
 register(computePictoLinkProgress);
 register(computeKuralinProgress);
+register(computeUnequalSudokuProgress);
 
 export function computeProgress(
   puzzle: PuzzleDefinition,

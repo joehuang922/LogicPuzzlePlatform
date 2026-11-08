@@ -193,7 +193,7 @@ function QuestionForm({
       const typeId = Number(puzzleType);
       let w: number | undefined;
       let h: number | undefined;
-      if (typeId === 1) {
+      if (typeId === 1 || typeId === 29) {
         w = 9;
         h = 9;
       } else if (typeId === 2 && canon.subboards) {

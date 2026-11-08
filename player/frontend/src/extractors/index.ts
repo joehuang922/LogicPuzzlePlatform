@@ -27,6 +27,7 @@ import { rippleEffectExtractor } from "./rippleEffect";
 import { hitoriExtractor } from "./hitori";
 import { pictoLinkExtractor } from "./pictoLink";
 import { kuralinExtractor } from "./kuralin";
+import { unequalSudokuExtractor } from "./unequalSudoku";
 
 const extractorRegistry = new Map<number, AnswerExtractor>();
 
@@ -62,6 +63,7 @@ registerExtractor(rippleEffectExtractor);
 registerExtractor(hitoriExtractor);
 registerExtractor(pictoLinkExtractor);
 registerExtractor(kuralinExtractor);
+registerExtractor(unequalSudokuExtractor);
 
 export function getExtractor(puzzleType: number): AnswerExtractor | undefined {
   return extractorRegistry.get(puzzleType);

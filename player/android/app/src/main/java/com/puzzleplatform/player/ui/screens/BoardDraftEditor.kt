@@ -41,6 +41,7 @@ import com.puzzleplatform.player.ui.board.SlalomMiniBoard
 import com.puzzleplatform.player.ui.board.SlitherlinkMiniBoard
 import com.puzzleplatform.player.ui.board.SudokuBoard
 import com.puzzleplatform.player.ui.board.SudokuMiniBoard
+import com.puzzleplatform.player.ui.board.UnequalSudokuMiniBoard
 import com.puzzleplatform.player.ui.board.TentaishowMiniBoard
 import com.puzzleplatform.player.ui.board.YajilinMiniBoard
 
@@ -291,6 +292,12 @@ fun BoardDraftEditor(
             draft = board.tentaishow,
             onChange = { t -> onChange { it.copy(tentaishow = t(it.tentaishow)) } },
         )
+        AuthoringType.UNEQUAL_SUDOKU -> UnequalSudokuEditor(
+            draft = board.unequalSudoku,
+            selectedCell = selectedCell,
+            onSelectCell = onSelectCell,
+            onChange = { t -> onChange { it.copy(unequalSudoku = t(it.unequalSudoku)) } },
+        )
         AuthoringType.HITORI -> ClueGridEditor(
             authoring = HitoriAuthoring,
             draft = board.hitori,
@@ -366,5 +373,7 @@ fun BoardDraftMiniBoard(type: AuthoringType, board: BoardDraft, size: Dp) {
             RippleEffectMiniBoard(draft = board.nuritwin, hasProblems = hasProblems, size = size)
         AuthoringType.TENTAISHOW ->
             TentaishowMiniBoard(draft = board.tentaishow, hasProblems = hasProblems, size = size)
+        AuthoringType.UNEQUAL_SUDOKU ->
+            UnequalSudokuMiniBoard(draft = board.unequalSudoku, hasProblems = hasProblems, size = size)
     }
 }

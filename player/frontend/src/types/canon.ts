@@ -393,3 +393,21 @@ export interface KuralinAnswer {
     v: number[][];
   };
 }
+
+// Unequal sudoku (type 29). Sign codes: 0 = none, 1 = this cell smaller (< / ∧),
+// 2 = this cell larger (> / ∨).
+export interface UnequalSudokuCanon {
+  // 9x9, 0 = empty, 1-9 = given
+  hints: number[][];
+  // 9x8: sign between (row, col) and (row, col + 1)
+  right: number[][];
+  // 8x9: sign between (row, col) and (row + 1, col)
+  down: number[][];
+}
+
+export interface UnequalSudokuAnswer {
+  // 9x9 committed answers (givens merged with the player's entries)
+  hints: number[][];
+  // 9x9 pencil-mark candidates, as in SudokuAnswer
+  notes?: number[][][];
+}

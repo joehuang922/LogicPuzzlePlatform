@@ -20,6 +20,7 @@ from puzzle_parsers.hitori.models import HitoriBoard
 from puzzle_parsers.yajilin.models import YajilinBoard
 from puzzle_parsers.picto_link.models import PictoLinkBoard
 from puzzle_parsers.kuralin.models import KuralinBoard
+from puzzle_parsers.unequal_sudoku.models import UnequalSudokuBoard
 from puzzle_parsers.validate import validate_canon
 
 SCHEMA_DIR = Path(__file__).parents[2] / "schemas" / "canon"
@@ -38,6 +39,7 @@ MODELS = {
     "yajilin": YajilinBoard,
     "picto-link": PictoLinkBoard,
     "kuralin": KuralinBoard,
+    "unequal-sudoku": UnequalSudokuBoard,
 }
 
 

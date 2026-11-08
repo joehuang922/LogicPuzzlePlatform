@@ -115,6 +115,7 @@ enum class AuthoringType(val label: String, val jpLabel: String, val puzzleType:
     HITORI("Hitori", "ひとりにしてくれ", HitoriAuthoring.PUZZLE_TYPE),
     NURITWIN("Nuritwin", "ぬりツイン", NuritwinAuthoring.PUZZLE_TYPE),
     TENTAISHOW("Tentaishow", "天体ショー", TentaishowAuthoring.PUZZLE_TYPE),
+    UNEQUAL_SUDOKU("Unequal Sudoku", "不等号ナンプレ", UnequalSudokuAuthoring.PUZZLE_TYPE),
     ;
 
     companion object {

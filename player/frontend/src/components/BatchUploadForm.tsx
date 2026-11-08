@@ -36,7 +36,7 @@ interface BatchItem {
 }
 
 function computeDimensions(typeId: number, canon: Record<string, unknown>): { w?: number; h?: number } {
-  if (typeId === 1) return { w: 9, h: 9 };
+  if (typeId === 1 || typeId === 29) return { w: 9, h: 9 };
   if (typeId === 2 && canon.subboards) {
     const subs = canon.subboards as { x: number; y: number }[];
     return {

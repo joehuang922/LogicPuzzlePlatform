@@ -23,9 +23,12 @@ sys.path.insert(0, str(PARSERS_ROOT))
 _OCR_CORE = {PKG / "recognition.py", PKG / "cell_ocr.py"}
 # Not a grid-cell clue reader: nonogram OCRs the clue strips outside the grid.
 _EXEMPT_PACKAGES = {"nonogram"}
-# Clues are single digits by the puzzle's rules (sudoku 1-9, akari and
-# shakashaka 0-4, slitherlink 0-3); every other puzzle allows multi-digit clues.
-_SINGLE_DIGIT_PACKAGES = {"sudoku", "combo_sudoku", "akari", "shakashaka", "slitherlink"}
+# Clues are single digits by the puzzle's rules (sudoku and unequal sudoku 1-9,
+# akari and shakashaka 0-4, slitherlink 0-3); every other puzzle allows
+# multi-digit clues.
+_SINGLE_DIGIT_PACKAGES = {
+    "sudoku", "combo_sudoku", "unequal_sudoku", "akari", "shakashaka", "slitherlink",
+}
 
 _DIRECT_OCR = re.compile(r"\.recognize_cells\(|\.readtext\(|\._reader\b|import easyocr")
 _SHARED_READ = re.compile(r"\b(read_cells|read_grid_clues)\(")

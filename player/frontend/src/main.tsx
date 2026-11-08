@@ -31,6 +31,7 @@ import { rippleEffectRenderer } from "./renderers/rippleEffect";
 import { hitoriRenderer } from "./renderers/hitori";
 import { pictoLinkRenderer } from "./renderers/pictoLink";
 import { kuralinRenderer } from "./renderers/kuralin";
+import { unequalSudokuRenderer } from "./renderers/unequalSudoku";
 
 registerRenderer(comboSudokuRenderer);
 registerRenderer(sudokuRenderer);
@@ -60,6 +61,7 @@ registerRenderer(rippleEffectRenderer);
 registerRenderer(hitoriRenderer);
 registerRenderer(pictoLinkRenderer);
 registerRenderer(kuralinRenderer);
+registerRenderer(unequalSudokuRenderer);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

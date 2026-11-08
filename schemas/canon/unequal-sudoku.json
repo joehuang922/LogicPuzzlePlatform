@@ -1,0 +1,42 @@
+{
+  "title": "Unequal Sudoku Canonical Representation",
+  "description": "9x9 sudoku with inequality signs between adjacent cells. hints: 0 = empty, 1-9 = given. right[r][c]: sign between (r,c) and (r,c+1). down[r][c]: sign between (r,c) and (r+1,c). 0 = none, 1 = this cell smaller (< or ∧), 2 = this cell larger (> or ∨).",
+  "type": "object",
+  "required": ["hints", "right", "down"],
+  "additionalProperties": false,
+  "properties": {
+    "hints": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": { "type": "integer", "minimum": 0, "maximum": 9 },
+        "minItems": 9,
+        "maxItems": 9
+      },
+      "minItems": 9,
+      "maxItems": 9
+    },
+    "right": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": { "type": "integer", "minimum": 0, "maximum": 2 },
+        "minItems": 8,
+        "maxItems": 8
+      },
+      "minItems": 9,
+      "maxItems": 9
+    },
+    "down": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": { "type": "integer", "minimum": 0, "maximum": 2 },
+        "minItems": 9,
+        "maxItems": 9
+      },
+      "minItems": 8,
+      "maxItems": 8
+    }
+  }
+}

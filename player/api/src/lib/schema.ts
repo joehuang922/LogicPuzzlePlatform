@@ -27,6 +27,7 @@ import rippleEffectSchema from "../../../../schemas/canon/ripple-effect.json";
 import hitoriSchema from "../../../../schemas/canon/hitori.json";
 import pictoLinkSchema from "../../../../schemas/canon/picto-link.json";
 import kuralinSchema from "../../../../schemas/canon/kuralin.json";
+import unequalSudokuSchema from "../../../../schemas/canon/unequal-sudoku.json";
 
 const ajv = new Ajv();
 
@@ -59,6 +60,7 @@ const validators: Record<number, ValidateFunction> = {
   26: ajv.compile(hitoriSchema),
   27: ajv.compile(pictoLinkSchema),
   28: ajv.compile(kuralinSchema),
+  29: ajv.compile(unequalSudokuSchema),
 };
 
 export function validateCanon(puzzleType: number, data: unknown): void {
