@@ -328,7 +328,7 @@ fun PlayScreen(
                                 // sets the explicit state and drops the key when it cycles to 0.
                                 onCycleEdge = { key, next -> vm.putUserValue(key, next) },
                             )
-                            // Shade/mark puzzles (LITS, Nurikabe, Nuritwin, Nurimaze) all share
+                            // Shade/mark puzzles (LITS, Nurikabe, Nuritwin, Nurimaze, ...) all share
                             // tap-to-cycle input: the engine decides what a tap covers (one cell,
                             // a whole room, or nothing for a clue) and tapShadeCell applies it.
                             3 -> NurimazeBoard(
@@ -439,6 +439,13 @@ fun PlayScreen(
                                 onPutValue = vm::putUserValue,
                             )
                             24 -> NurikabeBoard(
+                                puzzle = puzzle,
+                                userValues = state.userValues,
+                                onTapCell = vm::tapShadeCell,
+                            )
+                            // Corner chain shares Nurikabe's canon and board; its engine
+                            // holds the different rules.
+                            30 -> NurikabeBoard(
                                 puzzle = puzzle,
                                 userValues = state.userValues,
                                 onTapCell = vm::tapShadeCell,

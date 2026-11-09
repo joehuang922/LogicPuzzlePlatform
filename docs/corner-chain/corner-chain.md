@@ -76,7 +76,7 @@ Same as Nurikabe:
 - Left click cycles forward: empty → black → marked → empty. Right click cycles backward: empty → marked → black → empty. No drag-paint.
 - Clue cells are read-only.
 - Black cells are filled dark (no rooms here, so not `ROOM_SHADE`); marked cells show a small centered dot; clue numbers render on top of their cell.
-- Android port (later): the engine implements `ShadeMarkEngine` and the board wires `onTapCell` to `vm::tapShadeCell`.
+- Android: `CornerChainEngine` implements `ShadeMarkEngine` (tap cycles empty → black → marked) and plays on `NurikabeBoard`, whose `onTapCell` is wired to `vm::tapShadeCell`. Admin authoring reuses the Nurikabe clue editor and mini board with `CornerChainAuthoring`'s warnings (a 1, a clue bigger than the grid, different clues side by side).
 
 ### Progress calculation
 

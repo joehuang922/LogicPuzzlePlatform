@@ -37,6 +37,9 @@ private val SELECT_FILL = Color(0xFFE0E8FF)
  * applies it via [onTapCell]. Clue cells ignore taps. Two fingers pan/zoom via
  * [ZoomableBoard].
  *
+ * Corner chain (type 30) plays on this board too: same canon, same input, only its
+ * engine's rules differ.
+ *
  * The Admin review editor passes [selectedCell] ("col,row") to highlight the cell its
  * [onTapCell] selected.
  */

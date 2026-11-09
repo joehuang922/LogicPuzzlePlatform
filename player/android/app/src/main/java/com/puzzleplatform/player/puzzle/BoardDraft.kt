@@ -38,6 +38,7 @@ data class BoardDraft(
     val nuritwin: RippleEffectDraft = RippleEffectDraft(),
     val tentaishow: TentaishowDraft = TentaishowDraft(),
     val unequalSudoku: UnequalSudokuDraft = UnequalSudokuDraft(),
+    val cornerChain: NurikabeDraft = NurikabeDraft(),
 ) {
     /**
      * What the type's misread check finds wrong with this board — the list that turns
@@ -70,6 +71,7 @@ data class BoardDraft(
         AuthoringType.NURITWIN -> NuritwinAuthoring.problems(nuritwin)
         AuthoringType.TENTAISHOW -> TentaishowAuthoring.problems(tentaishow)
         AuthoringType.UNEQUAL_SUDOKU -> UnequalSudokuAuthoring.problems(unequalSudoku)
+        AuthoringType.CORNER_CHAIN -> CornerChainAuthoring.problems(cornerChain)
     }
 
     /**
@@ -156,6 +158,8 @@ data class BoardDraft(
             UnequalSudokuEngine.SIZE,
             UnequalSudokuEngine.SIZE,
         )
+        AuthoringType.CORNER_CHAIN ->
+            CanonBoard(CornerChainAuthoring.canonFromDraft(cornerChain), cornerChain.cols, cornerChain.rows)
     }
 
     companion object {
@@ -187,6 +191,7 @@ data class BoardDraft(
             AuthoringType.NURITWIN -> BoardDraft(nuritwin = NuritwinAuthoring.draftFromCanon(canon))
             AuthoringType.TENTAISHOW -> BoardDraft(tentaishow = TentaishowAuthoring.draftFromCanon(canon))
             AuthoringType.UNEQUAL_SUDOKU -> BoardDraft(unequalSudoku = UnequalSudokuAuthoring.draftFromCanon(canon))
+            AuthoringType.CORNER_CHAIN -> BoardDraft(cornerChain = CornerChainAuthoring.draftFromCanon(canon))
         }
     }
 }

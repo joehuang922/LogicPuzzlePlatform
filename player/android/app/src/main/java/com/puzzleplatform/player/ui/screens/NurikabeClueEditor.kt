@@ -17,6 +17,7 @@ import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.puzzleplatform.player.data.model.Puzzle
 import com.puzzleplatform.player.puzzle.NurikabeAuthoring
 import com.puzzleplatform.player.puzzle.NurikabeDraft
 import com.puzzleplatform.player.ui.board.NurikabeBoard
@@ -28,6 +29,9 @@ import com.puzzleplatform.player.ui.board.NurikabeBoard
  * delete its row/column (a parser's phantom line). Add row/column append a blank line
  * for one the parser missed. Every edit goes straight to [onChange]; [selectedCell] is
  * "col,row".
+ *
+ * Corner chain shares the canon and draft, so it reuses this editor with its own
+ * [problems] and [previewPuzzle].
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -36,6 +40,8 @@ fun NurikabeClueEditor(
     selectedCell: String?,
     onSelectCell: (String?) -> Unit,
     onChange: ((NurikabeDraft) -> NurikabeDraft) -> Unit,
+    problems: (NurikabeDraft) -> List<String> = NurikabeAuthoring::problems,
+    previewPuzzle: (NurikabeDraft) -> Puzzle = NurikabeAuthoring::previewPuzzle,
 ) {
     val selected = selectedCell?.split(",")?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 2 }
     val selCol = selected?.get(0)
@@ -48,13 +54,13 @@ fun NurikabeClueEditor(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        for (problem in NurikabeAuthoring.problems(draft)) {
+        for (problem in problems(draft)) {
             Text(problem, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         }
 
         if (draft.rows > 0 && draft.cols > 0) {
             NurikabeBoard(
-                puzzle = NurikabeAuthoring.previewPuzzle(draft),
+                puzzle = previewPuzzle(draft),
                 userValues = emptyMap(),
                 onTapCell = { col, row ->
                     val key = "$col,$row"

@@ -68,7 +68,7 @@ import com.puzzleplatform.player.ui.board.ZoomableImage
 
 /**
  * Create one *or many* questions from album photos. The puzzle type (sudoku,
- * nonogram, kakuro, slitherlink, nurikabe, heyawake, picto link, yajilin, ripple effect, masyu, slalom, shakashaka, akari, number link, shikaku, fillomino, kuralin, norinori, double choco, LITS, nurimaze, hitori, nuritwin, tentaishow or unequal sudoku, see [AuthoringType]) is picked from a dropdown and applies to the whole
+ * nonogram, kakuro, slitherlink, nurikabe, heyawake, picto link, yajilin, ripple effect, masyu, slalom, shakashaka, akari, number link, shikaku, fillomino, kuralin, norinori, double choco, LITS, nurimaze, hitori, nuritwin, tentaishow, unequal sudoku or corner chain, see [AuthoringType]) is picked from a dropdown and applies to the whole
  * batch. A single pick is just a batch of one — same flow throughout. Steps:
  * pick images → Parse all (OCR each) → review/fix any tile (full-screen, with the
  * source photo beside it: sudoku on the real player board, nonogram as editable clue
@@ -329,6 +329,10 @@ fun AdminQuestionScreen(
                                     "Tap a tile to review its photo and grid side by side, fix mis-read " +
                                         "digits or signs, and set its title. A red tile has givens that " +
                                         "repeat or break a sign, or gaps with no sign."
+                                AuthoringType.CORNER_CHAIN ->
+                                    "Tap a tile to review its photo and clues side by side, fix mis-read " +
+                                        "clues or phantom lines, and set its title. A red tile has clues " +
+                                        "that can't be right."
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -580,6 +584,9 @@ private fun ReviewScreen(
                     AuthoringType.UNEQUAL_SUDOKU ->
                         "Compare the photo with the grid — pinch to zoom the photo, tap a cell to fix a " +
                             "mis-read digit, or tap the gap between two cells to cycle its sign."
+                    AuthoringType.CORNER_CHAIN ->
+                        "Compare the photo with the grid — pinch to zoom the photo, tap a cell to fix " +
+                            "its island clue, delete a phantom line, or add a missed one."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

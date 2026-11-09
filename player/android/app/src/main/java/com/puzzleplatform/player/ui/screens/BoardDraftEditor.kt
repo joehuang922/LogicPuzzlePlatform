@@ -6,6 +6,7 @@ import androidx.compose.ui.unit.Dp
 import com.puzzleplatform.player.puzzle.AuthoringType
 import com.puzzleplatform.player.puzzle.AkariAuthoring
 import com.puzzleplatform.player.puzzle.BoardDraft
+import com.puzzleplatform.player.puzzle.CornerChainAuthoring
 import com.puzzleplatform.player.puzzle.FillominoAuthoring
 import com.puzzleplatform.player.puzzle.HitoriAuthoring
 import com.puzzleplatform.player.puzzle.LitsAuthoring
@@ -118,6 +119,14 @@ fun BoardDraftEditor(
             selectedCell = selectedCell,
             onSelectCell = onSelectCell,
             onChange = { t -> onChange { it.copy(nurikabe = t(it.nurikabe)) } },
+        )
+        AuthoringType.CORNER_CHAIN -> NurikabeClueEditor(
+            draft = board.cornerChain,
+            selectedCell = selectedCell,
+            onSelectCell = onSelectCell,
+            onChange = { t -> onChange { it.copy(cornerChain = t(it.cornerChain)) } },
+            problems = CornerChainAuthoring::problems,
+            previewPuzzle = CornerChainAuthoring::previewPuzzle,
         )
         AuthoringType.HEYAWAKE -> HeyawakeRoomEditor(
             draft = board.heyawake,
@@ -340,6 +349,7 @@ fun BoardDraftMiniBoard(type: AuthoringType, board: BoardDraft, size: Dp) {
         AuthoringType.SLITHERLINK ->
             SlitherlinkMiniBoard(draft = board.slitherlink, hasProblems = hasProblems, size = size)
         AuthoringType.NURIKABE -> NurikabeMiniBoard(draft = board.nurikabe, hasProblems = hasProblems, size = size)
+        AuthoringType.CORNER_CHAIN -> NurikabeMiniBoard(draft = board.cornerChain, hasProblems = hasProblems, size = size)
         AuthoringType.HEYAWAKE -> HeyawakeMiniBoard(draft = board.heyawake, hasProblems = hasProblems, size = size)
         AuthoringType.PICTO_LINK ->
             PictoLinkMiniBoard(draft = board.pictoLink, hasProblems = hasProblems, size = size)
