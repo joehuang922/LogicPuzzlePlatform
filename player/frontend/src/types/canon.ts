@@ -411,3 +411,13 @@ export interface UnequalSudokuAnswer {
   // 9x9 pencil-mark candidates, as in SudokuAnswer
   notes?: number[][][];
 }
+
+export interface CornerChainCanon {
+  // rows x cols; 0 = empty, positive integer = size of the island containing the cell
+  cells: number[][];
+}
+
+export interface CornerChainAnswer {
+  // rows x cols; 0 = unset, 1 = black, 2 = white-marked (solver aid)
+  states: number[][];
+}

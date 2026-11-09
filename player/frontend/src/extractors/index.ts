@@ -28,6 +28,7 @@ import { hitoriExtractor } from "./hitori";
 import { pictoLinkExtractor } from "./pictoLink";
 import { kuralinExtractor } from "./kuralin";
 import { unequalSudokuExtractor } from "./unequalSudoku";
+import { cornerChainExtractor } from "./cornerChain";
 
 const extractorRegistry = new Map<number, AnswerExtractor>();
 
@@ -64,6 +65,7 @@ registerExtractor(hitoriExtractor);
 registerExtractor(pictoLinkExtractor);
 registerExtractor(kuralinExtractor);
 registerExtractor(unequalSudokuExtractor);
+registerExtractor(cornerChainExtractor);
 
 export function getExtractor(puzzleType: number): AnswerExtractor | undefined {
   return extractorRegistry.get(puzzleType);

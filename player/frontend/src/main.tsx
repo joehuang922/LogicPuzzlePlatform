@@ -32,6 +32,7 @@ import { hitoriRenderer } from "./renderers/hitori";
 import { pictoLinkRenderer } from "./renderers/pictoLink";
 import { kuralinRenderer } from "./renderers/kuralin";
 import { unequalSudokuRenderer } from "./renderers/unequalSudoku";
+import { cornerChainRenderer } from "./renderers/cornerChain";
 
 registerRenderer(comboSudokuRenderer);
 registerRenderer(sudokuRenderer);
@@ -62,6 +63,7 @@ registerRenderer(hitoriRenderer);
 registerRenderer(pictoLinkRenderer);
 registerRenderer(kuralinRenderer);
 registerRenderer(unequalSudokuRenderer);
+registerRenderer(cornerChainRenderer);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

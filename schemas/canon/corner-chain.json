@@ -1,0 +1,19 @@
+{
+  "title": "Corner Chain Canonical Representation",
+  "description": "Rectangular grid where some cells contain a positive integer clue. Shading cells splits the rest into white islands; a clue gives the size of its island. Even-sized islands are rectangles, odd-sized islands are not, and all islands link into one network through shared corners.",
+  "type": "object",
+  "required": ["cells"],
+  "additionalProperties": false,
+  "properties": {
+    "cells": {
+      "description": "m x n grid of integers. 0 = empty cell, any positive integer = the number of cells in the island containing this cell.",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": { "type": "integer", "minimum": 0 },
+        "minItems": 1
+      },
+      "minItems": 1
+    }
+  }
+}

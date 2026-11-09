@@ -28,6 +28,7 @@ import { computeHitoriProgress } from "./hitori";
 import { computePictoLinkProgress } from "./pictoLink";
 import { computeKuralinProgress } from "./kuralin";
 import { computeUnequalSudokuProgress } from "./unequalSudoku";
+import { computeCornerChainProgress } from "./cornerChain";
 
 export interface ProgressCalculator {
   puzzleType: number;
@@ -69,6 +70,7 @@ register(computeHitoriProgress);
 register(computePictoLinkProgress);
 register(computeKuralinProgress);
 register(computeUnequalSudokuProgress);
+register(computeCornerChainProgress);
 
 export function computeProgress(
   puzzle: PuzzleDefinition,
