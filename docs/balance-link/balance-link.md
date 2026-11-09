@@ -97,6 +97,8 @@ Like Number Link:
 - **Tap** a line cell to clear the segments touching it.
 - Appearance: dashed thin grid lines like the print. Black cells are filled dark (no rooms, so not `ROOM_SHADE`). Symbols are drawn as vector shapes at the cell centre, outlined or filled. Lines are thick strokes between cell centres. When a line joins two matching symbols but isn't symmetric, it's drawn in red.
 
+- Android: `BalanceLinkBoard` shares Number Link's one-finger drag (`PathDragState`, now taking a per-cell segment cap: black 0, symbol 1, other 2) and keys; a tap clears the tapped cell's segments. Rules in `BalanceLinkRules` (port of `balanceLinkRules.ts`); authoring (`BalanceLinkEditor`) picks empty / black / shape + colour per cell on a `ClueGridDraft`.
+
 ### Progress calculation
 
 `(symbols on a finished line / all symbols) * 100`. A finished line joins two symbols of the same code and is symmetric; both its symbols count.

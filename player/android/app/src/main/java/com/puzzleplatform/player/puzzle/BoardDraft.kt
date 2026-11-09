@@ -40,6 +40,7 @@ data class BoardDraft(
     val unequalSudoku: UnequalSudokuDraft = UnequalSudokuDraft(),
     val cornerChain: NurikabeDraft = NurikabeDraft(),
     val sinkamino: SinkaminoGrid = SinkaminoGrid(emptyList(), emptyList()),
+    val balanceLink: ClueGridDraft = ClueGridDraft(),
 ) {
     /**
      * What the type's misread check finds wrong with this board — the list that turns
@@ -74,6 +75,7 @@ data class BoardDraft(
         AuthoringType.UNEQUAL_SUDOKU -> UnequalSudokuAuthoring.problems(unequalSudoku)
         AuthoringType.CORNER_CHAIN -> CornerChainAuthoring.problems(cornerChain)
         AuthoringType.SINKAMINO -> SinkaminoAuthoring.problems(sinkamino)
+        AuthoringType.BALANCE_LINK -> BalanceLinkAuthoring.problems(balanceLink)
     }
 
     /**
@@ -165,6 +167,8 @@ data class BoardDraft(
             CanonBoard(CornerChainAuthoring.canonFromDraft(cornerChain), cornerChain.cols, cornerChain.rows)
         AuthoringType.SINKAMINO ->
             CanonBoard(SinkaminoAuthoring.canonFromDraft(sinkamino), sinkamino.cols, sinkamino.rows)
+        AuthoringType.BALANCE_LINK ->
+            CanonBoard(BalanceLinkAuthoring.canonFromDraft(balanceLink), balanceLink.cols, balanceLink.rows)
     }
 
     companion object {
@@ -198,6 +202,7 @@ data class BoardDraft(
             AuthoringType.UNEQUAL_SUDOKU -> BoardDraft(unequalSudoku = UnequalSudokuAuthoring.draftFromCanon(canon))
             AuthoringType.CORNER_CHAIN -> BoardDraft(cornerChain = CornerChainAuthoring.draftFromCanon(canon))
             AuthoringType.SINKAMINO -> BoardDraft(sinkamino = SinkaminoAuthoring.draftFromCanon(canon))
+            AuthoringType.BALANCE_LINK -> BoardDraft(balanceLink = BalanceLinkAuthoring.draftFromCanon(canon))
         }
     }
 }

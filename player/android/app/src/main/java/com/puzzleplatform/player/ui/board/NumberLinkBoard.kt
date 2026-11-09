@@ -64,7 +64,10 @@ fun NumberLinkBoard(
     val cellsState = rememberUpdatedState(cells)
     val onSet = rememberUpdatedState(onSetEdge)
 
-    val drag = remember(puzzle.id) { NumberLinkDragState(rows, cols) }
+    // Endpoints take one segment, every other cell two.
+    val drag = remember(puzzle.id) {
+        PathDragState(rows, cols) { cs, r, c -> if ((cs.getOrNull(r)?.getOrNull(c) ?: 0) > 0) 1 else 2 }
+    }
 
     ZoomableBoard(
         cols = cols,
@@ -166,11 +169,13 @@ private fun DrawScope.drawToken(value: Int, cx: Float, cy: Float, cell: Float) {
 }
 
 /**
- * Tracks a single draw/erase stroke (port of NumberLinkBoard.tsx pointer handlers). Cells are
+ * Tracks a single draw/erase stroke of a cell-centre path board (port of
+ * NumberLinkBoard.tsx pointer handlers), shared by Number Link and Balance Link. Cells are
  * (row, col). Each step toggles the segment between the last cell and the newly-entered
  * adjacent cell. The first toggled segment fixes the mode: if it was already drawn, the
  * stroke erases; else it draws. Draw steps are degree-capped so no crossing/branch can be
- * created; a blocked draw leaves the anchor in place so a later legal move from the same
+ * created — [capacity] gives the most segments a cell may hold (Number Link endpoints 1,
+ * other cells 2; Balance Link black cells 0); a blocked draw leaves the anchor in place so a later legal move from the same
  * cell can still proceed.
  *
  * Writes made during the stroke are kept in [pending] and layered over the incoming values:
@@ -178,7 +183,11 @@ private fun DrawScope.drawToken(value: Int, cx: Float, cy: Float, cell: Float) {
  * faster than that, so without the overlay the degree cap and draw/erase decision would see
  * stale state.
  */
-private class NumberLinkDragState(private val rows: Int, private val cols: Int) {
+internal class PathDragState(
+    private val rows: Int,
+    private val cols: Int,
+    private val capacity: (cells: List<List<Int>>, row: Int, col: Int) -> Int,
+) {
     private var last: Pair<Int, Int>? = null
     // null = undecided, true = erasing, false = drawing.
     private var erasing: Boolean? = null
@@ -250,8 +259,8 @@ private class NumberLinkDragState(private val rows: Int, private val cols: Int) 
         // Draw mode: only add if both cells have spare degree capacity.
         if (edgeVal == NumberLinkEngine.EMPTY) {
             val e = NumberLinkEngine.edges(cells, current)
-            val maxFrom = if ((cells.getOrNull(from.first)?.getOrNull(from.second) ?: 0) > 0) 1 else 2
-            val maxTo = if ((cells.getOrNull(to.first)?.getOrNull(to.second) ?: 0) > 0) 1 else 2
+            val maxFrom = capacity(cells, from.first, from.second)
+            val maxTo = capacity(cells, to.first, to.second)
             if (NumberLinkEngine.degreeOf(e, from.first, from.second, rows, cols) >= maxFrom ||
                 NumberLinkEngine.degreeOf(e, to.first, to.second, rows, cols) >= maxTo
             ) {

@@ -68,6 +68,7 @@ object PuzzleEngines {
         NurikabeEngine,
         CornerChainEngine,
         SinkaminoEngine,
+        BalanceLinkEngine,
         NuritwinEngine,
         NumberLinkEngine,
         ShikakuEngine,

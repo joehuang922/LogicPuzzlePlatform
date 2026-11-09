@@ -74,6 +74,7 @@ import com.puzzleplatform.player.ui.board.NonogramMode
 import com.puzzleplatform.player.ui.board.NumberLinkBoard
 import com.puzzleplatform.player.ui.board.NurikabeBoard
 import com.puzzleplatform.player.ui.board.SinkaminoBoard
+import com.puzzleplatform.player.ui.board.BalanceLinkBoard
 import com.puzzleplatform.player.ui.board.PictoLinkBoard
 import com.puzzleplatform.player.ui.board.NorinoriBoard
 import com.puzzleplatform.player.ui.board.NurimazeBoard
@@ -386,6 +387,12 @@ fun PlayScreen(
                                 userValues = state.userValues,
                                 // Edge-based paths keyed "h:r,c"/"v:r,c"; putUserValue writes the
                                 // segment and drops the key when it's erased (0).
+                                onSetEdge = { key, state -> vm.putUserValue(key, state) },
+                            )
+                            // Number Link's drawing and keys; a tap clears a cell's segments.
+                            32 -> BalanceLinkBoard(
+                                puzzle = puzzle,
+                                userValues = state.userValues,
                                 onSetEdge = { key, state -> vm.putUserValue(key, state) },
                             )
                             27 -> PictoLinkBoard(

@@ -30,7 +30,7 @@ export function balanceLinkWarnings(canon: BalanceLinkCanon): string[] {
   for (const [code, n] of [...counts].sort((a, b) => a[0] - b[0])) {
     if (n % 2 === 1) {
       const shape = SHAPES.find((s) => s.id === symbolShape(code))?.name ?? `shape ${symbolShape(code)}`;
-      warnings.push(`${symbolIsBlack(code) ? "Black" : "White"} ${shape.toLowerCase()} appears ${n} times, so one can't be paired`);
+      warnings.push(`${symbolIsBlack(code) ? "Black" : "White"} ${shape.toLowerCase()} appears ${n === 1 ? "once" : `${n} times`}, so one can't be paired`);
     }
   }
   return warnings;
