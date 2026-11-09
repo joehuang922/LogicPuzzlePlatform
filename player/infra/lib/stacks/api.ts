@@ -182,8 +182,9 @@ export class ApiStack extends cdk.Stack {
     attemptSubResource.addMethod("GET", attemptIntegration);
     attemptSubResource.addMethod("POST", attemptIntegration);
 
-    // Batch upstream sync for the offline Android client: pushes a whole offline
-    // session (attempts + snapshots) in one request. Idempotent by client UUID.
+    // Offline sync for the Android client. POST pushes a whole offline session
+    // (attempts + snapshots) in one request, idempotent by client UUID; GET pulls
+    // every progress change since the client's cursor.
     const syncHandler = new lambda.Function(this, "SyncHandler", {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "handlers/sync.handler",
@@ -202,7 +203,10 @@ export class ApiStack extends cdk.Stack {
     props.cluster.grantDataApiAccess(syncHandler);
 
     const sync = api.root.addResource("sync");
-    sync.addMethod("POST", new apigw.LambdaIntegration(syncHandler));
+    const syncIntegration = new apigw.LambdaIntegration(syncHandler);
+    sync.addMethod("POST", syncIntegration);
+    // Incremental pull of the player's progress changed since a cursor.
+    sync.addMethod("GET", syncIntegration);
 
     // Parser Lambda — container-based with Function URL (bypasses APIGW 29s timeout)
     const parserHandler = new lambda.DockerImageFunction(this, "OcrParserHandler", {

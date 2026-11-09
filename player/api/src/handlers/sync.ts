@@ -45,7 +45,7 @@ function isDatetime(value: unknown): value is string {
 }
 
 /**
- * Batch upstream sync for the offline-capable Android client. The client pushes
+ * POST: batch upstream sync for the offline-capable Android client. The client pushes
  * every locally-created attempt and snapshot in one request, so a whole offline
  * session costs a single (cold-start-amortized) round trip.
  *
@@ -57,9 +57,14 @@ function isDatetime(value: unknown): value is string {
 export async function handler(
   event: APIGatewayProxyEvent
 ): Promise<APIGatewayProxyResult> {
-  if (event.httpMethod !== "POST") {
-    return response(405, { error: "Method not allowed" });
-  }
+  if (event.httpMethod === "POST") return push(event);
+  if (event.httpMethod === "GET") return pull(event);
+  return response(405, { error: "Method not allowed" });
+}
+
+async function push(
+  event: APIGatewayProxyEvent
+): Promise<APIGatewayProxyResult> {
   if (!event.body) return response(400, { error: "Missing request body" });
 
   const body = JSON.parse(event.body);
@@ -157,5 +162,132 @@ export async function handler(
     syncedAttemptIds,
     syncedSnapshotIds,
     newAchievements,
+  });
+}
+
+// Snapshots per pull page. A snapshot's current_answer averages ~2KB, so a page
+// stays well under the 6MB Lambda response cap.
+const PULL_PAGE_SIZE = 300;
+
+// Rows received in the last few seconds are left for the next pull, so a row
+// whose statement committed just after we read NOW() can never fall behind the
+// cursor the client stores.
+const SETTLE_SECONDS = 5;
+
+const DATETIME_FMT = "'%Y-%m-%d %H:%i:%s'";
+
+/**
+ * GET: incremental downstream sync of a player's progress, for every puzzle,
+ * in one round trip instead of several requests per puzzle.
+ *
+ * The window is (since, until]: `since` is the `until` the client stored after
+ * its last complete pull (absent => everything), and `until` is fixed by the
+ * first page and echoed back on the following ones. Changes are measured by
+ * server receive time (player_attempt.changed_at, player_attempt_snapshot.
+ * received_at), never by created_at, which /sync push copies from the client.
+ *
+ * Attempts (small rows: id, question, timestamps) changed in the window come
+ * on the first page. Snapshots are paged by (received_at, id); `next` is the
+ * keyset cursor for the following page, null on the last one. The client
+ * stores `until` only once every page is merged, so an interrupted pull is
+ * simply repeated; its merge is union-by-UUID, so re-delivery is harmless.
+ */
+async function pull(
+  event: APIGatewayProxyEvent
+): Promise<APIGatewayProxyResult> {
+  const params = event.queryStringParameters ?? {};
+  const player = Number(params.player);
+  if (!Number.isInteger(player) || player <= 0) {
+    return response(400, { error: "player is required" });
+  }
+  const since = params.since;
+  if (since !== undefined && !isDatetime(since)) {
+    return response(400, { error: "since must be 'YYYY-MM-DD HH:MM:SS'" });
+  }
+  let until = params.until;
+  if (until !== undefined && !isDatetime(until)) {
+    return response(400, { error: "until must be 'YYYY-MM-DD HH:MM:SS'" });
+  }
+  let after: { receivedAt: string; id: string } | undefined;
+  if (params.after !== undefined) {
+    const [receivedAt, id] = params.after.split("|");
+    if (!isDatetime(receivedAt) || !isUuid(id) || until === undefined) {
+      return response(400, { error: "after must be '<datetime>|<uuid>' with until" });
+    }
+    after = { receivedAt, id };
+  }
+
+  if (until === undefined) {
+    const now = await executeStatement(
+      `SELECT DATE_FORMAT(NOW() - INTERVAL ${SETTLE_SECONDS} SECOND, ${DATETIME_FMT}) AS until_at`
+    );
+    until = String(now.records[0].until_at);
+  }
+
+  const playerParam = { name: "player", value: { longValue: player } };
+  const untilParam = { name: "until", value: { stringValue: until } };
+  const sinceParam = since
+    ? [{ name: "since", value: { stringValue: since } }]
+    : [];
+
+  let attempts: unknown[] = [];
+  if (!after) {
+    const rows = await executeStatement(
+      `SELECT id, question,
+              DATE_FORMAT(created_at, ${DATETIME_FMT}) AS created_at,
+              DATE_FORMAT(finished_at, ${DATETIME_FMT}) AS finished_at
+       FROM player_attempt
+       WHERE player = :player AND changed_at <= :until
+         ${since ? "AND changed_at > :since" : ""}`,
+      [playerParam, untilParam, ...sinceParam]
+    );
+    attempts = rows.records.map((r) => ({
+      id: r.id,
+      question: r.question,
+      createdAt: r.created_at,
+      finishedAt: r.finished_at ?? null,
+    }));
+  }
+
+  const afterParams = after
+    ? [
+        { name: "afterAt", value: { stringValue: after.receivedAt } },
+        { name: "afterId", value: { stringValue: after.id } },
+      ]
+    : [];
+  const snapRows = await executeStatement(
+    `SELECT s.id, s.attempt, s.current_answer, s.progress, s.elapsed_seconds,
+            s.finished,
+            DATE_FORMAT(s.created_at, ${DATETIME_FMT}) AS created_at,
+            DATE_FORMAT(s.received_at, ${DATETIME_FMT}) AS received_at
+     FROM player_attempt_snapshot s
+     JOIN player_attempt a ON a.id = s.attempt
+     WHERE a.player = :player AND s.received_at <= :until
+       ${since ? "AND s.received_at > :since" : ""}
+       ${after ? "AND (s.received_at > :afterAt OR (s.received_at = :afterAt AND s.id > :afterId))" : ""}
+     ORDER BY s.received_at, s.id
+     LIMIT ${PULL_PAGE_SIZE + 1}`,
+    [playerParam, untilParam, ...sinceParam, ...afterParams]
+  );
+  const page = snapRows.records.slice(0, PULL_PAGE_SIZE);
+  const last = page[page.length - 1];
+  const next =
+    snapRows.records.length > PULL_PAGE_SIZE && last
+      ? `${last.received_at}|${last.id}`
+      : null;
+
+  return response(200, {
+    attempts,
+    snapshots: page.map((r) => ({
+      id: r.id,
+      attempt: r.attempt,
+      currentAnswer: r.current_answer,
+      progress: r.progress,
+      elapsedSeconds: r.elapsed_seconds,
+      finished: !!r.finished,
+      createdAt: r.created_at,
+    })),
+    until,
+    next,
   });
 }

@@ -99,7 +99,13 @@ object ServiceLocator {
     private val database: AppDatabase by lazy { AppDatabase.get(appContext) }
 
     val syncManager: SyncManager by lazy {
-        SyncManager(api, database, json, PuzzleRepository.PLAYER_ID)
+        SyncManager(
+            api,
+            database,
+            json,
+            PuzzleRepository.PLAYER_ID,
+            appContext.getSharedPreferences("sync", Context.MODE_PRIVATE),
+        )
     }
 
     val repository: PuzzleRepository by lazy {

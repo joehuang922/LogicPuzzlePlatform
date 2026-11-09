@@ -58,6 +58,10 @@ CREATE TABLE IF NOT EXISTS player_attempt (
   question     VARCHAR(36)  NOT NULL,
   created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   finished_at  TIMESTAMP    NULL,
+  -- Server time of the last insert/update; the GET /sync pull cursor. Not
+  -- created_at, which POST /sync copies from the client.
+  changed_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_attempt_player_changed (player, changed_at),
   FOREIGN KEY (player) REFERENCES player_account(id),
   FOREIGN KEY (question) REFERENCES puzzle_questions(id)
 );
@@ -70,6 +74,9 @@ CREATE TABLE IF NOT EXISTS player_attempt_snapshot (
   elapsed_seconds INT          NOT NULL DEFAULT 0,
   finished        BOOLEAN      NOT NULL DEFAULT FALSE,
   created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  -- Server receive time; the GET /sync pull cursor (created_at may be the client's).
+  received_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_snapshot_received (received_at, id),
   FOREIGN KEY (attempt) REFERENCES player_attempt(id)
 );
 

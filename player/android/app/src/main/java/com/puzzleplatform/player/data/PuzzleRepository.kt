@@ -308,8 +308,8 @@ class PuzzleRepository(
     /**
      * Best-effort two-way sync of every offline-downloaded collection: push any
      * local progress upstream first, then refresh each collection's reference data
-     * (server-side puzzle edits/additions/deletions) and pull cross-device progress
-     * back down. This is the primary path by which both content edits and progress
+     * (server-side puzzle edits/additions/deletions), then pull cross-device
+     * progress for every puzzle in one incremental request. This is the primary path by which both content edits and progress
      * made on another device reach an already-downloaded puzzle. A failure on one
      * collection is swallowed so the rest still refresh.
      */
@@ -326,6 +326,11 @@ class PuzzleRepository(
             } catch (_: Exception) {
                 // Offline or a transient server error; leave this collection as-is.
             }
+        }
+        try {
+            sync.pullProgress()
+        } catch (_: Exception) {
+            // Offline or transient; the cursor didn't move, so the next pull retries.
         }
     }
 

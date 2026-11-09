@@ -1,9 +1,14 @@
 package com.puzzleplatform.player.data.sync
 
+import android.content.SharedPreferences
 import com.puzzleplatform.player.data.api.PuzzleApi
+import com.puzzleplatform.player.data.local.AttemptEntity
+import com.puzzleplatform.player.data.local.SnapshotEntity
 import com.puzzleplatform.player.data.local.AppDatabase
 import com.puzzleplatform.player.data.local.toEntity
 import com.puzzleplatform.player.data.model.AchievementUnlock
+import com.puzzleplatform.player.data.model.ChangedAttempt
+import com.puzzleplatform.player.data.model.Snapshot
 import com.puzzleplatform.player.data.model.SyncAttemptInput
 import com.puzzleplatform.player.data.model.SyncRequest
 import com.puzzleplatform.player.data.model.SyncSnapshotInput
@@ -33,10 +38,10 @@ data class SyncState(
  *  - push(): replay locally-created attempts/snapshots upstream via POST /sync.
  *    Idempotent by client UUID, so retries and duplicate runs are safe.
  *  - downloadCollection()/refreshCollection(): pull server-authoritative
- *    reference data for offline play, detecting edits/additions/deletions, and
- *    pull server-side progress (attempts/snapshots) so work done on another
- *    device lands here. The progress merge is union-by-UUID, so local unsynced
- *    progress is never clobbered.
+ *    reference data for offline play, detecting edits/additions/deletions.
+ *  - pullProgress(): pull every attempt/snapshot changed since the last pull
+ *    (GET /sync, cursor-based) so work done on another device lands here. The
+ *    merge is union-by-UUID, so local unsynced progress is never clobbered.
  *
  * [player] mirrors the web client's hardcoded id (no auth on the backend).
  */
@@ -45,9 +50,11 @@ class SyncManager(
     private val db: AppDatabase,
     private val json: Json,
     private val player: Int,
+    private val cursorStore: SharedPreferences,
 ) {
     private val scope = CoroutineScope(SupervisorJob())
     private val pushMutex = Mutex()
+    private val pullMutex = Mutex()
 
     private val _syncing = MutableStateFlow(false)
     private val _lastSyncedAt = MutableStateFlow<Long?>(null)
@@ -128,8 +135,13 @@ class SyncManager(
         val puzzleEntities = puzzles.map { it.toEntity(json, updatedAt = null, deletedAt = null) }
         db.puzzleDao().upsertAll(puzzleEntities)
 
-        // Pull existing server-side progress for these puzzles.
-        pullProgressFor(puzzles.map { it.id })
+        // Progress for every puzzle (these included) arrives through the
+        // incremental pull; usually a no-op or a few rows. Best-effort, as
+        // before: a failed pull leaves the cursor, so the next one retries.
+        try {
+            pullProgress()
+        } catch (_: Exception) {
+        }
 
         db.collectionDownloadDao().upsert(
             com.puzzleplatform.player.data.local.CollectionDownloadEntity(
@@ -141,81 +153,74 @@ class SyncManager(
     }
 
     /**
-     * Pull server-side progress for the given puzzles and merge it locally. This
-     * is how an attempt made on another device reaches this one. The merge is
-     * additive (union-by-UUID): server rows are stored, but a locally-present row
-     * (which may hold unsynced progress) is never overwritten, so pulling can
-     * only add, never lose, local work. Best-effort per attempt — a failed fetch
-     * leaves that attempt untouched. Marked synced, since it came from the server.
+     * Pull every progress change made on any device since the last pull, for all
+     * puzzles, via GET /sync: one request per page (300 snapshots) instead of
+     * several per puzzle. This is how an attempt made on another device reaches
+     * this one.
+     *
+     * The merge is additive (union-by-UUID): a server attempt or snapshot is
+     * inserted only if absent locally, so a local row, which may hold unsynced
+     * progress, is never overwritten. The one exception is a server-side finish,
+     * adopted when the local attempt isn't finished yet. Attempts are stored even
+     * for puzzles not downloaded here, so downloading a collection later needs
+     * no progress fetch of its own.
+     *
+     * The cursor ([PROGRESS_CURSOR]) advances only after every page is merged,
+     * so an interrupted pull is repeated next time; re-delivered rows are no-ops.
      */
-    private suspend fun pullProgressFor(questionIds: List<String>) {
-        for (questionId in questionIds) {
-            val serverAttempts = try {
-                api.listAttempts(player, questionId, finished = null).attempts +
-                    api.listAttempts(player, questionId, finished = true).attempts
-            } catch (_: Exception) {
-                continue // offline/cold-start for this puzzle; skip it
-            }
-            for (attempt in serverAttempts.distinctBy { it.id }) {
-                importServerAttempt(attempt.id, questionId)
+    suspend fun pullProgress() = pullMutex.withLock {
+        val since = cursorStore.getString(PROGRESS_CURSOR, null)
+        var page = api.pullChanges(player, since = since)
+        val until = page.until
+        mergeAttempts(page.attempts)
+        while (true) {
+            mergeSnapshots(page.snapshots)
+            val next = page.next ?: break
+            page = api.pullChanges(player, since = since, until = until, after = next)
+        }
+        cursorStore.edit().putString(PROGRESS_CURSOR, until).apply()
+    }
+
+    private suspend fun mergeAttempts(attempts: List<ChangedAttempt>) {
+        val attemptDao = db.attemptDao()
+        for (server in attempts) {
+            val local = attemptDao.getById(server.id)
+            if (local == null) {
+                attemptDao.upsert(
+                    AttemptEntity(
+                        id = server.id,
+                        question = server.question,
+                        createdAt = server.createdAt,
+                        finishedAt = server.finishedAt,
+                        synced = true,
+                        puzzleUpdatedAt = db.puzzleDao().getById(server.question)?.updatedAt,
+                    )
+                )
+            } else if (local.finishedAt == null && server.finishedAt != null) {
+                // Finished on another device: adopt the server's completion time.
+                attemptDao.setFinishedAt(server.id, server.finishedAt)
             }
         }
     }
 
-    /**
-     * Fetch one server attempt's snapshots and merge them in (as synced). Only
-     * snapshots not already present locally are inserted (union-by-UUID), so a
-     * device's own unsynced snapshots are preserved. The attempt row is inserted
-     * only when absent locally; an existing local row keeps its own state (which
-     * may be ahead of the server and not yet pushed), except that a server-side
-     * finish is applied if the local row isn't finished yet.
-     */
-    private suspend fun importServerAttempt(attemptId: String, question: String) {
-        val snapshots = try {
-            api.listSnapshots(attemptId).snapshots
-        } catch (_: Exception) {
-            emptyList()
-        }
-        val existingSnapshotIds = db.snapshotDao().listForAttempt(attemptId).map { it.id }.toSet()
-        var finishedAt: String? = null
-        val snapEntities = snapshots.mapNotNull { summary ->
-            if (summary.id in existingSnapshotIds) return@mapNotNull null // already have it
-            val full = try {
-                api.getSnapshotById(attemptId, summary.id).snapshot
-            } catch (_: Exception) {
-                return@mapNotNull null
-            }
-            if (full.finished) finishedAt = full.createdAt
-            com.puzzleplatform.player.data.local.SnapshotEntity(
-                id = full.id,
-                attempt = attemptId,
-                currentAnswer = full.currentAnswer,
-                progress = full.progress,
-                elapsedSeconds = full.elapsedSeconds,
-                finished = full.finished,
-                createdAt = full.createdAt,
-                synced = true,
-            )
-        }
-        if (snapEntities.isNotEmpty()) db.snapshotDao().upsertAll(snapEntities)
-
-        val existingAttempt = db.attemptDao().getById(attemptId)
-        if (existingAttempt == null) {
-            db.attemptDao().upsert(
-                com.puzzleplatform.player.data.local.AttemptEntity(
-                    id = attemptId,
-                    question = question,
-                    createdAt = snapEntities.minByOrNull { it.createdAt }?.createdAt ?: SyncClock.nowDatetime(),
-                    finishedAt = finishedAt,
+    private suspend fun mergeSnapshots(snapshots: List<Snapshot>) {
+        val snapshotDao = db.snapshotDao()
+        val fresh = snapshots.filter { snapshotDao.getById(it.id) == null }
+        if (fresh.isEmpty()) return
+        snapshotDao.upsertAll(
+            fresh.map { s ->
+                SnapshotEntity(
+                    id = s.id,
+                    attempt = s.attempt,
+                    currentAnswer = s.currentAnswer,
+                    progress = s.progress,
+                    elapsedSeconds = s.elapsedSeconds,
+                    finished = s.finished,
+                    createdAt = s.createdAt,
                     synced = true,
-                    puzzleUpdatedAt = db.puzzleDao().getById(question)?.updatedAt,
                 )
-            )
-        } else if (existingAttempt.finishedAt == null && finishedAt != null) {
-            // Server saw this attempt finished (e.g. completed on another device)
-            // but our local row isn't finished yet — adopt the completion time.
-            db.attemptDao().setFinishedAt(attemptId, finishedAt!!)
-        }
+            }
+        )
     }
 
     /**
@@ -224,9 +229,7 @@ class SyncManager(
      *  - edited puzzles (server updatedAt newer) -> re-fetch canon_repr, replace.
      *  - deleted puzzles (deletedAt set) -> mark local row deleted (kept, hidden).
      *
-     * Then pulls server-side progress for the collection's puzzles so attempts
-     * made on another device land here. The progress merge is additive
-     * (union-by-UUID), so local unsynced progress is never clobbered.
+     * Progress is not pulled here: [pullProgress] covers every puzzle at once.
      */
     suspend fun refreshCollection(collectionId: Int) {
         val manifest = api.getCollectionManifest(collectionId).puzzles
@@ -255,11 +258,14 @@ class SyncManager(
             }
         }
 
-        // Pull cross-device progress for this collection's (live) puzzles.
-        pullProgressFor(db.puzzleDao().listByCollection(collectionId).map { it.id })
 
         db.collectionDownloadDao().getById(collectionId)?.let {
             db.collectionDownloadDao().upsert(it.copy(lastManifestSyncAt = SyncClock.nowMillis()))
         }
+    }
+
+    private companion object {
+        /** The server `until` of the last complete pull: the next pull's `since`. */
+        const val PROGRESS_CURSOR = "progressCursor"
     }
 }

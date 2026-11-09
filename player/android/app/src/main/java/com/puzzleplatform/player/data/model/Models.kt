@@ -284,6 +284,28 @@ data class SyncRequest(
     val attempts: List<SyncAttemptInput> = emptyList(),
 )
 
+/** One attempt from GET /sync whose row changed in the pulled window. */
+@Serializable
+data class ChangedAttempt(
+    val id: String,
+    val question: String,
+    val createdAt: String,
+    val finishedAt: String? = null,
+)
+
+/**
+ * One page of GET /sync: the player's progress changed in (since, until].
+ * Attempts come on the first page; snapshots are paged, [next] is the cursor
+ * for the following page and null on the last one.
+ */
+@Serializable
+data class ProgressChangesResponse(
+    val attempts: List<ChangedAttempt> = emptyList(),
+    val snapshots: List<Snapshot> = emptyList(),
+    val until: String,
+    val next: String? = null,
+)
+
 @Serializable
 data class SyncResponse(
     val syncedAttemptIds: List<String> = emptyList(),

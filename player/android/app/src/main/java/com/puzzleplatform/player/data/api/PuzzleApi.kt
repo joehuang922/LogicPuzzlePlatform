@@ -11,6 +11,7 @@ import com.puzzleplatform.player.data.model.CreateCollectionResponse
 import com.puzzleplatform.player.data.model.CreatePuzzleRequest
 import com.puzzleplatform.player.data.model.CreatePuzzleResponse
 import com.puzzleplatform.player.data.model.ProfileResponse
+import com.puzzleplatform.player.data.model.ProgressChangesResponse
 import com.puzzleplatform.player.data.model.PuzzleListResponse
 import com.puzzleplatform.player.data.model.PuzzleResponse
 import com.puzzleplatform.player.data.model.PuzzleTypeListResponse
@@ -117,4 +118,13 @@ interface PuzzleApi {
 
     @POST("sync")
     suspend fun sync(@Body body: SyncRequest): SyncResponse
+
+    /** Progress changed since [since] (null => all); pass [until]/[after] for later pages. */
+    @GET("sync")
+    suspend fun pullChanges(
+        @Query("player") player: Int,
+        @Query("since") since: String? = null,
+        @Query("until") until: String? = null,
+        @Query("after") after: String? = null,
+    ): ProgressChangesResponse
 }
