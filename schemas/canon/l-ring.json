@@ -1,0 +1,25 @@
+{
+  "title": "L-Ring Canonical Representation",
+  "description": "Rectangular grid of empty cells and arrows. A single loop passes through every arrow cell, turning there; the arm in the arrow's direction is exactly one cell longer than the other arm.",
+  "type": "object",
+  "required": [
+    "cells"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "cells": {
+      "description": "m x n grid. 0 = empty, 1 = arrow up, 2 = arrow right, 3 = arrow down, 4 = arrow left.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        }
+      }
+    }
+  }
+}

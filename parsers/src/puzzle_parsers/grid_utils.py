@@ -69,7 +69,13 @@ def find_quadrilateral_border(gray: NDArray) -> NDArray:
     2. Dark-pixel projection box — immune to titles (relative threshold) and to
        a single page-gutter seam. Used when no contour candidate is well
        supported, e.g. a title sits close above a dashed board.
-    3. Gradient-based fallback — steepest row/column brightness transitions.
+    3. Small-board contours — step 1 again, keeping edge components that span
+       30% of an axis and boards down to 8% of the frame. A whole-page photo can
+       leave the board under step 1's floors (l_ring board 1: 44% x 31% of the
+       frame, 14% of its area) while the projection box swallows the page
+       around it. Only tried when nothing above is well supported, so boards
+       that steps 1-2 already find are unchanged.
+    4. Gradient-based fallback — steepest row/column brightness transitions.
     """
     h, w = gray.shape
     fallback = np.float32([[0, 0], [w, 0], [w, h], [0, h]])
@@ -97,6 +103,16 @@ def find_quadrilateral_border(gray: NDArray) -> NDArray:
             return box
         best, best_support = box, box_support
 
+    for close_k in (1, 3, 5, 7):
+        quad = _find_border_via_contours(gray, close_k, min_span=0.3, min_area=0.08)
+        if quad is None:
+            continue
+        support = _edge_support(gray, quad)
+        if support >= _BORDER_SUPPORT_MIN and support > best_support:
+            best, best_support = quad, support
+    if best_support >= _BORDER_SUPPORT_MIN:
+        return best
+
     quad = _find_border_via_gradient(gray)
     if quad is not None and _edge_support(gray, quad) > best_support:
         return quad
@@ -104,7 +120,9 @@ def find_quadrilateral_border(gray: NDArray) -> NDArray:
     return best if best is not None else fallback
 
 
-def _find_border_via_contours(gray: NDArray, close_k: int = 1) -> NDArray | None:
+def _find_border_via_contours(
+    gray: NDArray, close_k: int = 1, *, min_span: float = 0.5, min_area: float = 0.15
+) -> NDArray | None:
     """Try to find the border as a large quadrilateral contour.
 
     Args:
@@ -112,6 +130,8 @@ def _find_border_via_contours(gray: NDArray, close_k: int = 1) -> NDArray | None
             edges before contour finding. ``1`` disables closing (clean scans);
             larger values reconnect a scan-broken border at the cost of possibly
             fusing nearby text — the caller guards against that via edge support.
+        min_span: Edge components must span this fraction of the width or height.
+        min_area: Smallest contour kept, as a fraction of the image area.
     """
     h, w = gray.shape
     img_area = h * w
@@ -124,11 +144,11 @@ def _find_border_via_contours(gray: NDArray, close_k: int = 1) -> NDArray | None
 
     # Drop small/scattered edge components (title text, clue digits, halftone):
     # only a board border spans most of an axis, so keep components whose
-    # bounding box covers > 50% of the width or height.
+    # bounding box covers > min_span (50%) of the width or height.
     n, labels, stats, _ = cv2.connectedComponentsWithStats(edges, 8)
     keep = np.zeros_like(edges)
     for i in range(1, n):
-        if stats[i, cv2.CC_STAT_WIDTH] > 0.5 * w or stats[i, cv2.CC_STAT_HEIGHT] > 0.5 * h:
+        if stats[i, cv2.CC_STAT_WIDTH] > min_span * w or stats[i, cv2.CC_STAT_HEIGHT] > min_span * h:
             keep[labels == i] = 255
     edges = keep
 
@@ -142,7 +162,7 @@ def _find_border_via_contours(gray: NDArray, close_k: int = 1) -> NDArray | None
         # Whole-page photos (kept so the author credit at the page foot is
         # captured) leave a small board at ~16% of the frame; a higher floor
         # skips its contour and lets a coarser fallback pick a wrong box.
-        if area < img_area * 0.15:
+        if area < img_area * min_area:
             break
         if area > img_area * 0.98:
             continue

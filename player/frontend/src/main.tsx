@@ -35,6 +35,7 @@ import { unequalSudokuRenderer } from "./renderers/unequalSudoku";
 import { cornerChainRenderer } from "./renderers/cornerChain";
 import { sinkaminoRenderer } from "./renderers/sinkamino";
 import { balanceLinkRenderer } from "./renderers/balanceLink";
+import { lRingRenderer } from "./renderers/lRing";
 
 registerRenderer(comboSudokuRenderer);
 registerRenderer(sudokuRenderer);
@@ -68,6 +69,7 @@ registerRenderer(unequalSudokuRenderer);
 registerRenderer(cornerChainRenderer);
 registerRenderer(sinkaminoRenderer);
 registerRenderer(balanceLinkRenderer);
+registerRenderer(lRingRenderer);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

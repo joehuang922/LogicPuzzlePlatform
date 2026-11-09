@@ -262,7 +262,7 @@ function QuestionForm({
       } else if (typeId === 23 && canon.grids) {
         h = canon.grids.h.length + 1;
         w = canon.grids.v[0].length + 1;
-      } else if ((typeId === 24 || typeId === 30 || typeId === 31 || typeId === 32) && canon.cells) {
+      } else if ((typeId === 24 || typeId === 30 || typeId === 31 || typeId === 32 || typeId === 33) && canon.cells) {
         h = canon.cells.length;
         w = canon.cells[0].length;
       } else if (typeId === 25 && canon.cells) {

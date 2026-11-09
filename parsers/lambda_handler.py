@@ -142,6 +142,9 @@ def _build_parser(puzzle_type: int):
     if puzzle_type == 32:
         from puzzle_parsers.balance_link.parser import BalanceLinkParser
         return BalanceLinkParser()
+    if puzzle_type == 33:
+        from puzzle_parsers.l_ring.parser import LRingParser
+        return LRingParser()
     return None
 
 

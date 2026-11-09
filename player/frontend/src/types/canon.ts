@@ -443,3 +443,13 @@ export interface BalanceLinkAnswer {
   // h: rows x (cols-1), v: (rows-1) x cols; 1 = segment drawn
   edges: { h: number[][]; v: number[][] };
 }
+
+export interface LRingCanon {
+  // rows x cols; 0 = empty, 1 = arrow up, 2 = right, 3 = down, 4 = left
+  cells: number[][];
+}
+
+export interface LRingAnswer {
+  // h: rows x (cols-1), v: (rows-1) x cols; 1 = loop segment drawn
+  edges: { h: number[][]; v: number[][] };
+}
