@@ -41,6 +41,7 @@ data class BoardDraft(
     val cornerChain: NurikabeDraft = NurikabeDraft(),
     val sinkamino: SinkaminoGrid = SinkaminoGrid(emptyList(), emptyList()),
     val balanceLink: ClueGridDraft = ClueGridDraft(),
+    val lRing: ClueGridDraft = ClueGridDraft(),
 ) {
     /**
      * What the type's misread check finds wrong with this board — the list that turns
@@ -76,6 +77,7 @@ data class BoardDraft(
         AuthoringType.CORNER_CHAIN -> CornerChainAuthoring.problems(cornerChain)
         AuthoringType.SINKAMINO -> SinkaminoAuthoring.problems(sinkamino)
         AuthoringType.BALANCE_LINK -> BalanceLinkAuthoring.problems(balanceLink)
+        AuthoringType.L_RING -> LRingAuthoring.problems(lRing)
     }
 
     /**
@@ -169,6 +171,8 @@ data class BoardDraft(
             CanonBoard(SinkaminoAuthoring.canonFromDraft(sinkamino), sinkamino.cols, sinkamino.rows)
         AuthoringType.BALANCE_LINK ->
             CanonBoard(BalanceLinkAuthoring.canonFromDraft(balanceLink), balanceLink.cols, balanceLink.rows)
+        AuthoringType.L_RING ->
+            CanonBoard(LRingAuthoring.canonFromDraft(lRing), lRing.cols, lRing.rows)
     }
 
     companion object {
@@ -203,6 +207,7 @@ data class BoardDraft(
             AuthoringType.CORNER_CHAIN -> BoardDraft(cornerChain = CornerChainAuthoring.draftFromCanon(canon))
             AuthoringType.SINKAMINO -> BoardDraft(sinkamino = SinkaminoAuthoring.draftFromCanon(canon))
             AuthoringType.BALANCE_LINK -> BoardDraft(balanceLink = BalanceLinkAuthoring.draftFromCanon(canon))
+            AuthoringType.L_RING -> BoardDraft(lRing = LRingAuthoring.draftFromCanon(canon))
         }
     }
 }

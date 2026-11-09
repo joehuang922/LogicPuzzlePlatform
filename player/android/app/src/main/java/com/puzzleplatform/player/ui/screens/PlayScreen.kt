@@ -75,6 +75,7 @@ import com.puzzleplatform.player.ui.board.NumberLinkBoard
 import com.puzzleplatform.player.ui.board.NurikabeBoard
 import com.puzzleplatform.player.ui.board.SinkaminoBoard
 import com.puzzleplatform.player.ui.board.BalanceLinkBoard
+import com.puzzleplatform.player.ui.board.LRingBoard
 import com.puzzleplatform.player.ui.board.PictoLinkBoard
 import com.puzzleplatform.player.ui.board.NorinoriBoard
 import com.puzzleplatform.player.ui.board.NurimazeBoard
@@ -318,6 +319,13 @@ fun PlayScreen(
                                 onSelectCell = vm::selectCell,
                             )
                             7 -> MasyuBoard(
+                                puzzle = puzzle,
+                                userValues = state.userValues,
+                                liveValidate = state.liveValidate,
+                                onSetEdge = vm::setUserValue,
+                            )
+                            // Masyu's loop drawing and keys; arrows turn red with Errors on.
+                            33 -> LRingBoard(
                                 puzzle = puzzle,
                                 userValues = state.userValues,
                                 liveValidate = state.liveValidate,

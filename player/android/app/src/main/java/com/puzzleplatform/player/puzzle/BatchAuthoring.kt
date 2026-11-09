@@ -119,6 +119,7 @@ enum class AuthoringType(val label: String, val jpLabel: String, val puzzleType:
     CORNER_CHAIN("Corner Chain", "隅角チェーン", CornerChainAuthoring.PUZZLE_TYPE),
     SINKAMINO("Sinkamino", "シンカミノ", SinkaminoAuthoring.PUZZLE_TYPE),
     BALANCE_LINK("Balance Link", "バランスリンク", BalanceLinkAuthoring.PUZZLE_TYPE),
+    L_RING("L-Ring", "えるりんぐ", LRingAuthoring.PUZZLE_TYPE),
     ;
 
     companion object {

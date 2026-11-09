@@ -150,7 +150,7 @@ fun MasyuBoard(
  * gesture is drawing or erasing (fixed by the first edge it crosses, matching the
  * web board). Each adjacent-cell crossing toggles exactly one edge.
  */
-private class MasyuDragState {
+internal class MasyuDragState {
     private var last: Pair<Int, Int>? = null
     private var erase: Boolean? = null // null until the first crossing decides
 

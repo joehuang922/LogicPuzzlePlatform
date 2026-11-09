@@ -102,6 +102,7 @@ Like Masyu:
   - Arrows are drawn as bold filled arrows in the cell, under the loop.
   - The loop is a thick dark stroke between cell centres.
 - Web rules live in `lRingRules.ts` (`arrowState`, `validateLRing`, `satisfiedArrows`). With **Errors** on, an arrow whose L can no longer work is drawn red.
+- Android: `LRingBoard` draws with Masyu's `MasyuDragState`, and with Errors on it reds out arrows the same way. `LRingRules` in `LRingEngine.kt` ports `lRingRules.ts`, and extract/restore delegate to `MasyuEngine`. Authoring is `LRingEditor` on a `ClueGridDraft`: pick Empty or a direction per cell, and delete or add rows and columns. Arrows pointing off the board are flagged.
 
 ### Progress calculation
 
