@@ -30,6 +30,7 @@ import { computeKuralinProgress } from "./kuralin";
 import { computeUnequalSudokuProgress } from "./unequalSudoku";
 import { computeCornerChainProgress } from "./cornerChain";
 import { computeSinkaminoProgress } from "./sinkamino";
+import { computeBalanceLinkProgress } from "./balanceLink";
 
 export interface ProgressCalculator {
   puzzleType: number;
@@ -73,6 +74,7 @@ register(computeKuralinProgress);
 register(computeUnequalSudokuProgress);
 register(computeCornerChainProgress);
 register(computeSinkaminoProgress);
+register(computeBalanceLinkProgress);
 
 export function computeProgress(
   puzzle: PuzzleDefinition,

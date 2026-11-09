@@ -1,0 +1,41 @@
+{
+  "title": "Balance Link Canonical Representation",
+  "description": "Rectangular grid of white cells, black cells and symbols. Identical symbols are joined in pairs by lines through cell centres; each line is mirror-symmetric about its midpoint.",
+  "type": "object",
+  "required": [
+    "cells"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "cells": {
+      "description": "m x n grid. 0 = white cell, 1 = black cell, otherwise a symbol: tens digit = shape (1 circle, 2 square, 3 diamond, 4 triangle up, 5 triangle down, 6 five-point star, 7 four-point star), ones digit = colour (0 white/outlined, 1 black/filled).",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "integer",
+          "enum": [
+            0,
+            1,
+            10,
+            11,
+            20,
+            21,
+            30,
+            31,
+            40,
+            41,
+            50,
+            51,
+            60,
+            61,
+            70,
+            71
+          ]
+        }
+      }
+    }
+  }
+}

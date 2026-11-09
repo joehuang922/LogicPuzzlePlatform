@@ -83,6 +83,7 @@ NAME_TO_TYPE: dict[str, int] = {
     "picto_link": 27,
     "corner_chain": 30,
     "sinkamino": 31,
+    "balance_link": 32,
 }
 
 

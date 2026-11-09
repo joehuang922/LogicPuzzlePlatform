@@ -30,6 +30,7 @@ import { kuralinExtractor } from "./kuralin";
 import { unequalSudokuExtractor } from "./unequalSudoku";
 import { cornerChainExtractor } from "./cornerChain";
 import { sinkaminoExtractor } from "./sinkamino";
+import { balanceLinkExtractor } from "./balanceLink";
 
 const extractorRegistry = new Map<number, AnswerExtractor>();
 
@@ -68,6 +69,7 @@ registerExtractor(kuralinExtractor);
 registerExtractor(unequalSudokuExtractor);
 registerExtractor(cornerChainExtractor);
 registerExtractor(sinkaminoExtractor);
+registerExtractor(balanceLinkExtractor);
 
 export function getExtractor(puzzleType: number): AnswerExtractor | undefined {
   return extractorRegistry.get(puzzleType);

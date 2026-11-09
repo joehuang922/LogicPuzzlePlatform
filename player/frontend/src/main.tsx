@@ -34,6 +34,7 @@ import { kuralinRenderer } from "./renderers/kuralin";
 import { unequalSudokuRenderer } from "./renderers/unequalSudoku";
 import { cornerChainRenderer } from "./renderers/cornerChain";
 import { sinkaminoRenderer } from "./renderers/sinkamino";
+import { balanceLinkRenderer } from "./renderers/balanceLink";
 
 registerRenderer(comboSudokuRenderer);
 registerRenderer(sudokuRenderer);
@@ -66,6 +67,7 @@ registerRenderer(kuralinRenderer);
 registerRenderer(unequalSudokuRenderer);
 registerRenderer(cornerChainRenderer);
 registerRenderer(sinkaminoRenderer);
+registerRenderer(balanceLinkRenderer);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

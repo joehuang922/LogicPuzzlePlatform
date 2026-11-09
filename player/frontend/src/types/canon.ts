@@ -433,3 +433,13 @@ export interface SinkaminoAnswer {
   // rows x cols; 0 = unset, 1 = placed square, 2 = marked (no square)
   states: number[][];
 }
+
+export interface BalanceLinkCanon {
+  // rows x cols; 0 = white, 1 = black, 10-71 = symbol (tens = shape, ones = 0 white / 1 black)
+  cells: number[][];
+}
+
+export interface BalanceLinkAnswer {
+  // h: rows x (cols-1), v: (rows-1) x cols; 1 = segment drawn
+  edges: { h: number[][]; v: number[][] };
+}

@@ -33,6 +33,7 @@ import KuralinEditor from "./KuralinEditor";
 import UnequalSudokuEditor from "./UnequalSudokuEditor";
 import CornerChainEditor from "./CornerChainEditor";
 import SinkaminoEditor from "./SinkaminoEditor";
+import BalanceLinkEditor from "./BalanceLinkEditor";
 
 // Puzzle types that have a visual board editor.
 export const EDITOR_TYPE_NAMES = [
@@ -40,7 +41,7 @@ export const EDITOR_TYPE_NAMES = [
   "masyu", "pencils", "nuritwin", "slalom", "shakashaka", "kakuro", "yajilin",
   "fillomino", "lits", "choco-banana", "number-link", "akari", "hell-golf",
   "tentaishow", "heyawake", "shikaku", "norinori", "nurikabe", "ripple-effect",
-  "hitori", "picto-link", "kuralin", "unequal-sudoku", "corner-chain", "sinkamino",
+  "hitori", "picto-link", "kuralin", "unequal-sudoku", "corner-chain", "sinkamino", "balance-link",
 ];
 
 export function hasVisualEditor(typeName: string | undefined): boolean {
@@ -92,6 +93,7 @@ function CanonEditor({
     case "unequal-sudoku": return <UnequalSudokuEditor initialJson={canonRepr} onChange={onChange} />;
     case "corner-chain": return <CornerChainEditor initialJson={canonRepr} onChange={onChange} />;
     case "sinkamino": return <SinkaminoEditor initialJson={canonRepr} onChange={onChange} />;
+    case "balance-link": return <BalanceLinkEditor initialJson={canonRepr} onChange={onChange} />;
     default: return null;
   }
 }

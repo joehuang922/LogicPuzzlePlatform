@@ -30,6 +30,7 @@ import kuralinSchema from "../../../../schemas/canon/kuralin.json";
 import unequalSudokuSchema from "../../../../schemas/canon/unequal-sudoku.json";
 import cornerChainSchema from "../../../../schemas/canon/corner-chain.json";
 import sinkaminoSchema from "../../../../schemas/canon/sinkamino.json";
+import balanceLinkSchema from "../../../../schemas/canon/balance-link.json";
 
 const ajv = new Ajv();
 
@@ -65,6 +66,7 @@ const validators: Record<number, ValidateFunction> = {
   29: ajv.compile(unequalSudokuSchema),
   30: ajv.compile(cornerChainSchema),
   31: ajv.compile(sinkaminoSchema),
+  32: ajv.compile(balanceLinkSchema),
 };
 
 export function validateCanon(puzzleType: number, data: unknown): void {

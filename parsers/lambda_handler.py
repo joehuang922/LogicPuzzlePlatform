@@ -139,6 +139,9 @@ def _build_parser(puzzle_type: int):
     if puzzle_type == 31:
         from puzzle_parsers.sinkamino.parser import SinkaminoParser
         return SinkaminoParser()
+    if puzzle_type == 32:
+        from puzzle_parsers.balance_link.parser import BalanceLinkParser
+        return BalanceLinkParser()
     return None
 
 
