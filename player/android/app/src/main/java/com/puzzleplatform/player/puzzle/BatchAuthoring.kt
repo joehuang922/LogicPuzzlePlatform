@@ -117,6 +117,7 @@ enum class AuthoringType(val label: String, val jpLabel: String, val puzzleType:
     TENTAISHOW("Tentaishow", "天体ショー", TentaishowAuthoring.PUZZLE_TYPE),
     UNEQUAL_SUDOKU("Unequal Sudoku", "不等号ナンプレ", UnequalSudokuAuthoring.PUZZLE_TYPE),
     CORNER_CHAIN("Corner Chain", "隅角チェーン", CornerChainAuthoring.PUZZLE_TYPE),
+    SINKAMINO("Sinkamino", "シンカミノ", SinkaminoAuthoring.PUZZLE_TYPE),
     ;
 
     companion object {

@@ -73,6 +73,7 @@ import com.puzzleplatform.player.ui.board.NonogramBoard
 import com.puzzleplatform.player.ui.board.NonogramMode
 import com.puzzleplatform.player.ui.board.NumberLinkBoard
 import com.puzzleplatform.player.ui.board.NurikabeBoard
+import com.puzzleplatform.player.ui.board.SinkaminoBoard
 import com.puzzleplatform.player.ui.board.PictoLinkBoard
 import com.puzzleplatform.player.ui.board.NorinoriBoard
 import com.puzzleplatform.player.ui.board.NurimazeBoard
@@ -446,6 +447,12 @@ fun PlayScreen(
                             // Corner chain shares Nurikabe's canon and board; its engine
                             // holds the different rules.
                             30 -> NurikabeBoard(
+                                puzzle = puzzle,
+                                userValues = state.userValues,
+                                onTapCell = vm::tapShadeCell,
+                            )
+                            // Sinkamino's "shaded" state is a placed square.
+                            31 -> SinkaminoBoard(
                                 puzzle = puzzle,
                                 userValues = state.userValues,
                                 onTapCell = vm::tapShadeCell,

@@ -78,7 +78,7 @@ Like the shade/mark puzzles (Nurikabe), with a square instead of a black fill:
 - Each white cell has three states: empty, square, and marked (a small dot). Left click cycles empty → square → marked → empty; right click cycles backward. No drag.
 - Black cells and given squares take no input.
 - Appearance: black cells filled dark (no rooms, so not `ROOM_SHADE`). Given squares are drawn like the print: an inset outlined square in black. Placed squares use the same inset square in a distinct colour (blue outline, light blue fill), so givens stay recognisable. Arrow trails are drawn on top as dark polylines through cell centres with a filled triangular head, ignoring clicks.
-- Android: the engine implements `ShadeMarkEngine` (square = the "shaded" state), with `shadeGroup` returning null for black cells and given squares.
+- Android: `SinkaminoEngine` implements `ShadeMarkEngine` (square = the "shaded" state), with `shadeGroup` returning null for black cells and given squares; `SinkaminoBoard` wires `onTapCell` to `vm::tapShadeCell`. The rules live in `SinkaminoRules` (a port of `sinkaminoRules.ts`). Admin authoring (`SinkaminoEditor`) has Cells and Arrows modes like the web editor: in Arrows, a one-finger drag draws a trail and a tap deletes one; trails over black cells etc. block creating.
 
 ### Progress calculation
 

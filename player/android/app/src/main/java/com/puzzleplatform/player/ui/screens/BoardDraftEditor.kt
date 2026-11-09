@@ -33,6 +33,7 @@ import com.puzzleplatform.player.ui.board.KuralinMiniBoard
 import com.puzzleplatform.player.ui.board.MasyuMiniBoard
 import com.puzzleplatform.player.ui.board.NonogramMiniBoard
 import com.puzzleplatform.player.ui.board.NurikabeMiniBoard
+import com.puzzleplatform.player.ui.board.SinkaminoMiniBoard
 import com.puzzleplatform.player.ui.board.PictoLinkMiniBoard
 import com.puzzleplatform.player.ui.board.RippleEffectMiniBoard
 import com.puzzleplatform.player.ui.board.NumberLinkBoard
@@ -301,6 +302,10 @@ fun BoardDraftEditor(
             draft = board.tentaishow,
             onChange = { t -> onChange { it.copy(tentaishow = t(it.tentaishow)) } },
         )
+        AuthoringType.SINKAMINO -> SinkaminoEditor(
+            draft = board.sinkamino,
+            onChange = { t -> onChange { it.copy(sinkamino = t(it.sinkamino)) } },
+        )
         AuthoringType.UNEQUAL_SUDOKU -> UnequalSudokuEditor(
             draft = board.unequalSudoku,
             selectedCell = selectedCell,
@@ -350,6 +355,7 @@ fun BoardDraftMiniBoard(type: AuthoringType, board: BoardDraft, size: Dp) {
             SlitherlinkMiniBoard(draft = board.slitherlink, hasProblems = hasProblems, size = size)
         AuthoringType.NURIKABE -> NurikabeMiniBoard(draft = board.nurikabe, hasProblems = hasProblems, size = size)
         AuthoringType.CORNER_CHAIN -> NurikabeMiniBoard(draft = board.cornerChain, hasProblems = hasProblems, size = size)
+        AuthoringType.SINKAMINO -> SinkaminoMiniBoard(draft = board.sinkamino, hasProblems = hasProblems, size = size)
         AuthoringType.HEYAWAKE -> HeyawakeMiniBoard(draft = board.heyawake, hasProblems = hasProblems, size = size)
         AuthoringType.PICTO_LINK ->
             PictoLinkMiniBoard(draft = board.pictoLink, hasProblems = hasProblems, size = size)

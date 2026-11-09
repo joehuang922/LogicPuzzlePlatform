@@ -39,6 +39,7 @@ data class BoardDraft(
     val tentaishow: TentaishowDraft = TentaishowDraft(),
     val unequalSudoku: UnequalSudokuDraft = UnequalSudokuDraft(),
     val cornerChain: NurikabeDraft = NurikabeDraft(),
+    val sinkamino: SinkaminoGrid = SinkaminoGrid(emptyList(), emptyList()),
 ) {
     /**
      * What the type's misread check finds wrong with this board — the list that turns
@@ -72,6 +73,7 @@ data class BoardDraft(
         AuthoringType.TENTAISHOW -> TentaishowAuthoring.problems(tentaishow)
         AuthoringType.UNEQUAL_SUDOKU -> UnequalSudokuAuthoring.problems(unequalSudoku)
         AuthoringType.CORNER_CHAIN -> CornerChainAuthoring.problems(cornerChain)
+        AuthoringType.SINKAMINO -> SinkaminoAuthoring.problems(sinkamino)
     }
 
     /**
@@ -79,7 +81,7 @@ data class BoardDraft(
      * (combo sudoku boards that are stacked or disagree on a shared cell, heyawake rooms
      * that aren't rectangles, ripple effect, norinori, LITS, nurimaze or nuritwin walls
      * that end inside a room, a slalom gate with two numbers, a blank hitori cell, a
-     * tentaishow with no dots). Unlike the rest
+     * tentaishow with no dots, a sinkamino arrow over a black cell). Unlike the rest
      * these can't be overridden: the
      * board can't be created or saved until they're fixed.
      */
@@ -94,6 +96,7 @@ data class BoardDraft(
         AuthoringType.HITORI -> HitoriAuthoring.formatProblems(hitori)
         AuthoringType.NURITWIN -> NuritwinAuthoring.formatProblems(nuritwin)
         AuthoringType.TENTAISHOW -> TentaishowAuthoring.formatProblems(tentaishow)
+        AuthoringType.SINKAMINO -> SinkaminoAuthoring.formatProblems(sinkamino)
         else -> emptyList()
     }
 
@@ -160,6 +163,8 @@ data class BoardDraft(
         )
         AuthoringType.CORNER_CHAIN ->
             CanonBoard(CornerChainAuthoring.canonFromDraft(cornerChain), cornerChain.cols, cornerChain.rows)
+        AuthoringType.SINKAMINO ->
+            CanonBoard(SinkaminoAuthoring.canonFromDraft(sinkamino), sinkamino.cols, sinkamino.rows)
     }
 
     companion object {
@@ -192,6 +197,7 @@ data class BoardDraft(
             AuthoringType.TENTAISHOW -> BoardDraft(tentaishow = TentaishowAuthoring.draftFromCanon(canon))
             AuthoringType.UNEQUAL_SUDOKU -> BoardDraft(unequalSudoku = UnequalSudokuAuthoring.draftFromCanon(canon))
             AuthoringType.CORNER_CHAIN -> BoardDraft(cornerChain = CornerChainAuthoring.draftFromCanon(canon))
+            AuthoringType.SINKAMINO -> BoardDraft(sinkamino = SinkaminoAuthoring.draftFromCanon(canon))
         }
     }
 }

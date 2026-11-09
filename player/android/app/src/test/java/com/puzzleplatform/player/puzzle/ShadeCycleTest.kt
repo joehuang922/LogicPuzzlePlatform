@@ -37,8 +37,8 @@ class ShadeCycleTest {
 
     @Test
     fun registry_shadeMarkPuzzlesImplementTheSharedInterface() {
-        // LITS 15, Nurikabe 24, Nuritwin 9, Nurimaze 3, Corner Chain 30.
-        for (type in listOf(15, 24, 9, 3, 30)) {
+        // LITS 15, Nurikabe 24, Nuritwin 9, Nurimaze 3, Corner Chain 30, Sinkamino 31.
+        for (type in listOf(15, 24, 9, 3, 30, 31)) {
             assertTrue("type $type", PuzzleEngines.forType(type) is ShadeMarkEngine)
         }
     }
