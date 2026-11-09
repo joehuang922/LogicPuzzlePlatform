@@ -82,6 +82,7 @@ NAME_TO_TYPE: dict[str, int] = {
     "hitori": 26,
     "picto_link": 27,
     "corner_chain": 30,
+    "sinkamino": 31,
 }
 
 

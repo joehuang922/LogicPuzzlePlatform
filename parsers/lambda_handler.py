@@ -136,6 +136,9 @@ def _build_parser(puzzle_type: int):
     if puzzle_type == 30:
         from puzzle_parsers.corner_chain.parser import CornerChainParser
         return CornerChainParser(ocr_backend=ocr)
+    if puzzle_type == 31:
+        from puzzle_parsers.sinkamino.parser import SinkaminoParser
+        return SinkaminoParser()
     return None
 
 

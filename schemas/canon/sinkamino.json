@@ -1,0 +1,33 @@
+{
+  "title": "Sinkamino Canonical Representation",
+  "description": "Rectangular grid of white, black and given-square cells, plus arrow trails through cell centres. The player places squares; edge-connected squares form islands, each crossed by trails exactly once, and along each trail every island is the previous one's shape (same orientation) plus one square.",
+  "type": "object",
+  "required": ["cells", "arrows"],
+  "additionalProperties": false,
+  "properties": {
+    "cells": {
+      "description": "m x n grid. 0 = white cell, 1 = black cell, 2 = given square.",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": { "type": "integer", "enum": [0, 1, 2] },
+        "minItems": 1
+      },
+      "minItems": 1
+    },
+    "arrows": {
+      "description": "Arrow trails. Each is an ordered list of [row, col] cells from tail to head; consecutive cells are orthogonally adjacent, and no cell is black.",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0 },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "minItems": 2
+      }
+    }
+  }
+}

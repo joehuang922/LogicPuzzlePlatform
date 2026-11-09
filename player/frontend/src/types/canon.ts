@@ -421,3 +421,15 @@ export interface CornerChainAnswer {
   // rows x cols; 0 = unset, 1 = black, 2 = white-marked (solver aid)
   states: number[][];
 }
+
+export interface SinkaminoCanon {
+  // rows x cols; 0 = white, 1 = black, 2 = given square
+  cells: number[][];
+  // trails, each an ordered list of [row, col] cells from tail to head
+  arrows: number[][][];
+}
+
+export interface SinkaminoAnswer {
+  // rows x cols; 0 = unset, 1 = placed square, 2 = marked (no square)
+  states: number[][];
+}

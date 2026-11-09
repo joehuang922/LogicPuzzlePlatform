@@ -22,6 +22,7 @@ from puzzle_parsers.picto_link.models import PictoLinkBoard
 from puzzle_parsers.kuralin.models import KuralinBoard
 from puzzle_parsers.unequal_sudoku.models import UnequalSudokuBoard
 from puzzle_parsers.corner_chain.models import CornerChainBoard
+from puzzle_parsers.sinkamino.models import SinkaminoBoard
 from puzzle_parsers.validate import validate_canon
 
 SCHEMA_DIR = Path(__file__).parents[2] / "schemas" / "canon"
@@ -42,6 +43,7 @@ MODELS = {
     "kuralin": KuralinBoard,
     "unequal-sudoku": UnequalSudokuBoard,
     "corner-chain": CornerChainBoard,
+    "sinkamino": SinkaminoBoard,
 }
 
 

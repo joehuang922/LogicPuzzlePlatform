@@ -29,6 +29,7 @@ import pictoLinkSchema from "../../../../schemas/canon/picto-link.json";
 import kuralinSchema from "../../../../schemas/canon/kuralin.json";
 import unequalSudokuSchema from "../../../../schemas/canon/unequal-sudoku.json";
 import cornerChainSchema from "../../../../schemas/canon/corner-chain.json";
+import sinkaminoSchema from "../../../../schemas/canon/sinkamino.json";
 
 const ajv = new Ajv();
 
@@ -63,6 +64,7 @@ const validators: Record<number, ValidateFunction> = {
   28: ajv.compile(kuralinSchema),
   29: ajv.compile(unequalSudokuSchema),
   30: ajv.compile(cornerChainSchema),
+  31: ajv.compile(sinkaminoSchema),
 };
 
 export function validateCanon(puzzleType: number, data: unknown): void {
@@ -156,6 +158,37 @@ const semanticChecks: Record<number, (data: any) => void> = {
       if (seen.has(key)) throw new Error(`Invalid tentaishow: two dots at (${dr}, ${dc})`);
       seen.add(key);
     }
+  },
+  // Sinkamino: the arrow trails are the board's format. Each must stay on the grid, step
+  // between orthogonal neighbours and never cross a black cell. Editors may hold a
+  // half-drawn trail; this keeps one from ever being stored.
+  31: (data: { cells: number[][]; arrows: number[][][] }) => {
+    const { cells, arrows } = data;
+    const rows = cells.length;
+    const cols = cells[0].length;
+    cells.forEach((row, r) => {
+      if (row.length !== cols) {
+        throw new Error(`Invalid sinkamino: row ${r + 1} has ${row.length} cells, expected ${cols}`);
+      }
+    });
+    arrows.forEach((trail, i) => {
+      trail.forEach(([r, c], j) => {
+        if (r >= rows || c >= cols) {
+          throw new Error(`Invalid sinkamino: arrow ${i + 1} leaves the ${cols}x${rows} grid at R${r + 1}C${c + 1}`);
+        }
+        if (cells[r][c] === 1) {
+          throw new Error(`Invalid sinkamino: arrow ${i + 1} crosses the black cell R${r + 1}C${c + 1}`);
+        }
+        if (j > 0) {
+          const [pr, pc] = trail[j - 1];
+          if (Math.abs(pr - r) + Math.abs(pc - c) !== 1) {
+            throw new Error(
+              `Invalid sinkamino: arrow ${i + 1} jumps from R${pr + 1}C${pc + 1} to R${r + 1}C${c + 1}`
+            );
+          }
+        }
+      });
+    });
   },
   // LITS: as norinori, the walls are the board's format.
   15: (data: { grids: { h: number[][]; v: number[][] } }) => {

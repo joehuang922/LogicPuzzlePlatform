@@ -33,6 +33,7 @@ import { pictoLinkRenderer } from "./renderers/pictoLink";
 import { kuralinRenderer } from "./renderers/kuralin";
 import { unequalSudokuRenderer } from "./renderers/unequalSudoku";
 import { cornerChainRenderer } from "./renderers/cornerChain";
+import { sinkaminoRenderer } from "./renderers/sinkamino";
 
 registerRenderer(comboSudokuRenderer);
 registerRenderer(sudokuRenderer);
@@ -64,6 +65,7 @@ registerRenderer(pictoLinkRenderer);
 registerRenderer(kuralinRenderer);
 registerRenderer(unequalSudokuRenderer);
 registerRenderer(cornerChainRenderer);
+registerRenderer(sinkaminoRenderer);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
