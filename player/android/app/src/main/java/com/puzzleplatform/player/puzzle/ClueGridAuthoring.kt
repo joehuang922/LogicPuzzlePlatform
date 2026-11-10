@@ -33,10 +33,16 @@ abstract class ClueGridAuthoring(
     private val jpLabel: String,
 ) {
 
-    /** Read a parser canon `{ cells }` into a draft, padding ragged rows and clearing anything that isn't a positive clue. */
+    /**
+     * Whether a canon value is kept as a cell; anything else reads as 0. Positive clues by
+     * default; Pencils also keeps its negative head codes.
+     */
+    protected open fun keeps(value: Int): Boolean = value > 0
+
+    /** Read a parser canon `{ cells }` into a draft, padding ragged rows and clearing anything [keeps] rejects. */
     fun draftFromCanon(canon: JsonObject): ClueGridDraft {
         val parsed = (canon["cells"] as? JsonArray)?.map { row ->
-            (row as? JsonArray)?.map { v -> maxOf((v as? JsonPrimitive)?.intOrNull ?: 0, 0) } ?: emptyList()
+            (row as? JsonArray)?.map { v -> (v as? JsonPrimitive)?.intOrNull?.takeIf { keeps(it) } ?: 0 } ?: emptyList()
         } ?: emptyList()
         val cols = parsed.maxOfOrNull { it.size } ?: 0
         return ClueGridDraft(parsed.map { row -> row + List(cols - row.size) { 0 } })
@@ -62,10 +68,10 @@ abstract class ClueGridAuthoring(
         canonRepr = canonFromDraft(draft),
     )
 
-    /** Set the clue at (col, row); null (or anything below 1) clears it. */
+    /** Set the clue at (col, row); null (or anything [keeps] rejects) clears it. */
     fun setClue(draft: ClueGridDraft, col: Int, row: Int, clue: Int?): ClueGridDraft {
         if (!draft.inGrid(col, row)) return draft
-        val value = if (clue != null && clue > 0) clue else 0
+        val value = if (clue != null && keeps(clue)) clue else 0
         return draft.copy(cells = draft.cells.mapIndexed { r, line ->
             if (r != row) line else line.mapIndexed { c, old -> if (c == col) value else old }
         })

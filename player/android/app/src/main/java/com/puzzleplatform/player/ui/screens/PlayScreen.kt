@@ -79,6 +79,7 @@ import com.puzzleplatform.player.ui.board.NurikabeBoard
 import com.puzzleplatform.player.ui.board.SinkaminoBoard
 import com.puzzleplatform.player.ui.board.BalanceLinkBoard
 import com.puzzleplatform.player.ui.board.LRingBoard
+import com.puzzleplatform.player.ui.board.PencilsBoard
 import com.puzzleplatform.player.ui.board.PictoLinkBoard
 import com.puzzleplatform.player.ui.board.NorinoriBoard
 import com.puzzleplatform.player.ui.board.NurimazeBoard
@@ -341,6 +342,13 @@ fun PlayScreen(
                                     userValues = state.userValues,
                                     liveValidate = state.liveValidate,
                                     onSetEdge = vm::setUserValue,
+                                )
+                                // Drag draws trails, a tap by a grid line toggles an edge, a tap
+                                // on a cell picks a head's direction.
+                                8 -> PencilsBoard(
+                                    puzzle = puzzle,
+                                    userValues = state.userValues,
+                                    onApplyChanges = vm::putUserValues,
                                 )
                                 // Masyu's loop drawing and keys; arrows turn red with Errors on.
                                 33 -> LRingBoard(

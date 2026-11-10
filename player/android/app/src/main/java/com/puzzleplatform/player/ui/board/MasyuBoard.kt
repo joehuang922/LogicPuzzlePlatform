@@ -148,9 +148,13 @@ fun MasyuBoard(
 /**
  * Tracks a single drag gesture: the last cell the finger was over and whether this
  * gesture is drawing or erasing (fixed by the first edge it crosses, matching the
- * web board). Each adjacent-cell crossing toggles exactly one edge.
+ * web board). Each adjacent-cell crossing toggles exactly one edge. [hKey]/[vKey] name
+ * the segment keys, (row, col)-anchored like Masyu's; Pencils passes its trail keys.
  */
-internal class MasyuDragState {
+internal class MasyuDragState(
+    private val hKey: (Int, Int) -> String = MasyuEngine::hKey,
+    private val vKey: (Int, Int) -> String = MasyuEngine::vKey,
+) {
     private var last: Pair<Int, Int>? = null
     private var erase: Boolean? = null // null until the first crossing decides
 
@@ -175,10 +179,10 @@ internal class MasyuDragState {
         if (abs(dr) + abs(dc) != 1) { last = cell; return } // not orthogonally adjacent
 
         val key = when {
-            dc == 1 -> MasyuEngine.hKey(prev.second, prev.first)
-            dc == -1 -> MasyuEngine.hKey(prev.second, cell.first)
-            dr == 1 -> MasyuEngine.vKey(prev.second, prev.first)
-            else -> MasyuEngine.vKey(cell.second, prev.first)
+            dc == 1 -> hKey(prev.second, prev.first)
+            dc == -1 -> hKey(prev.second, cell.first)
+            dr == 1 -> vKey(prev.second, prev.first)
+            else -> vKey(cell.second, prev.first)
         }
         val present = values[key] == 1
         if (erase == null) erase = present

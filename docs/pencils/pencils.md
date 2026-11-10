@@ -86,6 +86,8 @@ Three interaction modes:
 2. **Trail draw/erase** — Drag across cells to draw a trail line between their centers. Dragging over an existing trail erases it. Trail lines are rendered in **grey** to visually distinguish them from the solid black body edges.
 3. **Head placement** — Click a cell to show a popup with 4 directional options (up, down, left, right). Selecting one places a pencil head. Clicking a cell that already has a head erases it.
 
+Android: `PencilsBoard` has the same three inputs in one mode: drag draws trails (Masyu's `MasyuDragState` on the `th:`/`tv:` keys), a tap within 0.22 cell of an interior grid line toggles an edge (not one a head implies), and a tap on an empty cell shows direction chips under the board. `PencilsRules` in `PencilsEngine.kt` ports `validateSolution` and the progress calculation. As on the web, a trail segment between two cells that no head's trail reaches isn't checked. Authoring is `PencilsEditor` (the shared `ClueGridEditor` plus head chips) on a `ClueGridDraft` that keeps the negative head codes. Heads with no room for a body behind them, and unknown codes, are flagged as overridable warnings.
+
 ### Progress calculation
 
 `(cells covered by heads + body edges + trail segments) / total cells * 100`. A cell is considered covered if it has a head, is enclosed by body edges, or has at least one trail segment touching it.

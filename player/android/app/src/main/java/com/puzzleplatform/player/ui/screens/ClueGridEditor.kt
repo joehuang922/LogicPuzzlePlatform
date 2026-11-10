@@ -27,7 +27,8 @@ import com.puzzleplatform.player.puzzle.ClueGridDraft
  * tap callback and the "col,row" selection), any problems that can't be right, and a
  * panel for the selected cell — type its clue ([clueLabel], blank for none), or delete its
  * row/column (a parser's phantom line). Add row/column append a blank line for one the
- * parser missed. Every edit goes straight to [onChange].
+ * parser missed. Every edit goes straight to [onChange]. [cellExtras] adds controls for the
+ * selected cell under its clue field (Pencils' head chips).
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -38,6 +39,7 @@ fun ClueGridEditor(
     selectedCell: String?,
     onSelectCell: (String?) -> Unit,
     onChange: ((ClueGridDraft) -> ClueGridDraft) -> Unit,
+    cellExtras: (@Composable (col: Int, row: Int) -> Unit)? = null,
     board: @Composable (puzzle: Puzzle, onTapCell: (col: Int, row: Int) -> Unit, selectedCell: String?) -> Unit,
 ) {
     val selected = selectedCell?.split(",")?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 2 }
@@ -84,6 +86,7 @@ fun ClueGridEditor(
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
+            cellExtras?.invoke(selCol, selRow)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 OutlinedButton(
                     onClick = {

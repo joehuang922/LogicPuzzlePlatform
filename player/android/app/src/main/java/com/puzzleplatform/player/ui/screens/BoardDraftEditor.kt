@@ -36,6 +36,7 @@ import com.puzzleplatform.player.ui.board.NurikabeMiniBoard
 import com.puzzleplatform.player.ui.board.SinkaminoMiniBoard
 import com.puzzleplatform.player.ui.board.BalanceLinkMiniBoard
 import com.puzzleplatform.player.ui.board.LRingMiniBoard
+import com.puzzleplatform.player.ui.board.PencilsMiniBoard
 import com.puzzleplatform.player.ui.board.PictoLinkMiniBoard
 import com.puzzleplatform.player.ui.board.RippleEffectMiniBoard
 import com.puzzleplatform.player.ui.board.NumberLinkBoard
@@ -322,6 +323,12 @@ fun BoardDraftEditor(
             onSelectCell = onSelectCell,
             onChange = { t -> onChange { it.copy(lRing = t(it.lRing)) } },
         )
+        AuthoringType.PENCILS -> PencilsEditor(
+            draft = board.pencils,
+            selectedCell = selectedCell,
+            onSelectCell = onSelectCell,
+            onChange = { t -> onChange { it.copy(pencils = t(it.pencils)) } },
+        )
         AuthoringType.UNEQUAL_SUDOKU -> UnequalSudokuEditor(
             draft = board.unequalSudoku,
             selectedCell = selectedCell,
@@ -374,6 +381,7 @@ fun BoardDraftMiniBoard(type: AuthoringType, board: BoardDraft, size: Dp) {
         AuthoringType.SINKAMINO -> SinkaminoMiniBoard(draft = board.sinkamino, hasProblems = hasProblems, size = size)
         AuthoringType.BALANCE_LINK -> BalanceLinkMiniBoard(draft = board.balanceLink, hasProblems = hasProblems, size = size)
         AuthoringType.L_RING -> LRingMiniBoard(draft = board.lRing, hasProblems = hasProblems, size = size)
+        AuthoringType.PENCILS -> PencilsMiniBoard(draft = board.pencils, hasProblems = hasProblems, size = size)
         AuthoringType.HEYAWAKE -> HeyawakeMiniBoard(draft = board.heyawake, hasProblems = hasProblems, size = size)
         AuthoringType.PICTO_LINK ->
             PictoLinkMiniBoard(draft = board.pictoLink, hasProblems = hasProblems, size = size)
