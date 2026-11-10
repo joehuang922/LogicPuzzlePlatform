@@ -6,23 +6,27 @@ package com.puzzleplatform.player.puzzle
  * down / left / right), so the draft is a [ClueGridDraft] that also keeps the negative
  * head codes; [setClue] writes a number or a head.
  *
- * No format rules (any grid of ints >= -4 is a valid canon), so [problems] are overridable
- * misread warnings: an unknown code, or a head whose body would lie off the board.
+ * An unknown code (below -4) is a [formatProblems] hard block, since the canon schema
+ * rejects it; a head whose body would lie off the board is an overridable misread warning.
  */
 object PencilsAuthoring : ClueGridAuthoring(8, "pencils", "ペンシルズ") {
     const val PUZZLE_TYPE = 8
 
     override fun keeps(value: Int): Boolean = value != 0
 
-    override fun clueProblems(draft: ClueGridDraft): List<String> = buildList {
+    /** Codes below -4 aren't heads; the canon schema rejects them, so creating is refused. */
+    fun formatProblems(draft: ClueGridDraft): List<String> = buildList {
+        for (r in 0 until draft.rows) for (c in 0 until draft.cols) {
+            val v = draft.cells[r][c]
+            if (v < 0 && !PencilsRules.isHead(v)) add("${at(r, c)} holds an unknown value ($v)")
+        }
+    }
+
+    override fun clueProblems(draft: ClueGridDraft): List<String> = formatProblems(draft) + buildList {
         for (r in 0 until draft.rows) {
             for (c in 0 until draft.cols) {
                 val v = draft.cells[r][c]
-                if (v >= 0) continue
-                if (!PencilsRules.isHead(v)) {
-                    add("${at(r, c)} holds an unknown value ($v)")
-                    continue
-                }
+                if (!PencilsRules.isHead(v)) continue
                 val (br, bc) = PencilsRules.bodyStart(r, c, v) ?: continue
                 if (br !in 0 until draft.rows || bc !in 0 until draft.cols) {
                     val name = PencilsRules.HEADS.first { it.first == v }.second.lowercase()

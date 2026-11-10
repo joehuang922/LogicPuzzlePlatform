@@ -33,8 +33,10 @@ The clue value does not by itself say whether the cell is chocolate or banana �
 
 ### Sample images
 
-- [board-choco-banana.png](board-choco-banana.png) — 10x10 board (Easy)
-- [board-choco-banana-medium.png](board-choco-banana-medium.png) — larger board (Medium)
+- [board-choco-banana.png](board-choco-banana.png) — 10x10 board (Easy); true grid in [board-choco-banana.canon.json](board-choco-banana.canon.json)
+- [board-choco-banana-medium.png](board-choco-banana-medium.png) — 17x17 board (Medium); true grid in [board-choco-banana-medium.canon.json](board-choco-banana-medium.canon.json)
+
+The canonical JSON example above illustrates the format only; it is not the 10x10 sample's grid.
 
 ## Answer structure description
 
@@ -99,12 +101,15 @@ Every cell is assigned a state (shaded or unshaded) AND every shaded group is a 
 
 - The grid lines are solid — uses `detect_grid_lines` (standard solid-line detection).
 - Detects the outer grid geometry and determines dimensions from the internal line spacing.
-- Uses OCR / LLM-based digit recognition to read the clue number in each cell (empty vs. a positive integer).
+- Reads every clue with EasyOCR through the shared `cell_ocr.read_grid_clues` (multi-digit), so type 16 is in `_OCR_TYPES`. At native size both samples read exactly; `tests/test_choco_banana_parser.py` pins their geometry against the canons.
+- Known limit: the outline font gets small when an image is shrunk well below native size (the 17x17 sample at 600px wide reads two 3s as 8s). Android only shrinks images over 2000px, so its uploads aren't affected.
 - There are no regions or thick borders to classify — the only content is the per-cell clue array.
 - Validates that `cells` is an integer array of the correct rows×cols shape with all values ≥ 0.
 
 # Misc
 
 ## Coordinate convention
+
+Android: `ChocoBananaEngine` (a `ShadeMarkEngine`, so a tap cycles empty -> shaded -> marked -> empty on any cell, clues included) and `ChocoBananaBoard`, with the web board's chocolate fill and white clues on it (no rooms, so not `ROOM_SHADE`). Authoring is the shared `ClueGridEditor`; a clue bigger than the grid is an overridable warning.
 
 Player-entered values are keyed as `"c:col,row"`. The value encodes the tri-state: `1` = shaded, `2` = white-mark (definitely unshaded); absent or `0` = unknown. The persisted answer uses the structured `{states: [...]}` grid format directly, preserving all three states (`0` unknown, `1` shaded, `2` white-mark).

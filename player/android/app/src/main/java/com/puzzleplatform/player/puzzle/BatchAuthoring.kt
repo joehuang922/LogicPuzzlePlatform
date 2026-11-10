@@ -121,6 +121,7 @@ enum class AuthoringType(val label: String, val jpLabel: String, val puzzleType:
     BALANCE_LINK("Balance Link", "バランスリンク", BalanceLinkAuthoring.PUZZLE_TYPE),
     L_RING("L-Ring", "えるりんぐ", LRingAuthoring.PUZZLE_TYPE),
     PENCILS("Pencils", "ペンシルズ", PencilsAuthoring.PUZZLE_TYPE),
+    CHOCO_BANANA("Choco Banana", "チョコバナナ", ChocoBananaAuthoring.PUZZLE_TYPE),
     ;
 
     companion object {

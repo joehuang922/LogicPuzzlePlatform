@@ -42,12 +42,14 @@ class PencilsAuthoringTest {
         d = PencilsAuthoring.setClue(d, col = 0, row = 2, clue = -7)
         assertEquals(
             listOf(
+                "R3C1 holds an unknown value (-7)",
                 "R1C1: the down head has no room for a body behind it",
                 "R2C4: the left head has no room for a body behind it",
-                "R3C1 holds an unknown value (-7)",
             ),
             PencilsAuthoring.problems(d),
         )
+        // Only the unknown code blocks creating.
+        assertEquals(listOf("R3C1 holds an unknown value (-7)"), BoardDraft(pencils = d).formatProblems(AuthoringType.PENCILS))
     }
 
     @Test

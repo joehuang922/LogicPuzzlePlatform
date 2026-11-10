@@ -37,6 +37,8 @@ import com.puzzleplatform.player.ui.board.SinkaminoMiniBoard
 import com.puzzleplatform.player.ui.board.BalanceLinkMiniBoard
 import com.puzzleplatform.player.ui.board.LRingMiniBoard
 import com.puzzleplatform.player.ui.board.PencilsMiniBoard
+import com.puzzleplatform.player.ui.board.ChocoBananaBoard
+import com.puzzleplatform.player.puzzle.ChocoBananaAuthoring
 import com.puzzleplatform.player.ui.board.PictoLinkMiniBoard
 import com.puzzleplatform.player.ui.board.RippleEffectMiniBoard
 import com.puzzleplatform.player.ui.board.NumberLinkBoard
@@ -329,6 +331,21 @@ fun BoardDraftEditor(
             onSelectCell = onSelectCell,
             onChange = { t -> onChange { it.copy(pencils = t(it.pencils)) } },
         )
+        AuthoringType.CHOCO_BANANA -> ClueGridEditor(
+            authoring = ChocoBananaAuthoring,
+            draft = board.chocoBanana,
+            clueLabel = "Group size",
+            selectedCell = selectedCell,
+            onSelectCell = onSelectCell,
+            onChange = { t -> onChange { it.copy(chocoBanana = t(it.chocoBanana)) } },
+        ) { puzzle, onTap, selected ->
+            ChocoBananaBoard(
+                puzzle = puzzle,
+                userValues = emptyMap(),
+                onTapCell = onTap,
+                selectedCell = selected,
+            )
+        }
         AuthoringType.UNEQUAL_SUDOKU -> UnequalSudokuEditor(
             draft = board.unequalSudoku,
             selectedCell = selectedCell,
@@ -382,6 +399,8 @@ fun BoardDraftMiniBoard(type: AuthoringType, board: BoardDraft, size: Dp) {
         AuthoringType.BALANCE_LINK -> BalanceLinkMiniBoard(draft = board.balanceLink, hasProblems = hasProblems, size = size)
         AuthoringType.L_RING -> LRingMiniBoard(draft = board.lRing, hasProblems = hasProblems, size = size)
         AuthoringType.PENCILS -> PencilsMiniBoard(draft = board.pencils, hasProblems = hasProblems, size = size)
+        AuthoringType.CHOCO_BANANA ->
+            ClueGridMiniBoard(draft = board.chocoBanana, hasProblems = hasProblems, size = size)
         AuthoringType.HEYAWAKE -> HeyawakeMiniBoard(draft = board.heyawake, hasProblems = hasProblems, size = size)
         AuthoringType.PICTO_LINK ->
             PictoLinkMiniBoard(draft = board.pictoLink, hasProblems = hasProblems, size = size)

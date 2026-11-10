@@ -80,6 +80,7 @@ import com.puzzleplatform.player.ui.board.SinkaminoBoard
 import com.puzzleplatform.player.ui.board.BalanceLinkBoard
 import com.puzzleplatform.player.ui.board.LRingBoard
 import com.puzzleplatform.player.ui.board.PencilsBoard
+import com.puzzleplatform.player.ui.board.ChocoBananaBoard
 import com.puzzleplatform.player.ui.board.PictoLinkBoard
 import com.puzzleplatform.player.ui.board.NorinoriBoard
 import com.puzzleplatform.player.ui.board.NurimazeBoard
@@ -342,6 +343,12 @@ fun PlayScreen(
                                     userValues = state.userValues,
                                     liveValidate = state.liveValidate,
                                     onSetEdge = vm::setUserValue,
+                                )
+                                // Shade/mark: a tap on any cell, clues included, cycles it.
+                                16 -> ChocoBananaBoard(
+                                    puzzle = puzzle,
+                                    userValues = state.userValues,
+                                    onTapCell = vm::tapShadeCell,
                                 )
                                 // Drag draws trails, a tap by a grid line toggles an edge, a tap
                                 // on a cell picks a head's direction.

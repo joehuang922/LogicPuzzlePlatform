@@ -68,7 +68,7 @@ import com.puzzleplatform.player.ui.board.ZoomableImage
 
 /**
  * Create one *or many* questions from album photos. The puzzle type (sudoku,
- * nonogram, kakuro, slitherlink, nurikabe, heyawake, picto link, yajilin, ripple effect, masyu, slalom, shakashaka, akari, number link, shikaku, fillomino, kuralin, norinori, double choco, LITS, nurimaze, hitori, nuritwin, tentaishow, unequal sudoku, corner chain, sinkamino, balance link, L-Ring or pencils, see [AuthoringType]) is picked from a dropdown and applies to the whole
+ * nonogram, kakuro, slitherlink, nurikabe, heyawake, picto link, yajilin, ripple effect, masyu, slalom, shakashaka, akari, number link, shikaku, fillomino, kuralin, norinori, double choco, LITS, nurimaze, hitori, nuritwin, tentaishow, unequal sudoku, corner chain, sinkamino, balance link, L-Ring, pencils or choco banana, see [AuthoringType]) is picked from a dropdown and applies to the whole
  * batch. A single pick is just a batch of one — same flow throughout. Steps:
  * pick images → Parse all (OCR each) → review/fix any tile (full-screen, with the
  * source photo beside it: sudoku on the real player board, nonogram as editable clue
@@ -349,6 +349,10 @@ fun AdminQuestionScreen(
                                     "Tap a tile to review its photo and grid side by side, fix mis-read " +
                                         "numbers or heads, and set its title. A red tile has no clues or a " +
                                         "head with no room for its body."
+                                AuthoringType.CHOCO_BANANA ->
+                                    "Tap a tile to review its photo and grid side by side, fix mis-read " +
+                                        "numbers, and set its title. A red tile has no clues or a clue " +
+                                        "bigger than the grid."
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -616,6 +620,9 @@ private fun ReviewScreen(
                     AuthoringType.PENCILS ->
                         "Compare the photo with the grid — pinch to zoom the photo, tap a cell to type its " +
                             "number or pick a head's direction, delete a phantom line, or add a missed one."
+                    AuthoringType.CHOCO_BANANA ->
+                        "Compare the photo with the grid — pinch to zoom the photo, tap a cell to fix its " +
+                            "number, delete a phantom line, or add a missed one."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

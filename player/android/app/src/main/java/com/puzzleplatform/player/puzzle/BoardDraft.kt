@@ -45,6 +45,7 @@ data class BoardDraft(
     val balanceLink: ClueGridDraft = ClueGridDraft(),
     val lRing: ClueGridDraft = ClueGridDraft(),
     val pencils: ClueGridDraft = ClueGridDraft(),
+    val chocoBanana: ClueGridDraft = ClueGridDraft(),
 ) {
     /**
      * What the type's misread check finds wrong with this board — the list that turns
@@ -82,6 +83,7 @@ data class BoardDraft(
         AuthoringType.BALANCE_LINK -> BalanceLinkAuthoring.problems(balanceLink)
         AuthoringType.L_RING -> LRingAuthoring.problems(lRing)
         AuthoringType.PENCILS -> PencilsAuthoring.problems(pencils)
+        AuthoringType.CHOCO_BANANA -> ChocoBananaAuthoring.problems(chocoBanana)
     }
 
     /**
@@ -105,6 +107,7 @@ data class BoardDraft(
         AuthoringType.NURITWIN -> NuritwinAuthoring.formatProblems(nuritwin)
         AuthoringType.TENTAISHOW -> TentaishowAuthoring.formatProblems(tentaishow)
         AuthoringType.SINKAMINO -> SinkaminoAuthoring.formatProblems(sinkamino)
+        AuthoringType.PENCILS -> PencilsAuthoring.formatProblems(pencils)
         else -> emptyList()
     }
 
@@ -179,6 +182,8 @@ data class BoardDraft(
             CanonBoard(LRingAuthoring.canonFromDraft(lRing), lRing.cols, lRing.rows)
         AuthoringType.PENCILS ->
             CanonBoard(PencilsAuthoring.canonFromDraft(pencils), pencils.cols, pencils.rows)
+        AuthoringType.CHOCO_BANANA ->
+            CanonBoard(ChocoBananaAuthoring.canonFromDraft(chocoBanana), chocoBanana.cols, chocoBanana.rows)
     }
 
     companion object {
@@ -218,6 +223,7 @@ data class BoardDraft(
             AuthoringType.BALANCE_LINK -> BoardDraft(balanceLink = BalanceLinkAuthoring.draftFromCanon(canon))
             AuthoringType.L_RING -> BoardDraft(lRing = LRingAuthoring.draftFromCanon(canon))
             AuthoringType.PENCILS -> BoardDraft(pencils = PencilsAuthoring.draftFromCanon(canon))
+            AuthoringType.CHOCO_BANANA -> BoardDraft(chocoBanana = ChocoBananaAuthoring.draftFromCanon(canon))
         }
     }
 }
