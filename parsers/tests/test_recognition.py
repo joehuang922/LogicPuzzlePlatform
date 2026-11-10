@@ -122,3 +122,36 @@ def test_split_rows_covers_every_row_without_gaps_or_overlap():
         sizes = [end - start for start, end in spans]
         assert max(sizes) <= rows_per_batch  # honours the per-batch cell cap
         assert max(sizes) - min(sizes) <= 1  # balanced
+
+
+# -- EasyOCR glyph rendering ------------------------------------------------
+
+from puzzle_parsers.recognition import _column_groups, _drop_stray_marks, _space_glyphs  # noqa: E402
+
+
+def _ink(h: int, w: int, boxes: list[tuple[int, int, int, int]]) -> np.ndarray:
+    ink = np.zeros((h, w), np.uint8)
+    for y0, y1, x0, x1 in boxes:
+        ink[y0:y1, x0:x1] = 255
+    return ink
+
+
+def test_stray_marks_outside_the_digits_are_dropped():
+    # Two digit strokes 40 tall, a short line scrap above them, a stub left of them,
+    # and a small broken-off piece inside the digits' box.
+    ink = _ink(60, 80, [(10, 50, 20, 30), (10, 50, 50, 60), (2, 5, 10, 70), (20, 30, 5, 8), (30, 34, 35, 45)])
+    kept = _drop_stray_marks(ink)
+    assert kept[30, 25] and kept[30, 55]  # digits
+    assert kept[32, 40]  # broken piece inside the box
+    assert not kept[3, 40]  # scrap above
+    assert not kept[25, 6]  # stub to the left
+
+
+def test_column_groups_and_spacing():
+    ink = _ink(40, 30, [(0, 40, 2, 10), (0, 40, 13, 21)]) > 0  # "11": a 3px gap
+    assert _column_groups(ink) == 2
+    glyph = np.where(ink, 0, 255).astype(np.uint8)
+    spaced = _space_glyphs(glyph, ink)
+    # The gap opens to 0.3 x height = 12px; ink widths are unchanged.
+    assert spaced.shape == (40, 30 + 12 - 3)
+    assert _column_groups(spaced < 128) == 2

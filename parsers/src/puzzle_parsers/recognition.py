@@ -683,17 +683,95 @@ def _glyph_mask(gray: NDArray) -> NDArray:
         if area < 0.004 * h * w:
             continue
         touches = x == 0 or y == 0 or x + bw == w or y + bh == h
-        # A grid line: long and thin along an edge. An edge nick: small.
+        # A grid line: long and thin along an edge. An edge nick: small. A
+        # sliver: a line's last pixel or two along the edge, however long.
         line = min(bw, bh) < 0.12 * min(h, w) and max(bw, bh) > 0.5 * max(h, w)
         nick = bh < 0.3 * h and bw < 0.3 * w
-        if touches and (line or nick):
+        sliver = min(bw, bh) <= max(2, 0.03 * min(h, w))
+        if touches and (line or nick or sliver):
             continue
         keep[labels == i] = 255
+    return _drop_stray_marks(keep)
+
+
+# A clue's digits stand on one baseline at one height. A mark much shorter than
+# the tallest glyph and outside the digits' box is a scrap: a bowed grid line
+# crossing the crop near a page fold, a stub of a slanted line. Pieces of a
+# broken digit lie inside the box and stay.
+_GLYPH_MIN_HEIGHT = 0.55
+
+
+def _drop_stray_marks(ink: NDArray) -> NDArray:
+    import cv2
+    import numpy as np
+
+    n, labels, stats, _ = cv2.connectedComponentsWithStats(ink, connectivity=8)
+    if n <= 2:
+        return ink
+    comps = range(1, n)
+    tallest = max(stats[i][3] for i in comps)
+    digits = [i for i in comps if stats[i][3] >= _GLYPH_MIN_HEIGHT * tallest]
+    x0 = min(stats[i][0] for i in digits)
+    y0 = min(stats[i][1] for i in digits)
+    x1 = max(stats[i][0] + stats[i][2] for i in digits)
+    y1 = max(stats[i][1] + stats[i][3] for i in digits)
+    keep = np.zeros_like(ink)
+    for i in comps:
+        x, y, bw, bh, _ = stats[i]
+        if i in digits or (x >= x0 and y >= y0 and x + bw <= x1 and y + bh <= y1):
+            keep[labels == i] = 255
     return keep
 
 
-def _render_glyph(gray: NDArray) -> tuple[NDArray, list[int]] | None:
-    """The glyph on white, as a text line, plus its box for the recogniser."""
+# The recogniser merges two identical neighbours ("11" -> "1") when little
+# blank separates them. A multi-digit read of one digit from ink in two-plus
+# separate columns is retried with every gap between glyphs opened to at least
+# this fraction of the glyph height. Only then: wider gaps on every read
+# flipped borderline reads elsewhere ("25" with a clipped 5 -> "28").
+_MIN_GLYPH_GAP = 0.3
+
+
+def _column_groups(ink: NDArray) -> int:
+    """Runs of inked columns: separate glyphs side by side."""
+    import numpy as np
+
+    inked = ink.any(axis=0).astype(np.int8)
+    return int(inked[0] + np.count_nonzero(np.diff(inked) == 1))
+
+
+def _space_glyphs(glyph: NDArray, ink: NDArray) -> NDArray:
+    import numpy as np
+
+    min_gap = int(round(_MIN_GLYPH_GAP * glyph.shape[0]))
+    inked = ink.any(axis=0)
+    parts: list[NDArray] = []
+    start = 0
+    x = 0
+    w = len(inked)
+    while x < w:
+        if inked[x]:
+            x += 1
+            continue
+        gap_end = x
+        while gap_end < w and not inked[gap_end]:
+            gap_end += 1
+        if 0 < x and gap_end < w and gap_end - x < min_gap:
+            parts.append(glyph[:, start:x])
+            parts.append(np.full((glyph.shape[0], min_gap), 255, dtype=glyph.dtype))
+            start = gap_end
+        x = gap_end
+    if not parts:
+        return glyph
+    parts.append(glyph[:, start:])
+    return np.hstack(parts)
+
+
+def _render_glyph(
+    gray: NDArray, *, spaced: bool = False
+) -> tuple[NDArray, list[int], int] | None:
+    """The glyph on white, as a text line, plus its box for the recogniser and
+    how many separate glyphs it holds side by side. ``spaced`` opens the gaps
+    between them (see ``_MIN_GLYPH_GAP``)."""
     import cv2
     import numpy as np
 
@@ -704,6 +782,10 @@ def _render_glyph(gray: NDArray) -> tuple[NDArray, list[int]] | None:
     y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
     glyph = gray[y0:y1, x0:x1].copy()
     glyph[mask[y0:y1, x0:x1] == 0] = 255
+    ink = mask[y0:y1, x0:x1] > 0
+    groups = _column_groups(ink)
+    if spaced:
+        glyph = _space_glyphs(glyph, ink)
     scale = _GLYPH_HEIGHT / glyph.shape[0]
     width = max(8, int(round(glyph.shape[1] * scale)))
     interp = cv2.INTER_AREA if scale < 1 else cv2.INTER_CUBIC
@@ -712,7 +794,7 @@ def _render_glyph(gray: NDArray) -> tuple[NDArray, list[int]] | None:
     line = cv2.copyMakeBorder(glyph, my, my, mx, mx, cv2.BORDER_CONSTANT, value=255)
     pad = 8  # box slightly larger than the ink, as the detector would give
     box = [mx - pad, mx + width + pad, my - pad, my + _GLYPH_HEIGHT + pad]
-    return line, box
+    return line, box, groups
 
 
 class EasyOcrBackend(OcrBackend):
@@ -770,18 +852,30 @@ class EasyOcrBackend(OcrBackend):
         rendered = _render_glyph(gray)
         if rendered is None:
             return -1
-        line, box = rendered
+        line, box, groups = rendered
         if allowlist is None:
             allowlist = "0123456789" if multi_digit else "123456789"
-        results = self._reader.recognize(
-            line, horizontal_list=[box], free_list=[], allowlist=allowlist,
-            detail=1, paragraph=False,
-        )
-        if not results:
-            return -1
-        _, text, conf = results[0]
-        text = text.strip()
-        if float(conf) < min_confidence or not text.isdigit():
+
+        def read(line: NDArray, box: list[int]) -> str | None:
+            results = self._reader.recognize(
+                line, horizontal_list=[box], free_list=[], allowlist=allowlist,
+                detail=1, paragraph=False,
+            )
+            if not results:
+                return None
+            _, text, conf = results[0]
+            text = text.strip()
+            if float(conf) < min_confidence or not text.isdigit():
+                return None
+            return text
+
+        text = read(line, box)
+        if multi_digit and groups >= 2 and text is not None and len(text) == 1:
+            spaced = _render_glyph(gray, spaced=True)
+            retry = read(spaced[0], spaced[1]) if spaced else None
+            if retry is not None and len(retry) >= 2:
+                text = retry
+        if text is None:
             return -1
         if len(text) > 1 and not multi_digit:
             return -1

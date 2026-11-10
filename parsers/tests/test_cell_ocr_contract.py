@@ -23,11 +23,11 @@ sys.path.insert(0, str(PARSERS_ROOT))
 _OCR_CORE = {PKG / "recognition.py", PKG / "cell_ocr.py"}
 # Not a grid-cell clue reader: nonogram OCRs the clue strips outside the grid.
 _EXEMPT_PACKAGES = {"nonogram"}
-# Clues are single digits by the puzzle's rules (sudoku and unequal sudoku 1-9,
+# Clues are single digits by the puzzle's rules (combo and unequal sudoku 1-9,
 # akari and shakashaka 0-4, slitherlink 0-3); every other puzzle allows
-# multi-digit clues.
+# multi-digit clues. Plain sudoku decides by board size (see below).
 _SINGLE_DIGIT_PACKAGES = {
-    "sudoku", "combo_sudoku", "unequal_sudoku", "akari", "shakashaka", "slitherlink",
+    "combo_sudoku", "unequal_sudoku", "akari", "shakashaka", "slitherlink",
 }
 
 _DIRECT_OCR = re.compile(r"\.recognize_cells\(|\.readtext\(|\._reader\b|import easyocr")
@@ -94,6 +94,12 @@ def test_every_shared_ocr_parser_is_in_ocr_types(monkeypatch):
         "These parsers read clues with EasyOCR but are not in lambda_handler._OCR_TYPES, "
         "so production builds them with ocr_backend=None: " + ", ".join(missing)
     )
+
+
+def test_sudoku_reads_multi_digits_only_above_9x9():
+    # A 9x9 board's clues are 1-9; a 16x16 to 30x30 board's run to 16-30.
+    src = (PKG / "sudoku" / "parser.py").read_text()
+    assert "allow_multi_digits=size > 9, max_value=size" in src
 
 
 @pytest.mark.parametrize("pkg", sorted(_SINGLE_DIGIT_PACKAGES))
