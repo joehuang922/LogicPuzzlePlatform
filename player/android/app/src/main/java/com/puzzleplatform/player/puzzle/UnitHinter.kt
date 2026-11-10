@@ -3,7 +3,7 @@ package com.puzzleplatform.player.puzzle
 /**
  * Offline hint ladder for the sudoku family (plain sudoku, combo sudoku): the Kotlin port
  * of player/solver/src/plugins/sudoku (units.ts + techniques.ts) and hint.ts. It reads
- * cells, units and peers from a [Geometry], so [SudokuHinter] (one 9x9) and
+ * cells, units and peers from a [Geometry], so [SudokuHinter] (one N x N, 9x9 to 30x30) and
  * [ComboSudokuHinter] (overlapping 9x9 boards) share every rung. Runs on-device, no
  * network; units are scanned in geometry order, matching the TS engine step for step.
  */
@@ -12,7 +12,7 @@ object UnitHinter {
     enum class Kind(val noun: String) { ROW("row"), COL("column"), BOX("box") }
 
     /**
-     * Cells 0 until [size]; [units] (each 9 cell ids) in scan order with their [kinds];
+     * Cells 0 until [size]; [units] (each [digits] cell ids) in scan order with their [kinds];
      * [key] maps a cell to the client's "col,row", [cellLabel]/[unitLabel] name them.
      */
     class Geometry(
@@ -23,6 +23,9 @@ object UnitHinter {
         val cellLabel: (Int) -> String,
         val unitLabel: (Int) -> String,
     ) {
+        /** Digits run 1..digits: 9 on a standard board, room width x height in general. */
+        val digits: Int = units.firstOrNull()?.size ?: 9
+
         /** Per cell, the indices of the units containing it, ascending. */
         val cellUnits: Array<IntArray>
 
@@ -80,9 +83,9 @@ object UnitHinter {
                 values,
                 Array(geo.size) { id ->
                     if (values[id] != 0) return@Array IntArray(0)
-                    val taken = BooleanArray(10)
-                    for (peer in geo.peers[id]) if (values[peer] != 0) taken[values[peer]] = true
-                    (1..9).filter { !taken[it] }.toIntArray()
+                    val taken = BooleanArray(geo.digits + 1)
+                    for (peer in geo.peers[id]) if (values[peer] in 1..geo.digits) taken[values[peer]] = true
+                    (1..geo.digits).filter { !taken[it] }.toIntArray()
                 },
             )
         }
@@ -113,7 +116,7 @@ object UnitHinter {
         val geo = board.geo
         for (u in geo.units.indices) {
             val unit = geo.units[u]
-            for (v in 1..9) {
+            for (v in 1..geo.digits) {
                 val spots = unit.filter { board.isEmpty(it) && v in board.candidates[it] }
                 if (spots.size == 1) {
                     // Skip if it's also a naked single (depth 0 would have caught it).
@@ -151,7 +154,7 @@ object UnitHinter {
         for (b in geo.units.indices) {
             if (geo.kinds[b] != Kind.BOX) continue
             val box = geo.units[b]
-            for (v in 1..9) {
+            for (v in 1..geo.digits) {
                 val spots = box.filter { has(it, v) }
                 if (spots.size < 2) continue
                 for (line in unitsContaining(board, spots) { it != Kind.BOX }) {
@@ -172,7 +175,7 @@ object UnitHinter {
         for (u in geo.units.indices) {
             if (geo.kinds[u] == Kind.BOX) continue
             val line = geo.units[u]
-            for (v in 1..9) {
+            for (v in 1..geo.digits) {
                 val spots = line.filter { has(it, v) }
                 if (spots.size < 2) continue
                 val b = unitsContaining(board, spots) { it == Kind.BOX }.firstOrNull() ?: continue
@@ -269,7 +272,7 @@ object UnitHinter {
             if (dirtyList.isEmpty()) return true
             val u = dirtyList.removeLast()
             dirty[u] = false
-            for (v in 1..9) {
+            for (v in 1..geo.digits) {
                 val b = 1 shl v
                 var place = -1
                 var count = 0

@@ -44,9 +44,9 @@ internal object SolutionCheck {
     }
 
     /** A digit entered at "col,row" must be the solution's digit there (notes ignored). */
-    fun digits(solution: Array<IntArray>) = Expect { key, value ->
+    fun digits(solution: Array<IntArray>, max: Int = 9) = Expect { key, value ->
         val (c, r) = pair(key) ?: return@Expect null
-        if (value !in 1..9) return@Expect null
+        if (value !in 1..max) return@Expect null
         solution.getOrNull(r)?.getOrNull(c) == value
     }
 

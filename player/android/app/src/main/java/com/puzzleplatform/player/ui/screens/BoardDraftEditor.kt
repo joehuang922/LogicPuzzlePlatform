@@ -77,7 +77,8 @@ fun BoardDraftEditor(
 ) {
     when (type) {
         AuthoringType.SUDOKU -> {
-            val reviewPuzzle = remember { SudokuAuthoring.blankPuzzle() }
+            val reviewPuzzle = remember(board.sudokuDims) { SudokuAuthoring.blankPuzzle(board.sudokuDims) }
+            val n = board.sudokuDims.size
             SudokuBoard(
                 puzzle = reviewPuzzle,
                 userValues = board.userValues,
@@ -88,10 +89,11 @@ fun BoardDraftEditor(
             if (selectedCell != null) {
                 DigitBar(
                     onDigit = { digit ->
-                        if (digit in 1..9) onChange { it.copy(userValues = it.userValues + (selectedCell to digit)) }
+                        if (digit in 1..n) onChange { it.copy(userValues = it.userValues + (selectedCell to digit)) }
                     },
                     onClear = { onChange { it.copy(userValues = it.userValues - selectedCell) } },
                     onDismiss = { onSelectCell(null) },
+                    max = n,
                 )
             }
         }
@@ -355,7 +357,7 @@ fun BoardDraftEditor(
 fun BoardDraftMiniBoard(type: AuthoringType, board: BoardDraft, size: Dp) {
     val hasProblems = board.problems(type).isNotEmpty()
     when (type) {
-        AuthoringType.SUDOKU -> SudokuMiniBoard(givens = board.userValues, size = size)
+        AuthoringType.SUDOKU -> SudokuMiniBoard(givens = board.userValues, dims = board.sudokuDims, size = size)
         AuthoringType.COMBO_SUDOKU ->
             ComboSudokuMiniBoard(layout = board.comboSudoku.layout, hasProblems = hasProblems, size = size)
         AuthoringType.NONOGRAM -> NonogramMiniBoard(

@@ -13,6 +13,8 @@ import kotlinx.serialization.json.JsonObject
  */
 data class BoardDraft(
     val userValues: Map<String, Int> = emptyMap(),
+    // A sudoku's room size (default 3x3, a 9x9), read from its canon.
+    val sudokuDims: SudokuEngine.Dims = SudokuEngine.Dims(),
     val comboSudoku: ComboSudokuDraft = ComboSudokuDraft(),
     val nonogram: NonogramDraft = NonogramDraft(),
     val kakuro: KakuroDraft = KakuroDraft(),
@@ -107,9 +109,9 @@ data class BoardDraft(
     /** The board as its type's canon, plus the width/height stored beside it. */
     fun toCanon(type: AuthoringType): CanonBoard = when (type) {
         AuthoringType.SUDOKU -> CanonBoard(
-            SudokuAuthoring.canonFromUserValues(userValues),
-            SudokuAuthoring.SIZE,
-            SudokuAuthoring.SIZE,
+            SudokuAuthoring.canonFromUserValues(userValues, sudokuDims),
+            sudokuDims.size,
+            sudokuDims.size,
         )
         AuthoringType.COMBO_SUDOKU -> CanonBoard(
             ComboSudokuAuthoring.canonFromDraft(comboSudoku),
@@ -178,7 +180,10 @@ data class BoardDraft(
     companion object {
         /** Seed a board of [type] from a canon (a parser result or a stored question's). */
         fun fromCanon(type: AuthoringType, canon: JsonObject): BoardDraft = when (type) {
-            AuthoringType.SUDOKU -> BoardDraft(userValues = SudokuAuthoring.userValuesFromCanon(canon))
+            AuthoringType.SUDOKU -> BoardDraft(
+                userValues = SudokuAuthoring.userValuesFromCanon(canon),
+                sudokuDims = SudokuAuthoring.dims(canon),
+            )
             AuthoringType.COMBO_SUDOKU -> BoardDraft(comboSudoku = ComboSudokuAuthoring.draftFromCanon(canon))
             AuthoringType.NONOGRAM -> BoardDraft(nonogram = NonogramAuthoring.draftFromCanon(canon))
             AuthoringType.KAKURO -> BoardDraft(kakuro = KakuroAuthoring.draftFromCanon(canon))

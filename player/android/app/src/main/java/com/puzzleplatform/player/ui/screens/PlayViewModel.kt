@@ -190,8 +190,9 @@ class PlayViewModel(
         }
 
         val next: Pair<String, String>? = if (sudoku) {
+            val n = SudokuEngine.dims(puzzle).size
             SudokuHinter.nextPlacement(puzzle, values)?.placement
-                ?.let { SudokuHinter.cellKey(it.cell) to SudokuHinter.cellLabel(it.cell) }
+                ?.let { SudokuHinter.cellKey(it.cell, n) to SudokuHinter.cellLabel(it.cell, n) }
         } else {
             ComboSudokuHinter.nextCell(puzzle, values)
         }

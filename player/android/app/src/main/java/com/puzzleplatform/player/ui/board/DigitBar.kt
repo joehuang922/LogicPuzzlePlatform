@@ -21,7 +21,9 @@ import androidx.compose.ui.unit.sp
 
 /**
  * Bottom digit entry bar for number puzzles, the Compose analog of
- * frontend/src/components/DigitBar.tsx. Digits 1-9 plus clear (✕) and dismiss (↩).
+ * frontend/src/components/DigitBar.tsx. Digits 1-[max] (default 9; up to 30 on a big
+ * sudoku, where the bar wraps into a pad of smaller buttons) plus clear (✕) and
+ * dismiss (↩). Digits in [marked] (the selected cell's pencil marks) show filled.
  *
  * When [onToggleNoteMode] is provided, an extra "123" button toggles pencil-mark
  * (note) entry; it's disabled via [noteModeDisabled] when the selected cell holds
@@ -39,7 +41,10 @@ fun DigitBar(
     noteMode: Boolean = false,
     onToggleNoteMode: (() -> Unit)? = null,
     noteModeDisabled: Boolean = false,
+    max: Int = 9,
+    marked: Set<Int> = emptySet(),
 ) {
+    val button = if (max > 9) 40.dp else 46.dp
     FlowRow(
         modifier = modifier
             .fillMaxWidth()
@@ -56,13 +61,15 @@ fun DigitBar(
         // no room for the label inside a fixed 46dp button and clip the digit to
         // nothing. Zero it out so the number is centered and visible.
         val noPadding = PaddingValues(0.dp)
-        for (d in 1..9) {
-            OutlinedButton(
-                onClick = { onDigit(d) },
-                modifier = Modifier.size(46.dp),
-                contentPadding = noPadding,
-            ) {
-                Text(d.toString(), fontSize = 18.sp)
+        for (d in 1..max) {
+            if (d in marked) {
+                Button(onClick = { onDigit(d) }, modifier = Modifier.size(button), contentPadding = noPadding) {
+                    Text(d.toString(), fontSize = if (max > 9) 15.sp else 18.sp)
+                }
+            } else {
+                OutlinedButton(onClick = { onDigit(d) }, modifier = Modifier.size(button), contentPadding = noPadding) {
+                    Text(d.toString(), fontSize = if (max > 9) 15.sp else 18.sp)
+                }
             }
         }
         if (onToggleNoteMode != null) {
@@ -70,7 +77,7 @@ fun DigitBar(
                 Button(
                     onClick = onToggleNoteMode,
                     enabled = !noteModeDisabled,
-                    modifier = Modifier.size(46.dp),
+                    modifier = Modifier.size(button),
                     contentPadding = noPadding,
                 ) {
                     Text("123", fontSize = 13.sp)
@@ -79,7 +86,7 @@ fun DigitBar(
                 OutlinedButton(
                     onClick = onToggleNoteMode,
                     enabled = !noteModeDisabled,
-                    modifier = Modifier.size(46.dp),
+                    modifier = Modifier.size(button),
                     contentPadding = noPadding,
                 ) {
                     Text("123", fontSize = 13.sp)
@@ -88,14 +95,14 @@ fun DigitBar(
         }
         OutlinedButton(
             onClick = onClear,
-            modifier = Modifier.size(46.dp),
+            modifier = Modifier.size(button),
             contentPadding = noPadding,
         ) {
             Text("✕", fontSize = 16.sp)
         }
         OutlinedButton(
             onClick = onDismiss,
-            modifier = Modifier.size(46.dp),
+            modifier = Modifier.size(button),
             contentPadding = noPadding,
         ) {
             Text("↩", fontSize = 16.sp)

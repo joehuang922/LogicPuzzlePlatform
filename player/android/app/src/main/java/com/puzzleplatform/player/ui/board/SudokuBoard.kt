@@ -12,8 +12,6 @@ import androidx.compose.ui.unit.dp
 import com.puzzleplatform.player.data.model.Puzzle
 import com.puzzleplatform.player.puzzle.SudokuEngine
 
-private const val SIZE = 9
-
 private val GRID_BG = Color.White
 private val LINE = Color.Black
 private val HINT_COLOR = Color.Black
@@ -29,15 +27,15 @@ private val HINT_FOCUS_FILL = Color(0xFFFFF59D)
  * Compose Canvas renderer for Sudoku, the analog of
  * frontend/src/components/SudokuBoard.tsx.
  *
- * Draws a 9x9 grid (thin cell / medium box / thick border lines), hint values in
- * black, player entries in grey (red when [liveValidate] and in conflict), and
- * highlights the selected cell + its row/col/box peers. Tapping a non-hint cell
- * selects it; the caller renders a [DigitBar] to enter values.
+ * Draws an N x N grid (thin cell / medium room / thick border lines; rooms are
+ * roomWidth x roomHeight, 3x3 on a 9x9, up to 30x30), hint values in black, player
+ * entries in grey (red when [liveValidate] and in conflict), and highlights the
+ * selected cell + its row/col/room peers. Tapping a non-hint cell selects it; the
+ * caller renders a [DigitBar] to enter values.
  *
  * Rendering + tap hit-testing run through [ZoomableBoard]. A 9x9 grid fits at the
- * max cell size on a phone, so there's no zoom range and it behaves like a plain
- * fit-to-width board today; the plumbing is shared so larger variants (should the
- * size ever relax) get pinch/pan for free.
+ * max cell size on a phone, so it behaves like a plain fit-to-width board; a 16x16
+ * to 30x30 board gets pinch-zoom and pan.
  */
 @Composable
 fun SudokuBoard(
@@ -51,11 +49,13 @@ fun SudokuBoard(
     hintCell: String? = null,
 ) {
     val hints = remember(puzzle.id) { SudokuEngine.parseHints(puzzle) }
+    val dims = remember(puzzle.id) { SudokuEngine.dims(puzzle) }
+    val n = dims.size
     val conflicts = if (liveValidate) SudokuEngine.findConflicts(puzzle, userValues) else emptySet()
 
     ZoomableBoard(
-        cols = SIZE,
-        rows = SIZE,
+        cols = n,
+        rows = n,
         resetKey = puzzle.id,
         modifier = modifier,
         onTapCell = { col, row ->
@@ -64,7 +64,7 @@ fun SudokuBoard(
             onSelectCell(if (selectedCell == key) null else key)
         },
     ) { cell ->
-        val boardSize = SIZE * cell
+        val boardSize = n * cell
         drawRect(color = GRID_BG, size = androidx.compose.ui.geometry.Size(boardSize, boardSize))
 
         // Hint highlight, drawn under the selection/peer layer so a selected cell still
@@ -74,30 +74,30 @@ fun SudokuBoard(
         // Highlight selected cell + peers.
         selectedCell?.let { key ->
             val (selCol, selRow) = key.split(",").map { it.toInt() }
-            drawPeerHighlights(selCol, selRow, cell)
+            drawPeerHighlights(selCol, selRow, cell, dims)
             drawCellFill(selCol, selRow, cell, SELECT_FILL)
         }
 
-        // Grid lines (thin=1, box=2, border=3 dp scaled to px).
+        // Grid lines (thin=1, room=2, border=3 dp scaled to px): vertical room lines
+        // every roomWidth columns, horizontal every roomHeight rows.
         val thin = 1.dp.toPx()
         val medium = 2.dp.toPx()
         val thick = 3.dp.toPx()
-        for (i in 0..SIZE) {
-            val stroke = when {
-                i == 0 || i == SIZE -> thick
-                i % 3 == 0 -> medium
-                else -> thin
-            }
+        fun stroke(i: Int, room: Int) = when {
+            i == 0 || i == n -> thick
+            i % room == 0 -> medium
+            else -> thin
+        }
+        for (i in 0..n) {
             val p = i * cell
-            drawLine(LINE, Offset(0f, p), Offset(boardSize, p), stroke)
-            drawLine(LINE, Offset(p, 0f), Offset(p, boardSize), stroke)
+            drawLine(LINE, Offset(0f, p), Offset(boardSize, p), stroke(i, dims.roomHeight))
+            drawLine(LINE, Offset(p, 0f), Offset(p, boardSize), stroke(i, dims.roomWidth))
         }
 
         // Values.
         val textSize = cell * 0.55f
-        val noteTextSize = cell / 3f * 0.8f
-        for (row in 0 until SIZE) {
-            for (col in 0 until SIZE) {
+        for (row in 0 until n) {
+            for (col in 0 until n) {
                 val key = "$col,$row"
                 val hint = hints[row][col]
                 val value: Int
@@ -108,11 +108,11 @@ fun SudokuBoard(
                 } else {
                     val entered = userValues[key] ?: 0
                     if (entered <= 0) {
-                        // Empty cell: render pencil marks in a fixed 3x3 sub-layout
-                        // (1 2 3 / 4 5 6 / 7 8 9).
-                        for (digit in 1..9) {
+                        // Empty cell: render pencil marks laid out like a room (3x3 on a
+                        // 9x9: 1 2 3 / 4 5 6 / 7 8 9; roomWidth x roomHeight above).
+                        for (digit in 1..n) {
                             if (userValues["n:$key:$digit"] == 1) {
-                                drawNote(digit, col, row, cell, noteTextSize)
+                                drawNote(digit, col, row, cell, dims)
                             }
                         }
                         continue
@@ -135,20 +135,21 @@ private fun String.toColRow(): Pair<Int, Int>? {
     return col to row
 }
 
-/** Draw a single pencil-mark digit at its fixed 3x3 sub-cell within cell (col,row). */
-private fun DrawScope.drawNote(digit: Int, col: Int, row: Int, cell: Float, textSize: Float) {
+/** Draw a single pencil-mark digit at its room-shaped sub-cell within cell (col,row). */
+private fun DrawScope.drawNote(digit: Int, col: Int, row: Int, cell: Float, dims: SudokuEngine.Dims) {
+    val slotW = cell / dims.roomWidth
+    val slotH = cell / dims.roomHeight
     val paint = android.graphics.Paint().apply {
         this.color = NOTE_COLOR.toArgb()
-        this.textSize = textSize
+        this.textSize = minOf(slotH * 0.8f, slotW * if (digit > 9) 0.8f else 1.3f)
         this.textAlign = android.graphics.Paint.Align.CENTER
         this.isAntiAlias = true
         this.typeface = android.graphics.Typeface.DEFAULT
     }
-    val third = cell / 3f
     val sub = digit - 1
-    val cx = col * cell + ((sub % 3) + 0.5f) * third
+    val cx = col * cell + ((sub % dims.roomWidth) + 0.5f) * slotW
     val fm = paint.fontMetrics
-    val cy = row * cell + (sub / 3 + 0.5f) * third - (fm.ascent + fm.descent) / 2
+    val cy = row * cell + (sub / dims.roomWidth + 0.5f) * slotH - (fm.ascent + fm.descent) / 2
     drawContext.canvas.nativeCanvas.drawText(digit.toString(), cx, cy, paint)
 }
 
@@ -160,13 +161,14 @@ private fun DrawScope.drawCellFill(col: Int, row: Int, cell: Float, color: Color
     )
 }
 
-private fun DrawScope.drawPeerHighlights(selCol: Int, selRow: Int, cell: Float) {
-    for (c in 0 until SIZE) if (c != selCol) drawCellFill(c, selRow, cell, PEER_FILL)
-    for (r in 0 until SIZE) if (r != selRow) drawCellFill(selCol, r, cell, PEER_FILL)
-    val boxCol = selCol / 3 * 3
-    val boxRow = selRow / 3 * 3
-    for (r in boxRow until boxRow + 3) {
-        for (c in boxCol until boxCol + 3) {
+private fun DrawScope.drawPeerHighlights(selCol: Int, selRow: Int, cell: Float, dims: SudokuEngine.Dims) {
+    val n = dims.size
+    for (c in 0 until n) if (c != selCol) drawCellFill(c, selRow, cell, PEER_FILL)
+    for (r in 0 until n) if (r != selRow) drawCellFill(selCol, r, cell, PEER_FILL)
+    val boxCol = selCol / dims.roomWidth * dims.roomWidth
+    val boxRow = selRow / dims.roomHeight * dims.roomHeight
+    for (r in boxRow until boxRow + dims.roomHeight) {
+        for (c in boxCol until boxCol + dims.roomWidth) {
             if (r != selRow || c != selCol) drawCellFill(c, r, cell, PEER_FILL)
         }
     }

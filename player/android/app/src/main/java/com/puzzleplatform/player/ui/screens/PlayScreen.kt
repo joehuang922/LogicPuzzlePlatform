@@ -94,6 +94,7 @@ import com.puzzleplatform.player.ui.board.KuralinBoard
 import com.puzzleplatform.player.puzzle.NonogramEngine
 import com.puzzleplatform.player.puzzle.NonogramHinter
 import com.puzzleplatform.player.puzzle.PuzzleEngines
+import com.puzzleplatform.player.puzzle.SudokuEngine
 import com.puzzleplatform.player.puzzle.SudokuHinter
 import com.puzzleplatform.player.ui.formatElapsed
 
@@ -161,13 +162,23 @@ fun PlayScreen(
                     // the toggle.
                     val notesEnabled = type == 1 || type == 2 || type == 29
                     val cellHasAnswer = (state.userValues[selected] ?: 0) > 0
+                    // A sudoku above 9x9 takes digits up to N (16-30); the bar becomes a
+                    // pad of 1..N, marking the selected cell's pencil marks in note mode.
+                    val maxDigit = if (type == 1) state.puzzle?.let { SudokuEngine.dims(it).size } ?: 9 else 9
+                    val noteMode = state.noteMode && !cellHasAnswer
                     DigitBar(
                         onDigit = vm::enterDigit,
                         onClear = vm::clearCell,
                         onDismiss = { vm.selectCell(null) },
-                        noteMode = state.noteMode && !cellHasAnswer,
+                        noteMode = noteMode,
                         onToggleNoteMode = if (notesEnabled) vm::toggleNoteMode else null,
                         noteModeDisabled = cellHasAnswer,
+                        max = maxDigit,
+                        marked = if (noteMode && maxDigit > 9) {
+                            (1..maxDigit).filterTo(HashSet()) { state.userValues["n:$selected:$it"] == 1 }
+                        } else {
+                            emptySet()
+                        },
                     )
                 }
             }
