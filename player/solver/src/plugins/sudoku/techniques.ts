@@ -38,7 +38,7 @@ const hiddenSingle: Technique<UnitBoard> = {
     const { geo } = board;
     for (let u = 0; u < geo.units.length; u++) {
       const unit = geo.units[u];
-      for (let v = 1; v <= 9; v++) {
+      for (let v = 1; v <= geo.digits; v++) {
         const spots = unit.filter((id) => board.isEmpty(id) && board.candidates[id].includes(v));
         if (spots.length === 1) {
           // Skip if it's also a naked single (depth 0 would have caught it) to keep
@@ -84,7 +84,7 @@ const lockedCandidates: Technique<UnitBoard> = {
     for (let b = 0; b < geo.units.length; b++) {
       if (geo.kinds[b] !== "box") continue;
       const box = geo.units[b];
-      for (let v = 1; v <= 9; v++) {
+      for (let v = 1; v <= geo.digits; v++) {
         const spots = box.filter((id) => has(id, v));
         if (spots.length < 2) continue;
         for (const line of unitsContaining(board, spots, (k) => k !== "box")) {
@@ -106,7 +106,7 @@ const lockedCandidates: Technique<UnitBoard> = {
     for (let u = 0; u < geo.units.length; u++) {
       if (geo.kinds[u] === "box") continue;
       const line = geo.units[u];
-      for (let v = 1; v <= 9; v++) {
+      for (let v = 1; v <= geo.digits; v++) {
         const spots = line.filter((id) => has(id, v));
         if (spots.length < 2) continue;
         const [b] = unitsContaining(board, spots, (k) => k === "box");
@@ -215,7 +215,7 @@ function propagateSingles(board: UnitBoard, dom: number[], changed: number[]): b
     if (dirtyList.length === 0) return true;
     const u = dirtyList.pop()!;
     dirty[u] = 0;
-    for (let v = 1; v <= 9; v++) {
+    for (let v = 1; v <= geo.digits; v++) {
       const b = 1 << v;
       let place = -1;
       let count = 0;

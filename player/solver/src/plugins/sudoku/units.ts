@@ -1,6 +1,7 @@
 /**
  * The shape the sudoku-family hint ladder reasons over: cells, and units (rows, columns,
- * boxes) whose cells must hold different digits. Plain sudoku is one 9x9 instance; a
+ * boxes) whose cells must hold different digits. Plain sudoku is one NxN instance
+ * (9x9 by default, up to 30x30); a
  * combo sudoku is several 9x9 boards whose shared rooms are one box unit and whose
  * shared cells sit in every overlapping board's row and column.
  */
@@ -9,8 +10,10 @@ export type UnitKind = "row" | "col" | "box";
 export interface Geometry {
   /** Number of cells; cell ids are 0..size-1. */
   size: number;
-  /** Units in the order the ladder scans them. Each holds 9 cell ids. */
+  /** Units in the order the ladder scans them. Each holds `digits` cell ids. */
   units: number[][];
+  /** Digits run 1..digits (9 for a standard board, room width x height in general). */
+  digits: number;
   kinds: UnitKind[];
   /** Per cell, the indices of the units containing it. */
   cellUnits: number[][];
@@ -41,7 +44,8 @@ export function geometry(
       for (const other of unit) if (other !== id) peerSets[id].add(other);
     }
   });
-  return { size, units, kinds, cellUnits, peers: peerSets.map((s) => [...s]), key, cellLabel, unitLabel };
+  const digits = units[0]?.length ?? 9;
+  return { size, units, digits, kinds, cellUnits, peers: peerSets.map((s) => [...s]), key, cellLabel, unitLabel };
 }
 
 /**
@@ -52,7 +56,7 @@ export function geometry(
 export class UnitBoard {
   constructor(
     readonly geo: Geometry,
-    /** values[id] = 1..9 for a filled cell, 0 for empty. */
+    /** values[id] = 1..digits for a filled cell, 0 for empty. */
     readonly values: number[],
     /** candidates[id] = sorted legal digits for an empty cell; [] for a filled cell. */
     readonly candidates: number[][]
@@ -64,7 +68,7 @@ export class UnitBoard {
       const taken = new Set<number>();
       for (const peer of geo.peers[id]) if (values[peer] !== 0) taken.add(values[peer]);
       const legal: number[] = [];
-      for (let d = 1; d <= 9; d++) if (!taken.has(d)) legal.push(d);
+      for (let d = 1; d <= geo.digits; d++) if (!taken.has(d)) legal.push(d);
       return legal;
     });
     return new UnitBoard(geo, values, candidates);
