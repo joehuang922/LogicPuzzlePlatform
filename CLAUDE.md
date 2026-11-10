@@ -36,8 +36,8 @@ This is a solo project. Do not create pull requests or feature branches.
   EasyOCR, not Gemini. All sources use the same Nikoli font, so crop margins, the
   empty-cell test and glyph handling are shared. The only per-puzzle settings are
   the puzzle's clue rules: `allow_multi_digits` (`False` only where clues are
-  single digits by rule: sudoku, combo_sudoku, unequal_sudoku, akari, shakashaka,
-  slitherlink),
+  single digits by rule: combo_sudoku, unequal_sudoku, akari, shakashaka,
+  slitherlink; plain sudoku only on a 9x9, multi-digit on 16x16 to 30x30),
   `allow_zero` (0 is a clue) and `max_value`. Tune OCR in `cell_ocr.py` /
   `EasyOcrBackend` for everyone, not per parser. A parser whose digits are not dark
   on light (white on black, on a disc) converts its crop to dark-on-light first.

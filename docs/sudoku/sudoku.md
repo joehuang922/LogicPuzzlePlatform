@@ -4,7 +4,7 @@
 
 ## Question structure description
 
-A standard 9x9 Sudoku grid. Some cells are pre-filled with numbers 1-9 (hints); the remaining cells are empty (represented as 0) and must be filled by the player.
+An N x N Sudoku grid divided into rooms of `room_width` columns by `room_height` rows, with N = room_width x room_height. The standard board is 9x9 with 3x3 rooms; bigger ones run up to 30x30: 16x16 (4x4 rooms), 25x25 (5x5), 30x30 (rooms 6 wide and 5 tall, so 5 rooms across and 6 down). Some cells are pre-filled with numbers 1-N (hints); the remaining cells are empty (represented as 0) and must be filled by the player. Numbers above 9 are written as numbers (10-30), never letters.
 
 ### Canonical JSON structure
 
@@ -24,15 +24,19 @@ A standard 9x9 Sudoku grid. Some cells are pre-filled with numbers 1-9 (hints); 
 }
 ```
 
-- `hints`: A 9x9 array of integers. `0` = empty cell, `1-9` = pre-filled hint.
+- `room_width` / `room_height` (optional, default 3): room size in cells. A 9x9 canon leaves both out. N = room_width x room_height is at most 30 (the solver's candidate sets are 32-bit masks).
+- `hints`: An N x N array of integers. `0` = empty cell, `1-N` = pre-filled hint.
+
+A 30x30 canon starts `{"room_width": 6, "room_height": 5, "hints": [[0, 13, 1, ...], ...]}`. The API rejects a canon whose grid isn't N x N or holds a number above N.
 
 ### Sample images
 
-No dedicated sample images currently in docs. Puzzle images are standard 9x9 Sudoku grids with thick 3x3 box borders and thin cell borders.
+- `docs/combo-sudoku/board_sudoku.jpg`: a plain 9x9.
+- `board-sudoku-16x16.jpg`, `board-sudoku-25x25.jpg`, `board-sudoku-30x30.jpg` (a two-page spread) in this folder, each with its true grid as `*.canon.json`. Each canon has exactly one solution, and the hint ladder solves it from empty.
 
 ## Answer structure description
 
-The answer is the fully-filled 9x9 grid, combining hints and player-entered values.
+The answer is the fully-filled N x N grid, combining hints and player-entered values.
 
 ### Canonical JSON structure
 
@@ -46,18 +50,18 @@ The answer is the fully-filled 9x9 grid, combining hints and player-entered valu
 }
 ```
 
-- `hints`: A 9x9 array where every cell is filled with 1-9 (no zeros remain).
+- `hints`: An N x N array where every cell is filled with 1-N (no zeros remain).
 
 ## Rules
 
-- Fill every empty cell with a digit from 1 to 9.
-- Each row must contain all digits 1-9 exactly once.
-- Each column must contain all digits 1-9 exactly once.
-- Each 3x3 box (room) must contain all digits 1-9 exactly once.
+- Fill every empty cell with a number from 1 to N.
+- Each row must contain all numbers 1-N exactly once.
+- Each column must contain all numbers 1-N exactly once.
+- Each room (3x3 on a 9x9, room_width x room_height in general) must contain all numbers 1-N exactly once.
 
 ### Success finishing criteria
 
-All 81 cells are filled AND no conflicts exist (no duplicate digits in any row, column, or 3x3 box).
+All N x N cells are filled AND no conflicts exist (no duplicate number in any row, column, or room).
 
 ## Puzzle Player
 
@@ -67,7 +71,8 @@ All 81 cells are filled AND no conflicts exist (no duplicate digits in any row, 
 - On desktop: a radial menu appears around the selected cell with digits 1-9 and an erase (X) button. Click a digit to place it, or click X to clear.
 - Keyboard: press 1-9 to enter a digit, Backspace/Delete to clear, Escape to deselect.
 - On mobile: a digit bar appears at the bottom with 1-9 and clear.
-- Hovering a cell highlights its row, column, and 3x3 box peers.
+- Hovering a cell highlights its row, column, and room peers.
+- Boards above 9x9 (web and Android): a number pad of 1-N replaces the radial menu, on desktop too, and marks the selected cell's notes in note mode. On the keyboard a number takes one or two keys ("2", "7" -> 27); a digit that can start a longer number (a lone 1 on a 16x16) waits 0.8s for the second key. Notes are laid out like a room (room_width x room_height slots). On a phone the web board keeps 30px cells and scrolls sideways; Android pinch-zooms and pans.
 - Conflicts (duplicate digits in a group) are shown in red.
 - **Hint** (web and Android, offline): highlights the next cell to fill, never its
   digit. The cell is one whose digit can be worked out from the board as it stands: the
@@ -80,23 +85,24 @@ All 81 cells are filled AND no conflicts exist (no duplicate digits in any row, 
 
 ### Progress calculation
 
-`(cells assigned by the player / total empty cells that need assignment) * 100`. Only cells that were originally empty (hint = 0) count toward the total; pre-filled hints are excluded. A cell is "assigned" once the player enters any digit 1-9.
+`(cells assigned by the player / total empty cells that need assignment) * 100`. Only cells that were originally empty (hint = 0) count toward the total; pre-filled hints are excluded. A cell is "assigned" once the player enters any number 1-N.
 
 ## Puzzle Editor
 
 ### Interactions
 
-- Click any cell to select it, then type 1-9 to set a hint, or Backspace/0 to clear.
-- A JSON textarea is shown alongside the board; editing either updates the other.
-- Board always renders 9x9 — no resizing.
+- A size picker offers 9x9, 16x16, 25x25 and 30x30 (6-wide, 5-tall rooms); switching clears the givens (after a confirm).
+- Click any cell to select it, then type 1-N to set a hint (two keys for 10 and up), or Backspace to clear (0 also clears on a 9x9).
+- Givens that repeat a number in a row, column or room are shown in red with a count: likely misreads. It's a warning, not a block.
 
 ## Puzzle Parser
 
 - Uses contour detection to find the board border, then perspective-warps to a square.
-- Detects internal grid lines to determine cell geometry.
-- Supports two paths: full-image LLM OCR (Gemini) or cell-by-cell extraction + OCR.
-- Validates that the result is a 9x9 grid with values 0-9.
-- Grid is always fixed at 9x9 (81 cells). No variable sizing.
+- Counts the grid lines (`find_grid_lines`); the board must be square, at most 30x30.
+- Above 9x9, reads the room size off the thick walls (`classify_border_thickness`): of the factorizations N = width x height, the one whose room lines best match the thick-wall votes, so a page fold read as a wall is outvoted (`infer_rooms`).
+- Reads clues with EasyOCR through `cell_ocr.read_grid_clues`: single digits on a 9x9, multi-digit (`max_value=N`) above.
+- Pages are not flattened: on the 30x30 two-page spread the fold breaks line tracing. That sample reads all but two clues, both clipped by the fold; the 16x16 and 25x25 read exactly (at Android upload size, 1 and 5 misreads). The editor flags repeats so misreads are easy to spot.
+- Validates that the result is an N x N grid with values 0-N.
 
 # Misc
 
