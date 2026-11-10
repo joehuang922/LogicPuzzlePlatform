@@ -25,12 +25,6 @@ def main() -> None:
         help="Directory to save intermediate debug images",
         default=None,
     )
-    parser.add_argument(
-        "--ocr",
-        choices=["gemini", "none"],
-        default="gemini",
-        help="OCR backend for cell recognition (default: gemini)",
-    )
     args = parser.parse_args()
 
     image_path = Path(args.image)
@@ -38,12 +32,8 @@ def main() -> None:
         print(f"Error: Image file not found: {image_path}", file=sys.stderr)
         sys.exit(1)
 
-    ocr_backend = None
-    if args.ocr == "gemini":
-        from puzzle_parsers.recognition import GeminiOcrBackend
-        ocr_backend = GeminiOcrBackend()
-
-    pencils_parser = PencilsParser(ocr_backend=ocr_backend)
+    # Cells are read by Gemini (GEMINI_API_KEY), as in production.
+    pencils_parser = PencilsParser()
     board = pencils_parser.parse_file(
         image_path,
         debug_dir=args.debug,

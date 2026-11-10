@@ -28,8 +28,8 @@ def main() -> None:
     parser.add_argument(
         "--ocr",
         choices=["gemini", "easyocr", "none"],
-        default="gemini",
-        help="OCR backend for number recognition (default: gemini)",
+        default="easyocr",
+        help="OCR backend for number recognition (default: easyocr, as in production)",
     )
     args = parser.parse_args()
 

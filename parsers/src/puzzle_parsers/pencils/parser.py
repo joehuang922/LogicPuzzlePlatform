@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import cv2
 import numpy as np
@@ -22,19 +21,13 @@ from puzzle_parsers.pencils.grid_detector import detect_pencils_grid
 from puzzle_parsers.pencils.models import PencilsBoard
 from puzzle_parsers.cell_ocr import crop_cell
 
-if TYPE_CHECKING:
-    from puzzle_parsers.recognition import OcrBackend
-
 
 class PencilsParser(PuzzleParser):
     puzzle_type = "pencils"
 
-    def __init__(
-        self,
-        ocr_backend: OcrBackend | None = None,
-        recognizer: CellRecognizer | None = None,
-    ) -> None:
-        self._ocr = ocr_backend
+    def __init__(self, recognizer: CellRecognizer | None = None) -> None:
+        # Numbers and heads both come from Gemini (classify_cells): a head can't be read
+        # by EasyOCR, so there is no EasyOCR backend and type 8 is not in _OCR_TYPES.
         self._recognizer = recognizer
 
     @property

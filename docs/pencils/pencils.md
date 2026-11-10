@@ -32,8 +32,9 @@ A rectangular grid where some cells contain a number and some cells contain a pe
 
 ### Sample images
 
-- [board-pencils.png](board-pencils.png) — small board (7x7)
-- [board-pencils-medium.png](board-pencils-medium.png) — medium board (14x14)
+- [board-pencils.png](board-pencils.png) — small board (10x10); true grid in [board-pencils.canon.json](board-pencils.canon.json)
+- [board-pencils-medium.png](board-pencils-medium.png) — medium board (17x17); true grid in [board-pencils-medium.canon.json](board-pencils-medium.canon.json)
+- [board-pencils-big.png](board-pencils-big.png) — 45x31 spread; true grid in [board-pencils-big.canon.json](board-pencils-big.canon.json)
 
 ## Answer structure description
 
@@ -104,7 +105,8 @@ Android: `PencilsBoard` has the same three inputs in one mode: drag draws trails
 ## Puzzle Parser
 
 - Detect the grid by identifying the outer border and internal dashed lines.
-- Classify cells as empty, number, or pencil head using OCR/LLM.
+- Classify cells as empty, number, or pencil head with Gemini through `cell_classify.classify_cells` (`IntegerTarget`, `PencilHeadTarget`). There is no EasyOCR pass, so type 8 is not in `_OCR_TYPES` and production skips EasyOCR's cold start.
+- Live reads of all three samples at native size match their canons; `tests/test_pencils_parser.py` pins geometry at full size and 1080 wide, with the Gemini reads stubbed.
 - Pencil head direction determined by triangle orientation.
 - Challenge: distinguishing numbers from head icons, especially at small sizes.
 

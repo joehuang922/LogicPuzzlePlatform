@@ -21,7 +21,7 @@ _parsers: dict = {}
 # either does OCR via the Gemini vision API or has no text to read, so it must
 # not pay the ~7s EasyOCR model-load cost. Keep this in sync with the
 # ``ocr_backend=`` arguments in ``_PARSER_FACTORIES``.
-_OCR_TYPES = frozenset({1, 2, 4, 5, 7, 8, 9, 11, 14, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 29, 30})
+_OCR_TYPES = frozenset({1, 2, 4, 5, 7, 9, 11, 14, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 29, 30})
 
 
 def _get_ocr():
@@ -69,7 +69,7 @@ def _build_parser(puzzle_type: int):
         return MasyuParser(ocr_backend=ocr)
     if puzzle_type == 8:
         from puzzle_parsers.pencils.parser import PencilsParser
-        return PencilsParser(ocr_backend=ocr)
+        return PencilsParser()
     if puzzle_type == 9:
         from puzzle_parsers.nuritwin.parser import NuritwinParser
         return NuritwinParser(ocr_backend=ocr)
