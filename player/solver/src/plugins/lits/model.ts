@@ -183,14 +183,62 @@ function regionPlacements(regionCells: number[], cols: number): Placement[] {
   return out;
 }
 
+
+// -- model --------------------------------------------------------------------
+
+/** Cell states the propagation tracks. A cell starts UNKNOWN and only ever settles. */
+const UNKNOWN = 0;
+const SHADED = 1;
+const UNSHADED = 2;
+
+/** Per-puzzle data shared by reference across every model in a search. */
+interface Board {
+  rows: number;
+  cols: number;
+  /** cell -> region id. */
+  region: Int32Array;
+  /** region id -> its cells. */
+  regionCells: number[][];
+  /** region id -> its placements. */
+  placements: Placement[][];
+  /** region id -> placement -> orthogonal neighbours of the piece in *other* regions. */
+  outside: number[][][];
+  /** cell -> orthogonal neighbours. */
+  neighbors: number[][];
+  /** Every 2x2 block of the grid, as 4 cell ids. */
+  blocks: number[][];
+  /** cell -> indices into `blocks` of the blocks containing it. */
+  blocksOf: number[][];
+}
+
+/**
+ * LITS as a constraint model. The variables are the regions, each with a domain of
+ * still-possible placements; on top of them the model tracks every cell as unknown,
+ * shaded or unshaded. `propagate` runs the deductions a human solver uses until nothing
+ * changes:
+ *
+ * - region: a placement dies if it covers an unshaded cell, misses a shaded cell of its
+ *   region, would finish a shaded 2x2, touches a same-shape piece, or has no neighbour
+ *   outside its region that could still be shaded (it could never connect). A cell every
+ *   surviving placement covers is shaded; one none covers is unshaded.
+ * - 2x2: three shaded cells of a 2x2 make the fourth unshaded.
+ * - connectivity: shaded cells must lie in one component of not-unshaded cells; other
+ *   components are unshaded, and a cell whose removal would split the shaded cells is
+ *   shaded.
+ *
+ * Every deduction is sound (it never removes part of a valid solution), so the search
+ * stays complete. On well-formed puzzles they settle most regions before any branching,
+ * which is what keeps large boards (50x64) inside the gate's time budget.
+ */
 export class LitsModel implements ConstraintModel {
   private constructor(
-    private readonly rows: number,
-    private readonly cols: number,
-    private readonly placements: Placement[][], // region id -> its placements
-    private readonly domains: boolean[][], // region id -> per-placement still-legal flag
-    private readonly chosen: number[], // region id -> committed placement index, or -1
-    private readonly dead: boolean,
+    private readonly board: Board,
+    /** region id -> per-placement alive flag. Shared with the parent until written. */
+    private readonly domains: Uint8Array[],
+    /** region id -> number of alive placements. */
+    private readonly counts: Int32Array,
+    private readonly cells: Int8Array,
+    private dead: boolean,
   ) {}
 
   static fromCanon(canon: LitsCanon): LitsModel {
@@ -198,18 +246,55 @@ export class LitsModel implements ConstraintModel {
     const v = canon.grids.v;
     const rows = h.length + 1;
     const cols = (v[0]?.length ?? -1) + 1;
-    const region = computeRegions(rows, cols, h, v);
+    const regionList = computeRegions(rows, cols, h, v);
+    const n = rows * cols;
 
-    const regionCount = region.length ? Math.max(...region) + 1 : 0;
-    const cellsByRegion: number[][] = Array.from({ length: regionCount }, () => []);
-    for (let id = 0; id < region.length; id++) cellsByRegion[region[id]].push(id);
+    const regionCount = regionList.length ? Math.max(...regionList) + 1 : 0;
+    const regionCells: number[][] = Array.from({ length: regionCount }, () => []);
+    for (let id = 0; id < n; id++) regionCells[regionList[id]].push(id);
+    const region = Int32Array.from(regionList);
 
-    const placements = cellsByRegion.map((cells) => regionPlacements(cells, cols));
-    const domains = placements.map((p) => p.map(() => true));
-    const chosen = new Array<number>(regionCount).fill(-1);
+    const neighbors: number[][] = [];
+    for (let id = 0; id < n; id++) {
+      const r = Math.floor(id / cols);
+      const c = id % cols;
+      const list: number[] = [];
+      for (const [dr, dc] of DIRS) {
+        const nr = r + dr;
+        const nc = c + dc;
+        if (nr >= 0 && nc >= 0 && nr < rows && nc < cols) list.push(nr * cols + nc);
+      }
+      neighbors.push(list);
+    }
+
+    const placements = regionCells.map((cells) => regionPlacements(cells, cols));
+    const outside = placements.map((list, rid) =>
+      list.map((p) => {
+        const out = new Set<number>();
+        for (const cell of p.cells) {
+          for (const nb of neighbors[cell]) if (region[nb] !== rid) out.add(nb);
+        }
+        return [...out];
+      }),
+    );
+
+    const blocks: number[][] = [];
+    const blocksOf: number[][] = Array.from({ length: n }, () => []);
+    for (let r = 0; r + 1 < rows; r++) {
+      for (let c = 0; c + 1 < cols; c++) {
+        const block = [r * cols + c, r * cols + c + 1, (r + 1) * cols + c, (r + 1) * cols + c + 1];
+        for (const cell of block) blocksOf[cell].push(blocks.length);
+        blocks.push(block);
+      }
+    }
+
+    const board: Board = { rows, cols, region, regionCells, placements, outside, neighbors, blocks, blocksOf };
+    const domains = placements.map((list) => new Uint8Array(list.length).fill(1));
+    const counts = Int32Array.from(placements.map((list) => list.length));
     // A region with no legal placement makes the whole puzzle unsatisfiable.
-    const dead = placements.some((p) => p.length === 0);
-    return new LitsModel(rows, cols, placements, domains, chosen, dead);
+    const model = new LitsModel(board, domains, counts, new Int8Array(n), counts.some((k) => k === 0));
+    if (!model.dead) model.dead = !model.propagate();
+    return model;
   }
 
   isDead(): boolean {
@@ -218,30 +303,24 @@ export class LitsModel implements ConstraintModel {
 
   isSolved(): boolean {
     if (this.dead) return false;
-    for (let rid = 0; rid < this.chosen.length; rid++) {
-      if (this.chosen[rid] < 0) return false;
+    for (let rid = 0; rid < this.counts.length; rid++) {
+      if (this.counts[rid] !== 1) return false;
     }
-    // Every region is committed. Verify the two global rules in full (local rules were
-    // already enforced on assign, but connectivity and 2x2 span regions, so re-check).
-    const shaded = this.shadedSet(this.chosen);
-    if (!this.allConnected(shaded)) return false;
-    if (this.hasShaded2x2(shaded)) return false;
-    if (this.hasSameShapeAdjacency()) return false;
-    return true;
+    // Propagation already enforces every rule; re-verify the finished grid in full so a
+    // gap in it could only ever cost a solution, never accept a wrong one.
+    return this.verify();
   }
 
   selectBranch(): Branch | null {
-    // Min-remaining-values: branch on the uncommitted region with the fewest legal
-    // placements left.
+    // Min-remaining-values over the regions not yet down to one placement.
     let best = -1;
     let bestCount = Infinity;
-    for (let rid = 0; rid < this.chosen.length; rid++) {
-      if (this.chosen[rid] >= 0) continue;
-      const count = this.domains[rid].reduce((n, ok) => n + (ok ? 1 : 0), 0);
-      if (count < bestCount) {
-        bestCount = count;
+    for (let rid = 0; rid < this.counts.length; rid++) {
+      const k = this.counts[rid];
+      if (k > 1 && k < bestCount) {
+        bestCount = k;
         best = rid;
-        if (count <= 1) break;
+        if (k === 2) break;
       }
     }
     if (best === -1) return null;
@@ -254,152 +333,322 @@ export class LitsModel implements ConstraintModel {
   }
 
   assign(id: number, value: number): ConstraintModel {
-    const chosen = this.chosen.slice();
-    const domains = this.domains.map((d) => d.slice());
-    chosen[id] = value;
-    domains[id] = domains[id].map((_, i) => i === value);
-
-    const placed = this.placements[id][value];
-    // Forward-check uncommitted regions. A candidate placement is pruned when it would
-    // make a fully-shaded 2x2 with cells shaded so far, or sit orthogonally adjacent to
-    // this piece with the same shape. These prunings are SOUND (never remove a placement
-    // that could appear in a valid solution), so completeness is preserved; the global
-    // rules are still verified in full at the leaf.
-    let dead = false;
-    const shadedSoFar = this.shadedSet(chosen);
-    for (let rid = 0; rid < chosen.length; rid++) {
-      if (chosen[rid] >= 0) continue;
-      let any = false;
-      const dom = domains[rid];
-      for (let i = 0; i < dom.length; i++) {
-        if (!dom[i]) continue;
-        const cand = this.placements[rid][i];
-        if (this.wouldForm2x2(cand, shadedSoFar) || this.sameShapeAdjacent(cand, placed)) {
-          dom[i] = false;
-        } else {
-          any = true;
-        }
-      }
-      if (!any) dead = true;
-    }
-
-    return new LitsModel(this.rows, this.cols, this.placements, domains, chosen, dead || this.dead);
+    const domains = this.domains.slice();
+    domains[id] = new Uint8Array(domains[id].length);
+    domains[id][value] = 1;
+    const counts = this.counts.slice();
+    counts[id] = 1;
+    const model = new LitsModel(this.board, domains, counts, this.cells.slice(), false);
+    model.dead = !model.propagate(id);
+    return model;
   }
 
   solution(): number[][] {
-    const grid: number[][] = Array.from({ length: this.rows }, () => new Array<number>(this.cols).fill(0));
-    for (let rid = 0; rid < this.chosen.length; rid++) {
-      const idx = this.chosen[rid];
-      if (idx < 0) continue;
-      for (const cell of this.placements[rid][idx].cells) {
-        grid[Math.floor(cell / this.cols)][cell % this.cols] = 1;
+    const { rows, cols } = this.board;
+    const grid: number[][] = Array.from({ length: rows }, () => new Array<number>(cols).fill(0));
+    for (let rid = 0; rid < this.counts.length; rid++) {
+      const idx = this.domains[rid].indexOf(1);
+      if (this.counts[rid] !== 1 || idx < 0) continue;
+      for (const cell of this.board.placements[rid][idx].cells) {
+        grid[Math.floor(cell / cols)][cell % cols] = 1;
       }
     }
     return grid;
   }
 
-  // -- helpers ----------------------------------------------------------------
+  // -- propagation ------------------------------------------------------------
 
-  /** Shaded cells from a (possibly partial) assignment; uncommitted regions contribute none. */
-  private shadedSet(chosen: number[]): Set<number> {
-    const set = new Set<number>();
-    for (let rid = 0; rid < chosen.length; rid++) {
-      const idx = chosen[rid];
-      if (idx < 0) continue;
-      for (const cell of this.placements[rid][idx].cells) set.add(cell);
-    }
-    return set;
-  }
+  /**
+   * Run every deduction to a fixpoint. Returns false on a contradiction. Domains are
+   * shared with the parent model, so each is copied before its first write here;
+   * `owned` is a region whose domain this model already created.
+   */
+  private propagate(owned = -1): boolean {
+    const { placements, regionCells, outside, blocks } = this.board;
+    const cells = this.cells;
+    const multiRegion = placements.length > 1;
+    const copied = new Uint8Array(placements.length);
+    if (owned >= 0) copied[owned] = 1;
 
-  private wouldForm2x2(cand: Placement, shaded: Set<number>): boolean {
-    const cols = this.cols;
-    // A new 2x2 can only appear touching one of the candidate's own cells. For each
-    // candidate cell, test the (up to 4) 2x2 blocks it participates in.
-    for (const cell of cand.cells) {
-      const r = Math.floor(cell / cols);
-      const c = cell % cols;
-      for (const [r0, c0] of [[r - 1, c - 1], [r - 1, c], [r, c - 1], [r, c]]) {
-        if (r0 < 0 || c0 < 0 || r0 + 1 >= this.rows || c0 + 1 >= cols) continue;
-        const block = [r0 * cols + c0, r0 * cols + c0 + 1, (r0 + 1) * cols + c0, (r0 + 1) * cols + c0 + 1];
-        if (block.every((b) => cand.cellSet.has(b) || shaded.has(b))) return true;
+    let changed = true;
+    while (changed) {
+      changed = false;
+
+      for (let rid = 0; rid < placements.length; rid++) {
+        const list = placements[rid];
+        const rcells = regionCells[rid];
+        let shadedInRegion = 0;
+        for (const cell of rcells) if (cells[cell] === SHADED) shadedInRegion++;
+
+        const cover = new Map<number, number>();
+        let alive = 0;
+        for (let i = 0; i < list.length; i++) {
+          if (!this.domains[rid][i]) continue;
+          const p = list[i];
+          if (this.placementFits(p, outside[rid][i], shadedInRegion, multiRegion)) {
+            alive++;
+            for (const cell of p.cells) cover.set(cell, (cover.get(cell) ?? 0) + 1);
+            continue;
+          }
+          if (!copied[rid]) {
+            this.domains[rid] = this.domains[rid].slice();
+            copied[rid] = 1;
+          }
+          this.domains[rid][i] = 0;
+          changed = true;
+        }
+        this.counts[rid] = alive;
+        if (alive === 0) return false;
+
+        for (const cell of rcells) {
+          const k = cover.get(cell) ?? 0;
+          const want = k === alive ? SHADED : k === 0 ? UNSHADED : UNKNOWN;
+          if (want === UNKNOWN || cells[cell] === want) continue;
+          if (cells[cell] !== UNKNOWN) return false;
+          cells[cell] = want;
+          changed = true;
+        }
+      }
+
+      for (const block of blocks) {
+        let shaded = 0;
+        let unknown = -1;
+        let unknowns = 0;
+        for (const cell of block) {
+          if (cells[cell] === SHADED) shaded++;
+          else if (cells[cell] === UNKNOWN) {
+            unknowns++;
+            unknown = cell;
+          }
+        }
+        if (shaded === 4) return false;
+        if (shaded === 3 && unknowns === 1) {
+          cells[unknown] = UNSHADED;
+          changed = true;
+        }
+      }
+
+      // Connectivity is the costliest pass; run it only once the local rules are stuck.
+      if (!changed) {
+        const result = this.propagateConnectivity();
+        if (result < 0) return false;
+        if (result > 0) changed = true;
       }
     }
-    return false;
+    return true;
   }
 
-  private sameShapeAdjacent(a: Placement, b: Placement): boolean {
-    if (a.shape !== b.shape) return false;
-    const cols = this.cols;
-    for (const cell of a.cells) {
-      const r = Math.floor(cell / cols);
-      const c = cell % cols;
-      for (const [dr, dc] of DIRS) {
-        const nr = r + dr;
-        const nc = c + dc;
-        // Bounds-check both axes before indexing: without the column guard, the
-        // right-neighbor of a last-column cell (nc === cols) would wrap to id
-        // (r+1)*cols, i.e. the first cell of the next row, and the left-neighbor of
-        // a first-column cell (nc === -1) would wrap to the previous row's last
-        // cell — falsely reporting two far-apart pieces as orthogonally adjacent.
-        if (nr < 0 || nc < 0 || nr >= this.rows || nc >= cols) continue;
-        if (b.cellSet.has(nr * cols + nc)) return true;
+  /** Whether placement `p` of a region is still possible given the current cells. */
+  private placementFits(p: Placement, out: number[], shadedInRegion: number, multiRegion: boolean): boolean {
+    const cells = this.cells;
+    let covered = 0;
+    for (const cell of p.cells) {
+      if (cells[cell] === UNSHADED) return false;
+      if (cells[cell] === SHADED) covered++;
+    }
+    // The region's one piece must cover every shaded cell in it.
+    if (covered !== shadedInRegion) return false;
+
+    if (multiRegion) {
+      // All shading is connected, so a piece must touch a cell of another region that
+      // can still be shaded.
+      let reachable = false;
+      for (const nb of out) {
+        if (cells[nb] !== UNSHADED) {
+          reachable = true;
+          break;
+        }
+      }
+      if (!reachable) return false;
+      // A shaded neighbour belongs to its region's piece; if every placement left there
+      // has this shape, the two pieces would be same-shape neighbours.
+      for (const nb of out) {
+        if (cells[nb] === SHADED && this.fixedShape(this.board.region[nb]) === p.shape) return false;
       }
     }
-    return false;
+
+    // Would finish a 2x2 of shaded cells.
+    const { blocks, blocksOf } = this.board;
+    for (const cell of p.cells) {
+      for (const b of blocksOf[cell]) {
+        let full = true;
+        for (const x of blocks[b]) {
+          if (cells[x] !== SHADED && !p.cellSet.has(x)) {
+            full = false;
+            break;
+          }
+        }
+        if (full) return false;
+      }
+    }
+    return true;
   }
 
-  private allConnected(shaded: Set<number>): boolean {
-    if (shaded.size === 0) return false;
-    const cols = this.cols;
-    const start = shaded.values().next().value as number;
-    const seen = new Set<number>([start]);
-    const stack = [start];
+  /** The shape every alive placement of a region shares, or null when they differ. */
+  private fixedShape(rid: number): string | null {
+    const list = this.board.placements[rid];
+    const dom = this.domains[rid];
+    let shape: string | null = null;
+    for (let i = 0; i < list.length; i++) {
+      if (!dom[i]) continue;
+      if (shape === null) shape = list[i].shape;
+      else if (shape !== list[i].shape) return null;
+    }
+    return shape;
+  }
+
+  /**
+   * Shaded cells must form one connected group through cells that are not unshaded.
+   * Returns -1 on a contradiction (shaded cells in two components), 1 if it settled a
+   * cell, 0 otherwise. Components with no shaded cell become unshaded; a cut vertex that
+   * separates shaded cells becomes shaded.
+   */
+  private propagateConnectivity(): number {
+    const { neighbors } = this.board;
+    const cells = this.cells;
+    const n = cells.length;
+    let anyShaded = false;
+    for (let x = 0; x < n; x++) {
+      if (cells[x] === SHADED) {
+        anyShaded = true;
+        break;
+      }
+    }
+    if (!anyShaded) return 0;
+
+    const comp = new Int32Array(n).fill(-1);
+    let shadedComp = -1;
+    let changed = 0;
+    let next = 0;
+    for (let start = 0; start < n; start++) {
+      if (cells[start] === UNSHADED || comp[start] >= 0) continue;
+      const id = next++;
+      comp[start] = id;
+      const members = [start];
+      let hasShaded = false;
+      for (let k = 0; k < members.length; k++) {
+        const x = members[k];
+        if (cells[x] === SHADED) hasShaded = true;
+        for (const y of neighbors[x]) {
+          if (cells[y] !== UNSHADED && comp[y] < 0) {
+            comp[y] = id;
+            members.push(y);
+          }
+        }
+      }
+      if (hasShaded) {
+        if (shadedComp >= 0) return -1;
+        shadedComp = id;
+      } else {
+        for (const x of members) cells[x] = UNSHADED;
+        changed = 1;
+      }
+    }
+    if (this.shadeCutVertices(comp, shadedComp)) changed = 1;
+    return changed;
+  }
+
+  /**
+   * Iterative Tarjan DFS over the component holding the shaded cells, rooted at a shaded
+   * cell. A non-shaded vertex p with a child subtree that (a) cannot reach above p and
+   * (b) holds shaded cells, while shaded cells also lie outside that subtree, separates
+   * shaded cells, so it must be shaded.
+   */
+  private shadeCutVertices(comp: Int32Array, cid: number): boolean {
+    const { neighbors } = this.board;
+    const cells = this.cells;
+    const n = cells.length;
+    let root = -1;
+    let totalShaded = 0;
+    for (let x = 0; x < n; x++) {
+      if (comp[x] === cid && cells[x] === SHADED) {
+        totalShaded++;
+        if (root < 0) root = x;
+      }
+    }
+    if (root < 0) return false;
+
+    const disc = new Int32Array(n).fill(-1);
+    const low = new Int32Array(n);
+    const below = new Int32Array(n); // shaded cells in the DFS subtree
+    const parent = new Int32Array(n).fill(-1);
+    const nextEdge = new Int32Array(n);
+    const forced: number[] = [];
+    let time = 0;
+    disc[root] = low[root] = time++;
+    below[root] = 1;
+    const stack = [root];
     while (stack.length) {
-      const cell = stack.pop()!;
-      const r = Math.floor(cell / cols);
-      const c = cell % cols;
-      for (const [dr, dc] of DIRS) {
-        const nr = r + dr;
-        const nc = c + dc;
-        if (nr < 0 || nc < 0 || nr >= this.rows || nc >= cols) continue;
-        const nid = nr * cols + nc;
-        if (shaded.has(nid) && !seen.has(nid)) {
-          seen.add(nid);
-          stack.push(nid);
+      const a = stack[stack.length - 1];
+      const nbs = neighbors[a];
+      if (nextEdge[a] < nbs.length) {
+        const b = nbs[nextEdge[a]++];
+        if (cells[b] === UNSHADED) continue;
+        if (disc[b] < 0) {
+          parent[b] = a;
+          disc[b] = low[b] = time++;
+          below[b] = cells[b] === SHADED ? 1 : 0;
+          stack.push(b);
+        } else if (b !== parent[a]) {
+          low[a] = Math.min(low[a], disc[b]);
         }
+        continue;
+      }
+      stack.pop();
+      const p = parent[a];
+      if (p < 0) continue;
+      low[p] = Math.min(low[p], low[a]);
+      below[p] += below[a];
+      if (low[a] >= disc[p] && cells[p] === UNKNOWN && below[a] > 0 && totalShaded - below[a] > 0) {
+        forced.push(p);
       }
     }
-    return seen.size === shaded.size;
+    for (const x of forced) cells[x] = SHADED;
+    return forced.length > 0;
   }
 
-  private hasShaded2x2(shaded: Set<number>): boolean {
-    const cols = this.cols;
-    for (let r = 0; r < this.rows - 1; r++) {
-      for (let c = 0; c < cols - 1; c++) {
-        if (
-          shaded.has(r * cols + c) &&
-          shaded.has(r * cols + c + 1) &&
-          shaded.has((r + 1) * cols + c) &&
-          shaded.has((r + 1) * cols + c + 1)
-        ) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
+  // -- leaf verification --------------------------------------------------------
 
-  private hasSameShapeAdjacency(): boolean {
-    for (let rid = 0; rid < this.chosen.length; rid++) {
-      const idx = this.chosen[rid];
-      if (idx < 0) continue;
-      const a = this.placements[rid][idx];
-      for (let other = rid + 1; other < this.chosen.length; other++) {
-        const oidx = this.chosen[other];
-        if (oidx < 0) continue;
-        if (this.sameShapeAdjacent(a, this.placements[other][oidx])) return true;
+  /** Check the fully assigned grid against all LITS rules from scratch. */
+  private verify(): boolean {
+    const { placements, neighbors, blocks, region } = this.board;
+    const n = this.cells.length;
+    const shapeAt: (string | null)[] = new Array(n).fill(null);
+    let count = 0;
+    let start = -1;
+    for (let rid = 0; rid < placements.length; rid++) {
+      const p = placements[rid][this.domains[rid].indexOf(1)];
+      for (const cell of p.cells) {
+        shapeAt[cell] = p.shape;
+        count++;
+        start = cell;
       }
     }
-    return false;
+    if (count === 0) return false;
+
+    const seen = new Uint8Array(n);
+    seen[start] = 1;
+    const stack = [start];
+    let reached = 1;
+    while (stack.length) {
+      const x = stack.pop()!;
+      for (const y of neighbors[x]) {
+        if (shapeAt[y] === null || seen[y]) continue;
+        seen[y] = 1;
+        reached++;
+        stack.push(y);
+      }
+    }
+    if (reached !== count) return false;
+
+    for (const block of blocks) if (block.every((x) => shapeAt[x] !== null)) return false;
+
+    for (let x = 0; x < n; x++) {
+      if (shapeAt[x] === null) continue;
+      for (const y of neighbors[x]) {
+        if (region[y] !== region[x] && shapeAt[y] === shapeAt[x]) return false;
+      }
+    }
+    return true;
   }
 }
