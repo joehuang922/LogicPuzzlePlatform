@@ -42,7 +42,13 @@ export default function CanonPreview({ puzzleType, canonRepr }: { puzzleType: nu
   }
 
   if (puzzleType === 1 && parsed.hints) {
-    return <SudokuBoard hints={parsed.hints as number[][]} />;
+    return (
+      <SudokuBoard
+        hints={parsed.hints as number[][]}
+        roomWidth={(parsed.room_width as number | undefined) ?? 3}
+        roomHeight={(parsed.room_height as number | undefined) ?? 3}
+      />
+    );
   }
   if (puzzleType === 2 && parsed.subboards) {
     return <ComboSudokuBoard subboards={parsed.subboards as { x: number; y: number; hints: number[][] }[]} />;

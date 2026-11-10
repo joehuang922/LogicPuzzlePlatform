@@ -1,5 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { SudokuCanon } from "../types/canon";
+import { SUDOKU_SIZES, conflictCells, sudokuSize } from "./sudokuRules";
+import { useTypedNumber } from "../hooks/useTypedNumber";
 
 interface SudokuEditorProps {
   initialJson: string;
@@ -22,8 +24,8 @@ function parseCanon(json: string): SudokuCanon | null {
   return null;
 }
 
-function emptyHints(): number[][] {
-  return Array.from({ length: 9 }, () => Array(9).fill(0));
+function emptyHints(n = 9): number[][] {
+  return Array.from({ length: n }, () => Array(n).fill(0));
 }
 
 export default function SudokuEditor({ initialJson, onChange }: SudokuEditorProps) {
@@ -40,10 +42,29 @@ export default function SudokuEditor({ initialJson, onChange }: SudokuEditorProp
   }, [jsonText, onChange]);
 
   const [activeCell, setActiveCell] = useState<string | null>(null);
+  const dims = useMemo(() => sudokuSize(canon ?? {}), [canon]);
+  const n = dims.size;
+  const big = n > 9;
 
   const updateJson = useCallback((newCanon: SudokuCanon) => {
-    setJsonText(JSON.stringify(newCanon, null, 2));
+    // A 9x9 canon leaves the room size out, exactly as before sizes existed.
+    const { room_width, room_height, ...rest } = newCanon;
+    const out = (room_width ?? 3) === 3 && (room_height ?? 3) === 3 ? rest : { room_width, room_height, ...rest };
+    setJsonText(JSON.stringify(out, null, 2));
   }, []);
+
+  const changeSize = useCallback(
+    (roomWidth: number, roomHeight: number) => {
+      if (!canon) return;
+      const size = roomWidth * roomHeight;
+      if (canon.hints.some((row) => row.some((v) => v > 0)) && !window.confirm(`Switch to ${size}x${size}? This clears every given.`)) return;
+      setActiveCell(null);
+      updateJson({ room_width: roomWidth, room_height: roomHeight, hints: emptyHints(size) });
+    },
+    [canon, updateJson]
+  );
+
+  const conflicts = useMemo(() => (canon ? conflictCells(dims, canon.hints) : new Set<string>()), [canon, dims]);
 
   const handleCellClick = useCallback(
     (row: number, col: number) => {
@@ -56,12 +77,13 @@ export default function SudokuEditor({ initialJson, onChange }: SudokuEditorProp
     (digit: number) => {
       if (!activeCell || !canon) return;
       const [col, row] = activeCell.split(",").map(Number);
+      if (digit < 1 || digit > n) return;
       const newHints = canon.hints.map((r) => [...r]);
       newHints[row][col] = digit;
       updateJson({ ...canon, hints: newHints });
       setActiveCell(null);
     },
-    [activeCell, canon, updateJson]
+    [activeCell, canon, n, updateJson]
   );
 
   const clearValue = useCallback(() => {
@@ -73,11 +95,17 @@ export default function SudokuEditor({ initialJson, onChange }: SudokuEditorProp
     setActiveCell(null);
   }, [activeCell, canon, updateJson]);
 
+  // Above 9x9 a number takes one or two keys ("1", "2" -> 12), and 0 is part of 10/20/30.
+  const { pending, key: typeKey, reset: resetTyped } = useTypedNumber(n, enterValue);
+  useEffect(() => resetTyped(), [activeCell, resetTyped]);
+
   useEffect(() => {
     if (!activeCell) return;
     function handleKey(e: KeyboardEvent) {
       const digit = parseInt(e.key, 10);
-      if (digit >= 1 && digit <= 9) {
+      if (big && /^[0-9]$/.test(e.key)) {
+        typeKey(e.key);
+      } else if (digit >= 1 && digit <= 9) {
         enterValue(digit);
       } else if (e.key === "Backspace" || e.key === "Delete" || e.key === "0") {
         clearValue();
@@ -87,7 +115,7 @@ export default function SudokuEditor({ initialJson, onChange }: SudokuEditorProp
     }
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [activeCell, enterValue, clearValue]);
+  }, [activeCell, big, typeKey, enterValue, clearValue]);
 
   if (!canon) {
     return (
@@ -104,23 +132,21 @@ export default function SudokuEditor({ initialJson, onChange }: SudokuEditorProp
     );
   }
 
-  const svgWidth = 9 * CELL_SIZE + PAD * 2;
-  const svgHeight = 9 * CELL_SIZE + PAD * 2;
+  const svgWidth = n * CELL_SIZE + PAD * 2;
+  const svgHeight = n * CELL_SIZE + PAD * 2;
 
+  const stroke = (i: number, room: number) => (i === 0 || i === n ? THICK : i % room === 0 ? MEDIUM : THIN);
   const gridLines: JSX.Element[] = [];
-  for (let i = 0; i <= 9; i++) {
-    const isBorder = i === 0 || i === 9;
-    const isBox = i % 3 === 0 && !isBorder;
-    const strokeWidth = isBorder ? THICK : isBox ? MEDIUM : THIN;
+  for (let i = 0; i <= n; i++) {
     gridLines.push(
       <line
         key={`h-${i}`}
         x1={0}
         y1={i * CELL_SIZE}
-        x2={9 * CELL_SIZE}
+        x2={n * CELL_SIZE}
         y2={i * CELL_SIZE}
         stroke="black"
-        strokeWidth={strokeWidth}
+        strokeWidth={stroke(i, dims.roomHeight)}
       />
     );
     gridLines.push(
@@ -129,23 +155,47 @@ export default function SudokuEditor({ initialJson, onChange }: SudokuEditorProp
         x1={i * CELL_SIZE}
         y1={0}
         x2={i * CELL_SIZE}
-        y2={9 * CELL_SIZE}
+        y2={n * CELL_SIZE}
         stroke="black"
-        strokeWidth={strokeWidth}
+        strokeWidth={stroke(i, dims.roomWidth)}
       />
     );
   }
+  const sizeIndex = SUDOKU_SIZES.findIndex((o) => o.roomWidth === dims.roomWidth && o.roomHeight === dims.roomHeight);
 
   return (
     <div style={{ border: "2px solid #4a90d9", borderRadius: 8, padding: "1rem", background: "#f8fbff" }}>
-      <div style={{ fontSize: "0.75rem", color: "#666", marginBottom: "0.75rem" }}>
-        Click a cell then type 1–9 to set a hint, or Backspace/0 to clear.
+      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem", fontSize: "0.85rem" }}>
+        <label htmlFor="sudoku-size">Size</label>
+        <select
+          id="sudoku-size"
+          value={sizeIndex}
+          onChange={(e) => {
+            const o = SUDOKU_SIZES[Number(e.target.value)];
+            if (o) changeSize(o.roomWidth, o.roomHeight);
+          }}
+        >
+          {sizeIndex < 0 && <option value={-1}>{`${n}x${n} (${dims.roomWidth}x${dims.roomHeight} rooms)`}</option>}
+          {SUDOKU_SIZES.map((o, i) => (
+            <option key={o.label} value={i}>{o.label}</option>
+          ))}
+        </select>
       </div>
+      <div style={{ fontSize: "0.75rem", color: "#666", marginBottom: "0.75rem" }}>
+        {big
+          ? `Click a cell then type 1–${n} (two digits for 10 and up) to set a hint, or Backspace to clear.`
+          : "Click a cell then type 1–9 to set a hint, or Backspace/0 to clear."}
+      </div>
+      {conflicts.size > 0 && (
+        <div style={{ fontSize: "0.8rem", color: "#c62828", marginBottom: "0.5rem" }}>
+          {conflicts.size} givens repeat a number in a row, column or room (shown in red) — likely misreads.
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
         <div style={{ flexShrink: 0 }}>
           <svg
-            width={Math.min(svgWidth, 500)}
+            width={Math.min(svgWidth, big ? 760 : 500)}
             viewBox={`0 0 ${svgWidth} ${svgHeight}`}
             style={{ border: "1px solid #ccc", userSelect: "none", display: "block", background: "white" }}
           >
@@ -180,7 +230,7 @@ export default function SudokuEditor({ initialJson, onChange }: SudokuEditorProp
                       dominantBaseline="central"
                       fontSize={20}
                       fontFamily="sans-serif"
-                      fill="black"
+                      fill={conflicts.has(`${colIdx},${rowIdx}`) ? "#c62828" : "black"}
                       pointerEvents="none"
                     >
                       {val}
@@ -189,10 +239,29 @@ export default function SudokuEditor({ initialJson, onChange }: SudokuEditorProp
                 })
               )}
 
+              {/* Digits typed so far, while waiting for a second key */}
+              {activeCell && pending && (() => {
+                const [col, row] = activeCell.split(",").map(Number);
+                return (
+                  <text
+                    x={col * CELL_SIZE + CELL_SIZE / 2}
+                    y={row * CELL_SIZE + CELL_SIZE / 2}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    fontSize={20}
+                    fontFamily="sans-serif"
+                    fill="#1976d2"
+                    pointerEvents="none"
+                  >
+                    {pending}
+                  </text>
+                );
+              })()}
+
               {/* Click targets */}
-              {Array.from({ length: 81 }, (_, i) => {
-                const col = i % 9;
-                const row = Math.floor(i / 9);
+              {Array.from({ length: n * n }, (_, i) => {
+                const col = i % n;
+                const row = Math.floor(i / n);
                 return (
                   <rect
                     key={`click-${col}-${row}`}

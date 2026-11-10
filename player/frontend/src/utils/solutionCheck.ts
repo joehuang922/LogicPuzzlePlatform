@@ -51,10 +51,10 @@ function pair(key: string, prefix = ""): [number, number] | null {
 }
 
 /** A digit entered at "col,row" must be the solution's digit there (notes ignored). */
-function digits(sol: number[][]): Expect {
+function digits(sol: number[][], max = 9): Expect {
   return (key, value) => {
     const cr = pair(key);
-    if (!cr || value < 1 || value > 9) return null;
+    if (!cr || value < 1 || value > max) return null;
     return sol[cr[1]]?.[cr[0]] === value;
   };
 }
@@ -72,10 +72,11 @@ function onOff(sol: number[][], prefix: string, on: number, off: number, rowFirs
 }
 
 const CHECKS: Record<number, (canon: Json, solution: Json) => Expect | null> = {
-  // Sudoku: { hints: 9x9 }.
-  1: (_canon, s) => {
-    const sol = grid(s.hints, 9, 9);
-    return sol && digits(sol);
+  // Sudoku: { hints: N x N }, N = room_width * room_height (default 3x3).
+  1: (canon, s) => {
+    const n = ((canon.room_width as number | undefined) ?? 3) * ((canon.room_height as number | undefined) ?? 3);
+    const sol = grid(s.hints, n, n);
+    return sol && digits(sol, n);
   },
   // Combo sudoku: { subboards: [{ x, y, answers: 9x9 }] }, one per canon board.
   2: (canon, s) => {

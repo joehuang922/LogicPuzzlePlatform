@@ -1,5 +1,6 @@
 import { PuzzleDefinition, AnswerExtractor } from "../types/puzzle";
 import { SudokuCanon } from "../types/canon";
+import { sudokuSize } from "../components/sudokuRules";
 
 export const sudokuExtractor: AnswerExtractor = {
   puzzleType: 1,
@@ -9,10 +10,11 @@ export const sudokuExtractor: AnswerExtractor = {
       ? JSON.parse(puzzle.canonRepr)
       : puzzle.canonRepr) as SudokuCanon;
 
+    const n = sudokuSize(canonRepr).size;
     const answers: number[][] = [];
-    for (let row = 0; row < 9; row++) {
+    for (let row = 0; row < n; row++) {
       const rowArr: number[] = [];
-      for (let col = 0; col < 9; col++) {
+      for (let col = 0; col < n; col++) {
         const hint = canonRepr.hints[row]?.[col] ?? 0;
         if (hint > 0) {
           rowArr.push(hint);
@@ -23,10 +25,10 @@ export const sudokuExtractor: AnswerExtractor = {
       answers.push(rowArr);
     }
 
-    // 9x9 of ascending candidate-digit lists. Notes are dropped for cells that
+    // N x N of ascending candidate-digit lists. Notes are dropped for cells that
     // hold a hint or committed answer (answer overwrites notes).
-    const notes: number[][][] = Array.from({ length: 9 }, () =>
-      Array.from({ length: 9 }, () => [] as number[])
+    const notes: number[][][] = Array.from({ length: n }, () =>
+      Array.from({ length: n }, () => [] as number[])
     );
     for (const [key, val] of Object.entries(userValues)) {
       if (val !== 1 || !key.startsWith("n:")) continue;
@@ -35,8 +37,8 @@ export const sudokuExtractor: AnswerExtractor = {
       const digit = Number(digitStr);
       if (
         Number.isInteger(col) && Number.isInteger(row) &&
-        col >= 0 && col < 9 && row >= 0 && row < 9 &&
-        digit >= 1 && digit <= 9 &&
+        col >= 0 && col < n && row >= 0 && row < n &&
+        digit >= 1 && digit <= n &&
         answers[row][col] === 0
       ) {
         notes[row][col].push(digit);

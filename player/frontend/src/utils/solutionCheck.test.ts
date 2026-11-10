@@ -44,6 +44,15 @@ describe("matchesSolution", () => {
     expect(matchesSolution(p, { "3,1": 0 })).toBe(true); // a cleared cell is no mark
   });
 
+  it("sudoku: a 16x16 checks digits up to 16 against its 16x16 solution", () => {
+    const sol = Array.from({ length: 16 }, (_, r) => Array.from({ length: 16 }, (_, c) => ((4 * (r % 4) + Math.floor(r / 4) + c) % 16) + 1));
+    const p = puzzle(1, { room_width: 4, room_height: 4, hints: [] }, { hints: sol });
+    expect(matchesSolution(p, { "15,15": sol[15][15] })).toBe(true);
+    expect(matchesSolution(p, { "15,15": (sol[15][15] % 16) + 1 })).toBe(false);
+    // A 9x9 solution doesn't fit a 16x16 canon.
+    expect(matchesSolution(puzzle(1, { room_width: 4, room_height: 4, hints: [] }, { hints: sudokuGrid() }), {})).toBeNull();
+  });
+
   it("combo sudoku: a global cell is checked against the board covering it", () => {
     // Boards at (0,0) and (2,2) sharing one room, both cut from one global pattern so
     // the shared cells agree (the check compares digits; it doesn't re-validate).

@@ -4,9 +4,15 @@ import { useIsMobile } from "../hooks/useIsMobile";
 import DigitBar from "./DigitBar";
 import RadialInput from "./RadialInput";
 import { nextPlacement, cellLabel } from "@puzzle/solver";
+import { conflictCells as findConflicts, peerMap as buildPeerMap } from "./sudokuRules";
+import { useTypedNumber } from "../hooks/useTypedNumber";
 
 interface SudokuBoardProps {
   hints: number[][];
+  // Room size (default 3x3). The board is N x N with N = roomWidth * roomHeight and
+  // digits 1..N: 16x16, 25x25, 30x30 (6 wide, 5 tall) as well as the standard 9x9.
+  roomWidth?: number;
+  roomHeight?: number;
   initialUserValues?: Record<string, number>;
   // Pencil-mark candidates keyed by "col,row"; each an ascending digit list.
   initialNotes?: Record<string, number[]>;
@@ -21,31 +27,37 @@ type HintView =
   | { kind: "cell"; cellId: number }
   | { kind: "message"; text: string };
 
-const idToKey = (id: number) => `${id % 9},${Math.floor(id / 9)}`;
-
 const CELL_SIZE = 40;
+// On a phone a board above 9x9 keeps at least this many px per cell and scrolls
+// sideways, instead of shrinking 30 cells into a phone's width.
+const MIN_MOBILE_CELL_PX = 30;
 const PAD = CELL_SIZE;
 const THIN = 1;
 const MEDIUM = 2;
 const THICK = 3;
-function notesFromInitial(initial?: Record<string, number[]>): Record<string, Set<number>> {
+function notesFromInitial(initial: Record<string, number[]> | undefined, max: number): Record<string, Set<number>> {
   const map: Record<string, Set<number>> = {};
   if (initial) {
     for (const [key, digits] of Object.entries(initial)) {
-      const set = new Set(digits.filter((d) => d >= 1 && d <= 9));
+      const set = new Set(digits.filter((d) => d >= 1 && d <= max));
       if (set.size > 0) map[key] = set;
     }
   }
   return map;
 }
 
-export default function SudokuBoard({ hints, initialUserValues, initialNotes, onValuesChange, onComplete, liveValidate }: SudokuBoardProps) {
+export default function SudokuBoard({ hints, roomWidth = 3, roomHeight = 3, initialUserValues, initialNotes, onValuesChange, onComplete, liveValidate }: SudokuBoardProps) {
   const isMobile = useIsMobile();
-  const width = 9 * CELL_SIZE + PAD * 2;
-  const height = 9 * CELL_SIZE + PAD * 2;
+  const n = roomWidth * roomHeight;
+  const dims = useMemo(() => ({ roomWidth, roomHeight, size: n }), [roomWidth, roomHeight, n]);
+  // Above 9x9, digits come from a number pad (desktop too) and typed multi-digit keys.
+  const big = n > 9;
+  const idToKey = (id: number) => `${id % n},${Math.floor(id / n)}`;
+  const width = n * CELL_SIZE + PAD * 2;
+  const height = n * CELL_SIZE + PAD * 2;
 
   const [userValues, setUserValues] = useState<Record<string, number>>(initialUserValues ?? {});
-  const [notes, setNotes] = useState<Record<string, Set<number>>>(() => notesFromInitial(initialNotes));
+  const [notes, setNotes] = useState<Record<string, Set<number>>>(() => notesFromInitial(initialNotes, n));
   const [noteMode, setNoteMode] = useBoardUiState("sudoku.noteMode", false);
   const [activeCell, setActiveCell] = useState<string | null>(null);
   const [hoveredCell, setHoveredCell] = useState<string | null>(null);
@@ -64,8 +76,8 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, on
 
   const hintCells = useMemo(() => {
     const set = new Set<string>();
-    for (let row = 0; row < 9; row++) {
-      for (let col = 0; col < 9; col++) {
+    for (let row = 0; row < n; row++) {
+      for (let col = 0; col < n; col++) {
         if (hints[row]?.[col] > 0) {
           set.add(`${col},${row}`);
         }
@@ -74,86 +86,18 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, on
     return set;
   }, [hints]);
 
-  const peerMap = useMemo(() => {
-    const map = new Map<string, Set<string>>();
-    for (let row = 0; row < 9; row++) {
-      for (let col = 0; col < 9; col++) {
-        const key = `${col},${row}`;
-        const peers = new Set<string>();
-        for (let c = 0; c < 9; c++) {
-          if (c !== col) peers.add(`${c},${row}`);
-        }
-        for (let r = 0; r < 9; r++) {
-          if (r !== row) peers.add(`${col},${r}`);
-        }
-        const boxStartCol = Math.floor(col / 3) * 3;
-        const boxStartRow = Math.floor(row / 3) * 3;
-        for (let r = boxStartRow; r < boxStartRow + 3; r++) {
-          for (let c = boxStartCol; c < boxStartCol + 3; c++) {
-            if (r !== row || c !== col) peers.add(`${c},${r}`);
-          }
-        }
-        map.set(key, peers);
-      }
-    }
-    return map;
-  }, []);
+  const peerMap = useMemo(() => buildPeerMap(dims), [dims]);
 
   const conflictCells = useMemo(() => {
-    const conflicts = new Set<string>();
-    const fullGrid: number[][] = Array.from({ length: 9 }, (_, row) =>
-      Array.from({ length: 9 }, (_, col) => {
+    const fullGrid: number[][] = Array.from({ length: n }, (_, row) =>
+      Array.from({ length: n }, (_, col) => {
         const hint = hints[row]?.[col] ?? 0;
         if (hint > 0) return hint;
         return userValues[`${col},${row}`] ?? 0;
       })
     );
-
-    for (let row = 0; row < 9; row++) {
-      const seen = new Map<number, number[]>();
-      for (let col = 0; col < 9; col++) {
-        const val = fullGrid[row][col];
-        if (val === 0) continue;
-        if (!seen.has(val)) seen.set(val, []);
-        seen.get(val)!.push(col);
-      }
-      for (const [, cols] of seen) {
-        if (cols.length > 1) cols.forEach((c) => conflicts.add(`${c},${row}`));
-      }
-    }
-
-    for (let col = 0; col < 9; col++) {
-      const seen = new Map<number, number[]>();
-      for (let row = 0; row < 9; row++) {
-        const val = fullGrid[row][col];
-        if (val === 0) continue;
-        if (!seen.has(val)) seen.set(val, []);
-        seen.get(val)!.push(row);
-      }
-      for (const [, rows] of seen) {
-        if (rows.length > 1) rows.forEach((r) => conflicts.add(`${col},${r}`));
-      }
-    }
-
-    for (let boxRow = 0; boxRow < 3; boxRow++) {
-      for (let boxCol = 0; boxCol < 3; boxCol++) {
-        const seen = new Map<number, string[]>();
-        for (let r = boxRow * 3; r < boxRow * 3 + 3; r++) {
-          for (let c = boxCol * 3; c < boxCol * 3 + 3; c++) {
-            const val = fullGrid[r][c];
-            if (val === 0) continue;
-            if (!seen.has(val)) seen.set(val, []);
-            seen.get(val)!.push(`${c},${r}`);
-          }
-        }
-        for (const [, keys] of seen) {
-          if (keys.length > 1) keys.forEach((k) => conflicts.add(k));
-        }
-      }
-    }
-
-    return conflicts;
-  }, [hints, userValues]);
+    return findConflicts(dims, fullGrid);
+  }, [dims, n, hints, userValues]);
 
   const completedRef = useRef(false);
 
@@ -161,11 +105,11 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, on
     if (completedRef.current) return;
     const totalHints = hints.flat().filter((v) => v > 0).length;
     const totalFilled = totalHints + Object.keys(userValues).length;
-    if (totalFilled === 81 && conflictCells.size === 0) {
+    if (totalFilled === n * n && conflictCells.size === 0) {
       completedRef.current = true;
       onComplete?.();
     }
-  }, [userValues, conflictCells, hints, onComplete]);
+  }, [userValues, conflictCells, hints, n, onComplete]);
 
   const highlightSource = activeCell ?? hoveredCell;
   const highlightedCells = useMemo(() => {
@@ -186,7 +130,7 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, on
       setHint({ kind: "message", text: "Fix the conflicting cells first — hints assume your entries are correct." });
       return;
     }
-    const canon = { hints };
+    const canon = { room_width: roomWidth, room_height: roomHeight, hints };
     const step = nextPlacement(1, canon, userValues);
     if (step?.placement) {
       setHint({ kind: "cell", cellId: step.placement.cell });
@@ -194,7 +138,7 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, on
     }
     const complete = hints.every((row, r) => row.every((v, c) => v > 0 || (userValues[`${c},${r}`] ?? 0) > 0));
     setHint({ kind: "message", text: complete ? "The board is already complete." : "No hint is available from here." });
-  }, [conflictCells, hints, userValues]);
+  }, [conflictCells, hints, roomWidth, roomHeight, userValues]);
 
   // A hint reflects a specific board; once the player changes it, drop the stale hint.
   const userValuesAtHint = useRef(userValues);
@@ -207,7 +151,8 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, on
   const hintFocusKeys = useMemo(() => {
     if (!hint) return new Set<string>();
     return hint.kind === "cell" ? new Set([idToKey(hint.cellId)]) : new Set<string>();
-  }, [hint]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hint, n]);
 
   // A cell that already holds a committed answer can't take notes: force answer
   // mode and disable the toggle while such a cell is active.
@@ -262,11 +207,18 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, on
     setActiveCell(null);
   }, [activeCell, noteMode, userValues]);
 
+  // Above 9x9 a number takes one or two keys ("1", "2" -> 12).
+  const typed = useTypedNumber(n, enterValue);
+  const { key: typeKey, reset: resetTyped } = typed;
+  useEffect(() => resetTyped(), [activeCell, resetTyped]);
+
   useEffect(() => {
     if (!activeCell) return;
     function handleKey(e: KeyboardEvent) {
       const digit = parseInt(e.key, 10);
-      if (digit >= 1 && digit <= 9) {
+      if (big && /^[0-9]$/.test(e.key)) {
+        typeKey(e.key);
+      } else if (digit >= 1 && digit <= 9) {
         enterValue(digit);
       } else if (e.key === "Backspace" || e.key === "Delete") {
         clearValue();
@@ -278,27 +230,27 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, on
     }
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [activeCell, activeHasAnswer, enterValue, clearValue]);
+  }, [activeCell, activeHasAnswer, big, typeKey, enterValue, clearValue]);
 
   function handleCellClick(key: string) {
     if (hintCells.has(key)) return;
     setActiveCell((prev) => (prev === key ? null : key));
   }
 
+  // Room borders: vertical every roomWidth columns, horizontal every roomHeight rows.
+  const stroke = (i: number, room: number) =>
+    i === 0 || i === n ? THICK : i % room === 0 ? MEDIUM : THIN;
   const gridLines: JSX.Element[] = [];
-  for (let i = 0; i <= 9; i++) {
-    const isBorder = i === 0 || i === 9;
-    const isBox = i % 3 === 0 && !isBorder;
-    const strokeWidth = isBorder ? THICK : isBox ? MEDIUM : THIN;
+  for (let i = 0; i <= n; i++) {
     gridLines.push(
       <line
         key={`h-${i}`}
         x1={0}
         y1={i * CELL_SIZE}
-        x2={9 * CELL_SIZE}
+        x2={n * CELL_SIZE}
         y2={i * CELL_SIZE}
         stroke="black"
-        strokeWidth={strokeWidth}
+        strokeWidth={stroke(i, roomHeight)}
       />
     );
     gridLines.push(
@@ -307,15 +259,20 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, on
         x1={i * CELL_SIZE}
         y1={0}
         x2={i * CELL_SIZE}
-        y2={9 * CELL_SIZE}
+        y2={n * CELL_SIZE}
         stroke="black"
-        strokeWidth={strokeWidth}
+        strokeWidth={stroke(i, roomWidth)}
       />
     );
   }
 
+  // The number pad (mobile, or any board above 9x9) is fixed to the bottom of the
+  // window; leave room so it never hides the last rows.
+  const showPad = activeCell != null && (isMobile || big);
+  const padRows = big ? Math.ceil((n + 3) / (isMobile ? 8 : 13)) : 1;
+
   return (
-    <div style={{ maxWidth: width, width: "100%", paddingBottom: isMobile && activeCell ? 60 : 0 }}>
+    <div style={{ maxWidth: width, width: "100%", paddingBottom: showPad ? padRows * 42 + 24 : 0 }}>
       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
         <button
           onClick={requestHint}
@@ -363,7 +320,7 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, on
         >
           {hint.kind === "cell" && (
             <>
-              <div style={{ fontWeight: 600, marginBottom: "0.2rem" }}>Next cell: {cellLabel(hint.cellId)}</div>
+              <div style={{ fontWeight: 600, marginBottom: "0.2rem" }}>Next cell: {cellLabel(hint.cellId, n)}</div>
               <div style={{ color: "#333" }}>Its digit can be worked out from the board as it stands.</div>
             </>
           )}
@@ -371,8 +328,9 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, on
         </div>
       )}
 
+      <div style={{ overflowX: "auto" }}>
       <svg
-        width="100%"
+        width={isMobile && big ? (n * MIN_MOBILE_CELL_PX * width) / (n * CELL_SIZE) : "100%"}
         viewBox={`0 0 ${width} ${height}`}
         style={{ border: "1px solid #ccc", outline: "none", userSelect: "none", display: "block" }}
         tabIndex={0}
@@ -460,9 +418,9 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, on
           )}
 
           {/* Click targets */}
-          {Array.from({ length: 81 }, (_, i) => {
-            const col = i % 9;
-            const row = Math.floor(i / 9);
+          {Array.from({ length: n * n }, (_, i) => {
+            const col = i % n;
+            const row = Math.floor(i / n);
             const key = `${col},${row}`;
             const isHint = hintCells.has(key);
             return (
@@ -481,16 +439,18 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, on
             );
           })}
 
-          {/* Pencil-mark notes: small grey digits in a fixed 3x3 sub-layout
-              (1 2 3 / 4 5 6 / 7 8 9). Hidden once the cell holds an answer/hint. */}
+          {/* Pencil-mark notes: small grey digits laid out like a room (3x3 on a
+              9x9: 1 2 3 / 4 5 6 / 7 8 9; roomWidth x roomHeight above). Hidden once
+              the cell holds an answer/hint. */}
           {Object.entries(notes).map(([key, set]) => {
             const [col, row] = key.split(",").map(Number);
             if (hintCells.has(key) || (userValues[key] ?? 0) > 0) return null;
-            const third = CELL_SIZE / 3;
+            const slotW = CELL_SIZE / roomWidth;
+            const slotH = CELL_SIZE / roomHeight;
             return Array.from(set).map((digit) => {
               const sub = digit - 1;
-              const sx = col * CELL_SIZE + ((sub % 3) + 0.5) * third;
-              const sy = row * CELL_SIZE + (Math.floor(sub / 3) + 0.5) * third;
+              const sx = col * CELL_SIZE + ((sub % roomWidth) + 0.5) * slotW;
+              const sy = row * CELL_SIZE + (Math.floor(sub / roomWidth) + 0.5) * slotH;
               return (
                 <text
                   key={`note-${key}-${digit}`}
@@ -498,7 +458,7 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, on
                   y={sy}
                   textAnchor="middle"
                   dominantBaseline="central"
-                  fontSize={third * 0.8}
+                  fontSize={Math.min(slotH * 0.8, slotW * (digit > 9 ? 0.8 : 1.3))}
                   fontFamily="sans-serif"
                   fill="#999"
                   pointerEvents="none"
@@ -509,6 +469,25 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, on
             });
           })}
 
+
+          {/* Digits typed so far on a big board, while waiting for a second key. */}
+          {activeCell && typed.pending && (() => {
+            const [col, row] = activeCell.split(",").map(Number);
+            return (
+              <text
+                x={col * CELL_SIZE + CELL_SIZE / 2}
+                y={row * CELL_SIZE + CELL_SIZE / 2}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize={20}
+                fontFamily="sans-serif"
+                fill="#1976d2"
+                pointerEvents="none"
+              >
+                {typed.pending}
+              </text>
+            );
+          })()}
 
           {/* User-entered values */}
           {Object.entries(userValues).map(([key, val]) => {
@@ -531,8 +510,9 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, on
             );
           })}
 
-          {/* Radial input menu (desktop only; mobile uses the DigitBar below) */}
-          {activeCell && !isMobile && (() => {
+          {/* Radial input menu (desktop 9x9 only; mobile and bigger boards use the
+              DigitBar below) */}
+          {activeCell && !isMobile && !big && (() => {
             const [col, row] = activeCell.split(",").map(Number);
             return (
               <RadialInput
@@ -550,10 +530,13 @@ export default function SudokuBoard({ hints, initialUserValues, initialNotes, on
           })()}
         </g>
       </svg>
+      </div>
 
-      {/* Mobile digit bar */}
-      {activeCell && isMobile && (
+      {/* Number pad: mobile, and every board above 9x9 */}
+      {activeCell && showPad && (
         <DigitBar
+          max={n}
+          marked={effectiveNoteMode ? notes[activeCell] : undefined}
           onDigit={enterValue}
           onClear={clearValue}
           onDismiss={() => setActiveCell(null)}

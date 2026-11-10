@@ -1,11 +1,15 @@
 export interface SudokuCanon {
+  // Room size, default 3x3. The board is N x N, N = room_width * room_height (<= 30).
+  room_width?: number;
+  room_height?: number;
+  // N x N, 0 = empty, 1..N = given
   hints: number[][];
 }
 
 export interface SudokuAnswer {
-  // 9x9 committed answers (canon hints merged with the player's entries)
+  // N x N committed answers (canon hints merged with the player's entries)
   hints: number[][];
-  // 9x9; each cell an ascending list of candidate digits (1-9). Optional/additive:
+  // N x N; each cell an ascending list of candidate digits (1..N). Optional/additive:
   // absent on legacy snapshots. A cell with a committed answer carries [].
   notes?: number[][][];
 }
