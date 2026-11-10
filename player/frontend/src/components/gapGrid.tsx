@@ -14,7 +14,9 @@ export const cellY = (row: number) => row * PITCH;
 export const cellCx = (col: number) => col * PITCH + GAP_CELL / 2;
 export const cellCy = (row: number) => row * PITCH + GAP_CELL / 2;
 
-const BOX_TINTS = ["#ece7ee", "#f6f3f7"];
+// Dark vs near-white so the box a gap belongs to reads at a glance; the signs (#3a2430)
+// stay legible on both. Keep in sync with Android BOX_TINTS / MINI_TINTS.
+const BOX_TINTS = ["#c9b8cf", "#f5f2f6"];
 const PLATE_MARGIN = GAP / 2;
 
 /** Tinted backing plates for the nine 3x3 boxes. Plates meet in the middle of the

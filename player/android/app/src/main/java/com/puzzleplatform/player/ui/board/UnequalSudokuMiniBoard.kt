@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.dp
 import com.puzzleplatform.player.puzzle.UnequalSudokuDraft
 
 private const val SIZE = 9
-private val MINI_TINTS = listOf(Color(0xFFECE7EE), Color(0xFFF6F3F7))
+private val MINI_TINTS = listOf(Color(0xFFC9B8CF), Color(0xFFF5F2F6))
 private val MINI_INK = Color(0xFF3A2430)
 private val PROBLEM_TINT = Color(0x33D32F2F)
 

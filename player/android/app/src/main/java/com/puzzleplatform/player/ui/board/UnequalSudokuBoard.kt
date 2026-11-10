@@ -27,7 +27,7 @@ internal const val GAP_RATIO = 0.4f
 internal const val SLOT_INSET = GAP_RATIO / 2f / (1f + GAP_RATIO)
 
 private val PAGE_BG = Color.White
-private val BOX_TINTS = listOf(Color(0xFFECE7EE), Color(0xFFF6F3F7))
+private val BOX_TINTS = listOf(Color(0xFFC9B8CF), Color(0xFFF5F2F6))
 private val CELL_BG = Color.White
 private val OUTLINE = Color(0xFF3A2430)
 private val SIGN = Color(0xFF3A2430)
