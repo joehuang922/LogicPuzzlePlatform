@@ -80,10 +80,18 @@ def test_valid_sudoku_passes():
     validate_canon("sudoku", data)
 
 
+def test_valid_big_sudoku_passes():
+    data = {"room_width": 6, "room_height": 5, "hints": [[0] * 30 for _ in range(30)]}
+    validate_canon("sudoku", data)
+
+
 def test_invalid_sudoku_fails():
-    data = {"hints": [[0] * 8 for _ in range(9)]}
+    # The schema bounds the shape (N x N, N = room_width * room_height, is the API's
+    # semantic check); a digit above 30 or a 31-wide row is out on its face.
     with pytest.raises(Exception):
-        validate_canon("sudoku", data)
+        validate_canon("sudoku", {"hints": [[31] * 9 for _ in range(9)]})
+    with pytest.raises(Exception):
+        validate_canon("sudoku", {"hints": [[0] * 31 for _ in range(9)]})
 
 
 def test_valid_combo_sudoku_passes():

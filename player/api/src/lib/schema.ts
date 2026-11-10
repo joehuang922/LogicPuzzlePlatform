@@ -87,6 +87,24 @@ export function validateCanon(puzzleType: number, data: unknown): void {
 // solver gate these need no solver: they reject canons that are impossible on their face
 // (typically a mis-parse) for types the gate doesn't cover.
 const semanticChecks: Record<number, (data: any) => void> = {
+  // Sudoku: rooms are room_width x room_height (default 3x3) and the board is N x N with
+  // N = room_width * room_height <= 30 (the solver's candidate bit masks), digits 1..N.
+  1: (data: { room_width?: number; room_height?: number; hints: number[][] }) => {
+    const rw = data.room_width ?? 3;
+    const rh = data.room_height ?? 3;
+    const n = rw * rh;
+    if (n > 30) {
+      throw new Error(`Invalid sudoku: ${rw}x${rh} rooms make a ${n}x${n} board; at most 30x30 is supported`);
+    }
+    if (data.hints.length !== n || data.hints.some((row) => row.length !== n)) {
+      throw new Error(`Invalid sudoku: ${rw}x${rh} rooms need a ${n}x${n} grid of hints`);
+    }
+    data.hints.forEach((row, r) =>
+      row.forEach((v, c) => {
+        if (v > n) throw new Error(`Invalid sudoku: R${r + 1}C${c + 1} is ${v}, but digits run 1-${n}`);
+      })
+    );
+  },
   // Nonogram
   6: (data: { rowClues: number[][]; colClues: number[][] }) => {
     const { rowClues, colClues } = data;

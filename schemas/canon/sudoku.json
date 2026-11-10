@@ -1,20 +1,22 @@
 {
   "title": "Sudoku Canonical Representation",
-  "description": "9x9 grid of hints where 0 = empty cell",
+  "description": "N x N grid of hints where 0 = empty cell. Rooms are room_width x room_height (default 3x3, a 9x9 board); N = room_width * room_height, at most 30.",
   "type": "object",
   "required": ["hints"],
   "additionalProperties": false,
   "properties": {
+    "room_width": { "type": "integer", "minimum": 2, "maximum": 15, "default": 3 },
+    "room_height": { "type": "integer", "minimum": 2, "maximum": 15, "default": 3 },
     "hints": {
       "type": "array",
       "items": {
         "type": "array",
-        "items": { "type": "integer", "minimum": 0, "maximum": 9 },
-        "minItems": 9,
-        "maxItems": 9
+        "items": { "type": "integer", "minimum": 0, "maximum": 30 },
+        "minItems": 4,
+        "maxItems": 30
       },
-      "minItems": 9,
-      "maxItems": 9
+      "minItems": 4,
+      "maxItems": 30
     }
   }
 }
