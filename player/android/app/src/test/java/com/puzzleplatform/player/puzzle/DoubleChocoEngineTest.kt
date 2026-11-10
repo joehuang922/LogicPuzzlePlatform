@@ -86,13 +86,13 @@ class DoubleChocoEngineTest {
     // -- computeProgress ----------------------------------------------------
 
     @Test
-    fun progress_wholeBoardBalancedCountsFully() {
-        // No borders: one room of 4 white + 4 gray is already balanced (web parity).
-        assertEquals(100.0, DoubleChocoEngine.computeProgress(puzzle(canon2x4), emptyMap()), 1e-9)
+    fun progress_undividedBoardCountsNothing() {
+        // No borders: one balanced room, but its whites aren't one connected shape.
+        assertEquals(0.0, DoubleChocoEngine.computeProgress(puzzle(canon2x4), emptyMap()), 1e-9)
     }
 
     @Test
-    fun progress_countsOnlyBalancedRooms() {
+    fun progress_countsOnlyValidRooms() {
         // Split off (0,0) alone: it's unbalanced, and so is the remaining 7-cell room.
         val values = mapOf("v:0,0" to 1, "h:0,0" to 1)
         assertEquals(0.0, DoubleChocoEngine.computeProgress(puzzle(canon2x4), values), 1e-9)
@@ -101,6 +101,12 @@ class DoubleChocoEngineTest {
         // Cut the right room in half horizontally: (0,2),(0,3) all white, (1,2),(1,3) all gray.
         val split = solved + ("h:0,2" to 1) + ("h:0,3" to 1)
         assertEquals(50.0, DoubleChocoEngine.computeProgress(puzzle(canon2x4), split), 1e-9)
+    }
+
+    @Test
+    fun progress_skipsBalancedRoomWithWrongClue() {
+        val wrong = canon2x4.replace("[[0,2],", "[[0,3],")
+        assertEquals(50.0, DoubleChocoEngine.computeProgress(puzzle(wrong), solved), 1e-9)
     }
 
     // -- isComplete ---------------------------------------------------------

@@ -10,8 +10,9 @@ import kotlinx.serialization.json.intOrNull
  * Double Choco (puzzle type 4). Ports:
  *  - answer extraction from frontend/src/extractors/doubleChoco.ts
  *  - progress from frontend/src/progress/doubleChoco.ts
+ *  - per-room rules from frontend/src/components/doubleChocoRules.ts
  *  - room flood-fill, shape matching and completion logic from
- *    frontend/src/components/DoubleChocoBoard.tsx (computeRooms / validateSolution)
+ *    frontend/src/components/doubleChocoRules.ts (computeRooms / validateSolution)
  *
  * The player draws thick borders along cell edges to divide the grid into rooms: each
  * room holds equally many white and gray cells, each color forms one connected group,
@@ -169,25 +170,38 @@ object DoubleChocoEngine : PuzzleEngine {
     }
 
     /**
-     * Room ids that are "established": equally many (and at least one) white and gray
-     * cells. These are what progress counts.
+     * Room ids that pass every per-room rule (port of doubleChocoRules.ts validRoomIds):
+     *  1. equally many, and at least one, white and gray cells,
+     *  2. the white cells are connected, and so are the gray cells,
+     *  3. the white shape equals the gray shape up to rotation/reflection,
+     *  4. every clue in the room equals its per-color cell count.
      */
-    fun balancedRooms(board: Board, roomIds: Array<IntArray>): Set<Int> {
-        val balance = HashMap<Int, Int>()
-        val size = HashMap<Int, Int>()
+    fun validRooms(board: Board, roomIds: Array<IntArray>): Set<Int> {
+        val whites = HashMap<Int, MutableList<Pair<Int, Int>>>()
+        val grays = HashMap<Int, MutableList<Pair<Int, Int>>>()
+        val clues = HashMap<Int, MutableList<Int>>()
         for (r in 0 until board.rows) {
             for (c in 0 until board.cols) {
                 val id = roomIds[r][c]
-                balance[id] = (balance[id] ?: 0) + if (board.cells[r][c].gray) 1 else -1
-                size[id] = (size[id] ?: 0) + 1
+                val cell = board.cells[r][c]
+                (if (cell.gray) grays else whites).getOrPut(id) { mutableListOf() }.add(r to c)
+                if (cell.number > 0) clues.getOrPut(id) { mutableListOf() }.add(cell.number)
             }
         }
-        return balance.filter { (id, b) -> b == 0 && (size[id] ?: 0) > 0 }.keys
+        return (whites.keys + grays.keys).filterTo(HashSet()) { id ->
+            val w = whites[id].orEmpty()
+            val g = grays[id].orEmpty()
+            w.size == g.size && w.isNotEmpty() &&
+                isConnected(w) && isConnected(g) &&
+                normalize(w) in variants(g) &&
+                clues[id].orEmpty().all { it == w.size }
+        }
     }
 
     /**
-     * Progress = (cells in a room with equal white and gray counts / total cells) * 100.
-     * Mirrors frontend/src/progress/doubleChoco.ts; shapes and clues aren't checked.
+     * Progress = (cells in rooms that pass every per-room rule / total cells) * 100.
+     * Mirrors frontend/src/progress/doubleChoco.ts. The undivided board doesn't count
+     * even though it's balanced: its colors aren't two connected, matching halves.
      */
     override fun computeProgress(puzzle: Puzzle, userValues: Map<String, Int>): Double {
         val board = parseBoard(puzzle)
@@ -195,14 +209,14 @@ object DoubleChocoEngine : PuzzleEngine {
         val cols = board.cols
         if (rows < 1 || cols < 1) return 0.0
         val roomIds = computeRooms(rows, cols, edges(board, userValues))
-        val balanced = balancedRooms(board, roomIds)
+        val valid = validRooms(board, roomIds)
         var counted = 0
-        for (r in 0 until rows) for (c in 0 until cols) if (roomIds[r][c] in balanced) counted++
+        for (r in 0 until rows) for (c in 0 until cols) if (roomIds[r][c] in valid) counted++
         return counted.toDouble() / (rows * cols) * 100.0
     }
 
     /**
-     * True when the borders form a valid partition (port of DoubleChocoBoard.tsx
+     * True when the borders form a valid partition (port of doubleChocoRules.ts
      * validateSolution, gated on at least one border like the web board):
      *  1. every room has equally many, and at least one, white and gray cells,
      *  2. the white cells are connected, and so are the gray cells,
@@ -219,26 +233,8 @@ object DoubleChocoEngine : PuzzleEngine {
         if (!e.any) return false
         val roomIds = computeRooms(rows, cols, e)
 
-        val whites = HashMap<Int, MutableList<Pair<Int, Int>>>()
-        val grays = HashMap<Int, MutableList<Pair<Int, Int>>>()
-        val clues = HashMap<Int, MutableList<Int>>()
-        for (r in 0 until rows) {
-            for (c in 0 until cols) {
-                val id = roomIds[r][c]
-                val cell = board.cells[r][c]
-                (if (cell.gray) grays else whites).getOrPut(id) { mutableListOf() }.add(r to c)
-                if (cell.number > 0) clues.getOrPut(id) { mutableListOf() }.add(cell.number)
-            }
-        }
-
-        for (id in whites.keys + grays.keys) {
-            val w = whites[id].orEmpty()
-            val g = grays[id].orEmpty()
-            if (w.size != g.size || w.isEmpty()) return false
-            if (!isConnected(w) || !isConnected(g)) return false
-            if (normalize(w) !in variants(g)) return false
-            if (clues[id].orEmpty().any { it != w.size }) return false
-        }
+        val roomCount = roomIds.flatMap { it.asList() }.toSet().size
+        if (validRooms(board, roomIds).size != roomCount) return false
 
         for (r in 0 until rows - 1) {
             for (c in 0 until cols) {

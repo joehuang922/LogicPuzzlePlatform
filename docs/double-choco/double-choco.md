@@ -70,7 +70,7 @@ At least one thick border exists AND all rules above are satisfied for every roo
 
 ### Progress calculation
 
-`(area of rooms where gray cell count = white cell count / total cell count) * 100`. Rooms are determined by flood-filling cells connected by edges that have no thick border. A room is "established" (valid) when it contains an equal number of gray and white cells. All cells in established rooms count toward progress.
+`(area of valid rooms / total cell count) * 100`. Rooms are determined by flood-filling cells connected by edges that have no thick border. A room is valid when it passes every per-room rule: equally many (and at least one) gray and white cells, the white cells connected and the gray cells connected, the two halves the same shape up to rotation/reflection, and every number clue in it equal to the per-color cell count. All cells in valid rooms count toward progress. The undivided board at the start is balanced but scores 0, since its colors are not two matching connected halves. Shared logic: `player/frontend/src/components/doubleChocoRules.ts` (web), `DoubleChocoEngine.validRooms` (Android).
 
 ## Puzzle Editor
 
