@@ -64,12 +64,14 @@ This is a solo project. Do not create pull requests or feature branches.
 
 # Parser curved pages
 
-- A parser whose boards arrive as photos of a curved page or leaning scans
-  (kakuro, masyu, picto_link, fillomino, nurimaze) straightens them with
-  `flatten.flatten_board(image, rectify_board(image))` before
-  `find_grid_lines`; no per-parser line tracing or remap.
-  `parsers/tests/test_flatten.py` enforces it. Opt a parser in only after
-  every one of its samples traces to the right size, at full and Android size.
+- Every board found with `grid_utils.rectify_board` is flattened: it calls
+  `flatten.flatten_board`, which straightens a curved page or leaning scan
+  and returns the plain four-corner warp when the board is flat or its traced
+  lines don't reach the border with about a cell per gap. No parser calls
+  `flatten_board`, passes `flatten=False`, or traces or remaps lines itself;
+  `parsers/tests/test_flatten.py` enforces it. Tune tracing in `flatten.py`
+  for everyone. After a change there, every parser's samples must still read
+  the right size, at full and Android size (2000px long side).
 
 # Authoring room-based puzzles
 

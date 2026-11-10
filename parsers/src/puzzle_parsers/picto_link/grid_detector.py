@@ -5,7 +5,8 @@ Picto Link boards are a plain rectangular grid of square cells with no regions.
 A photographed magazine page bows, and the 4-corner warp only removes
 perspective: on the 25x25 sample the printed columns slant ~0.2 cell across the
 board, so no straight line fits them and a ruling bar lands inside the digit
-crop. ``flatten_board`` straightens the board before the shared grid finder.
+crop. ``rectify_board`` flattens the board (tracing the ink mask) before the
+shared grid finder.
 
 The rulings are printed in a single ink colour (red in the samples, but the
 pipeline must not assume any particular hue). We therefore drive every geometry
@@ -21,7 +22,6 @@ import cv2
 from numpy.typing import NDArray
 
 from puzzle_parsers.board_grid import BoardGrid
-from puzzle_parsers.flatten import flatten_board
 from puzzle_parsers.grid_utils import (
     find_grid_lines,
     rectify_board,
@@ -39,9 +39,7 @@ def detect_picto_link_grid(
         debug_path.mkdir(parents=True, exist_ok=True)
 
     ink = ink_intensity(image)
-    board = flatten_board(
-        image, rectify_board(image, border_image=ink), line_image=ink, debug_dir=debug_dir
-    )
+    board = rectify_board(image, border_image=ink, debug_dir=debug_dir)
     warped, border_pts = board.warped, board.quad
 
     if debug_path:

@@ -378,16 +378,25 @@ _LATTICE_BAND_FRAC = 0.055
 
 
 def rectify_board(
-    image: NDArray, *, border_image: NDArray | None = None
+    image: NDArray,
+    *,
+    border_image: NDArray | None = None,
+    flatten: bool = True,
+    debug_dir: str | Path | None = None,
 ) -> RectifiedBoard:
-    """Find the board, warp it to a rectangle and normalise its cell size.
+    """Find the board, warp it to a rectangle, flatten it and normalise its cell size.
 
     Returns a :class:`RectifiedBoard`: ``warped`` is the board at a normalised
     cell size, for finding the grid; ``native`` is the same board at source
     resolution, for reading clues (``to_native`` maps a grid found on
     ``warped`` onto it). ``border_image`` is a grayscale image, same size as
-    ``image``, to search for the border in instead of ``image`` itself (picto
-    link searches an ink mask).
+    ``image``, to search for the border and trace the lines in instead of
+    ``image`` itself (picto link uses an ink mask).
+
+    Every board goes through ``flatten.flatten_board``: a photo of a curved
+    page comes out with straight, even lines, and a flat board, or one whose
+    lines can't be traced to the border, comes back as the four-corner warp.
+    ``flatten=False`` returns the plain warp (tests compare the two).
     """
     gray = border_image
     if gray is None:
@@ -409,7 +418,12 @@ def rectify_board(
     else:
         quad = find_quadrilateral_border(gray)
     native, _, _ = warp_to_rectangle(image, quad)
-    return RectifiedBoard(warped=normalize_cell_scale(native), quad=quad, native=native)
+    board = RectifiedBoard(warped=normalize_cell_scale(native), quad=quad, native=native)
+    if not flatten:
+        return board
+    from puzzle_parsers.flatten import flatten_board  # flatten imports this module
+
+    return flatten_board(image, board, line_image=border_image, debug_dir=debug_dir)
 
 
 @dataclass
@@ -466,13 +480,52 @@ def _pitch_at_scale(warped_gray: NDArray) -> float | None:
         255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 3,
     )
     ink = (binary > 0).astype(np.float32)
-    row_pitch = _projection_pitch(ink.sum(axis=1))
-    col_pitch = _projection_pitch(ink.sum(axis=0))
+    row_proj, col_proj = ink.sum(axis=1), ink.sum(axis=0)
+    row_pitch = _projection_pitch(row_proj)
+    col_pitch = _projection_pitch(col_proj)
     if not row_pitch or not col_pitch:
         return None
-    if max(row_pitch, col_pitch) / min(row_pitch, col_pitch) > _PITCH_AXIS_AGREEMENT:
+    if max(row_pitch, col_pitch) / min(row_pitch, col_pitch) <= _PITCH_AXIS_AGREEMENT:
+        return (row_pitch + col_pitch) / 2
+    return _shared_pitch(min(row_pitch, col_pitch), row_proj, col_proj)
+
+
+# A lag both axes repeat at, each with at least this autocorrelation, is the
+# cell pitch even when one axis's strongest repeat is a multiple of it.
+_SHARED_PITCH_MIN_AC = 0.3
+
+
+def _autocorrelation(proj: NDArray) -> NDArray | None:
+    p = proj - proj.mean()
+    if not np.any(p):
         return None
-    return (row_pitch + col_pitch) / 2
+    ac = np.correlate(p, p, "full")[len(p) - 1 :]
+    return ac / ac[0]
+
+
+def _shared_pitch(pitch: float, row_proj: NDArray, col_proj: NDArray) -> float | None:
+    """``pitch`` if both axes repeat at it, else ``None``.
+
+    Called when the axes disagree. A maze of one-cell corridors and one-cell
+    walls (the 45x31 slalom at Android size) repeats every two cells along one
+    axis more strongly than every cell, so that axis reads twice the pitch.
+    The finer reading is the pitch when the other axis also peaks there.
+    A finer reading that is a half-cell overtone (a digit centred between the
+    lines) fails this: the other axis has a trough at half a cell.
+    """
+    from scipy.signal import find_peaks
+
+    lags = []
+    for ac in (_autocorrelation(row_proj), _autocorrelation(col_proj)):
+        if ac is None:
+            return None
+        lo, hi = int(pitch * 0.9), min(len(ac) - 1, int(np.ceil(pitch * 1.1)))
+        peaks, _ = find_peaks(ac[: hi + 2])
+        peaks = [int(k) for k in peaks if lo <= k <= hi and ac[k] >= _SHARED_PITCH_MIN_AC]
+        if not peaks:
+            return None
+        lags.append(max(peaks, key=lambda k: ac[k]))
+    return float(np.mean(lags))
 
 
 def normalize_cell_scale(warped: NDArray) -> NDArray:
@@ -548,11 +601,9 @@ def _projection_pitch(proj: NDArray) -> float | None:
     from scipy.signal import find_peaks
 
     span = len(proj)
-    p = proj - proj.mean()
-    if not np.any(p):
+    ac = _autocorrelation(proj)
+    if ac is None:
         return None
-    ac = np.correlate(p, p, "full")[span - 1 :]
-    ac = ac / ac[0]
     lo, hi = max(3, span // 64), span // 4
     peaks, _ = find_peaks(ac[: hi + 1], distance=max(2, lo // 2))
     peaks = [int(k) for k in peaks if k >= lo]

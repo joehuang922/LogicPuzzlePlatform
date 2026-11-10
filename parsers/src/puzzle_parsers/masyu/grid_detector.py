@@ -1,7 +1,7 @@
 """Grid detection for masyu: the shared board finder, flattening and grid finder.
 
 Masyu boards come as flat scans, big scans whose lines sit ~0.1 cell off an
-even grid, and phone photos of a curved page. ``flatten_board`` straightens
+even grid, and phone photos of a curved page. ``rectify_board`` flattens
 the last two (on a straight grid a black circle's rim poked into the cell above
 and read as a white circle); ``find_grid_lines`` then finds the lines.
 """
@@ -13,12 +13,11 @@ import cv2
 from numpy.typing import NDArray
 
 from puzzle_parsers.board_grid import BoardGrid
-from puzzle_parsers.flatten import flatten_board
 from puzzle_parsers.grid_utils import find_grid_lines, rectify_board
 
 
 def detect_masyu_grid(image: NDArray, debug_dir: str | None = None) -> BoardGrid:
-    board = flatten_board(image, rectify_board(image), debug_dir=debug_dir)
+    board = rectify_board(image, debug_dir=debug_dir)
     warped_gray = cv2.cvtColor(board.warped, cv2.COLOR_BGR2GRAY)
     h_lines, v_lines = find_grid_lines(warped_gray)
     grid = board.to_native(BoardGrid(warped=board.warped, h_lines=h_lines, v_lines=v_lines))

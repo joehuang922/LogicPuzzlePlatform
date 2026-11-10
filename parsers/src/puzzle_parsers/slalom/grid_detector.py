@@ -3,7 +3,7 @@
 Pipeline:
 1. Find quadrilateral border and warp to rectangle
 2. Detect grid lines via morphological projection
-3. Classify cells as wall (black) or empty (white) using intensity
+3. Classify cells as wall (black) or empty (white) against the local paper
 """
 from __future__ import annotations
 
@@ -12,13 +12,13 @@ from pathlib import Path
 import cv2
 import numpy as np
 from numpy.typing import NDArray
+from scipy.ndimage import maximum_filter
 
 from puzzle_parsers.board_grid import BoardGrid
 from puzzle_parsers.grid_utils import (
     find_grid_lines,
     rectify_board,
 )
-from puzzle_parsers.cell_fill import is_filled
 from puzzle_parsers.cell_ocr import crop_cell
 
 
@@ -61,28 +61,37 @@ def detect_slalom_grid(
     ))
 
 
-def classify_walls(warped_gray: NDArray, geom: BoardGrid) -> list[list[int]]:
-    """Classify cells as wall (1) or empty (0) with the shared ``is_filled``.
+# A cell is a wall when its centre is darker than this fraction of the
+# brightest paper within _WALL_PAPER_CELLS of it. Measured over every sample
+# at full and Android size: walls <= 0.60 (a wall under a thumb's shadow on
+# the 45x31 photo), paper >= 0.84.
+_WALL_PAPER_RATIO = 0.75
+_WALL_PAPER_CELLS = 3
 
-    Walls are black cells (some carry a white gate number); the test reads the
-    central region so the grid lines stay out.
+
+def classify_walls(warped_gray: NDArray, geom: BoardGrid) -> list[list[int]]:
+    """Classify cells as wall (1) or empty (0) against the local paper level.
+
+    Walls are black cells (some carry a white gate number). A cell's level is
+    the median of its central region (grid lines and a white digit stay out
+    of it). A fixed dark cutoff (``cell_fill.is_filled``) missed walls in a
+    shadow: they print grey (100-152) while the paper there is still white, so
+    each cell is compared with the brightest paper in a 7x7 cell window.
+    A slalom maze never has a solid 7x7 block of walls.
     """
     rows, cols = geom.rows, geom.cols
-    cells = [[0] * cols for _ in range(rows)]
-
-    for r in range(rows):
-        for c in range(cols):
-            y1 = geom.h_lines[r]
-            y2 = geom.h_lines[r + 1]
-            x1 = geom.v_lines[c]
-            x2 = geom.v_lines[c + 1]
-
-            center = crop_cell(warped_gray, y1, y2, x1, x2, margin=0.2)
-
-            if is_filled(center):
-                cells[r][c] = 1
-
-    return cells
+    level = np.array([
+        [
+            float(np.median(crop_cell(
+                warped_gray, geom.h_lines[r], geom.h_lines[r + 1],
+                geom.v_lines[c], geom.v_lines[c + 1], margin=0.2,
+            )))
+            for c in range(cols)
+        ]
+        for r in range(rows)
+    ])
+    paper = maximum_filter(level, size=2 * _WALL_PAPER_CELLS + 1, mode="nearest")
+    return (level < _WALL_PAPER_RATIO * np.maximum(paper, 1)).astype(int).tolist()
 
 
 def detect_gate_cells(

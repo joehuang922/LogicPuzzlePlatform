@@ -9,17 +9,18 @@ traces every grid line through narrow strips (a bowed line is nearly straight
 across a few cells) and remaps the board so each traced line becomes straight
 and evenly spaced. A flat board comes back unchanged.
 
-Usage, between finding the board and finding its lines::
+``rectify_board`` calls it on every board, so every parser that finds its
+board with ``rectify_board`` gets a curved page straightened:
 
-    board = flatten_board(image, rectify_board(image))
+    board = rectify_board(image)          # four-corner warp, then flatten_board
     h_lines, v_lines = find_grid_lines(gray(board.warped))
 
 Tracing reads only line-like ink, so it copes with dashed or solid rulings,
-clue circles, digits and black cells. It does count lines on its own, and on
-boards with a title band inside the border, halftone shading or a heavy frame
-that count can be wrong. That is why a parser opts in (kakuro, masyu,
-picto_link, fillomino, nurimaze: every sample of theirs traces to the right size) rather
-than every board going through it.
+clue circles, digits and black cells. It counts lines on its own, so it checks
+its trace before using it: the outer lines must reach the border quad that
+``rectify_board`` found and every gap must be about a cell (``_fits_border``).
+A board that fails that check (a title band inside the border, halftone
+shading, a heavy frame) comes back as the plain four-corner warp.
 """
 from __future__ import annotations
 
@@ -51,6 +52,10 @@ _MIN_MISFIT_CELLS = 0.05
 # A traced outer line this far (in cells) outside the border quad at both of
 # the board's corners is not the border (see _drop_outside).
 _OUTSIDE_CELLS = 0.35
+# A trace is kept only if its outer lines lie this close (in cells) to the
+# border quad and every gap is within this range of a cell (see _fits_border).
+_BORDER_FIT_CELLS = 0.5
+_GAP_RANGE = (0.6, 1.45)
 # Ink thicker than this across the line direction is a black cell or a filled
 # disc, not a ruling; only its rim (which sits on the cell's lines) is kept.
 _THIN_CELLS = 0.2
@@ -85,6 +90,7 @@ def flatten_board(
     if work.ndim == 3:
         work = cv2.cvtColor(work, cv2.COLOR_BGR2GRAY)
     binary = _binary(work)
+    _erase_solid(binary, work, _WORK_PX)
     _erase_blobs(binary, _WORK_PX)
 
     # The pitch estimate can be a few % off, and every threshold is in cells:
@@ -103,9 +109,15 @@ def flatten_board(
             break
         pitch = measured
 
-    h_tracks = _drop_outside(_trim_tracks(h_tracks, pitch), margin, margin + nh * to_work, pitch)
-    v_tracks = _drop_outside(_trim_tracks(v_tracks, pitch), margin, margin + nw * to_work, pitch)
+    h_edges = (margin, margin + nh * to_work)
+    v_edges = (margin, margin + nw * to_work)
+    h_tracks = _drop_outside(_trim_tracks(_drop_midcell(h_tracks, pitch), pitch), *h_edges, pitch)
+    v_tracks = _drop_outside(_trim_tracks(_drop_midcell(v_tracks, pitch), pitch), *v_edges, pitch)
     if len(h_tracks) < 3 or len(v_tracks) < 3:
+        return board
+    h_tracks = _add_border(h_tracks, *h_edges, pitch)
+    v_tracks = _add_border(v_tracks, *v_edges, pitch)
+    if not (_fits_border(h_tracks, *h_edges, pitch) and _fits_border(v_tracks, *v_edges, pitch)):
         return board
     if max(_misfit(h_tracks), _misfit(v_tracks)) < _MIN_MISFIT_CELLS * pitch:
         return board
@@ -162,6 +174,23 @@ def _erase_blobs(binary: NDArray, pitch: float) -> None:
     blob = (w >= lo) & (w <= hi) & (h >= lo) & (h <= hi)
     blob[0] = False  # background
     binary[blob[labels]] = 0
+
+
+def _erase_solid(binary: NDArray, gray: NDArray, pitch: float) -> None:
+    """Blank ``binary`` inside solid dark areas (black cells), in place.
+
+    A photo's grain inside a black cell survives the adaptive threshold as
+    specks; along a wall band several cells long they bridge into a run that
+    poses as a grid line mid-cell (the 45x31 slalom photo). The black cell's
+    own edges sit on grid lines and stay: only ink deeper than 0.15 cell
+    inside the dark area goes.
+    """
+    _, dark = cv2.threshold(
+        cv2.GaussianBlur(gray, (5, 5), 0), 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
+    )
+    k = max(3, int(round(0.3 * pitch)) | 1)
+    solid = cv2.erode(dark, cv2.getStructuringElement(cv2.MORPH_RECT, (k, k)))
+    binary[solid > 0] = 0
 
 
 def _line_mask(binary: NDArray, axis: int, pitch: float) -> NDArray:
@@ -378,6 +407,53 @@ def _drop_outside(tracks: NDArray, lo: float, hi: float, pitch: float) -> NDArra
     while b - a > 3 and outside(tracks[b - 1]):
         b -= 1
     return tracks[a:b]
+
+
+def _drop_midcell(tracks: NDArray, pitch: float) -> NDArray:
+    """Drop a line half a cell from both neighbours that are a cell apart.
+
+    A dashed line through cell centres (a slalom gate, a sinkamino rule)
+    traces like a ruling and splits one cell into two half cells.
+    """
+    keep = [tracks[0]]
+    for k in range(1, len(tracks) - 1):
+        g1 = float(np.mean(tracks[k] - keep[-1]))
+        g2 = float(np.mean(tracks[k + 1] - tracks[k]))
+        if 0.3 * pitch <= min(g1, g2) and max(g1, g2) <= 0.7 * pitch and 0.8 * pitch <= g1 + g2 <= 1.2 * pitch:
+            continue
+        keep.append(tracks[k])
+    keep.append(tracks[-1])
+    return np.array(keep)
+
+
+def _add_border(tracks: NDArray, lo: float, hi: float, pitch: float) -> NDArray:
+    """Add the border quad's edge as the outer line when tracing missed it.
+
+    A thick border next to a dark page curl or shadow merges into one fat band
+    the line mask drops; the traced lines then stop about a cell inside the
+    border quad, which ``rectify_board`` already fitted to the border.
+    """
+    first, last = float(tracks[0].mean()), float(tracks[-1].mean())
+    if 0.6 * pitch <= first - lo <= 1.4 * pitch:
+        tracks = np.vstack([np.full_like(tracks[0], lo), tracks])
+    if 0.6 * pitch <= hi - last <= 1.4 * pitch:
+        tracks = np.vstack([tracks, np.full_like(tracks[0], hi)])
+    return tracks
+
+
+def _fits_border(tracks: NDArray, lo: float, hi: float, pitch: float) -> bool:
+    """Whether the traced lines span the border quad with about a cell per gap.
+
+    Tracing counts lines on its own; when it loses part of the board (a title
+    band, halftone, a heavy frame) its outer lines end cells inside the quad,
+    or its gaps stop being a cell. Then the plain four-corner warp is the
+    safer board, so ``flatten_board`` is safe on every parser.
+    """
+    means = tracks.mean(axis=1)
+    if abs(means[0] - lo) > _BORDER_FIT_CELLS * pitch or abs(means[-1] - hi) > _BORDER_FIT_CELLS * pitch:
+        return False
+    gaps = np.diff(means) / pitch
+    return bool(np.all((gaps >= _GAP_RANGE[0]) & (gaps <= _GAP_RANGE[1])))
 
 
 def _misfit(tracks: NDArray) -> float:

@@ -121,11 +121,14 @@ def find_squares(ink: NDArray, h_lines: list[int], v_lines: list[int]) -> set[tu
         sides = np.minimum.reduce([
             hseg(Y, X, X + s), hseg(Y + s, X, X + s), vseg(X, Y, Y + s), vseg(X + s, Y, Y + s),
         ])
+        # Probe past the corner, one pixel clear of the dilation's reach: a
+        # side that is a pixel stair (a resampled, slightly tilted square)
+        # otherwise reads its own corner as running on.
         runs_on = np.maximum.reduce([
-            np.minimum(hseg(Y, X - e, X - 1), hseg(Y, X + s + 1, X + s + e)),
-            np.minimum(hseg(Y + s, X - e, X - 1), hseg(Y + s, X + s + 1, X + s + e)),
-            np.minimum(vseg(X, Y - e, Y - 1), vseg(X, Y + s + 1, Y + s + e)),
-            np.minimum(vseg(X + s, Y - e, Y - 1), vseg(X + s, Y + s + 1, Y + s + e)),
+            np.minimum(hseg(Y, X - e - 1, X - 2), hseg(Y, X + s + 2, X + s + e + 1)),
+            np.minimum(hseg(Y + s, X - e - 1, X - 2), hseg(Y + s, X + s + 2, X + s + e + 1)),
+            np.minimum(vseg(X, Y - e - 1, Y - 2), vseg(X, Y + s + 2, Y + s + e + 1)),
+            np.minimum(vseg(X + s, Y - e - 1, Y - 2), vseg(X + s, Y + s + 2, Y + s + e + 1)),
         ])
         inner = (ii[Y + s - a, X + s - a] - ii[Y + a, X + s - a] - ii[Y + s - a, X + a] + ii[Y + a, X + a]) / (
             (s - 2 * a) ** 2
