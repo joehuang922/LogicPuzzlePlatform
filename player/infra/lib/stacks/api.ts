@@ -30,6 +30,10 @@ export class ApiStack extends cdk.Stack {
       // 29s = API Gateway's max integration timeout. Gives the DB layer's
       // resume-retry loop room to outlast an Aurora cold start (~10-25s).
       timeout: cdk.Duration.seconds(29),
+      // Create/edit runs the solver gate synchronously under a 10s budget, and Lambda
+      // scales CPU with memory: the 128MB default is ~1/14 of a core, which turned a
+      // 0.6s LITS proof (50x64) into a timeout. 1769MB is one full vCPU.
+      memorySize: 1769,
     });
 
     props.cluster.secret!.grantRead(puzzlesHandler);
