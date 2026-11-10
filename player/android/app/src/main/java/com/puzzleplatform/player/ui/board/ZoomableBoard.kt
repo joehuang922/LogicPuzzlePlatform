@@ -1,20 +1,28 @@
 package com.puzzleplatform.player.ui.board
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /** Largest cell the board is ever drawn at — zooming in stops here. */
@@ -23,6 +31,20 @@ private val MAX_CELL = 40.dp
 private val AUTO_CELL = 28.dp
 /** Below this, cells are too small to tap/draw reliably, so input is off. */
 private val ENTRY_FLOOR = 24.dp
+
+/**
+ * The cell the player is typing into while an entry pad (DigitBar / NumberPad) covers
+ * the bottom of the screen. [cellKey] is "col,row"; [viewportBottom] is the space the
+ * pad takes, so a change in the pad's height re-runs the scroll. Provided by the play
+ * screen; every [ZoomableBoard] under it scrolls that cell into view (via the nearest
+ * scrollable parent) so a bottom-row cell never ends up behind the pad.
+ */
+data class EntryFocus(val cellKey: String, val viewportBottom: Dp)
+
+val LocalEntryFocus = compositionLocalOf<EntryFocus?> { null }
+
+/** Extra room kept around the focused cell when scrolling it into view, in cells. */
+private const val FOCUS_MARGIN_CELLS = 0.5f
 
 /**
  * A square, two-finger pan/zoom viewport for grid boards, shared by every puzzle
@@ -47,6 +69,7 @@ private val ENTRY_FLOOR = 24.dp
  * The draw callbacks receive a (col, row) or null when the finger is off-grid /
  * cells are too small to input.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ZoomableBoard(
     cols: Int,
@@ -80,9 +103,23 @@ fun ZoomableBoard(
         // A version counter so gesture-driven mutations to `transform` recompose.
         var version by remember(transform) { mutableStateOf(0) }
 
+        // Scroll the cell being typed into clear of the entry pad. Waits a frame so the
+        // layout with the pad (and the smaller viewport it leaves) is in place first.
+        val focus = LocalEntryFocus.current
+        val focusRequester = remember { BringIntoViewRequester() }
+        LaunchedEffect(focus, transform) {
+            val (col, row) = focus?.cellKey?.split(",")?.mapNotNull { it.toIntOrNull() }
+                ?.takeIf { it.size == 2 && it[0] in 0 until cols && it[1] in 0 until rows }
+                ?: return@LaunchedEffect
+            withFrameNanos { }
+            val (l, t, r, b) = transform.cellBounds(col, row, FOCUS_MARGIN_CELLS)
+            focusRequester.bringIntoView(Rect(l, t, r, b))
+        }
+
         val canvasMod = Modifier
             .fillMaxWidth()
             .aspectRatio(1f)
+            .bringIntoViewRequester(focusRequester)
             .pointerInput(transform, drawable) {
                 detectBoardGestures(
                     transformEnabled = transform.zoomable,

@@ -211,4 +211,30 @@ class BoardTransformTest {
         assertEquals(9.25f, row, 0.01f)
         assertNull(t.fractionalCellAt(t.panX - 30f, t.panY)) // beyond the margin
     }
+
+    // -- cellBounds (scrolling the selected cell clear of the entry pad) ---------
+
+    @Test
+    fun cellBounds_mapsCellAndMarginIntoViewport() {
+        // 9x9 at 40px is 360px, centered in 1080: grid origin at 360.
+        val t = make(9, 9)
+        val b = t.cellBounds(2, 8, marginCells = 0.5f)
+        assertEquals(360f + 80f - 20f, b[0], 0.01f)
+        assertEquals(360f + 320f - 20f, b[1], 0.01f)
+        assertEquals(360f + 120f + 20f, b[2], 0.01f)
+        assertEquals(360f + 360f + 20f, b[3], 0.01f)
+    }
+
+    @Test
+    fun cellBounds_clipsToViewport() {
+        // 60x60 at the 28px auto zoom overflows the viewport; anchored top-left, so
+        // the bottom-right cell lies far outside and clamps to the viewport edge.
+        val t = make(60, 60)
+        val b = t.cellBounds(0, 0, marginCells = 0.5f)
+        assertEquals(0f, b[0], 0.01f)
+        assertEquals(0f, b[1], 0.01f)
+        val far = t.cellBounds(59, 59)
+        assertEquals(VP, far[2], 0.01f)
+        assertEquals(VP, far[3], 0.01f)
+    }
 }

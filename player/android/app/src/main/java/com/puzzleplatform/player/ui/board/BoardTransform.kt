@@ -98,6 +98,21 @@ class BoardTransform(
         return if (col in -padCells..cols + padCells && row in -padCells..rows + padCells) col to row else null
     }
 
+    /**
+     * Viewport-space bounds (left, top, right, bottom) of cell ([col], [row]) at the
+     * current zoom/pan, grown by [marginCells] cells on every side and clipped to the
+     * square viewport. Used to scroll the selected cell clear of the entry pad.
+     */
+    fun cellBounds(col: Int, row: Int, marginCells: Float = 0f): FloatArray {
+        val m = marginCells * cellPx
+        return floatArrayOf(
+            (panX + col * cellPx - m).coerceIn(0f, viewportPx),
+            (panY + row * cellPx - m).coerceIn(0f, viewportPx),
+            (panX + (col + 1) * cellPx + m).coerceIn(0f, viewportPx),
+            (panY + (row + 1) * cellPx + m).coerceIn(0f, viewportPx),
+        )
+    }
+
     companion object {
         /**
          * Clamp one axis of the pan offset: center the board when it's smaller than
