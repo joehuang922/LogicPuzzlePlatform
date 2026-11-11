@@ -8,6 +8,8 @@ import {
   UNIQUE_SOLUTION,
   MULTIPLE,
   NONE,
+  HARD_15X25,
+  UNSOLVABLE_15X25,
 } from "./fixtures";
 
 const model = (canon = UNIQUE) => SlitherlinkModel.fromCanon(canon);
@@ -118,5 +120,35 @@ describe("gate() end-to-end", () => {
   it("reports 'none' with no solution payload", async () => {
     const { gate } = await import("../../gate");
     expect(gate(5, NONE)).toEqual({ verdict: "none", solution: null });
+  });
+});
+
+describe("large boards — probing and the loop-closing rule", () => {
+  // The old solver passed 340k nodes on HARD_15X25 without a verdict; a 100-node cap
+  // makes sure it is settled by deduction, not by a lucky search.
+  const budget = { maxNodes: 100 };
+
+  it("proves a production 15x25 unique within a tiny node budget", () => {
+    expect(classify(model(HARD_15X25), budget)).toBe("unique");
+    const s = solve(model(HARD_15X25), budget);
+    expect(s).not.toBeNull();
+    expect(isValidSolution(HARD_15X25, s!)).toBe(true);
+  });
+
+  it("proves an unsolvable 15x25 'none' within a tiny node budget", () => {
+    expect(classify(model(UNSOLVABLE_15X25), budget)).toBe("none");
+  });
+
+  it("forces off an edge that would close a loop that is not the whole answer", () => {
+    // 2x3 board with a 1 in the bottom-right cell. Drawing the top, left and bottom of the
+    // top-left cell leaves its right edge closing a square that misses the 1, so that edge
+    // must be off. Probing at construction leaves this corner open, and no clue, dot or
+    // colour rule sees it; only the loop-closing rule does.
+    // Edge ids: h(r,c) = r*3 + c, v(r,c) = 9 + r*4 + c.
+    const top0 = 0, bottom0 = 3, left0 = 9, right0 = 10;
+    let m = model(canonFromClues(["...", "..1"])) as unknown as SlitherlinkModel;
+    for (const e of [top0, left0, bottom0]) m = m.assign(e, 1) as SlitherlinkModel;
+    expect(m.isDead()).toBe(false);
+    expect((m as unknown as { state: Int8Array }).state[right0]).toBe(0);
   });
 });

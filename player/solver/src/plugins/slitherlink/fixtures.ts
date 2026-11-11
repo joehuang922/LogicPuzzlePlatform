@@ -55,6 +55,51 @@ export const MULTIPLE: SlitherlinkCanon = canonFromClues(["..", ".."]);
  */
 export const NONE: SlitherlinkCanon = canonFromClues(["3"]);
 
+/**
+ * A 15x25 production board (084c5d3f) that the gate used to time out on: the plain clue,
+ * dot and colouring rules left 639 of its 790 edges undecided, and the search ran past
+ * 340k nodes without proving it. Probing settles every edge before the search starts.
+ */
+export const HARD_15X25: SlitherlinkCanon = canonFromClues([
+  "101..3.....022.....3..223",
+  "32..0..333.....113..0..23",
+  "1..3.......1.3.......1..3",
+  "..1..320.21...23.203..2..",
+  ".0.3........0........3.3.",
+  "3...1...0..3.2..3...3...1",
+  ".1.2......3...3......2.1.",
+  "..3..020.0.....1.010..1..",
+  ".3.1......2...1........3.",
+  "2...1...0..2.0..1...3...2",
+  ".3.3........3........2.3.",
+  "..2..202.32...02.302..0..",
+  "3..2.......3.1.......2..2",
+  "13..2..313.....131..3..22",
+  "132..2.....112.....1..023",
+]);
+
+/**
+ * A 15x25 production board (007418ec) with no solution (most likely a misread clue). The
+ * old search needed ~15s to exhaust it; probing proves it dead at construction.
+ */
+export const UNSOLVABLE_15X25: SlitherlinkCanon = canonFromClues([
+  "33.3.3...201.112...3.0.13",
+  "....2..2..1...0..3..1....",
+  "..2.1.3.3...3...1.1.2.0..",
+  ".30...0.2..020..3.2...33.",
+  "13..0..1..11.12..3..3..22",
+  "2..2.3...13...31...1.1..1",
+  "..3...1.32.....32.2...2..",
+  ".3..3..32.......12..0..3.",
+  "..2...2.11.....22.1...3..",
+  "1..0.0...23...32...3.2..0",
+  "01..3..3..22.12..3..1..32",
+  ".22...2.3..010..2.3...22.",
+  "..2.1.3.2...1...3.3.2.1..",
+  "....2..2..0...1..0..1....",
+  "10.3.3...212.322.3.3.3.11",
+]);
+
 // -- independent rule checker -------------------------------------------------
 
 /**

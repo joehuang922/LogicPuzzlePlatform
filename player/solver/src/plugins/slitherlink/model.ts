@@ -245,6 +245,15 @@ class ParityDSU {
  * two faces to the same colour (OFF) or opposite colours (ON) — and conversely, once two
  * faces are known same/opposite, the edge between them is forced OFF/ON. This both detects
  * contradictions early and forces many more edges, collapsing the search on real puzzles.
+ *
+ * A fourth propagator applies the single-loop rule early (`applyLoopRule`): an edge that
+ * would close a path into a loop that isn't the whole answer is forced OFF.
+ *
+ * Even with all four, most edges of a 15x25 stay undecided, and the search used to run
+ * past 300k nodes without a verdict. So construction ends with failed-literal probing
+ * (`probe`): try each undecided edge both ways and keep the side that survives. That
+ * settles every production 15x25 before the search starts, in 5-25ms. Search nodes don't
+ * probe (measured slower), and the probe runs before the search budget's first tick.
  */
 export class SlitherlinkModel implements ConstraintModel<SlitherlinkEdges> {
   private constructor(
@@ -261,7 +270,7 @@ export class SlitherlinkModel implements ConstraintModel<SlitherlinkEdges> {
     // Propagate from the initial (all-undecided) board: 0-clues force their edges off,
     // and border dangles get resolved, before any branching.
     const model = new SlitherlinkModel(spec, state, dsu, false);
-    return model.propagateAll();
+    return model.propagateAll().probe();
   }
 
   isDead(): boolean {
@@ -298,6 +307,14 @@ export class SlitherlinkModel implements ConstraintModel<SlitherlinkEdges> {
   }
 
   assign(id: number, value: number): ConstraintModel<SlitherlinkEdges> {
+    // Probing runs once, at construction. Probing every search node too was measured
+    // slower: on a 45x31 the search after root probing is tiny, and re-probing each node
+    // cost ~35x more than it saved.
+    return this.assignRaw(id, value);
+  }
+
+  /** Assign and propagate (no probing); probing is built on it. */
+  private assignRaw(id: number, value: number): SlitherlinkModel {
     if (this.state[id] !== UNDECIDED) {
       // Reassigning a settled edge to the same value is a no-op; to a different value is a
       // contradiction. Branch candidates are always UNDECIDED, so this only guards misuse.
@@ -323,6 +340,36 @@ export class SlitherlinkModel implements ConstraintModel<SlitherlinkEdges> {
   }
 
   // -- propagation ------------------------------------------------------------
+
+  /**
+   * Failed-literal probing: for each undecided edge, try ON and OFF with full propagation.
+   * If one side dies the edge takes the other value (sound for counting: the dead side
+   * holds no solutions); if both die the model is dead. Repeats until a whole pass decides
+   * nothing. This is the "if this edge were a line, X breaks" step a human uses, and it is
+   * what lets large boards solve without deep search: the plain rules leave most edges of
+   * a 15x25 undecided, and a wrong guess was only exposed many levels further down.
+   */
+  private probe(): SlitherlinkModel {
+    let m: SlitherlinkModel = this;
+    for (let changed = true; changed && !m.dead; ) {
+      changed = false;
+      for (let e = 0; e < m.spec.edgeCount && !m.dead; e++) {
+        if (m.state[e] !== UNDECIDED) continue;
+        const on = m.assignRaw(e, ON);
+        if (on.dead) {
+          m = m.assignRaw(e, OFF);
+          changed = true;
+          continue;
+        }
+        const off = m.assignRaw(e, OFF);
+        if (off.dead) {
+          m = on;
+          changed = true;
+        }
+      }
+    }
+    return m;
+  }
 
   private toDead(): SlitherlinkModel {
     return new SlitherlinkModel(this.spec, this.state, this.dsu, true);
@@ -382,98 +429,104 @@ export class SlitherlinkModel implements ConstraintModel<SlitherlinkEdges> {
           if (before === null) colorDirty = true;
         }
       }
-      if (!colorDirty) break;
-      colorDirty = false;
-      // 2-coloring (faces -> edge): any undecided edge whose two faces are now known to be
-      // same/opposite colour is forced OFF/ON. Forced edges re-enter the worklist above.
-      for (let e = 0; e < spec.edgeCount; e++) {
-        if (state[e] !== UNDECIDED) continue;
-        const [fa, fb] = spec.facesOfEdge[e];
-        const rel = dsu.related(fa, fb);
-        if (rel !== null && !force(e, rel === 1 ? ON : OFF)) return this.toDead();
+      if (colorDirty) {
+        colorDirty = false;
+        // 2-coloring (faces -> edge): any undecided edge whose two faces are now known to be
+        // same/opposite colour is forced OFF/ON. Forced edges re-enter the worklist above.
+        for (let e = 0; e < spec.edgeCount; e++) {
+          if (state[e] !== UNDECIDED) continue;
+          const [fa, fb] = spec.facesOfEdge[e];
+          const rel = dsu.related(fa, fb);
+          if (rel !== null && !force(e, rel === 1 ? ON : OFF)) return this.toDead();
+        }
+        if (qi < queue.length) continue;
       }
+      // The single-loop rule runs once the local rules are quiet; any edge it forces sends
+      // the loop back round.
+      if (!this.applyLoopRule(force)) return this.toDead();
+      if (qi < queue.length) continue;
+      return this;
     }
-    // Premature-loop prune. A closed cycle among the ON edges can never grow — all its
-    // dots are locked at degree 2 — so it must BE the final loop. The branch is therefore
-    // dead unless that cycle is already the whole answer: the only ON component, with every
-    // clue satisfied. (We must NOT also require all edges decided: at the moment the true
-    // solution's loop closes, clue-free edges elsewhere may still be undecided and will be
-    // forced off later — requiring them resolved here would wrongly kill valid solutions.)
-    // Any surviving undecided edges are cleaned up by the search, and a stray second loop
-    // is rejected at the leaf by isSingleLoop. This is what tames the search on big boards.
-    if (this.prematureLoopDead()) return this.toDead();
-    return this;
   }
 
   /**
-   * Decide whether a prematurely-closed loop makes this branch dead. ON edges form a
-   * disjoint union of simple paths and cycles (every dot has ON-degree <= 2 by the dot
-   * rule); for a connected component a path has dots = edges + 1, a cycle has dots = edges.
-   * We union-find the ON edges once, then tally edges and dots per component.
+   * The single-loop rule, applied to the ON edges so far. They form simple paths and
+   * cycles (the dot rule keeps every dot's degree <= 2); per component a path has
+   * dots = edges + 1 and a cycle has dots = edges.
    *
-   * A closed cycle (edges === dots) can never grow — its dots are locked at degree 2 — so
-   * it must be the final loop. The branch is dead UNLESS that cycle is already the entire
-   * answer: the only ON component, with every clue satisfied (any still-undecided edges
-   * will be forced off, so they don't block completion). Returns true to kill the branch.
+   *  - A closed cycle can never grow (its dots are full), so it must BE the final loop: the
+   *    branch is dead unless it is the only ON component with every clue met, and then
+   *    every undecided edge is forced OFF (an ON one would start a second loop).
+   *  - Otherwise an undecided edge joining the two ends of the same path would close a
+   *    cycle, so it is forced OFF, unless that cycle would be the whole answer (the only
+   *    component, every clue met once the edge is ON).
+   *
+   * The second part matters: noticing a stray loop only after it closed costs a search
+   * node, and nothing else could build on the fact that the edge must stay off. Returns
+   * false on a contradiction.
    */
-  private prematureLoopDead(): boolean {
+  private applyLoopRule(force: (e: number, v: number) => boolean): boolean {
     const { spec, state } = this;
-    const parent = new Map<number, number>();
+    const dotCount = spec.edgesOfDot.length;
+    const parent = new Int32Array(dotCount);
+    for (let i = 0; i < dotCount; i++) parent[i] = i;
     const find = (x: number): number => {
-      let root = x;
-      while (parent.get(root) !== root) root = parent.get(root)!;
-      while (parent.get(x) !== root) {
-        const nxt = parent.get(x)!;
-        parent.set(x, root);
-        x = nxt;
+      while (parent[x] !== x) {
+        parent[x] = parent[parent[x]];
+        x = parent[x];
       }
-      return root;
+      return x;
     };
-    const ensure = (x: number) => {
-      if (!parent.has(x)) parent.set(x, x);
-    };
-
-    const onEdges: number[] = [];
+    const degree = new Uint8Array(dotCount);
+    let onCount = 0;
     for (let e = 0; e < spec.edgeCount; e++) {
       if (state[e] !== ON) continue;
-      onEdges.push(e);
+      onCount++;
       const [a, b] = spec.endpoints[e];
-      ensure(a);
-      ensure(b);
+      degree[a]++;
+      degree[b]++;
       const ra = find(a);
       const rb = find(b);
-      if (ra !== rb) parent.set(ra, rb);
+      if (ra !== rb) parent[ra] = rb;
     }
-    if (onEdges.length === 0) return false;
+    if (onCount === 0) return true;
 
-    // Final-pass tallies, keyed by current root (stable now that merging is done).
-    const edgesByRoot = new Map<number, number>();
-    const dotsByRoot = new Map<number, number>();
-    for (const e of onEdges) {
-      const r = find(spec.endpoints[e][0]);
-      edgesByRoot.set(r, (edgesByRoot.get(r) ?? 0) + 1);
-    }
-    for (const dot of parent.keys()) {
-      const r = find(dot);
-      dotsByRoot.set(r, (dotsByRoot.get(r) ?? 0) + 1);
-    }
-
+    // Per component (keyed by root): its ON edges and the dots they touch.
+    const edgesByRoot = new Int32Array(dotCount);
+    const dotsByRoot = new Int32Array(dotCount);
+    for (let e = 0; e < spec.edgeCount; e++) if (state[e] === ON) edgesByRoot[find(spec.endpoints[e][0])]++;
+    for (let d = 0; d < dotCount; d++) if (degree[d] > 0) dotsByRoot[find(d)]++;
+    let components = 0;
     let hasCycle = false;
-    for (const [root, edges] of edgesByRoot) {
-      if (edges === (dotsByRoot.get(root) ?? 0)) hasCycle = true;
+    for (let d = 0; d < dotCount; d++) {
+      if (edgesByRoot[d] === 0) continue;
+      components++;
+      if (edgesByRoot[d] === dotsByRoot[d]) hasCycle = true;
     }
-    if (!hasCycle) return false;
 
-    // A cycle exists. It's acceptable only as the whole, finished answer.
-    const singleComponent = edgesByRoot.size === 1;
-    return !(singleComponent && this.allCluesSatisfied());
+    if (hasCycle) {
+      if (components !== 1 || !this.allCluesSatisfied(-1)) return false;
+      for (let e = 0; e < spec.edgeCount; e++) if (state[e] === UNDECIDED && !force(e, OFF)) return false;
+      return true;
+    }
+
+    for (let e = 0; e < spec.edgeCount; e++) {
+      if (state[e] !== UNDECIDED) continue;
+      const [a, b] = spec.endpoints[e];
+      if (degree[a] !== 1 || degree[b] !== 1 || find(a) !== find(b)) continue;
+      // Closing this path is allowed only when it finishes the puzzle.
+      if (components === 1 && this.allCluesSatisfied(e)) continue;
+      if (!force(e, OFF)) return false;
+    }
+    return true;
   }
 
-  private allCluesSatisfied(): boolean {
+  /** True when every clue is met, counting edge `extraOn` (if >= 0) as ON. */
+  private allCluesSatisfied(extraOn: number): boolean {
     const { state, spec } = this;
     for (const cell of spec.clueCells) {
       let on = 0;
-      for (const e of cell.edges) if (state[e] === ON) on++;
+      for (const e of cell.edges) if (state[e] === ON || e === extraOn) on++;
       if (on !== cell.clue) return false;
     }
     return true;
