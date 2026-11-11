@@ -6,6 +6,10 @@ inside it are strong, and the thick border thresholds to two edges. The line
 tracker took the disc outlines, 0.75-0.85 cell from the border, cutting the
 first column's clues (``board-kakuro-big-3.jpg`` read every row's across clue
 half-cropped).
+
+The phone upload of that board (2000px, bilinear, JPEG 85) failed earlier, in
+flattening: a stray speck took the left border's place in one strip, the
+trace missed the curled page's bow, and the plain warp read 32x40.
 """
 from __future__ import annotations
 
@@ -44,3 +48,14 @@ def test_every_cell_is_about_one_pitch(name, rows, cols, android):
         pitch = (lines[-1] - lines[0]) / (len(lines) - 1)
         # 15%: a thick border's outer edge makes the edge cells a little short.
         assert np.all(np.abs(gaps - pitch) <= 0.15 * pitch), gaps.tolist()
+
+
+@pytest.mark.parametrize("long_side", [1800, 2000, 2500, 3000])
+def test_phone_upload_of_curled_page_reads_full_size(long_side):
+    """As ImageInput.kt sends it: bilinear downscale, then JPEG at quality 85."""
+    img = cv2.imread(str(DOCS_DIR / "board-kakuro-big-3.jpg"))
+    scale = long_side / max(img.shape[:2])
+    img = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_LINEAR)
+    _, jpeg = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 85])
+    geom = detect_kakuro_grid(cv2.imdecode(jpeg, cv2.IMREAD_COLOR))
+    assert (geom.rows, geom.cols) == (32, 42)

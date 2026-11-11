@@ -56,6 +56,21 @@ _OUTSIDE_CELLS = 0.35
 # border quad and every gap is within this range of a cell (see _fits_border).
 _BORDER_FIT_CELLS = 0.5
 _GAP_RANGE = (0.6, 1.45)
+# A gap within this many cells of 2 or 3 cells is a line (or two) the trace
+# missed, and is filled in. The outermost gap gets the looser tolerance when
+# the two gaps inside it are clean single cells: a curled page edge
+# foreshortens its edge cells. On a big kakuro photo the line between the
+# all-shaded first column and the next barely thresholds, and border-to-second
+# line measured 1.64 cells, so the trace failed _fits_border. An edge gap next
+# to an unreliable stretch of trace (a 17x17 hitori photo: 3.17, 0.86, 1.71)
+# stays at the strict tolerance. Both are under 0.5, so never a 1.5.
+_MISSED_GAP_TOL = 0.25
+_MISSED_EDGE_GAP_TOL = 0.4
+# A weaker run of a line's group (see _strip_positions) takes over from the
+# strongest only with at least this fraction of its ink. On the curled edge of
+# a big kakuro photo a stray run with 0.1 of the border's ink took the border's
+# place, because the faint line next to the border was missing from the strip.
+_MIN_ALT_RUN_INK = 0.25
 # Ink thicker than this across the line direction is a black cell or a filled
 # disc, not a ruling; only its rim (which sits on the cell's lines) is kept.
 _THIN_CELLS = 0.2
@@ -252,8 +267,12 @@ def _strip_positions(prof: NDArray, pitch: float) -> list[float]:
         if i + 1 < len(lines) and lines[i + 1] - lines[i] < 1.6 * pitch:
             want.append(lines[i + 1] - pitch)
         if want:
+            # Only a run with real ink can stand in: a page edge out-inks the
+            # frame, but a speck a tenth of the border's ink is not a line.
+            strong = max(q[1] for q in g)
+            cands = [q for q in g if q[1] >= _MIN_ALT_RUN_INK * strong]
             target = float(np.mean(want))
-            lines[i] = min(g, key=lambda q: abs(q[0] - target))[0]
+            lines[i] = min(cands, key=lambda q: abs(q[0] - target))[0]
     return lines
 
 
@@ -324,11 +343,18 @@ def _trace_lines(binary: NDArray, axis: int, pitch: float) -> tuple[NDArray, NDA
 
     # Insert lines missed in every strip (a gap of 2-3 cells) by interpolation;
     # drop a line closer than half a cell to the previous one.
+    raw = np.diff(arr.mean(axis=1)) / pitch
+
+    def missed_tol(i: int) -> float:
+        inner = raw[1:3] if i == 0 else raw[-3:-1] if i == len(raw) - 1 else []
+        clean = len(inner) == 2 and all(abs(g - 1) <= _MISSED_GAP_TOL for g in inner)
+        return _MISSED_EDGE_GAP_TOL if clean else _MISSED_GAP_TOL
+
     out = [arr[0]]
-    for t in arr[1:]:
+    for i, t in enumerate(arr[1:]):
         gap = float(np.mean(t - out[-1]))
         k = int(round(gap / pitch))
-        if 2 <= k <= 3 and abs(gap - k * pitch) <= 0.25 * pitch:
+        if 2 <= k <= 3 and abs(gap - k * pitch) <= missed_tol(i) * pitch:
             for q in range(1, k):
                 out.append(out[-1] + (t - out[-1]) / (k - q + 1))
         if gap >= 0.5 * pitch:
