@@ -807,19 +807,44 @@ def _track_ink(proj: NDArray, lines: list[int]) -> list[int]:
     smooth = np.convolve(proj, np.ones(3) / 3, "same")
     size = len(smooth)
 
-    def peak_near(expected: float) -> int:
+    def peak_near(expected: float, step: float = 0.0) -> int:
         lo = max(0, int(round(expected)) - tol)
         hi = min(size, int(round(expected)) + tol + 1)
-        return lo + int(np.argmax(smooth[lo:hi])) if hi > lo else int(round(expected))
+        if hi <= lo:
+            return int(round(expected))
+        score = smooth[lo:hi].copy()
+        if step:
+            ahead = np.arange(lo, hi) + int(round(step))
+            score += smooth[np.clip(ahead, 0, size - 1)]
+        return lo + int(np.argmax(score))
 
+    # The first step off each border also scores the line one cell further
+    # in: a thick border thresholds to two edges, so the pass starts from the
+    # outer one and its window reaches a row of clue-disc outlines (kakuro),
+    # which out-ink the faint line between two shaded cells.
     down = [lines[0]]
-    for _ in range(1, n):
-        down.append(peak_near(down[-1] + pitch))
+    for i in range(1, n):
+        down.append(peak_near(down[-1] + pitch, pitch if i == 1 and n > 2 else 0.0))
     up = [lines[-1]]
-    for _ in range(1, n):
-        up.append(peak_near(up[-1] - pitch))
+    for i in range(1, n):
+        up.append(peak_near(up[-1] - pitch, -pitch if i == 1 and n > 2 else 0.0))
     up = up[::-1]
+
     inner = [d if smooth[d] >= smooth[u] else u for d, u in zip(down[1:], up)]
+
+    # A pass never checks its last step against the far border. On a kakuro
+    # whose first column is all shaded clue cells the line between two grey
+    # cells is faint, and the bottom-up pass took the clue discs' outlines
+    # 0.78 cell from the border, halving the column's clues. So the line next
+    # to each border keeps the pass anchored on that border when the other
+    # pass's pick is off a cell from it.
+    def off(gap: float) -> bool:
+        return abs(gap - pitch) > tol
+
+    if off(inner[0] - lines[0]) and not off(down[1] - lines[0]):
+        inner[0] = down[1]
+    if off(lines[-1] - inner[-1]) and not off(lines[-1] - up[-1]):
+        inner[-1] = up[-1]
     return [lines[0], *inner, lines[-1]]
 
 
