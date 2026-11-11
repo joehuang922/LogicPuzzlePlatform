@@ -32,6 +32,9 @@ A rectangular grid of cells separated by dashed lines. Some cells contain a numb
 
 - [board-shikaku.png](board-shikaku.png) — 10x10 board
 - [board-shikaku-medium.png](board-shikaku-medium.png) — 10 col x 18 row board
+- `photo-nikoli193-{1,2,3,4,9}.jpg` — phone photos of Nikoli 193 boards (10x10, and
+  17x17 for 9), at Android upload size, with hand-checked `.canon.json` clues. Several
+  discs sit off-centre in their cells, so a number runs to the edge of the OCR crop.
 
 ## Answer structure description
 

@@ -30,6 +30,9 @@ CLUE_MIN_DARK_FRACTION = 0.12
 # Inset used to decide whether a cell is clued: tight, so only the filled centre
 # circle counts and the dashed grid lines near the edges do not.
 DETECT_MARGIN = 0.15
+# Fraction of the cell, from each corner, that only paper reaches: outside the
+# disc, which a number never leaves.
+CORNER_ZONE = 0.12
 
 
 class ShikakuParser(PuzzleParser):
@@ -84,7 +87,9 @@ class ShikakuParser(PuzzleParser):
                 if float(np.mean(detect_roi < DARK_PIXEL_VALUE)) < CLUE_MIN_DARK_FRACTION:
                     continue
                 clue_coords.append((r, c))
-                clue_crops.append(_disc_digit(crop_cell(warped_gray, y1, y2, x1, x2)))
+                clue_crops.append(
+                    _disc_digit(crop_cell(warped_gray, y1, y2, x1, x2, margin=0))
+                )
 
         if clue_crops:
             values = read_cells(self._ocr, [clue_crops], allow_multi_digits=True)[0]
@@ -126,22 +131,29 @@ class ShikakuParser(PuzzleParser):
         output_path.write_text(json.dumps(board.model_dump(), indent=4) + "\n")
 
 
-def _disc_digit(crop: NDArray) -> NDArray:
+def _disc_digit(cell: NDArray) -> NDArray:
     """The white number on a dark disc, as a dark number on white.
 
-    Paper and number are both light; the number is the light ink that does not
-    touch the crop edge (the paper around the disc does).
+    ``cell`` is the whole cell. Paper and number are both light; the paper is
+    the light ink that reaches a corner of the cell (a disc never covers the
+    corners), the number is the rest. Testing corners, not the crop edge, keeps
+    a number that runs to the edge of an off-centre disc.
     """
     _, light = cv2.threshold(
-        cv2.GaussianBlur(crop, (3, 3), 0), 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+        cv2.GaussianBlur(cell, (3, 3), 0), 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
     )
     n, labels, stats, _ = cv2.connectedComponentsWithStats(light, connectivity=8)
     h, w = light.shape
-    out = np.full_like(crop, 255)
+    cy, cx = max(1, int(CORNER_ZONE * h)), max(1, int(CORNER_ZONE * w))
+    paper = set()
+    for corner in (
+        labels[:cy, :cx], labels[:cy, -cx:], labels[-cy:, :cx], labels[-cy:, -cx:]
+    ):
+        paper.update(np.unique(corner).tolist())
+    out = np.full_like(cell, 255)
     for i in range(1, n):
-        x, y, bw, bh, area = stats[i]
-        if x == 0 or y == 0 or x + bw == w or y + bh == h or area < 0.005 * h * w:
+        if i in paper or stats[i, cv2.CC_STAT_AREA] < 0.005 * h * w:
             continue
         digit = labels == i
-        out[digit] = 255 - crop[digit]
+        out[digit] = 255 - cell[digit]
     return out
