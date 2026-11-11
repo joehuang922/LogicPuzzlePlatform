@@ -28,6 +28,8 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
+from puzzle_parsers.flatten import _interp_extend
+
 
 @dataclass
 class SlitherlinkGeometry:
@@ -49,6 +51,14 @@ def detect_slitherlink_grid(
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
     dots = _detect_dots(gray)
+    pitch = _estimate_pitch(dots)
+    if pitch > 0:
+        # Redetect against the local background: dots on a curled page edge
+        # (bent away from the camera) print lighter and smaller, and a global
+        # Otsu threshold drops whole rows of them.
+        local = _detect_dots(gray, pitch=pitch)
+        if len(local) >= len(dots):
+            dots = local
 
     if debug_path:
         vis = image.copy()
@@ -246,10 +256,11 @@ def _fit_lattice_grid(
 ) -> NDArray:
     """Isolate the puzzle board and build its dot_grid.
 
-    Keeps the largest neighbour-connected component (the board), fits an affine
-    lattice to it, trims stray bleed-in rows/columns via the occupancy
-    histogram, then emits the grid -- snapping each node to its real dot when
-    present and falling back to the affine-predicted position otherwise.
+    Keeps the largest neighbour-connected component (the board), numbers its
+    dots by walking the lattice (``_walk_lattice``), trims stray bleed-in
+    rows/columns via the occupancy histogram, then emits the grid -- each node
+    at its real dot when present, otherwise interpolated along its traced dot
+    row and column (``_fill_missing``).
     """
     if len(dots) < 10 or pitch <= 0:
         h, w = img_shape[:2]
@@ -260,7 +271,12 @@ def _fit_lattice_grid(
         h, w = img_shape[:2]
         return _synthetic_grid(w, h, 11, 11)
 
-    cx, cy, node_rows, node_cols = _fit_affine_lattice(comp, pitch)
+    cx, cy, _, _ = _fit_affine_lattice(comp, pitch)
+    basis = np.array([[cx[0], cy[0]], [cx[1], cy[1]]])  # col step, row step
+    comp, node_rows, node_cols = _walk_lattice(comp, pitch, basis)
+    if len(comp) < 10:
+        h, w = img_shape[:2]
+        return _synthetic_grid(w, h, 11, 11)
 
     # Trim stray rows/columns and recover the board's node-index window.
     r_base = int(node_rows.min())
@@ -275,36 +291,152 @@ def _fit_lattice_grid(
     r0 = r_base + r_off
     c0 = c_base + c_off
 
-    # Map (node_row, node_col) -> real dot coordinate for the board window.
-    node_to_dot: dict[tuple[int, int], NDArray] = {}
-    for k in range(len(comp)):
-        node_to_dot[(int(node_rows[k]), int(node_cols[k]))] = comp[k]
+    grid = np.full((n_dot_rows, n_dot_cols, 2), np.nan)
+    rr, cc = node_rows - r0, node_cols - c0
+    keep = (rr >= 0) & (rr < n_dot_rows) & (cc >= 0) & (cc < n_dot_cols)
+    grid[rr[keep], cc[keep]] = comp[keep]
+    return _fill_missing(grid, cx, cy, r0, c0)
 
-    grid = np.zeros((n_dot_rows, n_dot_cols, 2), dtype=np.float64)
-    for r in range(n_dot_rows):
-        for c in range(n_dot_cols):
-            node = (r0 + r, c0 + c)
-            if node in node_to_dot:
-                grid[r, c] = node_to_dot[node]
+
+# A step to a neighbour must land within this fraction of a lattice step of an
+# orthogonal neighbour node to be followed.
+_STEP_TOL = 0.3
+
+
+def _walk_lattice(
+    dots: NDArray, pitch: float, basis: NDArray,
+) -> tuple[NDArray, NDArray, NDArray]:
+    """Number the dots by walking from each dot to its orthogonal neighbours.
+
+    A global affine lattice can't follow a curled page: on a 45x31 board
+    photographed with its top corner lifted, the top rows drift off any
+    straight lattice, their dots split across several lattice rows, and the
+    occupancy trim then drops them. Walking instead measures each step against
+    the local lattice vectors carried from the dot it came from, so a row
+    keeps one index however much it bends -- the same idea as ``flatten.py``
+    tracing a grid line through narrow strips.
+
+    ``basis`` rows are the initial (column step, row step) vectors. Returns the
+    dots that were reached with their integer (row, col) indices.
+    """
+    from collections import deque
+
+    from scipy.spatial import cKDTree
+
+    tree = cKDTree(dots)
+    nbrs = tree.query_ball_point(dots, pitch * 1.35)
+    centre = np.median(dots, axis=0)
+    order = np.argsort(np.hypot(*(dots - centre).T))
+    start = next((int(i) for i in order if len(nbrs[i]) >= 5), int(order[0]))
+
+    n = len(dots)
+    idx = np.full((n, 2), np.iinfo(np.int64).min, dtype=np.int64)  # (row, col)
+    local = np.zeros((n, 2, 2))
+    taken: set[tuple[int, int]] = set()
+    idx[start] = (0, 0)
+    local[start] = basis
+    taken.add((0, 0))
+    queue = deque([start])
+    while queue:
+        i = queue.popleft()
+        B = local[i]
+        try:
+            inv = np.linalg.inv(B.T)
+        except np.linalg.LinAlgError:
+            continue
+        for j in nbrs[i]:
+            if j == i or idx[j, 0] != np.iinfo(np.int64).min:
+                continue
+            d = dots[j] - dots[i]
+            ab = inv @ d  # (col steps, row steps)
+            step = np.round(ab)
+            if abs(step).sum() != 1 or np.abs(ab - step).max() > _STEP_TOL:
+                continue
+            node = (int(idx[i, 0] + step[1]), int(idx[i, 1] + step[0]))
+            if node in taken:
+                continue
+            taken.add(node)
+            idx[j] = node
+            axis = 0 if step[0] else 1
+            nb = B.copy()
+            nb[axis] = 0.5 * B[axis] + 0.5 * d * step[axis]
+            local[j] = nb
+            queue.append(j)
+
+    reached = idx[:, 0] != np.iinfo(np.int64).min
+    return dots[reached], idx[reached, 0], idx[reached, 1]
+
+
+def _fill_missing(
+    grid: NDArray, cx: NDArray, cy: NDArray, r0: int, c0: int,
+) -> NDArray:
+    """Fill nodes with no dot (covered by a digit) from their row and column.
+
+    Each dot row and column is a traced line, as in ``flatten.py``: a missing
+    node is interpolated along its row from the row's real dots and along its
+    column from the column's, and the two estimates are averaged. A line with
+    fewer than two real dots falls back to the affine lattice.
+    """
+    n_rows, n_cols = grid.shape[:2]
+    real = ~np.isnan(grid[:, :, 0])
+    along_row = np.full_like(grid, np.nan)
+    along_col = np.full_like(grid, np.nan)
+    for r in range(n_rows):
+        known = np.flatnonzero(real[r])
+        if len(known) >= 2:
+            c = np.arange(n_cols, dtype=float)
+            for k in range(2):
+                along_row[r, :, k] = _interp_extend(c, known.astype(float), grid[r, known, k])
+    for c in range(n_cols):
+        known = np.flatnonzero(real[:, c])
+        if len(known) >= 2:
+            r = np.arange(n_rows, dtype=float)
+            for k in range(2):
+                along_col[:, c, k] = _interp_extend(r, known.astype(float), grid[known, c, k])
+
+    out = grid.copy()
+    for r in range(n_rows):
+        for c in range(n_cols):
+            if real[r, c]:
+                continue
+            ests = [e for e in (along_row[r, c], along_col[r, c]) if not np.isnan(e[0])]
+            if ests:
+                out[r, c] = np.mean(ests, axis=0)
             else:
                 col, row = c0 + c, r0 + r
-                grid[r, c] = [
+                out[r, c] = [
                     cx[0] * col + cx[1] * row + cx[2],
                     cy[0] * col + cy[1] * row + cy[2],
                 ]
+    return out
 
-    return grid
+
+# Adaptive-threshold offset (gray levels below the local mean) for the second
+# dot pass. Every value from 5 to 20 finds all 46x32 dots of a 45x31 photo
+# whose curled top rows Otsu loses.
+_LOCAL_THRESH_C = 10
 
 
-def _detect_dots(gray: NDArray) -> NDArray:
+def _detect_dots(gray: NDArray, pitch: float | None = None) -> NDArray:
     """Detect dot blobs and return their centers as (N, 2) array of (x, y).
 
     Strategy: dots are highly circular and cluster tightly around one area value.
     First find all round blobs (circularity > 0.7), compute their median area,
     then keep only those within a tight band around that median.
+
+    Without ``pitch`` the image is thresholded globally (Otsu). With it, each
+    pixel is compared to the mean of a pitch-sized window around it, so faint
+    dots on a shaded or curled part of the page survive.
     """
     blurred = cv2.GaussianBlur(gray, (3, 3), 0)
-    _, binary = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    if pitch is None:
+        _, binary = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    else:
+        block = max(3, int(pitch) | 1)
+        binary = cv2.adaptiveThreshold(
+            blurred, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV,
+            block, _LOCAL_THRESH_C,
+        )
 
     contours, _ = cv2.findContours(binary, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
