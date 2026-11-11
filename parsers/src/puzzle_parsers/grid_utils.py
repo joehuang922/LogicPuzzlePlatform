@@ -68,7 +68,10 @@ def find_quadrilateral_border(gray: NDArray) -> NDArray:
        scoring rejects the fused result, so we can safely try several.
     2. Dark-pixel projection box — immune to titles (relative threshold) and to
        a single page-gutter seam. Used when no contour candidate is well
-       supported, e.g. a title sits close above a dashed board.
+       supported, e.g. a title sits close above a dashed board. The box is
+       narrowed to the board's interior when that lies well inside it
+       (``_interior_within``): the previous puzzle's bottom border is a dark
+       full-width row too.
     3. Small-board contours — step 1 again, keeping edge components that span
        30% of an axis and boards down to 8% of the frame. A whole-page photo can
        leave the board under step 1's floors (l_ring board 1: 44% x 31% of the
@@ -100,7 +103,7 @@ def find_quadrilateral_border(gray: NDArray) -> NDArray:
     box_support = _edge_support(gray, box)
     if best is None or box_support > best_support:
         if box_support >= _BORDER_SUPPORT_MIN:
-            return box
+            return _interior_within(gray, box)
         best, best_support = box, box_support
 
     for close_k in (1, 3, 5, 7):
@@ -256,6 +259,50 @@ def _edge_support(gray: NDArray, quad: NDArray, band_ratio: float = 0.006) -> fl
                 hits += 1
         scores.append(hits / n_samples)
     return min(scores) if scores else 0.0
+
+
+# The board interior replaces a projection box that reaches this far (as a
+# fraction of the box's extent) beyond it on some side. A 10x10 kuralin photo:
+# the box ran from the previous puzzle's bottom border, 17% above the board's
+# top; on boards the box already fits it differs by under 2% (kakuro, where
+# the interior's corners come out a little rotated, tentaishow).
+_INTERIOR_SHRINK_MIN = 0.05
+
+
+def _interior_within(gray: NDArray, box: NDArray) -> NDArray:
+    """The board inside a projection box, when the box overreaches it.
+
+    The board's inside is one white region bounded by the inner edge of its
+    border: dashed lines leave gaps and clues are islands, so it stays one
+    region even where the border's outer edge runs into a page rule (which
+    stops the Canny contours closing). The largest such region inside ``box``,
+    reduced to a quad, replaces the box when it is well supported and the box
+    reaches more than ``_INTERIOR_SHRINK_MIN`` beyond it on some side.
+    """
+    h, w = gray.shape
+    ink = (cv2.GaussianBlur(gray, (5, 5), 0) < 128).astype(np.uint8) * 255
+    contours, hierarchy = cv2.findContours(ink, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+    if hierarchy is None:
+        return box
+    (bx0, by0), (bx1, by1) = box.min(axis=0), box.max(axis=0)
+    bw, bh = bx1 - bx0, by1 - by0
+    tol = 0.01 * max(bw, bh)
+    holes = [
+        c for c, link in zip(contours, hierarchy[0])
+        if link[3] != -1 and cv2.contourArea(c) >= 0.15 * h * w
+    ]
+    for contour in sorted(holes, key=cv2.contourArea, reverse=True)[:5]:
+        quad = _corners_from_contour(contour)
+        if quad is None or _edge_support(gray, quad) < _BORDER_SUPPORT_MIN:
+            continue
+        (qx0, qy0), (qx1, qy1) = quad.min(axis=0), quad.max(axis=0)
+        if qx0 < bx0 - tol or qy0 < by0 - tol or qx1 > bx1 + tol or qy1 > by1 + tol:
+            continue
+        reach = max((qx0 - bx0) / bw, (bx1 - qx1) / bw, (qy0 - by0) / bh, (by1 - qy1) / bh)
+        if reach > _INTERIOR_SHRINK_MIN:
+            return quad
+        return box
+    return box
 
 
 def _projection_box_quad(gray: NDArray) -> NDArray:
