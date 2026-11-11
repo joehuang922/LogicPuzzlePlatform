@@ -32,6 +32,7 @@ import { computeCornerChainProgress } from "./cornerChain";
 import { computeSinkaminoProgress } from "./sinkamino";
 import { computeBalanceLinkProgress } from "./balanceLink";
 import { computeLRingProgress } from "./lRing";
+import { computeHashiProgress } from "./hashi";
 
 export interface ProgressCalculator {
   puzzleType: number;
@@ -77,6 +78,7 @@ register(computeCornerChainProgress);
 register(computeSinkaminoProgress);
 register(computeBalanceLinkProgress);
 register(computeLRingProgress);
+register(computeHashiProgress);
 
 export function computeProgress(
   puzzle: PuzzleDefinition,

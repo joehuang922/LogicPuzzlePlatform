@@ -36,6 +36,7 @@ import { cornerChainRenderer } from "./renderers/cornerChain";
 import { sinkaminoRenderer } from "./renderers/sinkamino";
 import { balanceLinkRenderer } from "./renderers/balanceLink";
 import { lRingRenderer } from "./renderers/lRing";
+import { hashiRenderer } from "./renderers/hashi";
 
 registerRenderer(comboSudokuRenderer);
 registerRenderer(sudokuRenderer);
@@ -70,6 +71,7 @@ registerRenderer(cornerChainRenderer);
 registerRenderer(sinkaminoRenderer);
 registerRenderer(balanceLinkRenderer);
 registerRenderer(lRingRenderer);
+registerRenderer(hashiRenderer);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

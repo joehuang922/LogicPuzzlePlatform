@@ -457,3 +457,13 @@ export interface LRingAnswer {
   // h: rows x (cols-1), v: (rows-1) x cols; 1 = loop segment drawn
   edges: { h: number[][]; v: number[][] };
 }
+
+export interface HashiCanon {
+  // rows x cols lattice points; 0 = no island, 1-8 = an island with that number
+  cells: number[][];
+}
+
+export interface HashiAnswer {
+  // h: rows x (cols-1), v: (rows-1) x cols; bridges (0, 1 or 2) on each unit segment
+  bridges: { h: number[][]; v: number[][] };
+}

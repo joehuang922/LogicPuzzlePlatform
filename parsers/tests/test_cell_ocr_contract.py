@@ -24,10 +24,10 @@ _OCR_CORE = {PKG / "recognition.py", PKG / "cell_ocr.py"}
 # Not a grid-cell clue reader: nonogram OCRs the clue strips outside the grid.
 _EXEMPT_PACKAGES = {"nonogram"}
 # Clues are single digits by the puzzle's rules (combo and unequal sudoku 1-9,
-# akari and shakashaka 0-4, slitherlink 0-3); every other puzzle allows
+# akari and shakashaka 0-4, slitherlink 0-3, hashi 1-8); every other puzzle allows
 # multi-digit clues. Plain sudoku decides by board size (see below).
 _SINGLE_DIGIT_PACKAGES = {
-    "combo_sudoku", "unequal_sudoku", "akari", "shakashaka", "slitherlink",
+    "combo_sudoku", "unequal_sudoku", "akari", "shakashaka", "slitherlink", "hashi",
 }
 
 _DIRECT_OCR = re.compile(r"\.recognize_cells\(|\.readtext\(|\._reader\b|import easyocr")

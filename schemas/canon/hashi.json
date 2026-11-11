@@ -1,0 +1,25 @@
+{
+  "title": "Hashi Canonical Representation",
+  "description": "Islands on an implicit rectangular lattice. Bridges join islands horizontally or vertically, at most two per pair, without crossing; each island's bridge count equals its number and all islands connect into one group.",
+  "type": "object",
+  "required": [
+    "cells"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "cells": {
+      "description": "m x n lattice points. 0 = no island, 1-8 = an island with that number.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8
+        }
+      }
+    }
+  }
+}
