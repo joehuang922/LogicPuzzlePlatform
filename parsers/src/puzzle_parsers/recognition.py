@@ -653,6 +653,23 @@ def _is_blank(gray: NDArray) -> bool:
     return hi - lo < _EMPTY_CONTRAST
 
 
+# Grid-line removal in ``_glyph_mask`` smears ink 5 px along a line and erases
+# 2 px either side of it, sizes tuned on crops at least this many px across.
+# A smaller crop (a 45x31 slitherlink photographed at 2000 px: ~20 px) scales
+# them down: at full size the smear made a 3's bottom curve plus a corner dot
+# cover the edge row, and the erased band took a quarter of the glyph, so 3s
+# read as 2.
+_LINE_REF_PX = 40
+
+
+def _line_kernel(size: int) -> tuple[int, int]:
+    """(smear length, erase half-width) in px for a crop ``size`` px across."""
+    if not _LINE_REF_PX or size >= _LINE_REF_PX:
+        return 5, 2
+    k = size / _LINE_REF_PX
+    return max(1, int(round(5 * k))), max(1, int(round(2 * k)))
+
+
 def _glyph_mask(gray: NDArray) -> NDArray:
     """Ink of the clue glyph(s), without grid-line scraps along the crop edge."""
     import cv2
@@ -660,18 +677,19 @@ def _glyph_mask(gray: NDArray) -> NDArray:
 
     _, ink = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     h, w = ink.shape
+    smear_px, band_px = _line_kernel(min(h, w))
     # Grid lines that run inside the crop (a slanted or bowed page): rows or
     # columns in the outer band that are inked along nearly their whole
     # length. A small smear across the line first tolerates a slant of a few
     # px. Digits sit in the middle, so even a full-height "1" keeps its stem.
     for axis in (0, 1):
         size = ink.shape[1 - axis]
-        smear = cv2.dilate(ink, np.ones((1, 5) if axis == 0 else (5, 1), np.uint8))
+        smear = cv2.dilate(ink, np.ones((1, smear_px) if axis == 0 else (smear_px, 1), np.uint8))
         cover = (smear > 0).mean(axis=axis)
         zone = max(1, int(_LINE_ZONE * size))
         for i in [*range(zone), *range(size - zone, size)]:
             if cover[i] >= _LINE_LEN:
-                lo, hi = max(0, i - 2), min(size, i + 3)
+                lo, hi = max(0, i - band_px), min(size, i + band_px + 1)
                 if axis == 0:
                     ink[:, lo:hi] = 0
                 else:
