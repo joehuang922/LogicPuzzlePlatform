@@ -467,3 +467,37 @@ export interface HashiAnswer {
   // h: rows x (cols-1), v: (rows-1) x cols; bridges (0, 1 or 2) on each unit segment
   bridges: { h: number[][]; v: number[][] };
 }
+
+export interface SkeletonPuzzleWord {
+  // the kana as printed, small kana included
+  word: string;
+  // the parenthesised text, shown but never placed
+  hint?: string;
+}
+
+export interface SkeletonPuzzleMark {
+  r: number;
+  c: number;
+  label: string;
+}
+
+export interface SkeletonPuzzleCanon {
+  // rows x cols; 1 = a cell, 0 = not a cell
+  cells: number[][];
+  words: SkeletonPuzzleWord[];
+  // double-framed cells for a prize question, display only
+  marks?: SkeletonPuzzleMark[];
+}
+
+export interface SkeletonPuzzlePlacement {
+  // index into the canon's words
+  word: number;
+  // the slot's first cell
+  r: number;
+  c: number;
+  dir: "across" | "down";
+}
+
+export interface SkeletonPuzzleAnswer {
+  placements: SkeletonPuzzlePlacement[];
+}

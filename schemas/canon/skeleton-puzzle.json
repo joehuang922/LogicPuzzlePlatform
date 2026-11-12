@@ -1,0 +1,74 @@
+{
+  "title": "Skeleton Puzzle Canonical Representation",
+  "description": "Crossword-shaped board of cells with a word list. Every word fills one slot (a maximal across or down run of 2+ cells), one kana per cell; crossing words share their kana. Small kana are written full-size.",
+  "type": "object",
+  "required": [
+    "cells",
+    "words"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "cells": {
+      "description": "m x n lattice squares. 1 = a cell, 0 = not a cell.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "words": {
+      "description": "The word list in print order. word: the kana as printed (small kana included); hint: the parenthesised text, shown but never placed.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "word"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "word": {
+            "type": "string",
+            "minLength": 1
+          },
+          "hint": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "marks": {
+      "description": "Double-framed cells for a prize question, display only.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "r",
+          "c",
+          "label"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "r": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "c": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

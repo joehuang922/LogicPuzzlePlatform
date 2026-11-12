@@ -26,6 +26,7 @@ from puzzle_parsers.sinkamino.models import SinkaminoBoard
 from puzzle_parsers.balance_link.models import BalanceLinkBoard
 from puzzle_parsers.l_ring.models import LRingBoard
 from puzzle_parsers.hashi.models import HashiBoard
+from puzzle_parsers.skeleton_puzzle.models import SkeletonPuzzleBoard
 from puzzle_parsers.validate import validate_canon
 
 SCHEMA_DIR = Path(__file__).parents[2] / "schemas" / "canon"
@@ -50,6 +51,7 @@ MODELS = {
     "balance-link": BalanceLinkBoard,
     "l-ring": LRingBoard,
     "hashi": HashiBoard,
+    "skeleton-puzzle": SkeletonPuzzleBoard,
 }
 
 

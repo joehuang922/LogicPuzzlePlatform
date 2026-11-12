@@ -33,6 +33,7 @@ import sinkaminoSchema from "../../../../schemas/canon/sinkamino.json";
 import balanceLinkSchema from "../../../../schemas/canon/balance-link.json";
 import lRingSchema from "../../../../schemas/canon/l-ring.json";
 import hashiSchema from "../../../../schemas/canon/hashi.json";
+import skeletonPuzzleSchema from "../../../../schemas/canon/skeleton-puzzle.json";
 
 const ajv = new Ajv();
 
@@ -71,6 +72,7 @@ const validators: Record<number, ValidateFunction> = {
   32: ajv.compile(balanceLinkSchema),
   33: ajv.compile(lRingSchema),
   34: ajv.compile(hashiSchema),
+  35: ajv.compile(skeletonPuzzleSchema),
 };
 
 export function validateCanon(puzzleType: number, data: unknown): void {
@@ -162,6 +164,10 @@ const semanticChecks: Record<number, (data: any) => void> = {
       }
     }
   },
+  // Skeleton Puzzle: every word fills one slot, so slots and words must match by length;
+  // words are kana (and ー) of 2+ letters; marks sit on cells. Editors block on the same list.
+  35: (data: { cells: number[][]; words: { word: string }[]; marks?: { r: number; c: number }[] }) =>
+    checkSkeletonPuzzle(data),
   // Nurimaze: the symbol grid fixes the size; the walls must fit it and every one must
   // separate two rooms.
   3: (data: { cells: number[][]; grids: { h: number[][]; v: number[][] } }) =>
@@ -317,5 +323,57 @@ function checkRoomWalls(name: string, rows: number, cols: number, h: number[][],
         throw new Error(`Invalid ${name}: a wall at R${r + 1}C${c + 1} doesn't close off a room`);
       }
     }
+  }
+}
+
+// Kana a Skeleton Puzzle word may hold: hiragana, katakana (small ones included), ー and the
+// iteration marks. Mirrors KANA in frontend/src/components/skeletonPuzzleRules.ts.
+const SKELETON_KANA = /^[\u3041-\u3096\u309D\u309E\u30A1-\u30FA\u30FC-\u30FE]+$/;
+
+function checkSkeletonPuzzle(data: { cells: number[][]; words: { word: string }[]; marks?: { r: number; c: number }[] }): void {
+  const { cells, words } = data;
+  const rows = cells.length;
+  const cols = cells[0]?.length ?? 0;
+  if (cells.some((row) => row.length !== cols)) {
+    throw new Error("Invalid skeleton-puzzle: cells must be rectangular");
+  }
+  const isCell = (r: number, c: number) => cells[r]?.[c] === 1;
+  // Slot lengths: maximal across and down runs of 2+ cells.
+  const slots = new Map<number, number>();
+  const count = (len: number) => {
+    if (len >= 2) slots.set(len, (slots.get(len) ?? 0) + 1);
+  };
+  for (let r = 0; r < rows; r++) {
+    let run = 0;
+    for (let c = 0; c <= cols; c++) {
+      if (c < cols && isCell(r, c)) run++;
+      else { count(run); run = 0; }
+    }
+  }
+  for (let c = 0; c < cols; c++) {
+    let run = 0;
+    for (let r = 0; r <= rows; r++) {
+      if (r < rows && isCell(r, c)) run++;
+      else { count(run); run = 0; }
+    }
+  }
+  const wordLengths = new Map<number, number>();
+  words.forEach(({ word }, i) => {
+    if (!SKELETON_KANA.test(word)) {
+      throw new Error(`Invalid skeleton-puzzle: word ${i + 1} "${word}" must be kana (and ー) only`);
+    }
+    const len = [...word].length;
+    if (len < 2) throw new Error(`Invalid skeleton-puzzle: word ${i + 1} "${word}" is under 2 letters`);
+    wordLengths.set(len, (wordLengths.get(len) ?? 0) + 1);
+  });
+  for (const len of new Set([...slots.keys(), ...wordLengths.keys()])) {
+    const s = slots.get(len) ?? 0;
+    const w = wordLengths.get(len) ?? 0;
+    if (s !== w) {
+      throw new Error(`Invalid skeleton-puzzle: ${s} slot${s === 1 ? "" : "s"} of length ${len} but ${w} word${w === 1 ? "" : "s"} of ${len} letter${len === 1 ? "" : "s"}`);
+    }
+  }
+  for (const m of data.marks ?? []) {
+    if (!isCell(m.r, m.c)) throw new Error(`Invalid skeleton-puzzle: mark at R${m.r + 1}C${m.c + 1} is not on a cell`);
   }
 }

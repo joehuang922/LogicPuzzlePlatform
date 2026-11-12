@@ -1144,29 +1144,7 @@ def classify_border_thickness(
       v_borders: rows x (cols-1) — border right of cell[r][c]
     """
     h_lines, v_lines, rows, cols = grid.h_lines, grid.v_lines, grid.rows, grid.cols
-    scan_h = max(5, int(grid.cell_h * _WALL_SCAN_FRAC))
-    scan_w = max(5, int(grid.cell_w * _WALL_SCAN_FRAC))
-    seed_h = max(2, int(round(grid.cell_h * _WALL_SEED_FRAC)))
-    seed_w = max(2, int(round(grid.cell_w * _WALL_SEED_FRAC)))
-
-    h_widths = [
-        [
-            _measure_border_width_gray(
-                warped_gray, "h", h_lines[r + 1], v_lines[c], v_lines[c + 1], scan_h, seed_h
-            )
-            for c in range(cols)
-        ]
-        for r in range(rows - 1)
-    ]
-    v_widths = [
-        [
-            _measure_border_width_gray(
-                warped_gray, "v", v_lines[c + 1], h_lines[r], h_lines[r + 1], scan_w, seed_w
-            )
-            for c in range(cols - 1)
-        ]
-        for r in range(rows)
-    ]
+    h_widths, v_widths = _wall_widths(warped_gray, grid)
     widths = [w for row in h_widths for w in row] + [w for row in v_widths for w in row]
     otsu = _find_thickness_threshold(widths)
     # Two candidate cuts; rooms are closed, so keep the one that leaves fewer thick
@@ -1194,6 +1172,98 @@ def classify_border_thickness(
         cv2.imwrite(str(Path(debug_dir) / "04_thick_borders.png"), vis)
 
     return h_borders, v_borders
+
+
+def _wall_widths(warped_gray: NDArray, grid: BoardGrid) -> tuple[list[list[float]], list[list[float]]]:
+    """Width of every internal wall: (rows-1) x cols below each cell, rows x (cols-1) right of it."""
+    h_lines, v_lines, rows, cols = grid.h_lines, grid.v_lines, grid.rows, grid.cols
+    scan_h = max(5, int(grid.cell_h * _WALL_SCAN_FRAC))
+    scan_w = max(5, int(grid.cell_w * _WALL_SCAN_FRAC))
+    seed_h = max(2, int(round(grid.cell_h * _WALL_SEED_FRAC)))
+    seed_w = max(2, int(round(grid.cell_w * _WALL_SEED_FRAC)))
+    h_widths = [
+        [
+            _measure_border_width_gray(
+                warped_gray, "h", h_lines[r + 1], v_lines[c], v_lines[c + 1], scan_h, seed_h
+            )
+            for c in range(cols)
+        ]
+        for r in range(rows - 1)
+    ]
+    v_widths = [
+        [
+            _measure_border_width_gray(
+                warped_gray, "v", v_lines[c + 1], h_lines[r], h_lines[r + 1], scan_w, seed_w
+            )
+            for c in range(cols - 1)
+        ]
+        for r in range(rows)
+    ]
+    return h_widths, v_widths
+
+
+# A run wider than this many cells can't be a ruling: it is shading (the grey
+# disc behind a skeleton board) or the line crossing the wall at its end.
+_MAX_LINE_CELLS = 0.2
+# A wall is a line when at least this share of its sample points see one.
+_MIN_LINE_SAMPLES = 0.5
+
+
+def classify_border_lines(
+    warped_gray: NDArray, grid: BoardGrid
+) -> tuple[list[list[int]], list[list[int]]]:
+    """Classify every wall of the lattice, outer ones included: no line (0), thin (1) or thick (2).
+
+    For boards whose lattice squares aren't all cells (skeleton puzzle): a thin
+    line joins two cells, a thick one is the outline between a cell and a
+    non-cell (or the board's edge), and two non-cells have no line. Each wall is
+    sampled as in ``_measure_border_width_gray``, but a point that sees no
+    ruling-width run counts against the wall instead of being skipped: next to a
+    non-cell the end points catch the crossing outline, and on its own that read
+    as a line. Thick vs thin is Otsu over the walls that are lines.
+
+    Returns (h, v): h is (rows+1) x cols, the wall above cell[r][c] (row ``rows``
+    is the bottom edge); v is rows x (cols+1), the wall left of cell[r][c].
+    """
+    h_lines, v_lines, rows, cols = grid.h_lines, grid.v_lines, grid.rows, grid.cols
+    scan_h = max(5, int(grid.cell_h * _WALL_SCAN_FRAC))
+    scan_w = max(5, int(grid.cell_w * _WALL_SCAN_FRAC))
+    seed_h = max(2, int(round(grid.cell_h * _WALL_SEED_FRAC)))
+    seed_w = max(2, int(round(grid.cell_w * _WALL_SEED_FRAC)))
+    cap = _MAX_LINE_CELLS * min(grid.cell_w, grid.cell_h)
+
+    def width(samples: list[float | None]) -> float:
+        ruled = [x for x in samples if x is not None and x < cap]
+        if not samples or len(ruled) < _MIN_LINE_SAMPLES * len(samples):
+            return 0.0
+        return float(np.percentile(ruled, _WALL_PCT))
+
+    h_widths = [
+        [
+            width(_wall_width_samples(
+                warped_gray, "h", h_lines[r], v_lines[c], v_lines[c + 1], scan_h, seed_h,
+            ))
+            for c in range(cols)
+        ]
+        for r in range(rows + 1)
+    ]
+    v_widths = [
+        [
+            width(_wall_width_samples(
+                warped_gray, "v", v_lines[c], h_lines[r], h_lines[r + 1], scan_w, seed_w,
+            ))
+            for c in range(cols + 1)
+        ]
+        for r in range(rows)
+    ]
+    threshold = _find_thickness_threshold([w for row in h_widths + v_widths for w in row])
+
+    def cls(w: float) -> int:
+        if w <= 0:
+            return 0
+        return 2 if w > threshold else 1
+
+    return [[cls(w) for w in row] for row in h_widths], [[cls(w) for w in row] for row in v_widths]
 
 
 def _dangling_corners(h: list[list[int]], v: list[list[int]]) -> list[tuple[int, int]]:
@@ -1268,9 +1338,23 @@ def _measure_border_width_gray(
     jumped between them (norinori-medium flipped ~157 walls between settings).
     Returns 0.0 when no point has contrast.
     """
+    samples = [x for x in _wall_width_samples(gray, axis, line_pos, start, end, scan_range, seed_range) if x is not None]
+    return float(np.percentile(samples, _WALL_PCT)) if samples else 0.0
+
+
+def _wall_width_samples(
+    gray: NDArray,
+    axis: str,
+    line_pos: int,
+    start: int,
+    end: int,
+    scan_range: int,
+    seed_range: int,
+) -> list[float | None]:
+    """The per-point widths behind ``_measure_border_width_gray``; None where a point has no line."""
     h, w = gray.shape
     num_samples = max(3, min(7, (end - start) // 10))
-    samples: list[float] = []
+    samples: list[float | None] = []
 
     for i in range(num_samples):
         pos = start + (end - start) * (i + 1) // (num_samples + 1)
@@ -1282,17 +1366,21 @@ def _measure_border_width_gray(
             strip = gray[max(0, pos - 1): pos + 2, lo:min(w, line_pos + scan_range)].min(axis=0)
         strip = strip.astype(float)
         if strip.size == 0:
+            samples.append(None)
             continue
         paper = float(strip.max())
         if paper - float(strip.min()) < 20:
+            samples.append(None)
             continue
         centre = line_pos - lo
         s0, s1 = max(0, centre - seed_range), min(len(strip), centre + seed_range + 1)
         if s1 <= s0:
+            samples.append(None)
             continue
         seed = s0 + int(np.argmin(strip[s0:s1]))
         thresh = strip[seed] + (paper - strip[seed]) * 0.5
         if strip[seed] >= thresh:
+            samples.append(None)
             continue
         a = seed
         while a > 0 and strip[a - 1] < thresh:
@@ -1309,7 +1397,7 @@ def _measure_border_width_gray(
             width += min(1.0, max(0.0, (thresh - strip[b]) / max(1e-6, strip[b + 1] - strip[b]))) - 0.5
         samples.append(width)
 
-    return float(np.percentile(samples, _WALL_PCT)) if samples else 0.0
+    return samples
 
 
 # Smoothing for the thick/thin width histogram, as a fraction of the gap between

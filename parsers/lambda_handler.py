@@ -148,6 +148,9 @@ def _build_parser(puzzle_type: int):
     if puzzle_type == 34:
         from puzzle_parsers.hashi.parser import HashiParser
         return HashiParser(ocr_backend=ocr)
+    if puzzle_type == 35:
+        from puzzle_parsers.skeleton_puzzle.parser import SkeletonPuzzleParser
+        return SkeletonPuzzleParser()
     return None
 
 
