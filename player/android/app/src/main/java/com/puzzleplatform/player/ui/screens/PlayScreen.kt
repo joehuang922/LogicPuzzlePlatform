@@ -627,7 +627,7 @@ fun PlayScreen(
                         // a drag on the board itself draws), and the header pane gets
                         // what's left, at least LANDSCAPE_HEADER_MIN wide.
                         val boardPaneWidth = maxOf(maxWidth - LANDSCAPE_HEADER_MIN, maxWidth * 0.5f)
-                        val side = minOf(fullHeight - 16.dp, boardPaneWidth - 2 * LANDSCAPE_GUTTER)
+                        val side = minOf(fullHeight - 16.dp, boardPaneWidth - LANDSCAPE_GUTTER * 2)
                         Row(Modifier.fillMaxSize()) {
                             Column(
                                 Modifier
