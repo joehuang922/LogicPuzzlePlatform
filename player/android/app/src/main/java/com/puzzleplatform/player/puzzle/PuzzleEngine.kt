@@ -70,6 +70,7 @@ object PuzzleEngines {
         SinkaminoEngine,
         BalanceLinkEngine,
         LRingEngine,
+        HashiEngine,
         PencilsEngine,
         ChocoBananaEngine,
         NuritwinEngine,

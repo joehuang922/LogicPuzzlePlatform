@@ -44,6 +44,7 @@ data class BoardDraft(
     val sinkamino: SinkaminoGrid = SinkaminoGrid(emptyList(), emptyList()),
     val balanceLink: ClueGridDraft = ClueGridDraft(),
     val lRing: ClueGridDraft = ClueGridDraft(),
+    val hashi: ClueGridDraft = ClueGridDraft(),
     val pencils: ClueGridDraft = ClueGridDraft(),
     val chocoBanana: ClueGridDraft = ClueGridDraft(),
 ) {
@@ -82,6 +83,7 @@ data class BoardDraft(
         AuthoringType.SINKAMINO -> SinkaminoAuthoring.problems(sinkamino)
         AuthoringType.BALANCE_LINK -> BalanceLinkAuthoring.problems(balanceLink)
         AuthoringType.L_RING -> LRingAuthoring.problems(lRing)
+        AuthoringType.HASHI -> HashiAuthoring.problems(hashi)
         AuthoringType.PENCILS -> PencilsAuthoring.problems(pencils)
         AuthoringType.CHOCO_BANANA -> ChocoBananaAuthoring.problems(chocoBanana)
     }
@@ -180,6 +182,8 @@ data class BoardDraft(
             CanonBoard(BalanceLinkAuthoring.canonFromDraft(balanceLink), balanceLink.cols, balanceLink.rows)
         AuthoringType.L_RING ->
             CanonBoard(LRingAuthoring.canonFromDraft(lRing), lRing.cols, lRing.rows)
+        AuthoringType.HASHI ->
+            CanonBoard(HashiAuthoring.canonFromDraft(hashi), hashi.cols, hashi.rows)
         AuthoringType.PENCILS ->
             CanonBoard(PencilsAuthoring.canonFromDraft(pencils), pencils.cols, pencils.rows)
         AuthoringType.CHOCO_BANANA ->
@@ -222,6 +226,7 @@ data class BoardDraft(
             AuthoringType.SINKAMINO -> BoardDraft(sinkamino = SinkaminoAuthoring.draftFromCanon(canon))
             AuthoringType.BALANCE_LINK -> BoardDraft(balanceLink = BalanceLinkAuthoring.draftFromCanon(canon))
             AuthoringType.L_RING -> BoardDraft(lRing = LRingAuthoring.draftFromCanon(canon))
+            AuthoringType.HASHI -> BoardDraft(hashi = HashiAuthoring.draftFromCanon(canon))
             AuthoringType.PENCILS -> BoardDraft(pencils = PencilsAuthoring.draftFromCanon(canon))
             AuthoringType.CHOCO_BANANA -> BoardDraft(chocoBanana = ChocoBananaAuthoring.draftFromCanon(canon))
         }

@@ -79,6 +79,7 @@ import com.puzzleplatform.player.ui.board.NurikabeBoard
 import com.puzzleplatform.player.ui.board.SinkaminoBoard
 import com.puzzleplatform.player.ui.board.BalanceLinkBoard
 import com.puzzleplatform.player.ui.board.LRingBoard
+import com.puzzleplatform.player.ui.board.HashiBoard
 import com.puzzleplatform.player.ui.board.PencilsBoard
 import com.puzzleplatform.player.ui.board.ChocoBananaBoard
 import com.puzzleplatform.player.ui.board.PictoLinkBoard
@@ -363,6 +364,13 @@ fun PlayScreen(
                                     userValues = state.userValues,
                                     liveValidate = state.liveValidate,
                                     onSetEdge = vm::setUserValue,
+                                )
+                                // Drag island to island to cycle a bridge; over-full islands turn red with Errors on.
+                                34 -> HashiBoard(
+                                    puzzle = puzzle,
+                                    userValues = state.userValues,
+                                    liveValidate = state.liveValidate,
+                                    onApplyChanges = vm::putUserValues,
                                 )
                                 5 -> SlitherlinkBoard(
                                     puzzle = puzzle,

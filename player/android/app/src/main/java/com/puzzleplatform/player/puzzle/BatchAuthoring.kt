@@ -120,6 +120,7 @@ enum class AuthoringType(val label: String, val jpLabel: String, val puzzleType:
     SINKAMINO("Sinkamino", "シンカミノ", SinkaminoAuthoring.PUZZLE_TYPE),
     BALANCE_LINK("Balance Link", "バランスリンク", BalanceLinkAuthoring.PUZZLE_TYPE),
     L_RING("L-Ring", "えるりんぐ", LRingAuthoring.PUZZLE_TYPE),
+    HASHI("Hashi", "橋をかけろ", HashiAuthoring.PUZZLE_TYPE),
     PENCILS("Pencils", "ペンシルズ", PencilsAuthoring.PUZZLE_TYPE),
     CHOCO_BANANA("Choco Banana", "チョコバナナ", ChocoBananaAuthoring.PUZZLE_TYPE),
     ;

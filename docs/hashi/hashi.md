@@ -101,6 +101,11 @@ Every segment of one bridge holds the same count, and a run of non-zero segments
   - One bridge is a dark line between the two circle edges. Two bridges are two parallel lines.
   - An island turns grey once its bridge count equals its number.
   - With **Errors** on, an island with more bridges than its number is drawn red.
+- Web rules live in `hashiRules.ts` (`neighbour`, `wouldCross`, `islandState`, `validateHashi`).
+- Android: `HashiRules` in `HashiEngine.kt` ports `hashiRules.ts`. The engine stores counts 1 or 2 under Masyu's `h:` / `v:` keys, so it doesn't reuse Masyu's extract/restore, which keep only 1s.
+  - `HashiBoard` puts lattice points at cell centres, so `ZoomableBoard`'s cell under the finger is the point. One drag's bridge goes through `putUserValues` as one atomic change, which is also one undo step.
+  - A fast swipe can skip the neighbour's cell. Reaching any island along the line therefore cycles the bridge to the nearest island that way.
+  - Authoring is `HashiEditor` on a `ClueGridDraft`: pick Empty or 1–8 per point (empty points show as faint dots), and delete or add rows and columns. The warnings are the web editor's.
 
 ### Progress calculation
 

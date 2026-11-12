@@ -36,6 +36,7 @@ import com.puzzleplatform.player.ui.board.NurikabeMiniBoard
 import com.puzzleplatform.player.ui.board.SinkaminoMiniBoard
 import com.puzzleplatform.player.ui.board.BalanceLinkMiniBoard
 import com.puzzleplatform.player.ui.board.LRingMiniBoard
+import com.puzzleplatform.player.ui.board.HashiMiniBoard
 import com.puzzleplatform.player.ui.board.PencilsMiniBoard
 import com.puzzleplatform.player.ui.board.ChocoBananaBoard
 import com.puzzleplatform.player.puzzle.ChocoBananaAuthoring
@@ -325,6 +326,12 @@ fun BoardDraftEditor(
             onSelectCell = onSelectCell,
             onChange = { t -> onChange { it.copy(lRing = t(it.lRing)) } },
         )
+        AuthoringType.HASHI -> HashiEditor(
+            draft = board.hashi,
+            selectedCell = selectedCell,
+            onSelectCell = onSelectCell,
+            onChange = { t -> onChange { it.copy(hashi = t(it.hashi)) } },
+        )
         AuthoringType.PENCILS -> PencilsEditor(
             draft = board.pencils,
             selectedCell = selectedCell,
@@ -398,6 +405,7 @@ fun BoardDraftMiniBoard(type: AuthoringType, board: BoardDraft, size: Dp) {
         AuthoringType.SINKAMINO -> SinkaminoMiniBoard(draft = board.sinkamino, hasProblems = hasProblems, size = size)
         AuthoringType.BALANCE_LINK -> BalanceLinkMiniBoard(draft = board.balanceLink, hasProblems = hasProblems, size = size)
         AuthoringType.L_RING -> LRingMiniBoard(draft = board.lRing, hasProblems = hasProblems, size = size)
+        AuthoringType.HASHI -> HashiMiniBoard(draft = board.hashi, hasProblems = hasProblems, size = size)
         AuthoringType.PENCILS -> PencilsMiniBoard(draft = board.pencils, hasProblems = hasProblems, size = size)
         AuthoringType.CHOCO_BANANA ->
             ClueGridMiniBoard(draft = board.chocoBanana, hasProblems = hasProblems, size = size)
