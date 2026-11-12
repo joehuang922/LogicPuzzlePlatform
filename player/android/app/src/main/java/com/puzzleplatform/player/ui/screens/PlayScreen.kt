@@ -83,6 +83,7 @@ import com.puzzleplatform.player.ui.board.SinkaminoBoard
 import com.puzzleplatform.player.ui.board.BalanceLinkBoard
 import com.puzzleplatform.player.ui.board.LRingBoard
 import com.puzzleplatform.player.ui.board.HashiBoard
+import com.puzzleplatform.player.ui.board.SkeletonPuzzleBoard
 import com.puzzleplatform.player.ui.board.PencilsBoard
 import com.puzzleplatform.player.ui.board.ChocoBananaBoard
 import com.puzzleplatform.player.ui.board.PictoLinkBoard
@@ -380,6 +381,12 @@ fun PlayScreen(
                                     puzzle = puzzle,
                                     userValues = state.userValues,
                                     liveValidate = state.liveValidate,
+                                    onApplyChanges = vm::putUserValues,
+                                )
+                                // Tap a slot, pick a fitting word; the word list sits below.
+                                35 -> SkeletonPuzzleBoard(
+                                    puzzle = puzzle,
+                                    userValues = state.userValues,
                                     onApplyChanges = vm::putUserValues,
                                 )
                                 5 -> SlitherlinkBoard(

@@ -68,7 +68,7 @@ import com.puzzleplatform.player.ui.board.ZoomableImage
 
 /**
  * Create one *or many* questions from album photos. The puzzle type (sudoku,
- * nonogram, kakuro, slitherlink, nurikabe, heyawake, picto link, yajilin, ripple effect, masyu, slalom, shakashaka, akari, number link, shikaku, fillomino, kuralin, norinori, double choco, LITS, nurimaze, hitori, nuritwin, tentaishow, unequal sudoku, corner chain, sinkamino, balance link, L-Ring, Hashi, pencils or choco banana, see [AuthoringType]) is picked from a dropdown and applies to the whole
+ * nonogram, kakuro, slitherlink, nurikabe, heyawake, picto link, yajilin, ripple effect, masyu, slalom, shakashaka, akari, number link, shikaku, fillomino, kuralin, norinori, double choco, LITS, nurimaze, hitori, nuritwin, tentaishow, unequal sudoku, corner chain, sinkamino, balance link, L-Ring, Hashi, skeleton puzzle, pencils or choco banana, see [AuthoringType]) is picked from a dropdown and applies to the whole
  * batch. A single pick is just a batch of one — same flow throughout. Steps:
  * pick images → Parse all (OCR each) → review/fix any tile (full-screen, with the
  * source photo beside it: sudoku on the real player board, nonogram as editable clue
@@ -349,6 +349,10 @@ fun AdminQuestionScreen(
                                     "Tap a tile to review its photo and grid side by side, fix mis-read " +
                                         "islands, and set its title. A red tile has no islands, an odd total " +
                                         "or an island its neighbours can't satisfy."
+                                AuthoringType.SKELETON_PUZZLE ->
+                                    "Tap a tile to review its photo and grid side by side, fix mis-read " +
+                                        "cells or words, and set its title. A red tile's slots and words " +
+                                        "don't match by length."
                                 AuthoringType.PENCILS ->
                                     "Tap a tile to review its photo and grid side by side, fix mis-read " +
                                         "numbers or heads, and set its title. A red tile has no clues or a " +
@@ -624,6 +628,9 @@ private fun ReviewScreen(
                     AuthoringType.HASHI ->
                         "Compare the photo with the grid — pinch to zoom the photo, tap a point to make it " +
                             "empty or set its island's number, delete a phantom line, or add a missed one."
+                    AuthoringType.SKELETON_PUZZLE ->
+                        "Compare the photo with the grid — pinch to zoom the photo, tap a square to make it a " +
+                            "cell or not or mark it, fix the word list below, delete a phantom line, or add a missed one."
                     AuthoringType.PENCILS ->
                         "Compare the photo with the grid — pinch to zoom the photo, tap a cell to type its " +
                             "number or pick a head's direction, delete a phantom line, or add a missed one."

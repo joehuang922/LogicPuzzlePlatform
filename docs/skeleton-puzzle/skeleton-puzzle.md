@@ -105,6 +105,13 @@ The puzzle intends one solution, but any placement meeting these rules counts as
   - The **word list** sits below the board (beside it on wide screens), grouped by length like the print (3文字, 4文字, …). Each word is followed by its hint in small grey text. Placed words are struck through.
   - There is no Errors-mode colouring: placements can't clash, so there is nothing to mark red.
 
+- Web rules live in `skeletonPuzzleRules.ts` (`findSlots`, `candidates`, `boardGrid`, `isSolved`, `formatProblems`).
+- Android: `SkeletonRules` in `SkeletonPuzzleEngine.kt` ports `skeletonPuzzleRules.ts`, with the same slot order and `p:<slot>` keys.
+  - `SkeletonPuzzleBoard` draws the board in a `ZoomableBoard`. Below it sit the picker chips (and Clear) and the grouped word list.
+  - Each pick goes through `putUserValues` as one atomic change, which is also one undo step.
+  - Authoring is `SkeletonPuzzleEditor` on the canon itself (`SkeletonRules.Board`). Tap a square to make it a cell or not, or to add or remove its mark. Words go in a text field, one per line as `word (hint)`. Rows and columns can be deleted or added.
+  - Format problems block saving through `BoardDraft.formatProblems`.
+
 ### Progress calculation
 
 `(cells holding a kana / all cells) * 100`. A cell holds a kana when at least one placed word covers it. A board with no cells reads 0.

@@ -45,6 +45,7 @@ data class BoardDraft(
     val balanceLink: ClueGridDraft = ClueGridDraft(),
     val lRing: ClueGridDraft = ClueGridDraft(),
     val hashi: ClueGridDraft = ClueGridDraft(),
+    val skeletonPuzzle: SkeletonRules.Board = SkeletonRules.Board(),
     val pencils: ClueGridDraft = ClueGridDraft(),
     val chocoBanana: ClueGridDraft = ClueGridDraft(),
 ) {
@@ -84,6 +85,7 @@ data class BoardDraft(
         AuthoringType.BALANCE_LINK -> BalanceLinkAuthoring.problems(balanceLink)
         AuthoringType.L_RING -> LRingAuthoring.problems(lRing)
         AuthoringType.HASHI -> HashiAuthoring.problems(hashi)
+        AuthoringType.SKELETON_PUZZLE -> SkeletonPuzzleAuthoring.problems(skeletonPuzzle)
         AuthoringType.PENCILS -> PencilsAuthoring.problems(pencils)
         AuthoringType.CHOCO_BANANA -> ChocoBananaAuthoring.problems(chocoBanana)
     }
@@ -110,6 +112,7 @@ data class BoardDraft(
         AuthoringType.TENTAISHOW -> TentaishowAuthoring.formatProblems(tentaishow)
         AuthoringType.SINKAMINO -> SinkaminoAuthoring.formatProblems(sinkamino)
         AuthoringType.PENCILS -> PencilsAuthoring.formatProblems(pencils)
+        AuthoringType.SKELETON_PUZZLE -> SkeletonPuzzleAuthoring.formatProblems(skeletonPuzzle)
         else -> emptyList()
     }
 
@@ -184,6 +187,8 @@ data class BoardDraft(
             CanonBoard(LRingAuthoring.canonFromDraft(lRing), lRing.cols, lRing.rows)
         AuthoringType.HASHI ->
             CanonBoard(HashiAuthoring.canonFromDraft(hashi), hashi.cols, hashi.rows)
+        AuthoringType.SKELETON_PUZZLE ->
+            CanonBoard(SkeletonPuzzleAuthoring.canonFromDraft(skeletonPuzzle), skeletonPuzzle.cols, skeletonPuzzle.rows)
         AuthoringType.PENCILS ->
             CanonBoard(PencilsAuthoring.canonFromDraft(pencils), pencils.cols, pencils.rows)
         AuthoringType.CHOCO_BANANA ->
@@ -227,6 +232,7 @@ data class BoardDraft(
             AuthoringType.BALANCE_LINK -> BoardDraft(balanceLink = BalanceLinkAuthoring.draftFromCanon(canon))
             AuthoringType.L_RING -> BoardDraft(lRing = LRingAuthoring.draftFromCanon(canon))
             AuthoringType.HASHI -> BoardDraft(hashi = HashiAuthoring.draftFromCanon(canon))
+            AuthoringType.SKELETON_PUZZLE -> BoardDraft(skeletonPuzzle = SkeletonPuzzleAuthoring.draftFromCanon(canon))
             AuthoringType.PENCILS -> BoardDraft(pencils = PencilsAuthoring.draftFromCanon(canon))
             AuthoringType.CHOCO_BANANA -> BoardDraft(chocoBanana = ChocoBananaAuthoring.draftFromCanon(canon))
         }
