@@ -3,10 +3,9 @@
 The cell mask is deterministic and pinned against the hand-checked canons in
 ``docs/skeleton-puzzle/`` at full size and the Android upload size (2000 px).
 Each canon's slots match its printed word list length for length, which is
-how the masks were checked. Board 1 is a washed-out photo of a curled page:
-its thin lines are faint and flattening falls back to the plain warp (the
-hole in its middle leaves three vertical lines too sparse to trace), so the
-parser gets a few squares wrong there; the test pins exactly those.
+how the masks were checked. Board 1 is a washed-out photo of a curled page
+whose lines bow ~0.2 cell; the local lattice reads it exactly. All three
+boards also read exactly at 1080 px.
 
 The word list comes from Gemini, so the recognizer is a stub that returns the
 canon's words; the test covers geometry and how the reply becomes the canon.
@@ -36,11 +35,7 @@ from puzzle_parsers.skeleton_puzzle.parser import (
 
 DOCS_DIR = Path(__file__).parents[2] / "docs" / "skeleton-puzzle"
 SAMPLES = ["skeleton-puzzle-board-1", "skeleton-puzzle-board-2", "skeleton-puzzle-board-3"]
-# Squares the parser is known to get wrong, per (sample, size).
-KNOWN_OFF = {
-    ("skeleton-puzzle-board-1", None): {(0, 10), (0, 11), (0, 12), (0, 13), (3, 4)},
-    ("skeleton-puzzle-board-1", 2000): {(5, 4), (5, 5), (7, 4), (10, 1), (16, 18), (16, 19), (18, 18)},
-}
+SIZES = [None, 2000, 1080]
 
 
 class _StubRecognizer(CellRecognizer):
@@ -82,13 +77,9 @@ def test_canons_are_well_formed():
 
 
 @pytest.mark.parametrize("name", SAMPLES)
-@pytest.mark.parametrize("size", [None, 2000])
+@pytest.mark.parametrize("size", SIZES)
 def test_cell_mask_matches_canon(name, size):
-    want = _canon(name)["cells"]
-    got = detect_skeleton_grid(_image(name, size)).cells
-    assert (len(got), len(got[0])) == (len(want), len(want[0]))
-    off = {(r, c) for r in range(len(want)) for c in range(len(want[0])) if got[r][c] != want[r][c]}
-    assert off == KNOWN_OFF.get((name, size), set())
+    assert detect_skeleton_grid(_image(name, size)).cells == _canon(name)["cells"]
 
 
 def test_parse_reads_words_below_the_board():

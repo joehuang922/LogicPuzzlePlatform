@@ -127,37 +127,37 @@ The puzzle intends one solution, but any placement meeting these rules counts as
 
 ## Puzzle Parser
 
-Implemented in `parsers/src/puzzle_parsers/skeleton_puzzle/`. Lines are **solid**: thick on the outline, thin inside.
+Implemented in `parsers/src/puzzle_parsers/skeleton_puzzle/`. Lines are **solid**: thick on the outline, thin inside. The pages curl: board 1's lines bow about 0.2 cell.
 
-1. **Board.** All of a board's grid lines are joined, so the board is the largest connected ink component.
-   - Only that component goes to `rectify_board`, as `border_image`, with its rotated bounding box drawn round it as a frame.
-   - With the ragged outline alone, the border finder took an inner rectangle on board 1 and the page's decorative frame line on board 2.
-   - `rectify_board` flattens the board as it does every board.
-2. **Lattice.** `find_grid_lines` on the flattened board.
-3. **Walls.** The shared `grid_utils.classify_border_lines` reads every wall, the outer edges included, as no line, thin or thick.
-   - It samples walls as `classify_border_thickness` does, but a sample point that sees no ruling-width run counts against the wall instead of being skipped.
-   - That matters next to a non-cell: there the end points catch the crossing outline, which alone used to read as a line.
-   - Runs over 0.2 cell wide are shading (the grey disc behind boards 2 and 3), not lines.
-4. **Cells.** Squares joined by a non-thick wall share a class, so they form regions.
-   - Each region votes from its own walls: thin inside means cells, no line inside means non-cells, and a lined outer edge means cells.
-   - A region with no vote takes the opposite of its thick-walled neighbours.
-   - A local pass then lets each square follow its four walls.
-   - Voting per region keeps a misread local. One parity flood from a corner flipped whole bands of board 1.
-5. **Repair.** Every cell is in a slot, so a lone cell gets the square that joins it to the cell straight beyond filled in, unless a thick wall is in the way.
-6. **Word list.** The area below the board goes to Gemini (`recognize_image`) in one call. It returns each word as printed, small kana included, with its parenthesised hint.
+**No global warp.** The board has no rectangular border, and board 1's middle hole leaves three lines in a row too sparse for `flatten_board` to trace. So `rectify_board` / `flatten_board` aren't used. The first version used them: it fell back to the four-corner warp on board 1 and read 5–7 squares wrong. Allowing `flatten.py` a 4-line gap fixed that, but cost the Hitori 17x17 photo two digits. Instead the lattice is built locally, from the board itself:
+
+1. **Regions.** At a fixed 2000 px long side, the page is binarized and only the largest ink component is kept. That's the grid, since every line is joined.
+   - The white regions it encloses are single cells, runs of cells, or enclosed non-cell areas.
+   - Runs form because faint thin lines often vanish in the binarization, merging neighbours.
+   - An image of any size is scaled to 2000 px, so full size and the Android size read the same.
+2. **Corners.** Each region is a rectilinear polygon whose vertices sit on lattice corners. The pitch is fitted to the polygon edges, per axis.
+3. **Lattice.** Integer coordinates spread out from one corner by rounding each *local* offset to the pitch, shortest hops first, so a bowed page only bends things gradually.
+   - A smooth cubic map from pixels to lattice is then fitted to every corner, and each corner is re-rounded through it.
+   - That's needed because one badly rounded long edge can shift a whole cluster by a row (board 3 at 1280 px).
+   - Corners no region touches are interpolated from their 6 nearest known ones.
+4. **Walls.** Each square takes the region at its centre.
+   - Squares in one region share a class: nothing visible separates them. Either there's no line (both non-cells) or a thin line too faint to binarize (both cells).
+   - Between regions, the line is measured where it really is, with the shared `grid_utils.line_width_across`, then split thin / thick by Otsu.
+5. **Cells.** Region labels minimise the walls' disagreement, each wall weighted by how far its width is from the cut:
+   - a thin line wants both sides to be cells;
+   - a thick line wants them different;
+   - a line to the outside wants a cell.
+6. **Repair.** Every cell is in a slot, so a lone cell gets the square that joins it to the cell straight beyond filled in. This guards against a lost wall; the samples don't need it.
+7. **Word list.** The area below the board goes to Gemini (`recognize_image`) in one call. It returns each word as printed, small kana included, with its parenthesised hint.
    - The word list is free text, not cell clues, so EasyOCR and `_OCR_TYPES` don't apply.
    - The editor's slot/word check catches a dropped or merged word.
-7. **Marks.** Not read. The admin adds the double-framed cells in the editor.
+8. **Marks.** Not read. The admin adds the double-framed cells in the editor.
 
-**Accuracy.** The canons (`skeleton-puzzle-board-{1,2,3}.canon.json`) were checked by matching the slot counts against the printed word list, length by length.
-- **Boards 2 and 3:** parse exactly at full size and 2000 px.
-- **Board 1:** a washed-out photo of a curled page.
-  - Its thin lines are faint, and flattening falls back to the plain warp: the hole in its middle leaves three vertical lines in a row too sparse to trace.
-  - It reads 5 squares wrong at full size and 7 at 2000 px, out of 400.
-  - Allowing a 4-line gap in `flatten.py` cut that to 1, but on the Hitori 17x17 photo it lost two digits, so the change was dropped.
-- **Below 2000 px:** at 1080 px the thin lines are 1–2 px and every board degrades.
+**Accuracy.**
+- **Canons:** `skeleton-puzzle-board-{1,2,3}.canon.json` were checked by matching the slot counts against the printed word list, length by length.
+- **Cell masks:** all three boards parse exactly at full size, 2000, 1600, 1280 and 1080 px. At 800 px they are 1–4 squares off.
 - **Words:** Gemini read all three lists with every word and the right lengths. On board 1, ニシユタカ came back as ニシュタカ, which writes the same on the board.
-- `tests/test_skeleton_puzzle_parser.py` pins the masks, board 1's known misreads included, with the word reads stubbed.
+- `tests/test_skeleton_puzzle_parser.py` pins the masks at full size, 2000 and 1080 px, with the word reads stubbed.
 - The parser validates `cells` (rectangular, 0/1), the words (kana and ー, at least 2 letters) and the slot/word counts by length.
 
 # Misc

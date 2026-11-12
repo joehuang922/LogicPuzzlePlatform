@@ -72,6 +72,10 @@ This is a solo project. Do not create pull requests or feature branches.
   `parsers/tests/test_flatten.py` enforces it. Tune tracing in `flatten.py`
   for everyone. After a change there, every parser's samples must still read
   the right size, at full and Android size (2000px long side).
+- Skeleton puzzle is the exception: its board has no rectangular border and
+  lines too sparse for the trace, so it skips `rectify_board` and builds its
+  lattice locally from the corners of the regions the grid encloses (see
+  `skeleton_puzzle/grid_detector.py`). It warps and remaps nothing.
 
 # Authoring room-based puzzles
 
