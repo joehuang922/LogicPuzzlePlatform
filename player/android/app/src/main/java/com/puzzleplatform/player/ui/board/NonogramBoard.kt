@@ -2,7 +2,7 @@ package com.puzzleplatform.player.ui.board
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -132,8 +133,9 @@ fun NonogramBoard(
         )
     }
 
-    BoxWithConstraints(modifier.fillMaxWidth()) {
-        val vpx = with(density) { maxWidth.toPx() }
+    BoxWithConstraints(modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+        val side = boardSide(maxWidth)
+        val vpx = with(density) { side.toPx() }
         val perCluePx = with(density) { PER_CLUE_DEPTH.toPx() }
         val minBandPx = with(density) { MIN_BAND_DEPTH.toPx() }
         val maxBandPx = with(density) { MAX_BAND_DEPTH.toPx() }
@@ -153,8 +155,7 @@ fun NonogramBoard(
         val drag = remember(puzzle.id) { NonogramDragState() }
 
         val canvasMod = Modifier
-            .fillMaxWidth()
-            .aspectRatio(1f)
+            .size(side)
             .pointerInput(transform) {
                 detectBoardGestures(
                     transformEnabled = transform.zoomable,

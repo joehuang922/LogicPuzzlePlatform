@@ -2,11 +2,13 @@ package com.puzzleplatform.player.ui.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -61,6 +63,7 @@ import com.puzzleplatform.player.ui.board.AkariBoard
 import com.puzzleplatform.player.ui.board.HitoriBoard
 import com.puzzleplatform.player.ui.board.DigitBar
 import com.puzzleplatform.player.ui.board.EntryFocus
+import com.puzzleplatform.player.ui.board.LocalBoardMaxSide
 import com.puzzleplatform.player.ui.board.LocalEntryFocus
 import com.puzzleplatform.player.ui.board.DoubleChocoBoard
 import com.puzzleplatform.player.ui.board.FillominoBoard
@@ -103,6 +106,11 @@ import com.puzzleplatform.player.puzzle.PuzzleEngines
 import com.puzzleplatform.player.puzzle.SudokuEngine
 import com.puzzleplatform.player.puzzle.SudokuHinter
 import com.puzzleplatform.player.ui.formatElapsed
+
+/** Narrowest the header pane gets in landscape (two-pane) layout. */
+private val LANDSCAPE_HEADER_MIN = 260.dp
+/** Scrollable margin kept on each side of the board in landscape. */
+private val LANDSCAPE_GUTTER = 24.dp
 
 private class PlayViewModelFactory(
     private val puzzleId: String,
@@ -195,14 +203,11 @@ fun PlayScreen(
             }
             state.puzzle != null -> {
                 val puzzle = state.puzzle!!
-                Column(
-                    Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .padding(horizontal = 12.dp)
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
+                // The play screen is the header (info, timer, actions, progress,
+                // undo/redo) and the board. Portrait stacks them in one scroll; landscape
+                // (wider than tall) puts the header in a left pane and the board in a
+                // right pane sized to the screen height, see the layout at the end.
+                val header: @Composable () -> Unit = {
                     // Non-destructive notice when the puzzle was edited server-side
                     // since this attempt started. Progress stays; reload is opt-in.
                     if (state.puzzleEdited) {
@@ -242,11 +247,13 @@ fun PlayScreen(
                     }
 
                     // Timer + actions
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // A FlowRow so it wraps in the narrow landscape header pane.
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
                             formatElapsed(state.elapsedSeconds),
                             fontFamily = FontFamily.Monospace,
                             style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.align(Alignment.CenterVertically),
                         )
                         OutlinedButton(onClick = vm::save, enabled = !state.saving) {
                             Text(if (state.saving) "Saving…" else "Save")
@@ -257,6 +264,7 @@ fun PlayScreen(
                             selected = state.liveValidate,
                             onClick = vm::toggleLiveValidate,
                             label = { Text("Errors: ${if (state.liveValidate) "On" else "Off"}") },
+                            modifier = Modifier.align(Alignment.CenterVertically),
                         )
                     }
 
@@ -287,7 +295,9 @@ fun PlayScreen(
                             modifier = Modifier.align(Alignment.CenterVertically),
                         )
                     }
+                }
 
+                val board: @Composable () -> Unit = {
                     // Board, dispatched by puzzle type. Every touch gesture in here (a tap
                     // or a whole drag, whatever the board does with it) is one undo step.
                     // While a cell is selected the entry pad covers the bottom of the
@@ -594,6 +604,53 @@ fun PlayScreen(
                                 )
                                 else -> Text("This puzzle type isn't playable in this version yet.")
                             }
+                        }
+                    }
+                }
+
+                BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
+                    // Size boards from the height without the entry pad: the pad comes
+                    // and goes with the selected cell, and a board that resized with it
+                    // would reset its zoom on every tap. The pad covers the bottom of the
+                    // board instead, and the board scrolls the typed-in cell above it.
+                    val fullHeight = maxHeight + padding.calculateBottomPadding()
+                    if (maxWidth > fullHeight) {
+                        // Landscape: the board pane keeps a gutter beside the board so a
+                        // one-finger drag there still scrolls the pane (on drawing boards
+                        // a drag on the board itself draws), and the header pane gets
+                        // what's left, at least LANDSCAPE_HEADER_MIN wide.
+                        val boardPaneWidth = maxOf(maxWidth - LANDSCAPE_HEADER_MIN, maxWidth * 0.5f)
+                        val side = minOf(fullHeight - 16.dp, boardPaneWidth - 2 * LANDSCAPE_GUTTER)
+                        Row(Modifier.fillMaxSize()) {
+                            Column(
+                                Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .verticalScroll(rememberScrollState())
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) { header() }
+                            Column(
+                                Modifier
+                                    .width(boardPaneWidth)
+                                    .fillMaxHeight()
+                                    .verticalScroll(rememberScrollState())
+                                    .padding(vertical = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                CompositionLocalProvider(LocalBoardMaxSide provides side) { board() }
+                            }
+                        }
+                    } else {
+                        Column(
+                            Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 12.dp)
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            header()
+                            CompositionLocalProvider(LocalBoardMaxSide provides fullHeight) { board() }
                         }
                     }
                 }

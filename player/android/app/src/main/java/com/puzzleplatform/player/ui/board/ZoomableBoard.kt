@@ -5,8 +5,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
@@ -15,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -42,6 +43,21 @@ private val ENTRY_FLOOR = 24.dp
 data class EntryFocus(val cellKey: String, val viewportBottom: Dp)
 
 val LocalEntryFocus = compositionLocalOf<EntryFocus?> { null }
+
+/**
+ * The tallest a board viewport may be. Boards are square and as wide as their parent,
+ * which in landscape is far taller than the screen; the play screen provides the
+ * height it has room for and every board caps its side at it, centred in the width.
+ * Unbounded (no cap) where nothing provides one, e.g. the admin editors.
+ */
+val LocalBoardMaxSide = compositionLocalOf { Dp.Infinity }
+
+/** A square board's side: the parent's width, capped by [LocalBoardMaxSide]. */
+@Composable
+fun boardSide(maxWidth: Dp): Dp {
+    val cap = LocalBoardMaxSide.current
+    return if (cap < maxWidth) cap else maxWidth
+}
 
 /** Extra room kept around the focused cell when scrolling it into view, in cells. */
 private const val FOCUS_MARGIN_CELLS = 0.5f
@@ -91,8 +107,9 @@ fun ZoomableBoard(
     val density = LocalDensity.current
     val drawable = onDrawTo != null
 
-    BoxWithConstraints(modifier.fillMaxWidth()) {
-        val vpx = with(density) { maxWidth.toPx() } // viewport is square: vpx x vpx
+    BoxWithConstraints(modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+        val side = boardSide(maxWidth)
+        val vpx = with(density) { side.toPx() } // viewport is square: vpx x vpx
         val maxCellPx = with(density) { MAX_CELL.toPx() }
         val autoCellPx = with(density) { AUTO_CELL.toPx() }
         val entryFloorPx = with(density) { ENTRY_FLOOR.toPx() }
@@ -117,8 +134,7 @@ fun ZoomableBoard(
         }
 
         val canvasMod = Modifier
-            .fillMaxWidth()
-            .aspectRatio(1f)
+            .size(side)
             .bringIntoViewRequester(focusRequester)
             .pointerInput(transform, drawable) {
                 detectBoardGestures(
