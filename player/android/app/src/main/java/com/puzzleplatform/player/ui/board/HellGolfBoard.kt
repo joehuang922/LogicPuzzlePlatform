@@ -52,6 +52,9 @@ private val BALL_COLORS = listOf(
  * fingers pan/pinch-zoom, so large boards stay legible on a phone. The tap handler
  * reads [userValues]/selection through [rememberUpdatedState] so the gesture closure
  * (captured once by [ZoomableBoard]'s pointerInput) always sees the freshest state.
+ *
+ * The Admin review editor passes [onEditTap], which takes every tap instead of the play
+ * input (no ball selection, no moves), and [selectedCell] ("col,row") to outline it.
  */
 @Composable
 fun HellGolfBoard(
@@ -59,6 +62,8 @@ fun HellGolfBoard(
     userValues: Map<String, Int>,
     onPutValue: (key: String, value: Int) -> Unit,
     modifier: Modifier = Modifier,
+    onEditTap: ((col: Int, row: Int) -> Unit)? = null,
+    selectedCell: String? = null,
 ) {
     val canon = remember(puzzle.id) { HellGolfEngine.parseCanon(puzzle) }
     val rows = canon.rows
@@ -70,13 +75,18 @@ fun HellGolfBoard(
     // Freshest state for the once-captured tap closure (see ZoomableBoard docs).
     val valuesState = rememberUpdatedState(userValues)
     val onPut = rememberUpdatedState(onPutValue)
+    val onEdit = rememberUpdatedState(onEditTap)
 
     ZoomableBoard(
         cols = cols,
         rows = rows,
         resetKey = puzzle.id,
         modifier = modifier,
-        onTapCell = { col, row ->
+        onTapCell = tap@{ col, row ->
+            onEdit.value?.let {
+                it(col, row)
+                return@tap
+            }
             val cell = HellGolfEngine.Cell(row, col)
             val values = valuesState.value
             val trails = HellGolfEngine.trailsFrom(canon, values)
@@ -222,6 +232,8 @@ fun HellGolfBoard(
                 bold = true,
             )
         }
+
+        drawCellSelection(selectedCell, cell)
     }
 }
 

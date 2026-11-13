@@ -48,6 +48,7 @@ data class BoardDraft(
     val skeletonPuzzle: SkeletonRules.Board = SkeletonRules.Board(),
     val pencils: ClueGridDraft = ClueGridDraft(),
     val chocoBanana: ClueGridDraft = ClueGridDraft(),
+    val hellGolf: ClueGridDraft = ClueGridDraft(),
 ) {
     /**
      * What the type's misread check finds wrong with this board — the list that turns
@@ -88,6 +89,7 @@ data class BoardDraft(
         AuthoringType.SKELETON_PUZZLE -> SkeletonPuzzleAuthoring.problems(skeletonPuzzle)
         AuthoringType.PENCILS -> PencilsAuthoring.problems(pencils)
         AuthoringType.CHOCO_BANANA -> ChocoBananaAuthoring.problems(chocoBanana)
+        AuthoringType.HELL_GOLF -> HellGolfAuthoring.problems(hellGolf)
     }
 
     /**
@@ -193,6 +195,8 @@ data class BoardDraft(
             CanonBoard(PencilsAuthoring.canonFromDraft(pencils), pencils.cols, pencils.rows)
         AuthoringType.CHOCO_BANANA ->
             CanonBoard(ChocoBananaAuthoring.canonFromDraft(chocoBanana), chocoBanana.cols, chocoBanana.rows)
+        AuthoringType.HELL_GOLF ->
+            CanonBoard(HellGolfAuthoring.canonFromDraft(hellGolf), hellGolf.cols, hellGolf.rows)
     }
 
     companion object {
@@ -235,6 +239,7 @@ data class BoardDraft(
             AuthoringType.SKELETON_PUZZLE -> BoardDraft(skeletonPuzzle = SkeletonPuzzleAuthoring.draftFromCanon(canon))
             AuthoringType.PENCILS -> BoardDraft(pencils = PencilsAuthoring.draftFromCanon(canon))
             AuthoringType.CHOCO_BANANA -> BoardDraft(chocoBanana = ChocoBananaAuthoring.draftFromCanon(canon))
+            AuthoringType.HELL_GOLF -> BoardDraft(hellGolf = HellGolfAuthoring.draftFromCanon(canon))
         }
     }
 }

@@ -40,7 +40,7 @@ abstract class ClueGridAuthoring(
     protected open fun keeps(value: Int): Boolean = value > 0
 
     /** Read a parser canon `{ cells }` into a draft, padding ragged rows and clearing anything [keeps] rejects. */
-    fun draftFromCanon(canon: JsonObject): ClueGridDraft {
+    open fun draftFromCanon(canon: JsonObject): ClueGridDraft {
         val parsed = (canon["cells"] as? JsonArray)?.map { row ->
             (row as? JsonArray)?.map { v -> (v as? JsonPrimitive)?.intOrNull?.takeIf { keeps(it) } ?: 0 } ?: emptyList()
         } ?: emptyList()
@@ -49,7 +49,7 @@ abstract class ClueGridAuthoring(
     }
 
     /** The canon `{ cells }` to POST. */
-    fun canonFromDraft(draft: ClueGridDraft): JsonObject = JsonObject(
+    open fun canonFromDraft(draft: ClueGridDraft): JsonObject = JsonObject(
         mapOf("cells" to JsonArray(draft.cells.map { row -> JsonArray(row.map { JsonPrimitive(it) }) }))
     )
 

@@ -124,6 +124,7 @@ enum class AuthoringType(val label: String, val jpLabel: String, val puzzleType:
     SKELETON_PUZZLE("Skeleton Puzzle", "スケルトンパズル", SkeletonPuzzleAuthoring.PUZZLE_TYPE),
     PENCILS("Pencils", "ペンシルズ", PencilsAuthoring.PUZZLE_TYPE),
     CHOCO_BANANA("Choco Banana", "チョコバナナ", ChocoBananaAuthoring.PUZZLE_TYPE),
+    HELL_GOLF("Hell Golf", "ヘルゴルフ", HellGolfAuthoring.PUZZLE_TYPE),
     ;
 
     companion object {

@@ -37,6 +37,7 @@ import com.puzzleplatform.player.ui.board.SinkaminoMiniBoard
 import com.puzzleplatform.player.ui.board.BalanceLinkMiniBoard
 import com.puzzleplatform.player.ui.board.LRingMiniBoard
 import com.puzzleplatform.player.ui.board.HashiMiniBoard
+import com.puzzleplatform.player.ui.board.HellGolfMiniBoard
 import com.puzzleplatform.player.ui.board.SkeletonPuzzleMiniBoard
 import com.puzzleplatform.player.ui.board.PencilsMiniBoard
 import com.puzzleplatform.player.ui.board.ChocoBananaBoard
@@ -68,7 +69,7 @@ import com.puzzleplatform.player.ui.board.YajilinMiniBoard
  * [KuralinCircleEditor]; for norinori and LITS [RippleEffectRoomEditor] without numbers
  * and for nurimaze and nuritwin with their symbols / group sizes; for double choco
  * [DoubleChocoCellEditor]; for hitori [ClueGridEditor]; for tentaishow
- * [TentaishowDotEditor], each on its own player
+ * [TentaishowDotEditor]; for hell golf [HellGolfEditor], each on its own player
  * board (whose play input has nothing to write into here, so it's dropped). Each lists
  * its own problems.
  */
@@ -345,6 +346,12 @@ fun BoardDraftEditor(
             onSelectCell = onSelectCell,
             onChange = { t -> onChange { it.copy(pencils = t(it.pencils)) } },
         )
+        AuthoringType.HELL_GOLF -> HellGolfEditor(
+            draft = board.hellGolf,
+            selectedCell = selectedCell,
+            onSelectCell = onSelectCell,
+            onChange = { t -> onChange { it.copy(hellGolf = t(it.hellGolf)) } },
+        )
         AuthoringType.CHOCO_BANANA -> ClueGridEditor(
             authoring = ChocoBananaAuthoring,
             draft = board.chocoBanana,
@@ -417,6 +424,7 @@ fun BoardDraftMiniBoard(type: AuthoringType, board: BoardDraft, size: Dp) {
         AuthoringType.PENCILS -> PencilsMiniBoard(draft = board.pencils, hasProblems = hasProblems, size = size)
         AuthoringType.CHOCO_BANANA ->
             ClueGridMiniBoard(draft = board.chocoBanana, hasProblems = hasProblems, size = size)
+        AuthoringType.HELL_GOLF -> HellGolfMiniBoard(draft = board.hellGolf, hasProblems = hasProblems, size = size)
         AuthoringType.HEYAWAKE -> HeyawakeMiniBoard(draft = board.heyawake, hasProblems = hasProblems, size = size)
         AuthoringType.PICTO_LINK ->
             PictoLinkMiniBoard(draft = board.pictoLink, hasProblems = hasProblems, size = size)
