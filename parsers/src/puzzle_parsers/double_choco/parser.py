@@ -23,7 +23,8 @@ if TYPE_CHECKING:
 class DoubleChocoParser(PuzzleParser):
     puzzle_type = "double-choco"
 
-    _COLOR_MARGIN = 0.2
+    # Colour crop: the whole cell less the grid lines; shaded_cells masks digit ink.
+    _COLOR_MARGIN = 0.08
 
     def __init__(self, ocr_backend: OcrBackend | None = None) -> None:
         self._ocr = ocr_backend
@@ -58,7 +59,7 @@ class DoubleChocoParser(PuzzleParser):
 
         debug_path = _Path(debug_dir) if debug_dir else None
 
-        # Colour crops (centre of each cell) for the shared grey/white split,
+        # Colour crops (cell inside its lines) for the shared grey/white split,
         # and the shared OCR crop for the clue.
         color_rois = [
             [crop_cell(warped_gray, h_lines[r], h_lines[r + 1], v_lines[c], v_lines[c + 1],
