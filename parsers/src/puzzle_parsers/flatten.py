@@ -56,6 +56,8 @@ _OUTSIDE_CELLS = 0.35
 # border quad and every gap is within this range of a cell (see _fits_border).
 _BORDER_FIT_CELLS = 0.5
 _GAP_RANGE = (0.6, 1.45)
+# How far (in cells) the span / median gap may be from the gap count.
+_CELL_COUNT_TOL = 0.5
 # A gap within this many cells of 2 or 3 cells is a line (or two) the trace
 # missed, and is filled in. The outermost gap gets the looser tolerance when
 # the two gaps inside it are clean single cells: a curled page edge
@@ -551,7 +553,17 @@ def _fits_border(tracks: NDArray, lo: float, hi: float, pitch: float) -> bool:
     if abs(means[0] - lo) > _BORDER_FIT_CELLS * pitch or abs(means[-1] - hi) > _BORDER_FIT_CELLS * pitch:
         return False
     gaps = np.diff(means) / pitch
-    return bool(np.all((gaps >= _GAP_RANGE[0]) & (gaps <= _GAP_RANGE[1])))
+    if not np.all((gaps >= _GAP_RANGE[0]) & (gaps <= _GAP_RANGE[1])):
+        return False
+    # A stray line splits one cell into two gaps that each pass the range
+    # while the gaps around them flex, so also count cells: the span in
+    # median gaps must match the number of gaps (the 50x64 double choco photo
+    # at 1600px traced 66 column lines spanning 63.6 median gaps). The outer
+    # gaps are left out: a curled edge foreshortens them (the curled kakuro
+    # photo at 2000px, 0.73 cell, is a clean trace).
+    inner = means[1:-1] if len(means) >= 5 else means
+    count = (inner[-1] - inner[0]) / np.median(np.diff(means))
+    return abs(count - (len(inner) - 1)) <= _CELL_COUNT_TOL
 
 
 def _misfit(tracks: NDArray) -> float:

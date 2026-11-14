@@ -27,6 +27,7 @@ A rectangular grid where each cell has a color (white or gray) and optionally a 
 
 - [board-double-choco.jpg](double-choco/board-double-choco.jpg) — small board
 - [board-double-choco-medium.jpg](double-choco/board-double-choco-medium.jpg) — medium board
+- [board-double-choco-giant.jpg](double-choco/board-double-choco-giant.jpg) — 50x64 magazine photo: halftone grey, curled corner
 
 ## Answer structure description
 
