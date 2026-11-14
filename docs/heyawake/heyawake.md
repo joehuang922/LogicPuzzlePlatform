@@ -42,6 +42,8 @@ perimeter.
 
 - [board-heyawake.png](board-heyawake.png) — small board (10x10)
 - [board-heyawake-medium.png](board-heyawake-medium.png) — larger board
+- [board-heyawake-photo-10x10.jpg](board-heyawake-photo-10x10.jpg) — phone photo, faint blurred thin lines
+- [board-heyawake-photo-17x17.jpg](board-heyawake-photo-17x17.jpg) — phone photo, thin lines and show-through
 
 ## Answer structure description
 

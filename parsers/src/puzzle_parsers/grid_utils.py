@@ -1131,10 +1131,12 @@ def classify_border_thickness(
 ) -> tuple[list[list[int]], list[list[int]]]:
     """Classify each internal wall of a room board as thick (1) or thin (0).
 
-    1. Measure every wall's width (sub-pixel, on the run through the line).
-    2. Split widths into two classes: Otsu on this board's widths, or the
-       density valley between Otsu's two classes, whichever leaves fewer thick
-       walls dead-ending mid-board (see ``_valley_between_classes``).
+    1. Measure every wall's ink (see ``_wall_width``): its width weighted by
+       how dark it is, which a blurred photo can't inflate.
+    2. Split them into two classes: Otsu on this board's walls, the density
+       valley between Otsu's two classes (see ``_valley_between_classes``) or
+       the widest gap between them, whichever leaves fewer thick walls
+       dead-ending mid-board, then whichever lies furthest from any wall.
     3. Rooms are closed, so a thick wall can't end in the middle of the board:
        where one does, flip the least certain wall at that corner (see
        ``_close_dangling_walls``).
@@ -1149,36 +1151,32 @@ def classify_border_thickness(
     seed_h = max(2, int(round(grid.cell_h * _WALL_SEED_FRAC)))
     seed_w = max(2, int(round(grid.cell_w * _WALL_SEED_FRAC)))
 
-    h_widths = [
-        [
-            _measure_border_width_gray(
-                warped_gray, "h", h_lines[r + 1], v_lines[c], v_lines[c + 1], scan_h, seed_h
-            )
-            for c in range(cols)
-        ]
-        for r in range(rows - 1)
-    ]
-    v_widths = [
-        [
-            _measure_border_width_gray(
-                warped_gray, "v", v_lines[c + 1], h_lines[r], h_lines[r + 1], scan_w, seed_w
-            )
-            for c in range(cols - 1)
-        ]
-        for r in range(rows)
-    ]
-    widths = [w for row in h_widths for w in row] + [w for row in v_widths for w in row]
+    walls = [("h", h_lines[r + 1], v_lines[c], v_lines[c + 1], scan_h, seed_h)
+             for r in range(rows - 1) for c in range(cols)]
+    walls += [("v", v_lines[c + 1], h_lines[r], h_lines[r + 1], scan_w, seed_w)
+              for r in range(rows) for c in range(cols - 1)]
+    flat = [_wall_width(_wall_samples(warped_gray, *wall)) for wall in walls]
+    n_h = (rows - 1) * cols
+    h_widths = [flat[r * cols:(r + 1) * cols] for r in range(rows - 1)]
+    v_widths = [flat[n_h + r * (cols - 1):n_h + (r + 1) * (cols - 1)] for r in range(rows)]
+    widths = flat
     otsu = _find_thickness_threshold(widths)
-    # Two candidate cuts; rooms are closed, so keep the one that leaves fewer thick
-    # walls dead-ending mid-board (ties keep Otsu).
-    best: tuple[int, float, list[list[int]], list[list[int]]] | None = None
-    for threshold in (otsu, _valley_between_classes(np.array([w for w in widths if w > 0]), otsu)):
+    # Three candidate cuts; rooms are closed, so keep the one that leaves fewer
+    # thick walls dead-ending mid-board, then the one furthest from any wall.
+    # Otsu and the valley can both cut just inside a broad thick class (the
+    # blurred heyawake photo: thin 2-7, thick 10-20, Otsu at 10.6 under one
+    # wall's 10.4; the 45x31 nurimaze: valley 3.57 over a wall's 3.55, with
+    # nothing between 2.6 and 3.4); the widest gap cuts in the empty stretch.
+    positive = np.array([w for w in widths if w > 0])
+    best: tuple[int, float, float, list[list[int]], list[list[int]]] | None = None
+    for threshold in (otsu, _valley_between_classes(positive, otsu), _widest_gap(positive, otsu)):
         h_try = [[int(w > threshold) for w in row] for row in h_widths]
         v_try = [[int(w > threshold) for w in row] for row in v_widths]
         dangling = len(_dangling_corners(h_try, v_try))
-        if best is None or dangling < best[0]:
-            best = (dangling, threshold, h_try, v_try)
-    _, threshold, h_borders, v_borders = best
+        margin = float(np.abs(positive - threshold).min()) if positive.size else 0.0
+        if best is None or (dangling, -margin) < (best[0], -best[1]):
+            best = (dangling, margin, threshold, h_try, v_try)
+    _, _, threshold, h_borders, v_borders = best
     _close_dangling_walls(h_borders, v_borders, h_widths, v_widths, threshold)
 
     if debug_dir:
@@ -1209,7 +1207,7 @@ def line_width_across(gray: NDArray, a: NDArray, b: NDArray, reach: float) -> fl
     each square's corners locally on a curled page): the median, over five
     points along the segment, of the dark run crossing it, read on a profile
     perpendicular to it that reaches ``reach`` px each side. Like
-    ``_measure_border_width_gray`` a point needs 20 grey levels of contrast and
+    ``_wall_samples`` a point needs 20 grey levels of contrast and
     the run is darker than halfway between its darkest pixel and the paper.
     """
     a = np.asarray(a, dtype=float)
@@ -1295,7 +1293,7 @@ def _close_dangling_walls(
             return
 
 
-def _measure_border_width_gray(
+def _wall_samples(
     gray: NDArray,
     axis: str,
     line_pos: int,
@@ -1303,29 +1301,23 @@ def _measure_border_width_gray(
     end: int,
     scan_range: int,
     seed_range: int,
-) -> float:
-    """Width (px, sub-pixel) of the wall at ``line_pos`` between ``start``/``end``.
+) -> list[tuple[NDArray, int, float, float]]:
+    """Cross-line profiles of the wall at ``line_pos`` between ``start``/``end``.
 
-    At up to 7 points along the wall, take the cross-line profile (minimum over
-    3 px along the wall, which bridges dashes), seed at the darkest pixel within
-    ``seed_range`` of the line, and measure the run darker than halfway between
-    that pixel and the local paper, with linear interpolation at both edges.
-    The points are combined with ``_WALL_PCT``.
-    Whole-pixel runs left thick and thin a value or two apart and Otsu's split
-    jumped between them (norinori-medium flipped ~157 walls between settings).
-    Returns 0.0 when no point has contrast.
+    At up to 7 points along the wall, the profile across it (minimum over 3 px
+    along the wall, which bridges dashes), seeded at its darkest pixel within
+    ``seed_range`` of the line. Returns ``(profile, seed, dark, paper)`` for
+    each point with at least 20 grey levels of contrast.
     """
     h, w = gray.shape
     num_samples = max(3, min(7, (end - start) // 10))
-    samples: list[float] = []
-
+    out: list[tuple[NDArray, int, float, float]] = []
     for i in range(num_samples):
         pos = start + (end - start) * (i + 1) // (num_samples + 1)
+        lo = max(0, line_pos - scan_range)
         if axis == "h":
-            lo = max(0, line_pos - scan_range)
             strip = gray[lo:min(h, line_pos + scan_range), max(0, pos - 1): pos + 2].min(axis=1)
         else:
-            lo = max(0, line_pos - scan_range)
             strip = gray[max(0, pos - 1): pos + 2, lo:min(w, line_pos + scan_range)].min(axis=0)
         strip = strip.astype(float)
         if strip.size == 0:
@@ -1338,25 +1330,35 @@ def _measure_border_width_gray(
         if s1 <= s0:
             continue
         seed = s0 + int(np.argmin(strip[s0:s1]))
-        thresh = strip[seed] + (paper - strip[seed]) * 0.5
-        if strip[seed] >= thresh:
-            continue
+        out.append((strip, seed, float(strip[seed]), paper))
+    return out
+
+
+def _wall_width(samples: list[tuple[NDArray, int, float, float]]) -> float:
+    """A wall's ink from its profiles (px of full black), combined with ``_WALL_PCT``.
+
+    Each profile's run darker than halfway between its seed and the paper
+    (which keeps a clue digit near the line out), summed as darkness over
+    paper. A width at half a line's own depth reads a faint, blurred thin line
+    as wide as a black wall (a phone photo of a heyawake page: thin lines 40
+    grey levels deep, 14 px wide like the walls, read thick along whole rows);
+    weighted by darkness it stays small, and blur, which spreads ink without
+    removing it, barely moves either. Being continuous it also keeps Otsu's
+    split steady, as the sub-pixel width did (whole-pixel runs flipped ~157
+    norinori-medium walls between settings). Returns 0.0 when no point has
+    contrast.
+    """
+    inks: list[float] = []
+    for strip, seed, dark, paper in samples:
+        thresh = dark + (paper - dark) * 0.5
         a = seed
         while a > 0 and strip[a - 1] < thresh:
             a -= 1
         b = seed
         while b < len(strip) - 1 and strip[b + 1] < thresh:
             b += 1
-        width = float(b - a + 1)
-        # Each edge pixel outside the run contributes the fraction of it that
-        # lies below the threshold (linear interpolation), minus half a pixel.
-        if a > 0:
-            width += min(1.0, max(0.0, (thresh - strip[a]) / max(1e-6, strip[a - 1] - strip[a]))) - 0.5
-        if b < len(strip) - 1:
-            width += min(1.0, max(0.0, (thresh - strip[b]) / max(1e-6, strip[b + 1] - strip[b]))) - 0.5
-        samples.append(width)
-
-    return float(np.percentile(samples, _WALL_PCT)) if samples else 0.0
+        inks.append(float(np.sum(paper - strip[a:b + 1]) / paper))
+    return float(np.percentile(inks, _WALL_PCT)) if inks else 0.0
 
 
 # Smoothing for the thick/thin width histogram, as a fraction of the gap between
@@ -1404,6 +1406,16 @@ def _find_thickness_threshold(widths: list[float]) -> float:
             best_thresh = t
 
     return best_thresh
+
+
+def _widest_gap(arr: NDArray, otsu: float) -> float:
+    """Middle of the widest gap between sorted widths, between Otsu's class means."""
+    lo, hi = arr[arr <= otsu], arr[arr > otsu]
+    if len(lo) == 0 or len(hi) == 0:
+        return otsu
+    span = np.sort(np.concatenate([[lo.mean(), hi.mean()], arr[(arr > lo.mean()) & (arr < hi.mean())]]))
+    i = int(np.argmax(np.diff(span)))
+    return float((span[i] + span[i + 1]) / 2)
 
 
 def _valley_between_classes(arr: NDArray, otsu: float) -> float:
