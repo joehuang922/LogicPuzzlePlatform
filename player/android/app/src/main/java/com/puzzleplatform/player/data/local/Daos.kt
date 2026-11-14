@@ -35,6 +35,11 @@ interface PuzzleDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(puzzle: PuzzleEntity)
 
+    // Caches puzzles without touching rows already stored, so a listing never
+    // clears a downloaded puzzle's sync stamp (updatedAt).
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertMissing(puzzles: List<PuzzleEntity>)
+
     @Query("SELECT * FROM puzzles WHERE id = :id")
     suspend fun getById(id: String): PuzzleEntity?
 
@@ -65,6 +70,9 @@ interface PuzzleDao {
             "AND deletedAt IS NULL ORDER BY id"
     )
     suspend fun listByCollection(collectionId: Int): List<PuzzleEntity>
+
+    @Query("SELECT * FROM puzzles WHERE puzzleType = :puzzleType AND deletedAt IS NULL ORDER BY id")
+    suspend fun listByType(puzzleType: Int): List<PuzzleEntity>
 
     @Query("SELECT * FROM puzzles WHERE srcCollection = :collectionId OR (:collectionId = 0 AND srcCollection IS NULL)")
     suspend fun listByCollectionIncludingDeleted(collectionId: Int): List<PuzzleEntity>

@@ -85,6 +85,20 @@ class PuzzleRepository(
     }
 
     /**
+     * Every puzzle of one type, across collections (Home's type-first view). Online
+     * first so new puzzles show, caching what it fetches; offline it falls back to
+     * the puzzles of that type already in Room.
+     */
+    suspend fun listPuzzlesByType(puzzleType: Int): List<Puzzle> =
+        try {
+            val puzzles = api.listPuzzles(puzzleType = puzzleType.toString()).puzzles
+            db.puzzleDao().insertMissing(puzzles.map { it.toEntity(json, updatedAt = null, deletedAt = null) })
+            puzzles
+        } catch (e: Exception) {
+            db.puzzleDao().listByType(puzzleType).map { it.toModel(json) }.takeIf { it.isNotEmpty() } ?: throw e
+        }
+
+    /**
      * The [limit] puzzles the player most recently worked on (by latest snapshot),
      * newest first. Progress is local-first, so this reads only from Room — an empty
      * list simply means nothing has been played yet.

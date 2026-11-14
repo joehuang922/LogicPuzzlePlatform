@@ -217,6 +217,8 @@ export interface PuzzleType {
   name: string;
   jpLabel: string;
   rule: string;
+  /** Live puzzles of this type. */
+  puzzleCount?: number;
 }
 
 export function listPuzzleTypes() {

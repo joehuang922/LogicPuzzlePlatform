@@ -9,6 +9,7 @@ import com.puzzleplatform.player.data.model.Collection
 import com.puzzleplatform.player.data.model.CollectionProgress
 import com.puzzleplatform.player.data.model.Puzzle
 import com.puzzleplatform.player.data.model.PuzzleType
+import com.puzzleplatform.player.data.model.defaultCollection
 import com.puzzleplatform.player.data.sync.SyncManager
 import com.puzzleplatform.player.puzzle.PuzzleEngines
 import com.puzzleplatform.player.puzzle.PuzzleThumbnail
@@ -18,6 +19,30 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
+
+/** How Home lists puzzles below Latest: by collection, or by puzzle type. */
+enum class HomeBrowseMode { COLLECTION, TYPE }
+
+/** One collection's puzzles inside an expanded type (type-first view). */
+data class TypeCollectionGroup(
+    val collectionName: String,
+    val puzzles: List<Puzzle>,
+)
+
+/**
+ * Groups one type's puzzles by collection, collections by name (Uncategorized
+ * last) and puzzles by title within each, both case-insensitive.
+ */
+fun groupTypePuzzlesByCollection(puzzles: List<Puzzle>): List<TypeCollectionGroup> =
+    puzzles.groupBy { it.srcCollectionName }
+        .entries
+        .sortedWith(compareBy(nullsLast<String>()) { e: Map.Entry<String?, List<Puzzle>> -> e.key?.lowercase() })
+        .map { (name, items) ->
+            TypeCollectionGroup(
+                collectionName = name ?: defaultCollection(0).name,
+                puzzles = items.sortedBy { it.title?.lowercase() ?: "" },
+            )
+        }
 
 data class HomeUiState(
     val loading: Boolean = true,
@@ -30,6 +55,13 @@ data class HomeUiState(
     val collections: List<Collection> = emptyList(),
     val puzzleTypes: List<PuzzleType> = emptyList(),
     val collectionProgress: Map<Int, CollectionProgress> = emptyMap(),
+    val browseMode: HomeBrowseMode = HomeBrowseMode.COLLECTION,
+    // Expanded type state (type-first view; one type open at a time)
+    val expandedTypeId: Int? = null,
+    val typeGroups: List<TypeCollectionGroup> = emptyList(),
+    val loadingTypePuzzles: Boolean = false,
+    val typeSolvedIds: Set<String> = emptySet(),
+    val typeAttemptedIds: Set<String> = emptySet(),
     // Expanded collection state
     val expandedCollectionId: Int? = null,
     val collectionPuzzles: List<Puzzle> = emptyList(),
@@ -156,6 +188,7 @@ class HomeViewModel(
                 repo.refreshDownloadedCollections()
                 fetchHome()
                 _state.value.expandedCollectionId?.let { reloadCollectionPuzzles(it) }
+                _state.value.expandedTypeId?.let { reloadTypePuzzles(it) }
             } catch (e: Exception) {
                 _state.update { it.copy(error = e.message ?: "Refresh failed") }
             } finally {
@@ -196,12 +229,18 @@ class HomeViewModel(
                 progress = progress + (expandedId to
                     CollectionProgress(expandedId, current.collectionPuzzles.size, solved.solvedQuestions.size))
             }
+            val typePuzzleIds = current.typeGroups.flatMap { g -> g.puzzles.map { it.id } }
+            val typeSolved = if (current.expandedTypeId != null && typePuzzleIds.isNotEmpty()) {
+                repo.getSolvedQuestions(typePuzzleIds)
+            } else null
             _state.update {
                 it.copy(
                     puzzles = recentlyPlayed,
                     collectionProgress = progress,
                     solvedPuzzleIds = solved?.solvedQuestions?.toSet() ?: it.solvedPuzzleIds,
                     attemptedPuzzleIds = solved?.attemptedQuestions?.toSet() ?: it.attemptedPuzzleIds,
+                    typeSolvedIds = typeSolved?.solvedQuestions?.toSet() ?: it.typeSolvedIds,
+                    typeAttemptedIds = typeSolved?.attemptedQuestions?.toSet() ?: it.typeAttemptedIds,
                 )
             }
         }
@@ -262,6 +301,44 @@ class HomeViewModel(
                 attemptedPuzzleIds = solved.attemptedQuestions.toSet(),
                 collectionProgress = s.collectionProgress + (collectionId to
                     CollectionProgress(collectionId, puzzles.size, solved.solvedQuestions.size)),
+            )
+        }
+    }
+
+    fun setBrowseMode(mode: HomeBrowseMode) {
+        _state.update { it.copy(browseMode = mode) }
+    }
+
+    /** Expand one type (collapsing any other), or collapse it if already open. */
+    fun toggleType(typeId: Int) {
+        if (_state.value.expandedTypeId == typeId) {
+            _state.update { it.copy(expandedTypeId = null) }
+            return
+        }
+        _state.update {
+            it.copy(expandedTypeId = typeId, loadingTypePuzzles = true, typeGroups = emptyList())
+        }
+        viewModelScope.launch {
+            try {
+                reloadTypePuzzles(typeId)
+            } catch (e: Exception) {
+                _state.update { it.copy(loadingTypePuzzles = false, error = e.message) }
+            }
+        }
+    }
+
+    /** Load one type's puzzles, grouped by collection, plus solved/attempted state. */
+    private suspend fun reloadTypePuzzles(typeId: Int) {
+        val puzzles = repo.listPuzzlesByType(typeId)
+        val solved = repo.getSolvedQuestions(puzzles.map { it.id })
+        _state.update { s ->
+            // A different type may have been opened while this one loaded.
+            if (s.expandedTypeId != typeId) return@update s
+            s.copy(
+                loadingTypePuzzles = false,
+                typeGroups = groupTypePuzzlesByCollection(puzzles),
+                typeSolvedIds = solved.solvedQuestions.toSet(),
+                typeAttemptedIds = solved.attemptedQuestions.toSet(),
             )
         }
     }

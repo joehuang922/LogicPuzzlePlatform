@@ -162,6 +162,9 @@ data class PuzzleType(
     val name: String,
     val jpLabel: String,
     val rule: String,
+    // Live puzzles of the type; null when read from the Room cache, which doesn't
+    // store it (Home's type view then lists every type).
+    val puzzleCount: Int? = null,
 )
 
 @Serializable

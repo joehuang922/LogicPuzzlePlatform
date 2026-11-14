@@ -1,5 +1,6 @@
 package com.puzzleplatform.player.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -27,6 +28,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -37,9 +41,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -47,6 +54,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.puzzleplatform.player.data.model.Collection
 import com.puzzleplatform.player.data.model.Puzzle
+import com.puzzleplatform.player.data.model.PuzzleType
+import com.puzzleplatform.player.data.model.SizeTag
+import com.puzzleplatform.player.data.model.sizeTag
 import com.puzzleplatform.player.puzzle.PuzzleThumbnail
 import com.puzzleplatform.player.ui.DIFFICULTY_LABELS
 import com.puzzleplatform.player.ui.board.SolvedThumbnail
@@ -126,8 +136,18 @@ fun HomeScreen(
                         }
                     }
 
-                    if (state.collections.isNotEmpty()) {
-                        item { SectionHeader("Collections") }
+                    // Below Latest: collections first (each opening onto its puzzles by
+                    // type) or types first (each opening onto its puzzles by collection).
+                    val browseTypes = state.puzzleTypes
+                        .filter { (it.puzzleCount ?: 1) > 0 }
+                        .sortedBy { it.id }
+                    if (state.collections.isNotEmpty() || browseTypes.isNotEmpty()) {
+                        item(key = "browse-header") {
+                            BrowseHeader(state.browseMode, onModeChange = vm::setBrowseMode)
+                        }
+                    }
+
+                    if (state.browseMode == HomeBrowseMode.COLLECTION && state.collections.isNotEmpty()) {
                         items(state.collections, key = { "col-${it.id}" }) { c ->
                             CollectionRow(
                                 collection = c,
@@ -151,6 +171,51 @@ fun HomeScreen(
                                             onRequestThumbnail = { vm.loadThumbnail(p.id) },
                                             onClick = { vm.selectPuzzle(p) },
                                         )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (state.browseMode == HomeBrowseMode.TYPE) {
+                        items(browseTypes, key = { "type-${it.id}" }) { t ->
+                            val expanded = state.expandedTypeId == t.id
+                            val loaded = expanded && !state.loadingTypePuzzles
+                            val typePuzzleIds = if (loaded) state.typeGroups.flatMap { g -> g.puzzles.map { it.id } } else emptyList()
+                            TypeRow(
+                                type = t,
+                                expanded = expanded,
+                                countText = when {
+                                    loaded -> "${typePuzzleIds.count { it in state.typeSolvedIds }}/${typePuzzleIds.size}"
+                                    else -> t.puzzleCount?.toString()
+                                },
+                                onToggle = { vm.toggleType(t.id) },
+                            )
+                            if (expanded) {
+                                if (state.loadingTypePuzzles) {
+                                    Text("Loading questions…", modifier = Modifier.padding(start = 16.dp, bottom = 8.dp))
+                                } else if (state.typeGroups.isEmpty()) {
+                                    Text("No questions of this type.", modifier = Modifier.padding(start = 16.dp, bottom = 8.dp))
+                                } else {
+                                    for (g in state.typeGroups) {
+                                        Text(
+                                            g.collectionName,
+                                            style = MaterialTheme.typography.labelLarge,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 2.dp),
+                                        )
+                                        for (p in g.puzzles) {
+                                            CollectionPuzzleRow(
+                                                puzzle = p,
+                                                solved = state.typeSolvedIds.contains(p.id),
+                                                attempted = state.typeAttemptedIds.contains(p.id),
+                                                thumbnail = state.thumbnails[p.id],
+                                                onRequestThumbnail = { vm.loadThumbnail(p.id) },
+                                                onClick = { vm.selectPuzzle(p) },
+                                                showType = false,
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -231,11 +296,97 @@ private fun SectionHeader(text: String) {
     )
 }
 
+/** "Collections" / "Types" heading with the collection-first / type-first toggle. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BrowseHeader(mode: HomeBrowseMode, onModeChange: (HomeBrowseMode) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            if (mode == HomeBrowseMode.COLLECTION) "Collections" else "Types",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+        )
+        val options = listOf(HomeBrowseMode.COLLECTION to "Collection", HomeBrowseMode.TYPE to "Type")
+        SingleChoiceSegmentedButtonRow {
+            options.forEachIndexed { index, (option, label) ->
+                SegmentedButton(
+                    selected = mode == option,
+                    onClick = { onModeChange(option) },
+                    shape = SegmentedButtonDefaults.itemShape(index, options.size),
+                ) { Text(label) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TypeRow(
+    type: PuzzleType,
+    expanded: Boolean,
+    countText: String?,
+    onToggle: () -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onToggle)) {
+        Row(
+            Modifier.padding(12.dp).fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                (if (expanded) "▾ " else "▸ ") + type.jpLabel,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.weight(1f),
+            )
+            countText?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+        }
+    }
+}
+
+/** Title with the puzzle's BIG / GIANT pill after it, when it has one. */
+@Composable
+private fun TitleWithSizeTag(
+    title: String,
+    tag: SizeTag?,
+    modifier: Modifier = Modifier,
+    style: TextStyle = MaterialTheme.typography.bodyLarge,
+    fontWeight: FontWeight? = null,
+) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Text(title, style = style, fontWeight = fontWeight, modifier = Modifier.weight(1f, fill = false))
+        if (tag != null) {
+            Spacer(Modifier.width(6.dp))
+            SizePill(tag)
+        }
+    }
+}
+
+@Composable
+private fun SizePill(tag: SizeTag) {
+    val color = when (tag) {
+        SizeTag.BIG -> Color(0xFFEF6C00)
+        SizeTag.GIANT -> Color(0xFFC62828)
+    }
+    Text(
+        tag.label,
+        color = Color.White,
+        fontSize = 10.sp,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(color)
+            .padding(horizontal = 6.dp, vertical = 1.dp),
+    )
+}
+
 @Composable
 private fun PuzzleRow(p: Puzzle, onClick: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Column(Modifier.padding(12.dp)) {
-            Text(p.title ?: "Untitled", fontWeight = FontWeight.Medium)
+            TitleWithSizeTag(p.title ?: "Untitled", p.sizeTag(), fontWeight = FontWeight.Medium)
             val diff = DIFFICULTY_LABELS[p.difficulty] ?: "${p.difficulty}/5"
             val from = p.srcCollectionName?.let { " · $it" } ?: ""
             Text(
@@ -306,6 +457,8 @@ private fun CollectionPuzzleRow(
     thumbnail: PuzzleThumbnail?,
     onRequestThumbnail: () -> Unit,
     onClick: () -> Unit,
+    // False in the type-first view, where every row is the same type.
+    showType: Boolean = true,
 ) {
     // Kick off a lazy thumbnail load the first time a solved row composes; the VM
     // dedups and the repo memoizes, so scrolling this row in and out is cheap.
@@ -321,11 +474,12 @@ private fun CollectionPuzzleRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(puzzle.title ?: "(none)", style = MaterialTheme.typography.bodyMedium)
+            TitleWithSizeTag(puzzle.title ?: "(none)", puzzle.sizeTag(), style = MaterialTheme.typography.bodyMedium)
             val diff = DIFFICULTY_LABELS[puzzle.difficulty] ?: puzzle.difficulty
             val size = puzzle.width?.let { w -> puzzle.height?.let { h -> " · $w x $h" } } ?: ""
+            val type = if (showType) "${puzzle.puzzleTypeJpLabel} · " else ""
             Text(
-                "${puzzle.puzzleTypeJpLabel} · $diff$size",
+                "$type$diff$size",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

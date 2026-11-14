@@ -13,8 +13,13 @@ function response(statusCode: number, body: unknown): APIGatewayProxyResult {
 }
 
 async function listPuzzleTypes(): Promise<APIGatewayProxyResult> {
+  // puzzleCount: live (not soft-deleted) puzzles of the type, so clients can
+  // list only the types that have puzzles (Android Home's type-first view).
   const result = await executeStatement(
-    "SELECT id, name, jp_label AS jpLabel, rule FROM puzzle_types ORDER BY id"
+    `SELECT pt.id, pt.name, pt.jp_label AS jpLabel, pt.rule,
+            (SELECT COUNT(*) FROM puzzle_questions pq
+              WHERE pq.puzzle_type = pt.id AND pq.deleted_at IS NULL) AS puzzleCount
+     FROM puzzle_types pt ORDER BY pt.id`
   );
   return response(200, { puzzleTypes: result.records });
 }
