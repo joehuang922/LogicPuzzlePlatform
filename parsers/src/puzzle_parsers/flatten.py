@@ -74,6 +74,15 @@ _MIN_ALT_RUN_INK = 0.25
 # Ink thicker than this across the line direction is a black cell or a filled
 # disc, not a ruling; only its rim (which sits on the cell's lines) is kept.
 _THIN_CELLS = 0.2
+# Adaptive-threshold offsets (grey levels below the local mean) to trace at,
+# in order. 3 keeps faint rulings (a big kakuro photo's line beside an
+# all-black column). A halftone grey shade (a printed dot screen, the 50x64
+# double choco scan) survives 3 as speckle that bridges into fat bands along
+# the line mask, so mid-board lines drift or drop and the trace fails
+# _fits_border; 8 drops the dots but keeps the dashed rulings. The second
+# offset is tried only when the first trace fails, so a board that traces at
+# 3 is unchanged.
+_BINARY_OFFSETS = (3, 8)
 
 
 def flatten_board(
@@ -104,36 +113,15 @@ def flatten_board(
     work = _warp_with_margin(src, to_rect, to_work, margin, (nw, nh))
     if work.ndim == 3:
         work = cv2.cvtColor(work, cv2.COLOR_BGR2GRAY)
-    binary = _binary(work)
-    _erase_solid(binary, work, _WORK_PX)
-    _erase_blobs(binary, _WORK_PX)
-
-    # The pitch estimate can be a few % off, and every threshold is in cells:
-    # trace, re-measure the pitch from the traced lines, and retrace if needed.
-    pitch = _WORK_PX
-    for _ in range(2):
-        h_traced = _trace_lines(binary, 0, pitch)
-        v_traced = _trace_lines(binary, 1, pitch)
-        if h_traced is None or v_traced is None:
-            return board
-        (h_tracks, xc), (v_tracks, yc) = h_traced, v_traced
-        measured = float(np.median(np.concatenate([
-            np.diff(h_tracks.mean(axis=1)), np.diff(v_tracks.mean(axis=1))
-        ])))
-        if abs(measured - pitch) <= 0.1 * pitch:
-            break
-        pitch = measured
-
     h_edges = (margin, margin + nh * to_work)
     v_edges = (margin, margin + nw * to_work)
-    h_tracks = _drop_outside(_trim_tracks(_drop_midcell(h_tracks, pitch), pitch), *h_edges, pitch)
-    v_tracks = _drop_outside(_trim_tracks(_drop_midcell(v_tracks, pitch), pitch), *v_edges, pitch)
-    if len(h_tracks) < 3 or len(v_tracks) < 3:
+    for offset in _BINARY_OFFSETS:
+        traced = _trace_grid(work, offset, h_edges, v_edges)
+        if traced is not None:
+            break
+    else:
         return board
-    h_tracks = _add_border(h_tracks, *h_edges, pitch)
-    v_tracks = _add_border(v_tracks, *v_edges, pitch)
-    if not (_fits_border(h_tracks, *h_edges, pitch) and _fits_border(v_tracks, *v_edges, pitch)):
-        return board
+    h_tracks, xc, v_tracks, yc, pitch = traced
     if max(_misfit(h_tracks), _misfit(v_tracks)) < _MIN_MISFIT_CELLS * pitch:
         return board
 
@@ -158,6 +146,45 @@ def flatten_board(
     return RectifiedBoard(warped=warped, quad=board.quad, native=native)
 
 
+def _trace_grid(
+    work: NDArray, offset: int, h_edges: tuple[float, float], v_edges: tuple[float, float]
+) -> tuple[NDArray, NDArray, NDArray, NDArray, float] | None:
+    """Trace both axes' lines on ``work`` binarised at ``offset``.
+
+    Returns ``(h_tracks, xc, v_tracks, yc, pitch)`` when the lines span the
+    border quad with about a cell per gap, else ``None``.
+    """
+    binary = _binary(work, offset)
+    _erase_solid(binary, work, _WORK_PX)
+    _erase_blobs(binary, _WORK_PX)
+
+    # The pitch estimate can be a few % off, and every threshold is in cells:
+    # trace, re-measure the pitch from the traced lines, and retrace if needed.
+    pitch = _WORK_PX
+    for _ in range(2):
+        h_traced = _trace_lines(binary, 0, pitch)
+        v_traced = _trace_lines(binary, 1, pitch)
+        if h_traced is None or v_traced is None:
+            return None
+        (h_tracks, xc), (v_tracks, yc) = h_traced, v_traced
+        measured = float(np.median(np.concatenate([
+            np.diff(h_tracks.mean(axis=1)), np.diff(v_tracks.mean(axis=1))
+        ])))
+        if abs(measured - pitch) <= 0.1 * pitch:
+            break
+        pitch = measured
+
+    h_tracks = _drop_outside(_trim_tracks(_drop_midcell(h_tracks, pitch), pitch), *h_edges, pitch)
+    v_tracks = _drop_outside(_trim_tracks(_drop_midcell(v_tracks, pitch), pitch), *v_edges, pitch)
+    if len(h_tracks) < 3 or len(v_tracks) < 3:
+        return None
+    h_tracks = _add_border(h_tracks, *h_edges, pitch)
+    v_tracks = _add_border(v_tracks, *v_edges, pitch)
+    if not (_fits_border(h_tracks, *h_edges, pitch) and _fits_border(v_tracks, *v_edges, pitch)):
+        return None
+    return h_tracks, xc, v_tracks, yc, pitch
+
+
 def _warp_with_margin(
     image: NDArray, to_rect: NDArray, scale: float, margin: float, size: tuple[int, int]
 ) -> NDArray:
@@ -169,10 +196,10 @@ def _warp_with_margin(
     return cv2.warpPerspective(image, A, (w, h), borderMode=cv2.BORDER_CONSTANT, borderValue=white)
 
 
-def _binary(gray: NDArray) -> NDArray:
+def _binary(gray: NDArray, offset: int = _BINARY_OFFSETS[0]) -> NDArray:
     return cv2.adaptiveThreshold(
         cv2.GaussianBlur(gray, (3, 3), 0),
-        255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 3,
+        255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, offset,
     )
 
 
