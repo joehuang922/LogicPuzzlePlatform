@@ -83,6 +83,15 @@ _THIN_CELLS = 0.2
 # offset is tried only when the first trace fails, so a board that traces at
 # 3 is unchanged.
 _BINARY_OFFSETS = (3, 8)
+# A page bends neighbouring lines together, so a traced point that strays
+# more than this (in cells) from its neighbours' bend is a slip: ink between
+# two lines (a digit, leftover shading) pulled the trace. On the 50x64 double
+# choco scan two lines pinched 0.22 cell toward each other at one strip, and
+# the remap bent a line into the cells beside it, read as a column of "1"s.
+# Clean traces agree with their neighbours to ~0.06 cell. The neighbours are
+# the _BEND_NEIGHBOURS lines on each side.
+_BEND_OUTLIER_CELLS = 0.15
+_BEND_NEIGHBOURS = 3
 
 
 def flatten_board(
@@ -122,6 +131,8 @@ def flatten_board(
     else:
         return board
     h_tracks, xc, v_tracks, yc, pitch = traced
+    h_tracks = _fix_bend_outliers(h_tracks, pitch)
+    v_tracks = _fix_bend_outliers(v_tracks, pitch)
     if max(_misfit(h_tracks), _misfit(v_tracks)) < _MIN_MISFIT_CELLS * pitch:
         return board
 
@@ -184,6 +195,40 @@ def _trace_grid(
         return None
     return h_tracks, xc, v_tracks, yc, pitch
 
+
+
+def _fix_bend_outliers(tracks: NDArray, pitch: float) -> NDArray:
+    """Replace traced points that bend away from their neighbouring lines.
+
+    Printed lines are evenly spaced, so an interior line sits midway between
+    the lines d away on each side, d = 1.._BEND_NEIGHBOURS: symmetric pairs
+    cancel perspective's gradual change of spacing, and a smooth bend moves
+    the pair with it. Nothing is learned from the line's own trace, which can
+    be wrong in most of its strips (the 16x16 double choco medium-2 sample:
+    3 of 5, pulled toward a row of digits). The worst point further than
+    ``_BEND_OUTLIER_CELLS`` from the median midpoint takes it, and the rest
+    are judged again, so a pinched pair is mended one point at a time. The
+    outer lines are left to the border handling.
+    """
+    tracks = tracks.copy()
+    for _ in range(tracks.size):
+        pred = _bend_predictions(tracks)
+        miss = np.nan_to_num(np.abs(tracks - pred)) / pitch
+        k, s = np.unravel_index(int(np.argmax(miss)), miss.shape)
+        if miss[k, s] <= _BEND_OUTLIER_CELLS:
+            break
+        tracks[k, s] = pred[k, s]
+    return tracks
+
+
+def _bend_predictions(tracks: NDArray) -> NDArray:
+    """Each interior line's position as the median midpoint of the lines around it."""
+    n = len(tracks)
+    pred = np.full_like(tracks, np.nan)
+    for k in range(1, n - 1):
+        reach = min(_BEND_NEIGHBOURS, k, n - 1 - k)
+        pred[k] = np.median([(tracks[k - d] + tracks[k + d]) / 2 for d in range(1, reach + 1)], axis=0)
+    return pred
 
 def _warp_with_margin(
     image: NDArray, to_rect: NDArray, scale: float, margin: float, size: tuple[int, int]
