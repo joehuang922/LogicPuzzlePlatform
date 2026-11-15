@@ -21,3 +21,5 @@ export { nurimazePlugin, NurimazeModel } from "./plugins/nurimaze";
 export type { NurimazeCanon } from "./plugins/nurimaze";
 export { masyuPlugin, MasyuModel } from "./plugins/masyu";
 export type { MasyuCanon, MasyuEdges } from "./plugins/masyu";
+export { yajilinPlugin, YajilinModel } from "./plugins/yajilin";
+export type { YajilinCanon, YajilinSolution } from "./plugins/yajilin";

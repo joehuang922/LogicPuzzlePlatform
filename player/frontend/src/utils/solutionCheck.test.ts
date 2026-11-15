@@ -103,6 +103,21 @@ describe("matchesSolution", () => {
     expect(matchesSolution(puzzle(7, { cells: [[0, 0], [0, 0]] }, { edges }), {})).toBeNull();
   });
 
+  it("yajilin: shading, marks and lines against the stored answer", () => {
+    // 3x4, clue at (0,1); the corner (0,0) is shaded and the loop fills the rest.
+    const solution = {
+      blacks: [[1, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
+      edges: { h: [[0, 0, 1], [1, 1, 0], [1, 1, 1]], v: [[0, 0, 1, 1], [1, 0, 0, 1]] },
+    };
+    const cells = [[null, { dir: "left", num: 1 }, null, null], [null, null, null, null], [null, null, null, null]];
+    const p = puzzle(13, { cells }, solution);
+    expect(matchesSolution(p, { "b:0,0": 1, "b:1,1": 2, "h:1,0": 1, "v:0,3": 1 })).toBe(true);
+    expect(matchesSolution(p, { "b:1,1": 1 })).toBe(false);
+    expect(matchesSolution(p, { "b:0,0": 2 })).toBe(false);
+    expect(matchesSolution(p, { "h:0,0": 1 })).toBe(false);
+    expect(matchesSolution(puzzle(13, { cells: [[null, null], [null, null]] }, solution), {})).toBeNull();
+  });
+
   it("nurimaze: painted rooms black, marked rooms white", () => {
     const p = puzzle(3, { cells: [[3, 0], [0, 4]] }, { states: [[2, 1], [2, 2]] });
     expect(matchesSolution(p, { "1,0": 1, "0,1": 2 })).toBe(true);

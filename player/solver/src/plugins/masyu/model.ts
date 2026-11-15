@@ -1,4 +1,8 @@
 import { Branch, ConstraintModel } from "../../types";
+import {
+  Lattice, ParityDSU, Paths, UNDECIDED, OFF, ON,
+  buildLattice, edgeGrids, forbidClosing, isConnectable, isSingleLoop,
+} from "../loop/lattice";
 
 /**
  * Canonical Masyu representation, mirroring the frontend `MasyuCanon`. `cells` is a
@@ -21,11 +25,6 @@ export interface MasyuEdges {
 export const WHITE = 1;
 export const BLACK = 2;
 
-// Edge decision states. Edges are binary variables; UNDECIDED is "domain {OFF, ON}".
-const UNDECIDED = -1;
-const OFF = 0;
-const ON = 1;
-
 /**
  * A circle's rule as an explicit table: the edges it reads and every allowed ON/OFF
  * combination of them (bit i of a tuple = value of `edges[i]`). A circle reads at most 8
@@ -41,33 +40,14 @@ interface CircleRule {
 
 /**
  * Static per-puzzle metadata, shared by reference across all models of one puzzle so
- * `assign` only copies the mutable state. Nodes are cells (r * cols + c); edges join
- * orthogonally adjacent cells: horizontal (r,c)-(r,c+1) has id r * (cols-1) + c, vertical
- * (r,c)-(r+1,c) has id hCount + r * cols + c.
+ * `assign` only copies the mutable state: the cell lattice plus the circles' rules.
  */
-interface Spec {
-  rows: number;
-  cols: number;
-  hCount: number;
-  edgeCount: number;
-  nodeCount: number;
-  /** Edge id -> the two cells it joins. */
-  endpoints: [number, number][];
-  /** Cell id -> its 2-4 incident edge ids. */
-  edgesOfNode: number[][];
+interface Spec extends Lattice {
   /** Cell ids holding a circle. */
   circles: number[];
   rules: CircleRule[];
   /** Edge id -> the circle rules that read it. */
   rulesOfEdge: CircleRule[][];
-  /**
-   * The two faces an edge separates, for the inside/outside 2-colouring. Faces are the
-   * (rows-1) x (cols-1) unit squares between cell centres, plus one outer region.
-   */
-  facesOfEdge: [number, number][];
-  /** Face id -> the edges on its boundary, to re-check after its colour class grows. */
-  edgesOfFace: number[][];
-  faceCount: number;
   /** Cell id -> 1 when it holds a circle. */
   isCircle: Uint8Array;
 }
@@ -76,81 +56,23 @@ function buildSpec(canon: MasyuCanon): Spec {
   const cells = canon.cells;
   const rows = cells.length;
   const cols = cells[0]?.length ?? 0;
-  const hCount = rows * Math.max(cols - 1, 0);
-  const edgeCount = hCount + Math.max(rows - 1, 0) * cols;
-  const nodeCount = rows * cols;
-
-  const inside = (r: number, c: number) => r >= 0 && c >= 0 && r < rows && c < cols;
-  const hId = (r: number, c: number) => r * (cols - 1) + c;
-  const vId = (r: number, c: number) => hCount + r * cols + c;
-  const nodeId = (r: number, c: number) => r * cols + c;
-
-  // The edge leaving cell (r,c) in direction (dr,dc), or -1 when it would leave the grid.
-  const edgeFrom = (r: number, c: number, dr: number, dc: number): number => {
-    const r2 = r + dr;
-    const c2 = c + dc;
-    if (!inside(r, c) || !inside(r2, c2)) return -1;
-    if (dr === 0) return hId(r, Math.min(c, c2));
-    return vId(Math.min(r, r2), c);
-  };
-
-  const faceRows = rows - 1;
-  const faceCols = cols - 1;
-  const outerFace = Math.max(faceRows, 0) * Math.max(faceCols, 0);
-  const faceId = (i: number, j: number) =>
-    i < 0 || j < 0 || i >= faceRows || j >= faceCols ? outerFace : i * faceCols + j;
-
-  const endpoints: [number, number][] = new Array(edgeCount);
-  const facesOfEdge: [number, number][] = new Array(edgeCount);
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols - 1; c++) {
-      endpoints[hId(r, c)] = [nodeId(r, c), nodeId(r, c + 1)];
-      facesOfEdge[hId(r, c)] = [faceId(r - 1, c), faceId(r, c)];
-    }
-  }
-  for (let r = 0; r < rows - 1; r++) {
-    for (let c = 0; c < cols; c++) {
-      endpoints[vId(r, c)] = [nodeId(r, c), nodeId(r + 1, c)];
-      facesOfEdge[vId(r, c)] = [faceId(r, c - 1), faceId(r, c)];
-    }
-  }
-
-  const edgesOfNode: number[][] = Array.from({ length: nodeCount }, () => []);
-  for (let e = 0; e < edgeCount; e++) {
-    const [a, b] = endpoints[e];
-    edgesOfNode[a].push(e);
-    edgesOfNode[b].push(e);
-  }
-
+  const lat = buildLattice(rows, cols);
   const circles: number[] = [];
   const rules: CircleRule[] = [];
-  const rulesOfEdge: CircleRule[][] = Array.from({ length: edgeCount }, () => []);
+  const rulesOfEdge: CircleRule[][] = Array.from({ length: lat.edgeCount }, () => []);
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const kind = cells[r][c];
       if (kind !== WHITE && kind !== BLACK) continue;
-      circles.push(nodeId(r, c));
-      const rule = circleRule(kind, r, c, edgeFrom);
+      circles.push(r * cols + c);
+      const rule = circleRule(kind, r, c, lat.edgeFrom);
       rules.push(rule);
       for (const e of rule.edges) rulesOfEdge[e].push(rule);
     }
   }
-
-  const faceCount = outerFace + 1;
-  const edgesOfFace: number[][] = Array.from({ length: faceCount }, () => []);
-  for (let e = 0; e < edgeCount; e++) {
-    const [fa, fb] = facesOfEdge[e];
-    edgesOfFace[fa].push(e);
-    if (fb !== fa) edgesOfFace[fb].push(e);
-  }
-  const isCircle = new Uint8Array(nodeCount);
+  const isCircle = new Uint8Array(lat.nodeCount);
   for (const c of circles) isCircle[c] = 1;
-
-  return {
-    rows, cols, hCount, edgeCount, nodeCount,
-    endpoints, edgesOfNode, circles, rules, rulesOfEdge,
-    facesOfEdge, edgesOfFace, faceCount, isCircle,
-  };
+  return { ...lat, circles, rules, rulesOfEdge, isCircle };
 }
 
 /**
@@ -192,171 +114,6 @@ function circleRule(
   return { edges, tuples };
 }
 
-
-/**
- * Parity (relational) union-find over faces for the inside/outside 2-colouring argument,
- * as in Slitherlink. Each face is inside or outside the loop, and the loop is exactly the
- * boundary between the two, so an OFF edge joins same-coloured faces and an ON edge
- * opposite-coloured ones.
- *
- * Unlike Slitherlink's, each class also keeps its members on a circular linked list
- * (`next`), and `relate` reports the members of the smaller class it merged. Only edges
- * touching those faces can have just become decidable, so propagation re-checks those
- * instead of rescanning every edge after each merge (the rescan dominated large boards).
- * Copied at the model boundary so sibling search branches never alias.
- */
-class ParityDSU {
-  private constructor(
-    private readonly parent: Int32Array,
-    private readonly size: Int32Array,
-    private readonly parity: Uint8Array, // colour relative to parent (0 same, 1 opposite)
-    private readonly next: Int32Array, // circular member list of each class
-  ) {}
-
-  static create(n: number): ParityDSU {
-    const parent = new Int32Array(n);
-    const next = new Int32Array(n);
-    for (let i = 0; i < n; i++) {
-      parent[i] = i;
-      next[i] = i;
-    }
-    return new ParityDSU(parent, new Int32Array(n).fill(1), new Uint8Array(n), next);
-  }
-
-  clone(): ParityDSU {
-    return new ParityDSU(
-      Int32Array.from(this.parent),
-      Int32Array.from(this.size),
-      Uint8Array.from(this.parity),
-      Int32Array.from(this.next),
-    );
-  }
-
-  /** Root of x, compressing the path. Read x's parity to it with `parityOf` after. */
-  private find(x: number): number {
-    let root = x;
-    while (this.parent[root] !== root) root = this.parent[root];
-    // Second pass: point every node on the path at the root with its absolute parity.
-    // Collect the parities top-down by walking once more from x.
-    let p = 0;
-    for (let cur = x; cur !== root; cur = this.parent[cur]) p ^= this.parity[cur];
-    let cur = x;
-    while (cur !== root) {
-      const up = this.parent[cur];
-      const par = this.parity[cur];
-      this.parent[cur] = root;
-      this.parity[cur] = p;
-      p ^= par;
-      cur = up;
-    }
-    return root;
-  }
-
-  /** Known parity of a vs b (0 same colour, 1 opposite), or -1 when unrelated. */
-  related(a: number, b: number): number {
-    const ra = this.find(a);
-    const rb = this.find(b);
-    if (ra !== rb) return -1;
-    // After find, a and b point straight at the root (or are it).
-    return this.parity[a] ^ this.parity[b];
-  }
-
-  /**
-   * Record that a and b differ by `diff`. Returns false on a contradiction. On a merge,
-   * pushes the members of the smaller class onto `merged`.
-   */
-  relate(a: number, b: number, diff: number, merged: number[]): boolean {
-    let ra = this.find(a);
-    let rb = this.find(b);
-    const pa = ra === a ? 0 : this.parity[a];
-    const pb = rb === b ? 0 : this.parity[b];
-    if (ra === rb) return (pa ^ pb) === diff;
-    if (this.size[ra] < this.size[rb]) [ra, rb] = [rb, ra];
-    // rb (smaller) goes under ra; its parity makes pa ^ p(rb) ^ pb === diff.
-    this.parent[rb] = ra;
-    this.parity[rb] = pa ^ pb ^ diff;
-    this.size[ra] += this.size[rb];
-    let m = rb;
-    do {
-      merged.push(m);
-      m = this.next[m];
-    } while (m !== rb);
-    const t = this.next[ra];
-    this.next[ra] = this.next[rb];
-    this.next[rb] = t;
-    return true;
-  }
-}
-
-/**
- * The ON edges so far form simple paths (and at most one closed cycle, which must then be
- * the answer), since the node rule caps every degree at 2. Tracked incrementally, as an
- * edge turns ON, rather than recomputed: `mate[x]` is the other end of the path x ends
- * (-1 when x is not an end), `paths` counts components, `touched` counts circles on them.
- */
-class Paths {
-  constructor(
-    readonly degree: Uint8Array,
-    readonly mate: Int32Array,
-    public paths: number,
-    public touched: number,
-    public closed: boolean,
-  ) {}
-
-  static create(n: number): Paths {
-    return new Paths(new Uint8Array(n), new Int32Array(n).fill(-1), 0, 0, false);
-  }
-
-  clone(): Paths {
-    return new Paths(Uint8Array.from(this.degree), Int32Array.from(this.mate), this.paths, this.touched, this.closed);
-  }
-
-  /**
-   * Add the ON edge a-b. Returns the two ends of the path it now belongs to, or null when
-   * it closed a cycle or broke the degree rule (the node rule reports that one).
-   */
-  add(a: number, b: number, isCircle: Uint8Array): [number, number] | null {
-    const { degree, mate } = this;
-    if (degree[a] >= 2 || degree[b] >= 2 || this.closed) {
-      // A branch (the node rule kills it) or an edge beyond a closed loop: count it as a
-      // further component so the loop rule sees more than one.
-      degree[a]++;
-      degree[b]++;
-      this.paths++;
-      return null;
-    }
-    for (const x of [a, b]) if (degree[x] === 0 && isCircle[x]) this.touched++;
-    const da = degree[a]++;
-    const db = degree[b]++;
-    if (da === 0 && db === 0) {
-      mate[a] = b;
-      mate[b] = a;
-      this.paths++;
-      return [a, b];
-    }
-    if (da === 1 && db === 1) {
-      if (mate[a] === b) {
-        mate[a] = mate[b] = -1;
-        this.closed = true;
-        return null;
-      }
-      const x = mate[a];
-      const y = mate[b];
-      mate[a] = mate[b] = -1;
-      mate[x] = y;
-      mate[y] = x;
-      this.paths--;
-      return [x, y];
-    }
-    // One end extends: the old end (degree 1 before) passes its mate to the new node.
-    const [old, fresh] = da === 1 ? [a, b] : [b, a];
-    const x = mate[old];
-    mate[old] = -1;
-    mate[x] = fresh;
-    mate[fresh] = x;
-    return [x, fresh];
-  }
-}
 
 /**
  * Native CSP solver for Masyu (puzzle type 7), built like the Slitherlink model with the
@@ -405,7 +162,7 @@ export class MasyuModel implements ConstraintModel<MasyuEdges> {
   isSolved(): boolean {
     if (this.dead) return false;
     for (let e = 0; e < this.spec.edgeCount; e++) if (this.state[e] === UNDECIDED) return false;
-    return this.isSingleLoop();
+    return isSingleLoop(this.spec, this.state);
   }
 
   selectBranch(): Branch | null {
@@ -438,16 +195,7 @@ export class MasyuModel implements ConstraintModel<MasyuEdges> {
   }
 
   solution(): MasyuEdges {
-    const { rows, cols, hCount } = this.spec;
-    const h = Array.from({ length: rows }, () => new Array<number>(Math.max(cols - 1, 0)).fill(0));
-    const v = Array.from({ length: Math.max(rows - 1, 0) }, () => new Array<number>(cols).fill(0));
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols - 1; c++) if (this.state[r * (cols - 1) + c] === ON) h[r][c] = 1;
-    }
-    for (let r = 0; r < rows - 1; r++) {
-      for (let c = 0; c < cols; c++) if (this.state[hCount + r * cols + c] === ON) v[r][c] = 1;
-    }
-    return { h, v };
+    return edgeGrids(this.spec, this.state);
   }
 
   // -- propagation ------------------------------------------------------------
@@ -540,7 +288,7 @@ export class MasyuModel implements ConstraintModel<MasyuEdges> {
       ends.length = 0;
       recheckAll = false;
       if (qi < queue.length) continue;
-      return this.isConnectable() ? this : this.toDead();
+      return isConnectable(spec, state, (x) => spec.isCircle[x] === 1 || loops.degree[x] > 0) ? this : this.toDead();
     }
   }
 
@@ -559,83 +307,7 @@ export class MasyuModel implements ConstraintModel<MasyuEdges> {
       return true;
     }
     if (loops.paths === 1 && loops.touched === spec.circles.length) return true;
-    const check = (x: number): boolean => {
-      const y = loops.mate[x];
-      if (y < 0) return true;
-      for (const e of spec.edgesOfNode[x]) {
-        if (state[e] !== UNDECIDED) continue;
-        const [a, b] = spec.endpoints[e];
-        if ((a === y || b === y) && !force(e, OFF)) return false;
-      }
-      return true;
-    };
-    if (all) {
-      for (let x = 0; x < spec.nodeCount; x++) if (!check(x)) return false;
-    } else {
-      for (const x of ends) if (!check(x)) return false;
-    }
-    return true;
-  }
-
-  /**
-   * Connectivity: every circle and every cell already on the loop must lie in one
-   * component of the graph of not-OFF edges, and no single edge of it (a bridge) may
-   * separate two of them, since a loop crosses every cut that splits it an even number of
-   * times, so at least twice. One iterative Tarjan pass over the not-OFF graph.
-   */
-  private isConnectable(): boolean {
-    const { spec, state, loops } = this;
-    const n = spec.nodeCount;
-    const required = (x: number) => spec.isCircle[x] === 1 || loops.degree[x] > 0;
-    let total = 0;
-    let root = -1;
-    for (let x = 0; x < n; x++) {
-      if (required(x)) {
-        total++;
-        if (root < 0) root = x;
-      }
-    }
-    if (total <= 1) return true;
-
-    const disc = new Int32Array(n).fill(-1);
-    const low = new Int32Array(n);
-    const below = new Int32Array(n); // required cells in the DFS subtree
-    const parentEdge = new Int32Array(n).fill(-1);
-    const iter = new Int32Array(n);
-    const stack = new Int32Array(n);
-    let sp = 0;
-    let time = 0;
-    disc[root] = low[root] = time++;
-    below[root] = 1;
-    stack[sp++] = root;
-    while (sp > 0) {
-      const x = stack[sp - 1];
-      const incident = spec.edgesOfNode[x];
-      if (iter[x] < incident.length) {
-        const e = incident[iter[x]++];
-        if (state[e] === OFF || e === parentEdge[x]) continue;
-        const [a, b] = spec.endpoints[e];
-        const y = a === x ? b : a;
-        if (disc[y] < 0) {
-          disc[y] = low[y] = time++;
-          below[y] = required(y) ? 1 : 0;
-          parentEdge[y] = e;
-          stack[sp++] = y;
-        } else if (disc[y] < low[x]) {
-          low[x] = disc[y];
-        }
-        continue;
-      }
-      sp--;
-      if (sp > 0) {
-        const p = stack[sp - 1];
-        if (low[x] < low[p]) low[p] = low[x];
-        below[p] += below[x];
-        // x's subtree hangs off p by a bridge: it must hold all or none of the required.
-        if (low[x] > disc[p] && below[x] > 0 && below[x] < total) return false;
-      }
-    }
-    return below[root] === total;
+    return forbidClosing(spec, state, loops, ends, all, force);
   }
 
   /** A cell's degree is 0 or 2. Returns false on contradiction. */
@@ -707,40 +379,5 @@ export class MasyuModel implements ConstraintModel<MasyuEdges> {
       score = Math.min(score, undecided);
     }
     return score === Infinity ? 10 : score;
-  }
-
-  // -- leaf connectivity ------------------------------------------------------
-
-  /** True when the ON edges form exactly one connected loop. */
-  private isSingleLoop(): boolean {
-    const { spec, state } = this;
-    const adj: number[][] = Array.from({ length: spec.nodeCount }, () => []);
-    let start = -1;
-    let loopNodes = 0;
-    for (let e = 0; e < spec.edgeCount; e++) {
-      if (state[e] !== ON) continue;
-      const [a, b] = spec.endpoints[e];
-      if (adj[a].length === 0) loopNodes++;
-      if (adj[b].length === 0) loopNodes++;
-      adj[a].push(b);
-      adj[b].push(a);
-      start = a;
-    }
-    if (start < 0) return false;
-    const seen = new Uint8Array(spec.nodeCount);
-    seen[start] = 1;
-    const stack = [start];
-    let reached = 1;
-    while (stack.length) {
-      const x = stack.pop()!;
-      for (const y of adj[x]) {
-        if (!seen[y]) {
-          seen[y] = 1;
-          reached++;
-          stack.push(y);
-        }
-      }
-    }
-    return reached === loopNodes;
   }
 }

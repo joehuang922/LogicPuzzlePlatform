@@ -150,6 +150,25 @@ const CHECKS: Record<number, (canon: Json, solution: Json) => Expect | null> = {
     const sol = grid(s.values, cells.length, cells[0].length);
     return sol && digits(sol);
   },
+  // Yajilin: { blacks: rows x cols, edges: { h: rows x (cols-1), v: (rows-1) x cols } };
+  // "b:row,col" -> 1 shaded, 2 marked unshaded; "h:row,col" / "v:row,col" -> 1 line.
+  13: (canon, s) => {
+    const cells = canon.cells as unknown[][] | undefined;
+    const edges = s.edges as Json | undefined;
+    if (!Array.isArray(cells) || !Array.isArray(cells[0]) || !edges) return null;
+    const rows = cells.length;
+    const cols = cells[0].length;
+    const blacks = grid(s.blacks, rows, cols);
+    const h = grid(edges.h, rows, cols - 1);
+    const v = grid(edges.v, rows - 1, cols);
+    if (!blacks || !h || !v) return null;
+    const checks: Record<string, Expect> = {
+      b: onOff(blacks, "b:", 1, 2, true),
+      h: onOff(h, "h:", 1, 0, true),
+      v: onOff(v, "v:", 1, 0, true),
+    };
+    return (key, value) => checks[key[0]]?.(key, value) ?? null;
+  },
   // LITS: { shaded: rows x cols of 0/1 }; "c:col,row" -> 1 shaded, 2 marked unshaded.
   15: (canon, s) => {
     const g = canon.grids as { h?: unknown[]; v?: unknown[][] } | undefined;

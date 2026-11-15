@@ -110,6 +110,18 @@ All empty cells are either blackened or traversed by the loop AND the loop forms
 - Uses LLM recognizer (Gemini) to classify each cell as empty or clue, and for clue cells, extract the number and arrow direction.
 - Validates that all clue numbers are non-negative integers and directions are valid.
 
+## Solver
+
+`player/solver/src/plugins/yajilin` proves uniqueness at create/edit (the auto-solve gate)
+and stores the solution for the on-track check. Variables are the edges between adjacent
+cells and each empty cell's "shaded" flag. It propagates the cell rule (shaded: no lines;
+unshaded: exactly two), no touching shaded cells, each clue filtered exactly against every
+shading of its line, and the loop rules shared with Masyu (`plugins/loop/lattice.ts`:
+inside/outside colouring, single loop, connectivity), then probes every variable both
+ways. That settles every sample before any search: the 10x10 and 17x17 in a few ms, the
+45x31 giant (`board-yajilin-big.png`, transcribed in the solver's `fixtures.json`) in
+~0.1s.
+
 # Misc
 
 ## Coordinate convention

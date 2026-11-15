@@ -179,6 +179,31 @@ object YajilinEngine : ShadeMarkEngine {
     }
 
     /**
+     * Every shaded cell, mark and line agrees with the stored solution (`solutionRepr`:
+     * `blacks` rows x cols, `edges.h` rows x (cols-1), `edges.v` (rows-1) x cols): a shaded
+     * cell must be shaded there, a mark must not, a line must be on the loop.
+     */
+    override fun matchesSolution(puzzle: Puzzle, userValues: Map<String, Int>): Boolean? {
+        val (rows, cols) = dims(parseCells(puzzle))
+        val solution = puzzle.solutionRepr ?: return null
+        val edges = solution["edges"] as? JsonObject ?: return null
+        val blacks = SolutionCheck.grid(solution["blacks"], rows, cols) ?: return null
+        val h = SolutionCheck.grid(edges["h"], rows, cols - 1) ?: return null
+        val v = SolutionCheck.grid(edges["v"], rows - 1, cols) ?: return null
+        val checkB = SolutionCheck.onOff(blacks, "b:", BLACK, MARKED, rowFirst = true)
+        val checkH = SolutionCheck.onOff(h, "h:", 1, 0, rowFirst = true)
+        val checkV = SolutionCheck.onOff(v, "v:", 1, 0, rowFirst = true)
+        return SolutionCheck.matches(userValues) { key, value ->
+            when {
+                key.startsWith("b:") -> checkB.check(key, value)
+                key.startsWith("h:") -> checkH.check(key, value)
+                key.startsWith("v:") -> checkV.check(key, value)
+                else -> null
+            }
+        }
+    }
+
+    /**
      * True when every non-clue cell is blackened or on a single closed loop, no two
      * blackened cells touch orthogonally, and every arrow clue counts correctly (port of
      * YajilinBoard.tsx validateSolution). Marks (2) are solver aids and count as unshaded.

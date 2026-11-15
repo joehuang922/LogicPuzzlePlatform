@@ -96,4 +96,17 @@ class SolutionCheckTest {
         assertEquals(false, MasyuEngine.matchesSolution(p, mapOf("v:0,1" to 1)))
         assertNull(MasyuEngine.matchesSolution(puzzle(7, """{"cells":[[0,0],[0,0]]}""", edges), emptyMap()))
     }
+
+    @Test
+    fun `yajilin shading, marks and lines against the stored answer`() {
+        val solution = """{"blacks":[[1,0,0,0],[0,0,0,0],[0,0,0,0]],""" +
+            """"edges":{"h":[[0,0,1],[1,1,0],[1,1,1]],"v":[[0,0,1,1],[1,0,0,1]]}}"""
+        val canon = """{"cells":[[null,{"dir":"left","num":1},null,null],[null,null,null,null],[null,null,null,null]]}"""
+        val p = puzzle(13, canon, solution)
+        assertEquals(true, YajilinEngine.matchesSolution(p, mapOf("b:0,0" to 1, "b:1,1" to 2, "h:1,0" to 1, "v:0,3" to 1)))
+        assertEquals(false, YajilinEngine.matchesSolution(p, mapOf("b:1,1" to 1)))
+        assertEquals(false, YajilinEngine.matchesSolution(p, mapOf("b:0,0" to 2)))
+        assertEquals(false, YajilinEngine.matchesSolution(p, mapOf("h:0,0" to 1)))
+        assertNull(YajilinEngine.matchesSolution(puzzle(13, """{"cells":[[null,null],[null,null]]}""", solution), emptyMap()))
+    }
 }
