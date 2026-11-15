@@ -188,6 +188,15 @@ fill-every-cell structure (same as Fillomino).
   it sits in. A failing board is reported for review, but the parser still
   returns its best-effort result.
 
+## Solver
+
+`player/solver/src/plugins/ripple-effect` proves uniqueness at create/edit (the auto-solve
+gate) and stores the solution for the on-track check. Each cell's candidates are 1..(its
+room's size); a placed K leaves its room and every cell within K steps in its row and
+column, a value with one possible cell in its room goes there, and probing tries every
+candidate once more before search. Both sample boards (the 8x8 and the 18x10, read from
+the images into the solver's `fixtures.json`) settle in a few ms with no search.
+
 # Misc
 
 ## Coordinate convention

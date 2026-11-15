@@ -109,4 +109,13 @@ class SolutionCheckTest {
         assertEquals(false, YajilinEngine.matchesSolution(p, mapOf("h:0,0" to 1)))
         assertNull(YajilinEngine.matchesSolution(puzzle(13, """{"cells":[[null,null],[null,null]]}""", solution), emptyMap()))
     }
+
+    @Test
+    fun `ripple effect numbers must match the stored grid`() {
+        val p = puzzle(25, """{"cells":[[0,0,0]],"edges":{"h":[],"v":[[0,1]]}}""", """{"numbers":[[1,2,1]]}""")
+        assertEquals(true, RippleEffectEngine.matchesSolution(p, mapOf("0,0" to 1, "1,0" to 2)))
+        assertEquals(false, RippleEffectEngine.matchesSolution(p, mapOf("1,0" to 1)))
+        assertEquals(false, RippleEffectEngine.matchesSolution(p, mapOf("2,0" to 3)))
+        assertNull(RippleEffectEngine.matchesSolution(puzzle(25, """{"cells":[[0,0]]}""", """{"numbers":[[1,2,1]]}"""), emptyMap()))
+    }
 }

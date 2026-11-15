@@ -172,6 +172,16 @@ object RippleEffectEngine : PuzzleEngine {
     }
 
     /**
+     * Every entered number equals the stored solution's (`solutionRepr.numbers`, rows x
+     * cols). Any size counts: a number bigger than its room is simply off track.
+     */
+    override fun matchesSolution(puzzle: Puzzle, userValues: Map<String, Int>): Boolean? {
+        val (rows, cols) = dims(parseCells(puzzle))
+        val numbers = SolutionCheck.grid(puzzle.solutionRepr?.get("numbers"), rows, cols) ?: return null
+        return SolutionCheck.matches(userValues, SolutionCheck.digits(numbers, rows * cols))
+    }
+
+    /**
      * True when the board is fully filled, every room of size N holds exactly {1..N},
      * and no two equal values K in a row/column sit within K cells of each other
      * (port of RippleEffectBoard.tsx validateSolution).

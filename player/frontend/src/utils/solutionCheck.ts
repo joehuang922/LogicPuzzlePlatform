@@ -136,6 +136,14 @@ const CHECKS: Record<number, (canon: Json, solution: Json) => Expect | null> = {
     const checkV = onOff(v, "v:", 1, 0, true);
     return (key, value) => (key.startsWith("h:") ? checkH(key, value) : checkV(key, value));
   },
+  // Ripple Effect: { numbers: rows x cols }; "col,row" -> the entered number (any size: a
+  // number bigger than its room is simply off track).
+  25: (canon, s) => {
+    const cells = canon.cells as unknown[][] | undefined;
+    if (!Array.isArray(cells) || !Array.isArray(cells[0])) return null;
+    const sol = grid(s.numbers, cells.length, cells[0].length);
+    return sol && digits(sol, cells.length * cells[0].length);
+  },
   // Nonogram: { cells: rows x cols of 0/1 }; "col,row" -> 1 filled, 2 crossed.
   6: (canon, s) => {
     const rows = (canon.rowClues as unknown[] | undefined)?.length ?? 0;

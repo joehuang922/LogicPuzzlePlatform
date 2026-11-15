@@ -118,6 +118,14 @@ describe("matchesSolution", () => {
     expect(matchesSolution(puzzle(13, { cells: [[null, null], [null, null]] }, solution), {})).toBeNull();
   });
 
+  it("ripple effect: entered numbers must match the stored grid", () => {
+    const p = puzzle(25, { cells: [[0, 0, 0]] }, { numbers: [[1, 2, 1]] });
+    expect(matchesSolution(p, { "0,0": 1, "1,0": 2 })).toBe(true);
+    expect(matchesSolution(p, { "1,0": 1 })).toBe(false);
+    expect(matchesSolution(p, { "2,0": 3 })).toBe(false);
+    expect(matchesSolution(puzzle(25, { cells: [[0, 0]] }, { numbers: [[1, 2, 1]] }), {})).toBeNull();
+  });
+
   it("nurimaze: painted rooms black, marked rooms white", () => {
     const p = puzzle(3, { cells: [[3, 0], [0, 4]] }, { states: [[2, 1], [2, 2]] });
     expect(matchesSolution(p, { "1,0": 1, "0,1": 2 })).toBe(true);

@@ -23,3 +23,5 @@ export { masyuPlugin, MasyuModel } from "./plugins/masyu";
 export type { MasyuCanon, MasyuEdges } from "./plugins/masyu";
 export { yajilinPlugin, YajilinModel } from "./plugins/yajilin";
 export type { YajilinCanon, YajilinSolution } from "./plugins/yajilin";
+export { rippleEffectPlugin, RippleEffectModel } from "./plugins/ripple-effect";
+export type { RippleEffectCanon } from "./plugins/ripple-effect";
