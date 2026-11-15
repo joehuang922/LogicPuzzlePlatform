@@ -20,7 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 /**
- * Admin hub: entry point for in-app authoring. Links to create a collection, create
+ * Admin hub: entry point for in-app authoring. Links to create or edit a collection, create
  * questions (sudoku, nonogram, kakuro, slitherlink, nurikabe, heyawake, picto link,
  * yajilin, ripple effect, masyu, slalom, shakashaka, akari, number link, shikaku, fillomino, kuralin,
  * norinori, double choco, LITS, nurimaze, hitori, nuritwin, tentaishow, unequal sudoku, corner chain, sinkamino, balance link, L-Ring, Hashi, skeleton puzzle, pencils, choco banana, hell golf) from
@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 fun AdminScreen(
     onBack: () -> Unit,
     onCreateCollection: () -> Unit,
+    onEditCollection: () -> Unit,
     onCreateQuestion: () -> Unit,
     onEditQuestions: () -> Unit,
 ) {
@@ -60,6 +61,9 @@ fun AdminScreen(
             )
             Button(onClick = onCreateCollection, modifier = Modifier.fillMaxWidth()) {
                 Text("Create collection")
+            }
+            Button(onClick = onEditCollection, modifier = Modifier.fillMaxWidth()) {
+                Text("Edit collection")
             }
             Button(onClick = onCreateQuestion, modifier = Modifier.fillMaxWidth()) {
                 Text("Create question(s)")

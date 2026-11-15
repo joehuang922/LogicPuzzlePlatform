@@ -146,6 +146,17 @@ export interface Collection {
   publishAt: string | null;
   coverSrc: string | null;
   puzzleCount: number;
+  // Closed to new puzzles: hidden from every create / move-to picker. Set by the admin edit only.
+  sealed?: boolean;
+}
+
+/**
+ * The collections a puzzle may be created in or moved to: every unsealed one.
+ * [keepId] (a puzzle's current collection) stays listed even when sealed, so a
+ * picker can still show where the puzzle is.
+ */
+export function creationTargets(collections: Collection[], keepId?: number | null): Collection[] {
+  return collections.filter((c) => !c.sealed || c.id === keepId);
 }
 
 // Ascending, case-insensitive, missing values last. publishAt is an ISO date, so
@@ -182,6 +193,23 @@ export function createCollection(data: {
 }) {
   return request<{ id: number }>("/collections", {
     method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+/** Admin edit: a field left out is kept, an empty optional one is cleared. */
+export function updateCollection(
+  id: number,
+  data: {
+    name?: string;
+    publisher?: string | null;
+    publishAt?: string | null;
+    coverSrc?: string | null;
+    sealed?: boolean;
+  }
+) {
+  return request<{ collection: Collection }>(`/collections/${id}`, {
+    method: "PATCH",
     body: JSON.stringify(data),
   });
 }

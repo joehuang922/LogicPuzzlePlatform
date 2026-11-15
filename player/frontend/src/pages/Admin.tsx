@@ -5,6 +5,8 @@ import {
   sortCollections,
   listPuzzles,
   createCollection,
+  updateCollection,
+  creationTargets,
   createPuzzle,
   updatePuzzle,
   deletePuzzle,
@@ -23,31 +25,58 @@ import { extractBase64 } from "../utils/image";
 import { cardStyle, fieldStyle, inputStyle, errorStyle } from "../styles/admin";
 import { DIFFICULTY_OPTIONS, DIFFICULTY_LABELS } from "../constants";
 
-function CollectionForm({ onCreated }: { onCreated: () => void }) {
-  const [name, setName] = useState("");
-  const [publisher, setPublisher] = useState("");
-  const [publishAt, setPublishAt] = useState("");
-  const [coverSrc, setCoverSrc] = useState("");
+/** Cover image: a URL to paste, or a file upload that fills the URL in, plus a preview. */
+function CoverField({ value, onChange }: { value: string; onChange: (url: string) => void }) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState<string | null>(null);
 
-  async function handleCoverUpload(e: FormEvent<HTMLInputElement> | React.ChangeEvent<HTMLInputElement>) {
-    const file = (e.target as HTMLInputElement).files?.[0];
+  async function handleCoverUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
     if (!file) return;
     setUploadError(null);
     setUploading(true);
     try {
-      const url = await uploadImage(file);
-      setCoverSrc(url);
+      onChange(await uploadImage(file));
     } catch (err: unknown) {
       setUploadError(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setUploading(false);
     }
   }
+
+  return (
+    <div style={fieldStyle}>
+      <label>Cover image</label>
+      <input
+        style={inputStyle}
+        placeholder="Paste a URL or upload a file below"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.35rem" }}>
+        <input type="file" accept="image/*" onChange={handleCoverUpload} disabled={uploading} />
+        {uploading && <span style={{ fontSize: "0.8rem", color: "#666" }}>Uploading…</span>}
+      </div>
+      {uploadError && <span style={errorStyle}>{uploadError}</span>}
+      {value && !uploading && (
+        <img
+          src={value}
+          alt="Cover preview"
+          style={{ marginTop: "0.5rem", maxWidth: 120, maxHeight: 160, border: "1px solid #ddd", borderRadius: 4 }}
+        />
+      )}
+    </div>
+  );
+}
+
+function CollectionForm({ onCreated }: { onCreated: () => void }) {
+  const [name, setName] = useState("");
+  const [publisher, setPublisher] = useState("");
+  const [publishAt, setPublishAt] = useState("");
+  const [coverSrc, setCoverSrc] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState<string | null>(null);
 
   function validate(): boolean {
     const errs: Record<string, string> = {};
@@ -100,33 +129,114 @@ function CollectionForm({ onCreated }: { onCreated: () => void }) {
           <label>Publish date</label>
           <input style={inputStyle} type="date" value={publishAt} onChange={(e) => setPublishAt(e.target.value)} />
         </div>
-        <div style={fieldStyle}>
-          <label>Cover image</label>
-          <input
-            style={inputStyle}
-            placeholder="Paste a URL or upload a file below"
-            value={coverSrc}
-            onChange={(e) => setCoverSrc(e.target.value)}
-          />
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.35rem" }}>
-            <input type="file" accept="image/*" onChange={handleCoverUpload} disabled={uploading} />
-            {uploading && <span style={{ fontSize: "0.8rem", color: "#666" }}>Uploading…</span>}
-          </div>
-          {uploadError && <span style={errorStyle}>{uploadError}</span>}
-          {coverSrc && !uploading && (
-            <img
-              src={coverSrc}
-              alt="Cover preview"
-              style={{ marginTop: "0.5rem", maxWidth: 120, maxHeight: 160, border: "1px solid #ddd", borderRadius: 4 }}
-            />
-          )}
-        </div>
+        <CoverField value={coverSrc} onChange={setCoverSrc} />
         {errors.form && <span style={errorStyle}>{errors.form}</span>}
         {success && <span style={{ color: "green", fontSize: "0.85rem" }}>{success}</span>}
         <button type="submit" disabled={submitting} style={{ alignSelf: "flex-start", padding: "0.5rem 1rem" }}>
           {submitting ? "Creating..." : "Create Collection"}
         </button>
       </form>
+    </div>
+  );
+}
+
+/**
+ * Edit an existing collection: pick one, change any property (cover by URL or
+ * upload), and Done saves. "Sealed" lives only here: a sealed collection drops out
+ * of every create / move-to picker, and the API refuses puzzles into it.
+ */
+function EditCollectionForm({ collections, onSaved }: { collections: Collection[]; onSaved: () => void }) {
+  const [selectedId, setSelectedId] = useState("");
+  const [name, setName] = useState("");
+  const [publisher, setPublisher] = useState("");
+  const [publishAt, setPublishAt] = useState("");
+  const [coverSrc, setCoverSrc] = useState("");
+  const [sealed, setSealed] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  function pick(id: string) {
+    setSelectedId(id);
+    setError(null);
+    setSuccess(null);
+    const c = collections.find((x) => String(x.id) === id);
+    setName(c?.name ?? "");
+    setPublisher(c?.publisher ?? "");
+    setPublishAt(c?.publishAt ? c.publishAt.slice(0, 10) : "");
+    setCoverSrc(c?.coverSrc ?? "");
+    setSealed(!!c?.sealed);
+  }
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setSuccess(null);
+    if (!name.trim()) {
+      setError("Name is required");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await updateCollection(Number(selectedId), {
+        name: name.trim(),
+        publisher: publisher.trim() || null,
+        publishAt: publishAt || null,
+        coverSrc: coverSrc.trim() || null,
+        sealed,
+      });
+      setSuccess(`Saved "${name.trim()}"`);
+      onSaved();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div style={cardStyle}>
+      <h2>Edit Collection</h2>
+      <div style={{ ...fieldStyle, marginBottom: "0.75rem" }}>
+        <label>Collection</label>
+        <select style={inputStyle} value={selectedId} onChange={(e) => pick(e.target.value)}>
+          <option value="">— Pick a collection —</option>
+          {collections.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.publisher ? `${c.publisher} · ` : ""}{c.name}{c.sealed ? " (sealed)" : ""}
+            </option>
+          ))}
+        </select>
+      </div>
+      {selectedId && (
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+          <div style={fieldStyle}>
+            <label>Name *</label>
+            <input style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div style={fieldStyle}>
+            <label>Publisher</label>
+            <input style={inputStyle} value={publisher} onChange={(e) => setPublisher(e.target.value)} />
+          </div>
+          <div style={fieldStyle}>
+            <label>Publish date</label>
+            <input style={inputStyle} type="date" value={publishAt} onChange={(e) => setPublishAt(e.target.value)} />
+          </div>
+          <CoverField value={coverSrc} onChange={setCoverSrc} />
+          <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <input type="checkbox" checked={sealed} onChange={(e) => setSealed(e.target.checked)} />
+            Sealed
+            <span style={{ fontSize: "0.8rem", color: "#666" }}>
+              (no new puzzles: hidden from create and move-to pickers)
+            </span>
+          </label>
+          {error && <span style={errorStyle}>{error}</span>}
+          {success && <span style={{ color: "green", fontSize: "0.85rem" }}>{success}</span>}
+          <button type="submit" disabled={saving} style={{ alignSelf: "flex-start", padding: "0.5rem 1rem" }}>
+            {saving ? "Saving..." : "Done"}
+          </button>
+        </form>
+      )}
     </div>
   );
 }
@@ -518,7 +628,9 @@ function PuzzleEditRow({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [gateTimedOut, setGateTimedOut] = useState(false);
-  const showCollectionPicker = collections && !puzzle.srcCollection;
+  // Shown only for an uncollected puzzle, so sealed collections are simply left out.
+  const moveTargets = collections && creationTargets(collections);
+  const showCollectionPicker = moveTargets && !puzzle.srcCollection;
 
   const typeName = puzzleTypes.find((pt) => pt.id === puzzle.puzzleType)?.name;
   const hasEditor = hasVisualEditor(typeName);
@@ -583,7 +695,7 @@ function PuzzleEditRow({
                 <label style={{ fontSize: "0.75rem", fontWeight: "bold" }}>Collection</label>
                 <select style={{ ...inputStyle, width: 200 }} value={srcCollection} onChange={(e) => setSrcCollection(e.target.value)}>
                   <option value="">— None —</option>
-                  {collections!.map((c) => (
+                  {moveTargets!.map((c) => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
@@ -625,7 +737,7 @@ function PuzzleEditRow({
                 initialAuthor={author}
                 initialDifficulty={Number(difficulty) || 3}
                 initialSrcCollection={srcCollection ? Number(srcCollection) : null}
-                collections={showCollectionPicker ? collections : undefined}
+                collections={showCollectionPicker ? moveTargets : undefined}
                 showCollection={showCollectionPicker}
                 onDone={(result) => {
                   setCanonRepr(result.canonRepr);
@@ -1180,14 +1292,18 @@ export default function Admin() {
 
   if (loading) return <p>Loading...</p>;
 
+  // Sealed collections take no new puzzles, so the create forms never offer them.
+  const targets = creationTargets(collections);
+
   return (
     <div>
       <h1>Admin</h1>
       <ReviewQueue puzzleTypes={puzzleTypes} collections={collections} />
       <CollectionBrowser collections={collections} puzzleTypes={puzzleTypes} onDataChanged={loadData} />
       <CollectionForm onCreated={loadData} />
-      <BatchUploadForm puzzleTypes={puzzleTypes} collections={collections} />
-      <QuestionForm puzzleTypes={puzzleTypes} collections={collections} />
+      <EditCollectionForm collections={collections} onSaved={loadData} />
+      <BatchUploadForm puzzleTypes={puzzleTypes} collections={targets} />
+      <QuestionForm puzzleTypes={puzzleTypes} collections={targets} />
     </div>
   );
 }

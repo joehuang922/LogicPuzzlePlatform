@@ -793,7 +793,9 @@ private fun TypeDropdown(
 /**
  * Optional source-collection picker: shared across the batch here, and per question in
  * [AdminPuzzleEditScreen]. "None" leaves the puzzles uncollected (the common case for a
- * quick one-off), matching the web admin's optional field.
+ * quick one-off), matching the web admin's optional field. Sealed collections take no
+ * new puzzles, so they're left out, except the current selection (a puzzle already in
+ * one still shows where it is).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -804,6 +806,7 @@ internal fun CollectionDropdown(
 ) {
     var expanded by remember { mutableStateOf(false) }
     val selectedName = collections.firstOrNull { it.id == selectedId }?.name ?: "None"
+    val options = collections.filter { !it.sealed || it.id == selectedId }
 
     ExposedDropdownMenuBox(
         expanded = expanded,
@@ -827,7 +830,7 @@ internal fun CollectionDropdown(
                 text = { Text("None") },
                 onClick = { onSelect(null); expanded = false },
             )
-            for (c in collections) {
+            for (c in options) {
                 DropdownMenuItem(
                     text = { Text(c.name) },
                     onClick = { onSelect(c.id); expanded = false },

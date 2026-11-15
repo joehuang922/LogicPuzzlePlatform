@@ -7,6 +7,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.puzzleplatform.player.ui.screens.AdminBrowseScreen
+import com.puzzleplatform.player.ui.screens.AdminCollectionEditScreen
 import com.puzzleplatform.player.ui.screens.AdminCollectionScreen
 import com.puzzleplatform.player.ui.screens.AdminPuzzleEditScreen
 import com.puzzleplatform.player.ui.screens.AdminQuestionScreen
@@ -20,6 +21,7 @@ object Routes {
     const val PROFILE = "profile"
     const val ADMIN = "admin"
     const val ADMIN_COLLECTION = "admin/collection"
+    const val ADMIN_COLLECTION_EDIT = "admin/collection/edit"
     const val ADMIN_QUESTION = "admin/question"
     const val ADMIN_BROWSE = "admin/browse"
     // admin/puzzle/{puzzleId}
@@ -74,12 +76,16 @@ fun PuzzleApp() {
             AdminScreen(
                 onBack = { navController.popBackStack() },
                 onCreateCollection = { navController.navigate(Routes.ADMIN_COLLECTION) },
+                onEditCollection = { navController.navigate(Routes.ADMIN_COLLECTION_EDIT) },
                 onCreateQuestion = { navController.navigate(Routes.ADMIN_QUESTION) },
                 onEditQuestions = { navController.navigate(Routes.ADMIN_BROWSE) },
             )
         }
         composable(Routes.ADMIN_COLLECTION) {
             AdminCollectionScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Routes.ADMIN_COLLECTION_EDIT) {
+            AdminCollectionEditScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.ADMIN_QUESTION) {
             AdminQuestionScreen(onBack = { navController.popBackStack() })

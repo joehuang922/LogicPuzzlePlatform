@@ -1,4 +1,5 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
+import { Field } from "@aws-sdk/client-rds-data";
 import { executeStatement } from "../lib/db";
 
 function toCamelCase(str: string): string {
@@ -93,6 +94,69 @@ async function createCollection(
   return response(201, { id: result.generatedId });
 }
 
+/**
+ * PATCH /collections/{id}: the admin edit. Every property is editable; a field
+ * left out of the body is kept, and an empty optional field is cleared. `sealed`
+ * is set only here (new collections start unsealed): a sealed collection takes no
+ * new puzzles (see sealedTargetError in puzzles.ts). Returns the updated row.
+ */
+async function updateCollection(
+  event: APIGatewayProxyEvent
+): Promise<APIGatewayProxyResult> {
+  const id = Number(event.pathParameters?.id);
+  if (!id) return response(400, { error: "Missing collection id" });
+  if (!event.body) return response(400, { error: "Missing request body" });
+
+  const body = JSON.parse(event.body);
+  const sets: string[] = [];
+  const params: { name: string; value: Field }[] = [{ name: "id", value: { longValue: id } }];
+
+  if (body.name !== undefined) {
+    if (typeof body.name !== "string" || !body.name.trim()) {
+      return response(400, { error: "name is required" });
+    }
+    sets.push("name = :name");
+    params.push({ name: "name", value: { stringValue: body.name.trim() } });
+  }
+  for (const [field, column] of [
+    ["publisher", "publisher"],
+    ["publishAt", "publish_at"],
+    ["coverSrc", "cover_src"],
+  ] as const) {
+    if (body[field] === undefined) continue;
+    const v = typeof body[field] === "string" ? body[field].trim() : "";
+    sets.push(`${column} = :${field}`);
+    params.push({ name: field, value: v ? { stringValue: v } : { isNull: true } });
+  }
+  if (body.sealed !== undefined) {
+    sets.push("sealed = :sealed");
+    params.push({ name: "sealed", value: { booleanValue: !!body.sealed } });
+  }
+  if (sets.length === 0) return response(400, { error: "No fields to update" });
+
+  const exists = await executeStatement(
+    "SELECT id FROM puzzle_collections WHERE id = :id",
+    [{ name: "id", value: { longValue: id } }]
+  );
+  if (exists.records.length === 0) return response(404, { error: "Collection not found" });
+
+  await executeStatement(
+    `UPDATE puzzle_collections SET ${sets.join(", ")} WHERE id = :id`,
+    params
+  );
+
+  const updated = await executeStatement(
+    `SELECT pc.*, COUNT(pq.id) AS puzzle_count
+     FROM puzzle_collections pc
+     LEFT JOIN puzzle_questions pq
+       ON pq.src_collection = pc.id AND pq.deleted_at IS NULL
+     WHERE pc.id = :id
+     GROUP BY pc.id`,
+    [{ name: "id", value: { longValue: id } }]
+  );
+  return response(200, { collection: mapRecord(updated.records[0]) });
+}
+
 export async function handler(
   event: APIGatewayProxyEvent
 ): Promise<APIGatewayProxyResult> {
@@ -108,6 +172,9 @@ export async function handler(
   }
   if (method === "POST") {
     return createCollection(event);
+  }
+  if (method === "PATCH" && hasId && !subResource) {
+    return updateCollection(event);
   }
 
   return response(405, { error: "Method not allowed" });

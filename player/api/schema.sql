@@ -17,7 +17,9 @@ CREATE TABLE IF NOT EXISTS puzzle_collections (
   name         VARCHAR(255) NOT NULL,
   publisher    VARCHAR(255) NULL,
   publish_at   DATE         NULL,
-  cover_src    VARCHAR(512) NULL
+  cover_src    VARCHAR(512) NULL,
+  -- Closed to new puzzles (no create or move into it); set by the admin edit only.
+  sealed       BOOLEAN      NOT NULL DEFAULT FALSE
 );
 
 CREATE TABLE IF NOT EXISTS player_account (

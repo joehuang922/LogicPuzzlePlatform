@@ -96,6 +96,8 @@ export class ApiStack extends cdk.Stack {
     // collections/{id}/{proxy} → e.g. GET /collections/3/manifest, the tiny
     // change-detection manifest the offline client diffs against its local copy.
     const singleCollection = collections.addResource("{id}");
+    // PATCH /collections/{id}: the admin collection edit.
+    singleCollection.addMethod("PATCH", collectionIntegration);
     const collectionSubResource = singleCollection.addResource("{proxy}");
     collectionSubResource.addMethod("GET", collectionIntegration);
 

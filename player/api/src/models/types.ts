@@ -19,6 +19,8 @@ export interface PuzzleCollection {
   publisher: string | null;
   publishAt: string | null;
   coverSrc: string | null;
+  // Closed to new puzzles: no create into it, no move into it. Set only by the admin edit.
+  sealed: boolean;
 }
 
 export interface PuzzleQuestion {

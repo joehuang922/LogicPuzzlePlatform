@@ -69,6 +69,9 @@ data class Collection(
     val publishAt: String? = null,
     val coverSrc: String? = null,
     val puzzleCount: Int,
+    // Closed to new puzzles: left out of the admin create / move-to pickers. Network
+    // only; Room doesn't cache it (only the admin screens read it, always from the server).
+    val sealed: Boolean = false,
 )
 
 @Serializable
@@ -92,6 +95,22 @@ data class CreateCollectionRequest(
 
 @Serializable
 data class CreateCollectionResponse(val id: Int)
+
+/**
+ * PATCH /collections/{id} body, the admin edit. Mirrors updateCollection in
+ * frontend/src/api/client.ts. Every field is sent; a null optional one is cleared.
+ */
+@Serializable
+data class UpdateCollectionRequest(
+    val name: String,
+    val publisher: String?,
+    val publishAt: String?,
+    val coverSrc: String?,
+    val sealed: Boolean,
+)
+
+@Serializable
+data class UpdateCollectionResponse(val collection: Collection)
 
 /**
  * POST /puzzles body. The server runs the solver gate and rejects a puzzle with

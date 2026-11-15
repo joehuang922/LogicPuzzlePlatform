@@ -8,6 +8,8 @@ import com.puzzleplatform.player.data.model.CreateAttemptRequest
 import com.puzzleplatform.player.data.model.CreateAttemptResponse
 import com.puzzleplatform.player.data.model.CreateCollectionRequest
 import com.puzzleplatform.player.data.model.CreateCollectionResponse
+import com.puzzleplatform.player.data.model.UpdateCollectionRequest
+import com.puzzleplatform.player.data.model.UpdateCollectionResponse
 import com.puzzleplatform.player.data.model.CreatePuzzleRequest
 import com.puzzleplatform.player.data.model.CreatePuzzleResponse
 import com.puzzleplatform.player.data.model.ProfileResponse
@@ -59,6 +61,12 @@ interface PuzzleApi {
 
     @POST("collections")
     suspend fun createCollection(@Body body: CreateCollectionRequest): CreateCollectionResponse
+
+    @PATCH("collections/{id}")
+    suspend fun updateCollection(
+        @Path("id") id: Int,
+        @Body body: UpdateCollectionRequest,
+    ): UpdateCollectionResponse
 
     @POST("puzzles")
     suspend fun createPuzzle(@Body body: CreatePuzzleRequest): CreatePuzzleResponse

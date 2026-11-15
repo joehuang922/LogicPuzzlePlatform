@@ -158,6 +158,28 @@ async function getPuzzle(
   return response(200, { puzzle: mapRecord(result.records[0]) });
 }
 
+/**
+ * A sealed collection is closed to new puzzles: none may be created in it or moved
+ * into it. Returns the 400 to send, or null when [collectionId] may take puzzles.
+ * A puzzle already in a sealed collection stays editable (see updatePuzzle).
+ */
+async function sealedTargetError(
+  collectionId: number | null | undefined
+): Promise<APIGatewayProxyResult | null> {
+  if (!collectionId) return null;
+  const res = await executeStatement(
+    // SELECT * so a database without the sealed column yet reads as unsealed.
+    "SELECT * FROM puzzle_collections WHERE id = :id",
+    [{ name: "id", value: { longValue: Number(collectionId) } }]
+  );
+  const row = res.records[0];
+  if (!row) return response(400, { error: `Collection ${collectionId} does not exist` });
+  if (row.sealed) {
+    return response(400, { error: `Collection "${row.name}" is sealed and takes no new puzzles` });
+  }
+  return null;
+}
+
 async function createPuzzle(
   event: APIGatewayProxyEvent
 ): Promise<APIGatewayProxyResult> {
@@ -169,6 +191,9 @@ async function createPuzzle(
       error: "puzzleType, difficulty, and canonRepr are required",
     });
   }
+
+  const sealed = await sealedTargetError(body.srcCollection);
+  if (sealed) return sealed;
 
   let gateResult: { status: string | null; solution: string | null };
   try {
@@ -281,6 +306,18 @@ async function updatePuzzle(
   }
 
   if (body.srcCollection !== undefined) {
+    // Moving into a sealed collection is refused; re-sending the puzzle's current
+    // collection (clients PATCH it on every save) is not a move.
+    if (body.srcCollection) {
+      const current = await executeStatement(
+        "SELECT src_collection FROM puzzle_questions WHERE id = :id",
+        [{ name: "id", value: { stringValue: id } }]
+      );
+      if (Number(current.records[0]?.src_collection ?? 0) !== Number(body.srcCollection)) {
+        const sealed = await sealedTargetError(body.srcCollection);
+        if (sealed) return sealed;
+      }
+    }
     sets.push("src_collection = :srcCollection");
     params.push({
       name: "srcCollection",

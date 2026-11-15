@@ -15,6 +15,7 @@ import com.puzzleplatform.player.data.model.DEFAULT_COLLECTION_ID
 import com.puzzleplatform.player.data.model.ParseImageRequest
 import com.puzzleplatform.player.data.model.ParseImageResponse
 import com.puzzleplatform.player.data.model.Puzzle
+import com.puzzleplatform.player.data.model.UpdateCollectionRequest
 import com.puzzleplatform.player.data.model.UpdatePuzzleRequest
 import com.puzzleplatform.player.data.model.defaultCollection
 import com.puzzleplatform.player.data.model.sortedForDisplay
@@ -54,6 +55,21 @@ class AdminRepository(
 
     suspend fun createCollection(req: CreateCollectionRequest): Int =
         api.createCollection(req).id
+
+    /**
+     * PATCH the collection and return the server's row. A cached copy is written
+     * through (name, publisher, date, cover) so Home shows the edit without a sync;
+     * best-effort, as for [createPuzzle].
+     */
+    suspend fun updateCollection(id: Int, req: UpdateCollectionRequest): Collection {
+        val updated = api.updateCollection(id, req).collection
+        runCatching {
+            if (db.collectionDao().getAll().any { it.id == id }) {
+                db.collectionDao().upsertAll(listOf(updated.toEntity()))
+            }
+        }
+        return updated
+    }
 
     /**
      * Every collection for the Admin browser, in display order: the real ones plus, when
