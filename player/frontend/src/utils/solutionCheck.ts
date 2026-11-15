@@ -121,6 +121,21 @@ const CHECKS: Record<number, (canon: Json, solution: Json) => Expect | null> = {
     const checkV = onOff(v, "v:", 1, 2, true);
     return (key, value) => (key.startsWith("h:") ? checkH(key, value) : checkV(key, value));
   },
+  // Masyu: { edges: { h: rows x (cols-1), v: (rows-1) x cols } } between cell centres;
+  // "h:row,col" / "v:row,col" -> 1 line (the board has no crosses).
+  7: (canon, s) => {
+    const cells = canon.cells as unknown[][] | undefined;
+    const edges = s.edges as Json | undefined;
+    if (!Array.isArray(cells) || !Array.isArray(cells[0]) || !edges) return null;
+    const rows = cells.length;
+    const cols = cells[0].length;
+    const h = grid(edges.h, rows, cols - 1);
+    const v = grid(edges.v, rows - 1, cols);
+    if (!h || !v) return null;
+    const checkH = onOff(h, "h:", 1, 0, true);
+    const checkV = onOff(v, "v:", 1, 0, true);
+    return (key, value) => (key.startsWith("h:") ? checkH(key, value) : checkV(key, value));
+  },
   // Nonogram: { cells: rows x cols of 0/1 }; "col,row" -> 1 filled, 2 crossed.
   6: (canon, s) => {
     const rows = (canon.rowClues as unknown[] | undefined)?.length ?? 0;

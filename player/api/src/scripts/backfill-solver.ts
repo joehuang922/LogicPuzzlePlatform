@@ -4,6 +4,10 @@
  * (D9): the backfill only *flags* puzzles — it never hides or deletes live ones.
  * Multiple/none verdicts are listed explicitly so editors can re-review them.
  *
+ * The same sweep runs after every deploy, from the SolverBackfill Lambda
+ * (handlers/backfill.ts) with --commit --only-missing, so a newly registered solver's
+ * existing puzzles are classified without running this by hand.
+ *
  * Usage (from player/api):
  *   npx tsx src/scripts/backfill-solver.ts            # dry run: classify, write nothing
  *   npx tsx src/scripts/backfill-solver.ts --commit   # write validation_status + solution_repr
@@ -15,13 +19,6 @@
  */
 import { resolve } from "node:path";
 import { readFileSync } from "node:fs";
-
-type Verdict = "unique" | "multiple" | "none" | "unknown";
-
-// Offline budget per puzzle. Longer than the interactive gate's default (the backfill is
-// not behind the 29s Lambda timeout), but still bounded so one pathological board can't
-// stall a whole-table sweep. Boards that still time out are recorded as "unknown".
-const BACKFILL_GATE_BUDGET_MS = 30_000;
 
 /**
  * Load .env.local making the file authoritative, overriding any ambient shell env.
@@ -76,109 +73,14 @@ async function main() {
   // Run under tsx in CommonJS mode (api package has no "type":"module"), so __dirname
   // is the script's own directory regardless of the caller's cwd.
   loadEnvOverriding(resolve(__dirname, "../../.env.local"));
-  const { executeStatement } = await import("../lib/db");
-  const { gate, getPlugin } = await import("@puzzle/solver");
-
-  // Which registered types to process. Default: every type with a plugin that we
-  // find in the library; `--type` narrows to one.
-  const typeFilter = args.type != null ? [args.type] : null;
-
-  // Pull candidate rows. We classify in-process, so we only need id/type/canon.
-  const conditions = ["deleted_at IS NULL"];
-  const params: { name: string; value: { longValue: number } }[] = [];
-  if (typeFilter) {
-    conditions.push("puzzle_type = :pt");
-    params.push({ name: "pt", value: { longValue: typeFilter[0] } });
-  }
-  if (args.onlyMissing) conditions.push("validation_status IS NULL");
-
-  const rows = await executeStatement(
-    `SELECT id, puzzle_type, canon_repr FROM puzzle_questions
-     WHERE ${conditions.join(" AND ")}
-     ORDER BY created_at ASC`,
-    params
-  );
+  const { backfillSolver, formatSummary } = await import("../lib/backfillSolver");
 
   console.log(
     `Mode: ${args.commit ? "COMMIT" : "DRY RUN"}${args.onlyMissing ? " (only unclassified)" : ""}` +
-      `${typeFilter ? ` | type=${typeFilter[0]}` : ""}`
+      `${args.type != null ? ` | type=${args.type}` : ""}\n`
   );
-  console.log(`Fetched ${rows.records.length} candidate puzzle(s).\n`);
-
-  const counts: Record<Verdict, number> = { unique: 0, multiple: 0, none: 0, unknown: 0 };
-  const flagged: { id: string; type: number; verdict: Verdict }[] = [];
-  let skippedNoPlugin = 0;
-  let written = 0;
-
-  for (const row of rows.records) {
-    const id = row.id as string;
-    const puzzleType = Number(row.puzzle_type);
-    if (!getPlugin(puzzleType)) {
-      skippedNoPlugin++;
-      continue; // D8: types without a solver bypass the gate.
-    }
-
-    let canon: unknown;
-    try {
-      const raw = row.canon_repr;
-      canon = typeof raw === "string" ? JSON.parse(raw) : raw;
-    } catch {
-      console.error(`  ! ${id}: canon_repr is not valid JSON — skipping`);
-      continue;
-    }
-
-    const result = gate(puzzleType, canon, { deadline: Date.now() + BACKFILL_GATE_BUDGET_MS });
-    if (!result) {
-      skippedNoPlugin++;
-      continue;
-    }
-
-    const verdict = result.verdict as Verdict;
-    counts[verdict]++;
-    if (verdict !== "unique") flagged.push({ id, type: puzzleType, verdict });
-
-    if (args.commit) {
-      const solution = verdict === "unique" ? JSON.stringify(result.solution) : null;
-      await executeStatement(
-        `UPDATE puzzle_questions
-         SET validation_status = :status, solution_repr = :solution
-         WHERE id = :id`,
-        [
-          { name: "id", value: { stringValue: id } },
-          { name: "status", value: { stringValue: verdict } },
-          {
-            name: "solution",
-            value: solution != null ? { stringValue: solution } : { isNull: true },
-          },
-        ]
-      );
-      written++;
-    }
-  }
-
-  console.log("Verdict histogram:");
-  console.log(`  unique:   ${counts.unique}`);
-  console.log(`  multiple: ${counts.multiple}`);
-  console.log(`  none:     ${counts.none}`);
-  console.log(`  unknown:  ${counts.unknown}`);
-  if (skippedNoPlugin > 0) {
-    console.log(`  (skipped ${skippedNoPlugin} with no registered solver)`);
-  }
-
-  if (flagged.length > 0) {
-    console.log(`\nFlagged for editorial review (${flagged.length}):`);
-    for (const f of flagged) {
-      console.log(`  ${f.verdict.padEnd(8)} type=${f.type}  ${f.id}`);
-    }
-  } else {
-    console.log("\nNo puzzles flagged — all registered puzzles have a unique solution.");
-  }
-
-  if (args.commit) {
-    console.log(`\nWrote ${written} row(s).`);
-  } else {
-    console.log("\nDry run — no rows written. Re-run with --commit to persist.");
-  }
+  const summary = await backfillSolver({ ...args, log: (line) => console.log(line) });
+  for (const line of formatSummary(summary, args.commit)) console.log(line);
 }
 
 main().catch((err) => {

@@ -206,6 +206,27 @@ export class ApiStack extends cdk.Stack {
     props.cluster.secret!.grantRead(syncHandler);
     props.cluster.grantDataApiAccess(syncHandler);
 
+    // Post-deploy solver backfill (handlers/backfill.ts). Not on API Gateway: the deploy
+    // workflow invokes it directly after each deploy, so puzzles of a newly registered
+    // solver type get their verdict and solution. 15 minutes is Lambda's maximum; the
+    // handler stops starting puzzles a minute before it and the next deploy finishes up.
+    const solverBackfillHandler = new lambda.Function(this, "SolverBackfillHandler", {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: "handlers/backfill.handler",
+      code: lambda.Code.fromAsset(path.join(__dirname, "../../../api/dist")),
+      environment: {
+        CLUSTER_ARN: props.cluster.clusterArn,
+        SECRET_ARN: props.cluster.secret!.secretArn,
+        DATABASE_NAME: props.databaseName,
+      },
+      timeout: cdk.Duration.minutes(15),
+      // One full vCPU, as for the puzzles handler: the solver is CPU-bound.
+      memorySize: 1769,
+    });
+
+    props.cluster.secret!.grantRead(solverBackfillHandler);
+    props.cluster.grantDataApiAccess(solverBackfillHandler);
+
     const sync = api.root.addResource("sync");
     const syncIntegration = new apigw.LambdaIntegration(syncHandler);
     sync.addMethod("POST", syncIntegration);
@@ -247,6 +268,10 @@ export class ApiStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, "ParserUrl", {
       value: parserUrl.url,
+    });
+
+    new cdk.CfnOutput(this, "SolverBackfillFunction", {
+      value: solverBackfillHandler.functionName,
     });
   }
 }

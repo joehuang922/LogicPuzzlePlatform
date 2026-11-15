@@ -42,6 +42,7 @@ jobs:
             -c geminiApiKey="${GEMINI_API_KEY}"
           echo "api_url=$(jq -r '.PuzzleApiStack.ApiUrl' cdk-outputs.json)" >> "$GITHUB_OUTPUT"
           echo "parser_url=$(jq -r '.PuzzleApiStack.ParserUrl' cdk-outputs.json)" >> "$GITHUB_OUTPUT"
+          echo "backfill_fn=$(jq -r '.PuzzleApiStack.SolverBackfillFunction' cdk-outputs.json)" >> "$GITHUB_OUTPUT"
           cat cdk-outputs.json
         working-directory: player/infra
         env:
@@ -57,3 +58,13 @@ jobs:
       - name: Deploy Frontend stack
         run: npx cdk deploy PuzzleFrontendStack --require-approval never
         working-directory: player/infra
+
+      # Classify puzzles of solver-backed types that have no verdict yet (e.g. every
+      # existing puzzle of a newly registered solver). Idempotent; runs last so a slow or
+      # failed sweep never holds back the deploy itself.
+      - name: Backfill solver verdicts
+        run: |
+          aws lambda invoke --function-name "${{ steps.deploy-api.outputs.backfill_fn }}" \
+            --cli-read-timeout 960 --cli-binary-format raw-in-base64-out --payload '{}' backfill.json
+          jq -r '.report[]? // .' backfill.json
+          if jq -e '.errorMessage' backfill.json > /dev/null; then exit 1; fi

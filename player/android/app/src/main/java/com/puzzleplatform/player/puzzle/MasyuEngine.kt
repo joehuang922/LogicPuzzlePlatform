@@ -315,6 +315,22 @@ object MasyuEngine : PuzzleEngine {
     }
 
     /**
+     * Every drawn line is on the solution's loop (`solutionRepr.edges`: h is rows x (cols-1),
+     * v is (rows-1) x cols). Masyu has no crosses, so only lines are checked.
+     */
+    override fun matchesSolution(puzzle: Puzzle, userValues: Map<String, Int>): Boolean? {
+        val (rows, cols) = dims(parseCells(puzzle))
+        val edges = puzzle.solutionRepr?.get("edges") as? JsonObject ?: return null
+        val h = SolutionCheck.grid(edges["h"], rows, cols - 1) ?: return null
+        val v = SolutionCheck.grid(edges["v"], rows - 1, cols) ?: return null
+        val checkH = SolutionCheck.onOff(h, "h:", 1, 0, rowFirst = true)
+        val checkV = SolutionCheck.onOff(v, "v:", 1, 0, rowFirst = true)
+        return SolutionCheck.matches(userValues) { key, value ->
+            if (key.startsWith("h:")) checkH.check(key, value) else checkV.check(key, value)
+        }
+    }
+
+    /**
      * True when the drawn segments form exactly one closed loop that satisfies every
      * circle (port of MasyuBoard.tsx validateSolution). Empty board -> not complete.
      */

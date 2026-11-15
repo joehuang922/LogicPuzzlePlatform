@@ -86,4 +86,14 @@ class SolutionCheckTest {
         assertEquals(true, SlitherlinkEngine.matchesSolution(p, mapOf("h:0,0" to 1, "v:0,1" to 1)))
         assertEquals(false, SlitherlinkEngine.matchesSolution(p, mapOf("v:0,0" to 2)))
     }
+
+    @Test
+    fun `masyu lines must be on the solution loop`() {
+        val edges = """{"edges":{"h":[[1,1],[0,0],[1,1]],"v":[[1,0,1],[1,0,1]]}}"""
+        val p = puzzle(7, """{"cells":[[2,0,2],[0,0,0],[0,0,0]]}""", edges)
+        assertEquals(true, MasyuEngine.matchesSolution(p, mapOf("h:0,1" to 1, "v:1,2" to 1)))
+        assertEquals(false, MasyuEngine.matchesSolution(p, mapOf("h:1,0" to 1)))
+        assertEquals(false, MasyuEngine.matchesSolution(p, mapOf("v:0,1" to 1)))
+        assertNull(MasyuEngine.matchesSolution(puzzle(7, """{"cells":[[0,0],[0,0]]}""", edges), emptyMap()))
+    }
 }

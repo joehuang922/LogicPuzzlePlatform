@@ -108,6 +108,16 @@ At least one edge exists AND the edges form a single connected closed loop with 
 - Uses LLM recognizer (Gemini) to classify each cell as empty, white circle, or black circle.
 - Validates that all cell values are in the range 0-2.
 
+## Solver
+
+`player/solver/src/plugins/masyu` proves uniqueness at create/edit (the auto-solve gate)
+and stores the solution for the on-track check. Edges between adjacent cells are the
+variables; it propagates the degree-0-or-2 rule, each circle's rule as a table over the
+8 edges it reads, the inside/outside colouring, the single-loop rule and a connectivity
+rule (circles and loop cells stay reachable, with no bridge between them), then probes
+every edge both ways. That settles all three sample boards before any search: 17x17 in
+~20ms, 45x31 in ~0.2s, the 50x64 photo in ~2.5s.
+
 # Misc
 
 ## Coordinate convention

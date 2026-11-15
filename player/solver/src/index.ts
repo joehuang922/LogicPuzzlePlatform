@@ -4,7 +4,7 @@ export type { Verdict, SearchBudget } from "./drivers";
 export { gate, DEFAULT_GATE_BUDGET_MS } from "./gate";
 export type { GateResult } from "./gate";
 export { nextHint, nextPlacement } from "./hint";
-export { getPlugin } from "./registry";
+export { getPlugin, registeredPuzzleTypes } from "./registry";
 export { sudokuPlugin, SudokuModel, SudokuBoard, cellLabel, sudokuGeometry, sudokuDims, MAX_SUDOKU_SIZE } from "./plugins/sudoku";
 export type { SudokuCanon, SudokuDims } from "./plugins/sudoku";
 export { kakuroPlugin, KakuroModel } from "./plugins/kakuro";
@@ -19,3 +19,5 @@ export { comboSudokuPlugin, ComboSudokuModel, comboGeometry } from "./plugins/co
 export type { ComboSudokuCanon, ComboSudokuSolution } from "./plugins/combo-sudoku";
 export { nurimazePlugin, NurimazeModel } from "./plugins/nurimaze";
 export type { NurimazeCanon } from "./plugins/nurimaze";
+export { masyuPlugin, MasyuModel } from "./plugins/masyu";
+export type { MasyuCanon, MasyuEdges } from "./plugins/masyu";

@@ -92,6 +92,17 @@ describe("matchesSolution", () => {
     expect(matchesSolution(p, { "c:0,0": 2 })).toBe(false);
   });
 
+  it("masyu: every drawn line must be on the solution's loop", () => {
+    // 3x3 ring: h is 3x2, v is 2x3.
+    const edges = { h: [[1, 1], [0, 0], [1, 1]], v: [[1, 0, 1], [1, 0, 1]] };
+    const p = puzzle(7, { cells: [[2, 0, 2], [0, 0, 0], [0, 0, 0]] }, { edges });
+    expect(matchesSolution(p, { "h:0,1": 1, "v:1,2": 1 })).toBe(true);
+    expect(matchesSolution(p, { "h:1,0": 1 })).toBe(false);
+    expect(matchesSolution(p, { "v:0,1": 1 })).toBe(false);
+    // Slitherlink-sized grids (one more row/col) don't fit a masyu canon.
+    expect(matchesSolution(puzzle(7, { cells: [[0, 0], [0, 0]] }, { edges }), {})).toBeNull();
+  });
+
   it("nurimaze: painted rooms black, marked rooms white", () => {
     const p = puzzle(3, { cells: [[3, 0], [0, 4]] }, { states: [[2, 1], [2, 2]] });
     expect(matchesSolution(p, { "1,0": 1, "0,1": 2 })).toBe(true);
