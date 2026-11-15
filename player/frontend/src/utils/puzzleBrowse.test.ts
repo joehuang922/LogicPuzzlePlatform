@@ -1,0 +1,42 @@
+import { describe, expect, it } from "vitest";
+import { groupByCollection, sizeTag } from "./puzzleBrowse";
+
+const p = (puzzleType: number, width: number | null, height: number | null, canonRepr: Record<string, unknown> = {}) =>
+  ({ puzzleType, width, height, canonRepr });
+
+describe("sizeTag", () => {
+  it("sudoku by side", () => {
+    expect(sizeTag(p(1, 9, 9))).toBeNull();
+    expect(sizeTag(p(1, 12, 12))).toBeNull();
+    expect(sizeTag(p(1, 16, 16))).toBe("BIG");
+    expect(sizeTag(p(1, 25, 25))).toBe("GIANT");
+    expect(sizeTag(p(1, null, null, { hints: new Array(16).fill([]) }))).toBe("BIG");
+  });
+  it("combo sudoku by subboards", () => {
+    const combo = (n: number) => p(2, 21, 21, { subboards: new Array(n).fill({}) });
+    expect(sizeTag(combo(9))).toBeNull();
+    expect(sizeTag(combo(10))).toBe("BIG");
+    expect(sizeTag(combo(20))).toBe("GIANT");
+  });
+  it("nonogram by cells", () => {
+    expect(sizeTag(p(6, 50, 59))).toBeNull();
+    expect(sizeTag(p(6, 50, 60))).toBe("BIG");
+    expect(sizeTag(p(6, 100, 100))).toBe("GIANT");
+  });
+  it("other types by cells", () => {
+    expect(sizeTag(p(5, 30, 33))).toBeNull();
+    expect(sizeTag(p(5, 40, 25))).toBe("BIG");
+    expect(sizeTag(p(5, 50, 40))).toBe("GIANT");
+    expect(sizeTag(p(5, null, null))).toBeNull();
+  });
+});
+
+describe("groupByCollection", () => {
+  it("orders collections by name, Uncategorized last, titles within", () => {
+    const q = (title: string, srcCollectionName: string | null) => ({ title, srcCollectionName });
+    const groups = groupByCollection([q("b", "Vol 2"), q("z", null), q("B2", "alpha"), q("a", "Vol 2"), q("a1", "alpha")]);
+    expect(groups.map((g) => g.collectionName)).toEqual(["alpha", "Vol 2", "Uncategorized"]);
+    expect(groups[0].puzzles.map((x) => x.title)).toEqual(["a1", "B2"]);
+    expect(groups[1].puzzles.map((x) => x.title)).toEqual(["a", "b"]);
+  });
+});
