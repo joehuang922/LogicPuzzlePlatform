@@ -20,10 +20,10 @@ fun PuzzleType.toEntity() = PuzzleTypeEntity(id, name, jpLabel, rule)
 fun PuzzleTypeEntity.toModel() = PuzzleType(id, name, jpLabel, rule)
 
 fun Collection.toEntity() =
-    CollectionEntity(id, name, publisher, publishAt, coverSrc, puzzleCount)
+    CollectionEntity(id, name, publisher, publishAt, coverSrc, puzzleCount, sealed)
 
 fun CollectionEntity.toModel() =
-    Collection(id, name, publisher, publishAt, coverSrc, puzzleCount)
+    Collection(id, name, publisher, publishAt, coverSrc, puzzleCount, sealed)
 
 fun Puzzle.toEntity(json: Json, updatedAt: String?, deletedAt: String?) = PuzzleEntity(
     id = id,

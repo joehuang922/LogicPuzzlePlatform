@@ -97,12 +97,11 @@ class AdminPuzzleEditViewModel(
                 _state.update { it.copy(loading = false, loadError = repo.serverMessage(e)) }
             }
         }
-        // Collection picker options; silent on failure (the current one still shows).
+        // Collection picker options: the cached names at once, then the server's list.
+        // Silent on failure (puzzles can still be created / saved without one).
         viewModelScope.launch {
-            try {
-                val collections = repo.listCollections()
+            repo.pickerCollections().collect { collections ->
                 _state.update { it.copy(collections = collections) }
-            } catch (_: Exception) {
             }
         }
     }

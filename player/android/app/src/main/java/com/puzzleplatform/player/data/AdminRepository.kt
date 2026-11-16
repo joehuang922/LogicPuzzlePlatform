@@ -8,6 +8,7 @@ import com.puzzleplatform.player.data.api.PuzzleApi
 import com.puzzleplatform.player.data.local.AppDatabase
 import com.puzzleplatform.player.data.local.toEntity
 import com.puzzleplatform.player.data.local.toLocalEntity
+import com.puzzleplatform.player.data.local.toModel
 import com.puzzleplatform.player.data.model.Collection
 import com.puzzleplatform.player.data.model.CreateCollectionRequest
 import com.puzzleplatform.player.data.model.CreatePuzzleRequest
@@ -21,6 +22,8 @@ import com.puzzleplatform.player.data.model.defaultCollection
 import com.puzzleplatform.player.data.model.sortedForDisplay
 import com.puzzleplatform.player.data.sync.SyncClock
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -52,6 +55,25 @@ class AdminRepository(
 
     suspend fun listCollections(): List<Collection> =
         api.listCollections().collections.sortedForDisplay()
+
+    /**
+     * The collection pickers' options, cache first: emits the collections cached in
+     * Room at once (no default collection), then the server's list once it answers,
+     * written through to Room. A failed server read keeps the cached list; with an
+     * empty cache too, nothing is emitted (the pickers can still choose "None").
+     */
+    fun pickerCollections(): Flow<List<Collection>> = flow {
+        val cached = runCatching {
+            db.collectionDao().getAll()
+                .filter { it.id != DEFAULT_COLLECTION_ID }
+                .map { it.toModel() }
+                .sortedForDisplay()
+        }.getOrDefault(emptyList())
+        if (cached.isNotEmpty()) emit(cached)
+        val fresh = runCatching { api.listCollections().collections }.getOrNull() ?: return@flow
+        runCatching { db.collectionDao().upsertAll(fresh.map { it.toEntity() }) }
+        emit(fresh.sortedForDisplay())
+    }
 
     suspend fun createCollection(req: CreateCollectionRequest): Int =
         api.createCollection(req).id

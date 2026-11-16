@@ -105,13 +105,11 @@ class AdminQuestionViewModel(
     val state: StateFlow<AdminQuestionUiState> = _state.asStateFlow()
 
     init {
-        // Populate the optional shared "source collection" dropdown; silent on
-        // failure (puzzles can still be created without one).
+        // Collection picker options: the cached names at once, then the server's list.
+        // Silent on failure (puzzles can still be created / saved without one).
         viewModelScope.launch {
-            try {
-                val collections = repo.listCollections()
+            repo.pickerCollections().collect { collections ->
                 _state.update { it.copy(collections = collections) }
-            } catch (_: Exception) {
             }
         }
     }

@@ -1,5 +1,6 @@
 package com.puzzleplatform.player.data.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -30,6 +31,8 @@ data class CollectionEntity(
     val publishAt: String?,
     val coverSrc: String?,
     val puzzleCount: Int,
+    // Closed to new puzzles; kept so the admin pickers can hide it from the cache.
+    @ColumnInfo(defaultValue = "0") val sealed: Boolean = false,
 )
 
 @Entity(
