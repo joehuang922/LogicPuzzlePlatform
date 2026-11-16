@@ -27,3 +27,5 @@ export { rippleEffectPlugin, RippleEffectModel } from "./plugins/ripple-effect";
 export type { RippleEffectCanon } from "./plugins/ripple-effect";
 export { nuritwinPlugin, NuritwinModel } from "./plugins/nuritwin";
 export type { NuritwinCanon } from "./plugins/nuritwin";
+export { norinoriPlugin, NorinoriModel } from "./plugins/norinori";
+export type { NorinoriCanon } from "./plugins/norinori";

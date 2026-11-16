@@ -128,4 +128,13 @@ class SolutionCheckTest {
         assertEquals(false, NuritwinEngine.matchesSolution(p, mapOf("0,1" to 2)))
         assertNull(NuritwinEngine.matchesSolution(puzzle(9, """{"cells":[[0,0]],"grids":{"h":[],"v":[[0]]}}""", """{"states":[[1,0,1]]}"""), emptyMap()))
     }
+
+    @Test
+    fun `norinori shaded cells and marks against the stored grid`() {
+        val p = puzzle(23, """{"grids":{"h":[],"v":[[0,1,0,0]]}}""", """{"states":[[1,1,0,1,1]]}""")
+        assertEquals(true, NorinoriEngine.matchesSolution(p, mapOf("c:0,0" to 1, "c:2,0" to 2, "c:4,0" to 1)))
+        assertEquals(false, NorinoriEngine.matchesSolution(p, mapOf("c:2,0" to 1)))
+        assertEquals(false, NorinoriEngine.matchesSolution(p, mapOf("c:3,0" to 2)))
+        assertNull(NorinoriEngine.matchesSolution(puzzle(23, """{"grids":{"h":[],"v":[[0]]}}""", """{"states":[[1,1,0,1,1]]}"""), emptyMap()))
+    }
 }

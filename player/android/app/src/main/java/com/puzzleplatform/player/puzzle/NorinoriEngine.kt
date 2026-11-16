@@ -242,4 +242,14 @@ object NorinoriEngine : ShadeMarkEngine {
         grid.getOrNull(r)?.getOrNull(c) ?: 0
 
     private val DIRS = listOf(-1 to 0, 1 to 0, 0 to -1, 0 to 1)
+
+    /**
+     * Every shaded cell and mark agrees with the stored solution (`solutionRepr.states`,
+     * rows x cols of 0/1): a shaded cell must be shaded there, a mark must not.
+     */
+    override fun matchesSolution(puzzle: Puzzle, userValues: Map<String, Int>): Boolean? {
+        val grids = parseGrids(puzzle)
+        val solution = SolutionCheck.grid(puzzle.solutionRepr?.get("states"), grids.rows, grids.cols) ?: return null
+        return SolutionCheck.matches(userValues, SolutionCheck.onOff(solution, "c:", SHADED, MARKED, rowFirst = false))
+    }
 }

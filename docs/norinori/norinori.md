@@ -94,6 +94,15 @@ A simplified version of the Nurimaze / LITS editor: same thick-border room-drawi
 - Validates that `grids.h` and `grids.v` are integer 0/1 arrays with the correct (rows-1)xcols and rowsx(cols-1) shapes.
 - **Accuracy bar:** judged by fraction of internal edges classified correctly (edges-off), not by whether every detected region is a valid room. A result 1–2 edges off on a real scan is shippable; the editor's edge-toggle covers the remaining misses. Thresholds are not tuned chasing a perfect partition.
 
+## Solver
+
+`player/solver/src/plugins/norinori` proves uniqueness at create/edit (the auto-solve
+gate) and stores the solution for the on-track check. One shaded/white variable per
+cell: a room holds exactly two shaded cells, and a shaded cell has exactly one shaded
+neighbour (so once it has one, its other neighbours turn white; with one candidate left,
+that one is shaded). Then it probes every cell both ways. Both samples (walls read by the
+parser's classifier into the solver's `fixtures.json`) settle with no search in a few ms.
+
 # Misc
 
 ## Coordinate convention

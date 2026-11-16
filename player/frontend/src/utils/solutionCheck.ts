@@ -143,6 +143,14 @@ const CHECKS: Record<number, (canon: Json, solution: Json) => Expect | null> = {
     const checkV = onOff(v, "v:", 1, 0, true);
     return (key, value) => (key.startsWith("h:") ? checkH(key, value) : checkV(key, value));
   },
+  // Norinori: { states: rows x cols of 0/1 }; "c:col,row" -> 1 shaded, 2 marked unshaded.
+  // Sized from the walls (rows = h.length + 1, cols = v[0].length + 1), as LITS.
+  23: (canon, s) => {
+    const g = canon.grids as { h?: unknown[]; v?: unknown[][] } | undefined;
+    if (!g?.h || !Array.isArray(g.v?.[0])) return null;
+    const sol = grid(s.states, g.h.length + 1, g.v[0].length + 1);
+    return sol && onOff(sol, "c:", 1, 2, false);
+  },
   // Ripple Effect: { numbers: rows x cols }; "col,row" -> the entered number (any size: a
   // number bigger than its room is simply off track).
   25: (canon, s) => {
