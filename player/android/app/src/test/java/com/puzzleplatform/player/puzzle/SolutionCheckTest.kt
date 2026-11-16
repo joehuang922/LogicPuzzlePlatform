@@ -118,4 +118,14 @@ class SolutionCheckTest {
         assertEquals(false, RippleEffectEngine.matchesSolution(p, mapOf("2,0" to 3)))
         assertNull(RippleEffectEngine.matchesSolution(puzzle(25, """{"cells":[[0,0]]}""", """{"numbers":[[1,2,1]]}"""), emptyMap()))
     }
+
+    @Test
+    fun `nuritwin shaded cells and marks against the stored grid`() {
+        val canon = """{"cells":[[0,0,0],[0,0,0]],"grids":{"h":[[0,0,0]],"v":[[0,0],[0,0]]}}"""
+        val p = puzzle(9, canon, """{"states":[[1,0,1],[1,0,1]]}""")
+        assertEquals(true, NuritwinEngine.matchesSolution(p, mapOf("0,0" to 1, "1,0" to 2, "2,1" to 1)))
+        assertEquals(false, NuritwinEngine.matchesSolution(p, mapOf("1,1" to 1)))
+        assertEquals(false, NuritwinEngine.matchesSolution(p, mapOf("0,1" to 2)))
+        assertNull(NuritwinEngine.matchesSolution(puzzle(9, """{"cells":[[0,0]],"grids":{"h":[],"v":[[0]]}}""", """{"states":[[1,0,1]]}"""), emptyMap()))
+    }
 }

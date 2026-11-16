@@ -201,6 +201,16 @@ object NuritwinEngine : ShadeMarkEngine {
     }
 
     /**
+     * Every shaded cell and mark agrees with the stored solution (`solutionRepr.states`,
+     * rows x cols of 0/1): a shaded cell must be shaded there, a mark must not.
+     */
+    override fun matchesSolution(puzzle: Puzzle, userValues: Map<String, Int>): Boolean? {
+        val canon = parseCanon(puzzle)
+        val states = SolutionCheck.grid(puzzle.solutionRepr?.get("states"), canon.rows, canon.cols) ?: return null
+        return SolutionCheck.matches(userValues, SolutionCheck.onOff(states, "", BLACK, MARKED, rowFirst = false))
+    }
+
+    /**
      * True when the current paint is a full, valid Nuritwin solution (port of
      * NuritwinBoard.tsx validateSolution):
      *  1. no 2x2 block of cells is entirely black,

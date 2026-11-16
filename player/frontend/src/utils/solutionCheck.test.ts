@@ -126,6 +126,14 @@ describe("matchesSolution", () => {
     expect(matchesSolution(puzzle(25, { cells: [[0, 0]] }, { numbers: [[1, 2, 1]] }), {})).toBeNull();
   });
 
+  it("nuritwin: shaded cells and marks against the stored grid", () => {
+    const p = puzzle(9, { cells: [[0, 0, 0], [0, 0, 0]] }, { states: [[1, 0, 1], [1, 0, 1]] });
+    expect(matchesSolution(p, { "0,0": 1, "1,0": 2, "2,1": 1 })).toBe(true);
+    expect(matchesSolution(p, { "1,1": 1 })).toBe(false);
+    expect(matchesSolution(p, { "0,1": 2 })).toBe(false);
+    expect(matchesSolution(puzzle(9, { cells: [[0, 0]] }, { states: [[1, 0, 1]] }), {})).toBeNull();
+  });
+
   it("nurimaze: painted rooms black, marked rooms white", () => {
     const p = puzzle(3, { cells: [[3, 0], [0, 4]] }, { states: [[2, 1], [2, 2]] });
     expect(matchesSolution(p, { "1,0": 1, "0,1": 2 })).toBe(true);

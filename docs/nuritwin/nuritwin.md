@@ -103,6 +103,18 @@ Every room contains exactly two equal-size connected black components, all black
 - Uses LLM-based cell recognizer (Gemini) to identify numbers in each cell.
 - Validates dimensions, cell value ranges, and grid border consistency.
 
+## Solver
+
+`player/solver/src/plugins/nuritwin` proves uniqueness at create/edit (the auto-solve
+gate) and stores the solution for the on-track check. It reasons cell by cell, never by
+listing a room's possible shadings (which explodes on a large room). Per room it bounds
+the twin size N (the number; else a closed group fixes it; else at least the largest
+group and at most what the room's not-white pockets can fit twice, so a 3-cell room is
+N = 1) and applies: groups never pass N, a group of N is closed off, pockets smaller than
+N stay white, the room holds 2N shaded cells, two closed groups finish it. Board-wide:
+no 2x2 shaded block, and a cell that is the only link between shaded cells is shaded.
+Then it probes every cell both ways. The 10x10 sample settles with no search in ~20ms.
+
 # Misc
 
 ## Coordinate convention

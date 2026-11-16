@@ -25,3 +25,5 @@ export { yajilinPlugin, YajilinModel } from "./plugins/yajilin";
 export type { YajilinCanon, YajilinSolution } from "./plugins/yajilin";
 export { rippleEffectPlugin, RippleEffectModel } from "./plugins/ripple-effect";
 export type { RippleEffectCanon } from "./plugins/ripple-effect";
+export { nuritwinPlugin, NuritwinModel } from "./plugins/nuritwin";
+export type { NuritwinCanon } from "./plugins/nuritwin";

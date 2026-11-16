@@ -106,6 +106,13 @@ const CHECKS: Record<number, (canon: Json, solution: Json) => Expect | null> = {
       return sol[cr[1]]?.[cr[0]] === value;
     };
   },
+  // Nuritwin: { states: rows x cols of 0/1 }; "col,row" -> 1 shaded, 2 marked unshaded.
+  9: (canon, s) => {
+    const cells = canon.cells as unknown[][] | undefined;
+    if (!Array.isArray(cells) || !Array.isArray(cells[0])) return null;
+    const sol = grid(s.states, cells.length, cells[0].length);
+    return sol && onOff(sol, "", 1, 2, false);
+  },
   // Slitherlink: { edges: { h: (rows+1) x cols, v: rows x (cols+1) } }; "h:row,col" /
   // "v:row,col" -> 1 line, 2 cross.
   5: (canon, s) => {
