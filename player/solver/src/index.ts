@@ -31,3 +31,5 @@ export { norinoriPlugin, NorinoriModel } from "./plugins/norinori";
 export type { NorinoriCanon } from "./plugins/norinori";
 export { hitoriPlugin, HitoriModel } from "./plugins/hitori";
 export type { HitoriCanon } from "./plugins/hitori";
+export { heyawakePlugin, HeyawakeModel } from "./plugins/heyawake";
+export type { HeyawakeCanon } from "./plugins/heyawake";

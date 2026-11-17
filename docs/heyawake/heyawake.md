@@ -152,6 +152,18 @@ the player assigns it any state (black = 1 or white-marked = 2). Unset cells
   validation criteria — a failing board is reported for review, but the parser
   itself still returns its best-effort result.
 
+## Solver
+
+`player/solver/src/plugins/heyawake` proves uniqueness at create/edit (the auto-solve
+gate) and stores the solution for the on-track check. One shaded/white variable per cell:
+a shaded cell whitens its neighbours, a numbered room holds exactly its count, an
+undecided cell that alone links white cells is white, and the three-room rule becomes
+windows (a room's stretch of a row or column plus the cell either side) that each need a
+shaded cell, so a window with one undecided cell left shades it. Failed-literal probing
+runs at construction and at every search node (on the 17x17 medium sample that cuts the
+proof from 2094 nodes to 16). Four samples (walls read by the parser's classifier,
+numbers from the images, in the solver's `fixtures.json`) prove unique in under 0.1s.
+
 # Misc
 
 ## Coordinate convention

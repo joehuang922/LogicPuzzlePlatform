@@ -118,6 +118,16 @@ object HeyawakeEngine : ShadeMarkEngine {
     }
 
     /**
+     * Every shaded cell and mark agrees with the stored solution (`solutionRepr.states`,
+     * height x width of 0/1): a shaded cell must be shaded there, a mark must not.
+     */
+    override fun matchesSolution(puzzle: Puzzle, userValues: Map<String, Int>): Boolean? {
+        val board = parseBoard(puzzle)
+        val states = SolutionCheck.grid(puzzle.solutionRepr?.get("states"), board.height, board.width) ?: return null
+        return SolutionCheck.matches(userValues, SolutionCheck.onOff(states, "", SHADED, MARKED, rowFirst = false))
+    }
+
+    /**
      * True when the shaded cells form a valid Heyawake solution (port of HeyawakeBoard.tsx
      * validateSolution):
      *  1. every clued room holds exactly its clue count of shaded cells,

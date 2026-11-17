@@ -151,6 +151,14 @@ const CHECKS: Record<number, (canon: Json, solution: Json) => Expect | null> = {
     const sol = grid(s.states, g.h.length + 1, g.v[0].length + 1);
     return sol && onOff(sol, "c:", 1, 2, false);
   },
+  // Heyawake: { states: height x width of 0/1 }; "col,row" -> 1 shaded, 2 marked unshaded.
+  21: (canon, s) => {
+    const height = canon.height as number | undefined;
+    const width = canon.width as number | undefined;
+    if (!Number.isInteger(height) || !Number.isInteger(width)) return null;
+    const sol = grid(s.states, height!, width!);
+    return sol && onOff(sol, "", 1, 2, false);
+  },
   // Hitori: { states: rows x cols of 0/1 }; "col,row" -> 1 shaded, 2 marked unshaded.
   26: (canon, s) => {
     const cells = canon.cells as unknown[][] | undefined;

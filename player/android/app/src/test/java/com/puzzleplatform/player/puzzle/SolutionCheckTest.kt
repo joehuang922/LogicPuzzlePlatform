@@ -146,4 +146,13 @@ class SolutionCheckTest {
         assertEquals(false, HitoriEngine.matchesSolution(p, mapOf("2,0" to 2)))
         assertNull(HitoriEngine.matchesSolution(puzzle(26, """{"cells":[[1,1]]}""", """{"states":[[1,0,1]]}"""), emptyMap()))
     }
+
+    @Test
+    fun `heyawake shaded cells and marks against the stored grid`() {
+        val p = puzzle(21, """{"width":4,"height":1,"rooms":[]}""", """{"states":[[1,0,0,1]]}""")
+        assertEquals(true, HeyawakeEngine.matchesSolution(p, mapOf("0,0" to 1, "1,0" to 2)))
+        assertEquals(false, HeyawakeEngine.matchesSolution(p, mapOf("1,0" to 1)))
+        assertEquals(false, HeyawakeEngine.matchesSolution(p, mapOf("3,0" to 2)))
+        assertNull(HeyawakeEngine.matchesSolution(puzzle(21, """{"width":3,"height":1,"rooms":[]}""", """{"states":[[1,0,0,1]]}"""), emptyMap()))
+    }
 }
