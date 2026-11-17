@@ -13,6 +13,8 @@
  *   npx tsx src/scripts/backfill-solver.ts --commit   # write validation_status + solution_repr
  *   npx tsx src/scripts/backfill-solver.ts --type 1   # restrict to one puzzle type
  *   npx tsx src/scripts/backfill-solver.ts --only-missing   # skip rows already classified
+ *   npx tsx src/scripts/backfill-solver.ts --retry-unknown --type 5   # retry timed-out rows
+ *   npx tsx src/scripts/backfill-solver.ts --retry-unknown --budget-ms 120000   # longer per puzzle
  *
  * Loads the same Aurora credentials the Lambda uses from player/api/.env.local, so
  * db.ts (which reads the ARNs at import time) must be imported *after* env is loaded.
@@ -49,15 +51,19 @@ interface Args {
   commit: boolean;
   type: number | null;
   onlyMissing: boolean;
+  retryUnknown: boolean;
+  budgetMs?: number;
 }
 
 function parseArgs(argv: string[]): Args {
-  const args: Args = { commit: false, type: null, onlyMissing: false };
+  const args: Args = { commit: false, type: null, onlyMissing: false, retryUnknown: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--commit") args.commit = true;
     else if (a === "--only-missing") args.onlyMissing = true;
     else if (a === "--type") args.type = Number(argv[++i]);
+    else if (a === "--retry-unknown") args.retryUnknown = true;
+    else if (a === "--budget-ms") args.budgetMs = Number(argv[++i]);
     else {
       console.error(`Unknown argument: ${a}`);
       process.exit(2);
@@ -77,6 +83,7 @@ async function main() {
 
   console.log(
     `Mode: ${args.commit ? "COMMIT" : "DRY RUN"}${args.onlyMissing ? " (only unclassified)" : ""}` +
+      `${args.retryUnknown ? " (retrying timed-out)" : ""}` +
       `${args.type != null ? ` | type=${args.type}` : ""}\n`
   );
   const summary = await backfillSolver({ ...args, log: (line) => console.log(line) });

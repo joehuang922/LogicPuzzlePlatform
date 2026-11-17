@@ -1,0 +1,59 @@
+name: Solver rerun
+
+# Re-run the solver gate on puzzles whose verdict is "unknown" (it timed out, or an editor
+# saved past a timeout), e.g. after a solver got stronger. Invokes the production
+# SolverBackfillHandler Lambda (player/api/src/handlers/backfill.ts) — the same one the
+# deploy calls for never-classified puzzles — and resumes it with its cursor until the
+# sweep is done. Puzzles that still time out stay "unknown"; nothing else is touched.
+
+on:
+  workflow_dispatch:
+    inputs:
+      puzzle_type:
+        description: "Puzzle type id to retry (e.g. 5 = Slitherlink); empty = every solver-backed type"
+        required: false
+        default: ""
+      budget_ms:
+        description: "Search budget per puzzle, in ms (at most 300000)"
+        required: false
+        default: "60000"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  rerun:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Retry timed-out puzzles
+        env:
+          PUZZLE_TYPE: ${{ inputs.puzzle_type }}
+          BUDGET_MS: ${{ inputs.budget_ms }}
+        run: |
+          fn=$(aws cloudformation describe-stacks --stack-name PuzzleApiStack \
+            --query "Stacks[0].Outputs[?OutputKey=='SolverBackfillFunction'].OutputValue" --output text)
+          echo "Backfill function: $fn"
+          cursor=null
+          for round in $(seq 1 10); do
+            payload=$(jq -nc --arg type "$PUZZLE_TYPE" --arg budget "$BUDGET_MS" --argjson after "$cursor" \
+              '{retryUnknown: true, budgetMs: ($budget | tonumber), after: $after}
+               + (if $type == "" then {} else {type: ($type | tonumber)} end)')
+            echo "::group::Round $round: $payload"
+            aws lambda invoke --function-name "$fn" --cli-read-timeout 960 \
+              --cli-binary-format raw-in-base64-out --payload "$payload" out.json > /dev/null
+            echo "::endgroup::"
+            if jq -e '.errorMessage' out.json > /dev/null; then cat out.json; exit 1; fi
+            jq -r '.report[]' out.json
+            remaining=$(jq '.remaining' out.json)
+            cursor=$(jq -c '.cursor' out.json)
+            if [ "$remaining" = "0" ]; then echo "Sweep complete."; exit 0; fi
+            echo "$remaining puzzle(s) left; resuming."
+          done
+          echo "Stopped after 10 rounds with puzzles left; run the workflow again to continue."
