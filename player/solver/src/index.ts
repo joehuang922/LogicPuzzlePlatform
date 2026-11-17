@@ -37,3 +37,5 @@ export { nurikabePlugin, NurikabeModel } from "./plugins/nurikabe";
 export type { NurikabeCanon } from "./plugins/nurikabe";
 export { cornerChainPlugin, CornerChainModel } from "./plugins/corner-chain";
 export type { CornerChainCanon } from "./plugins/corner-chain";
+export { akariPlugin, AkariModel } from "./plugins/akari";
+export type { AkariCanon } from "./plugins/akari";

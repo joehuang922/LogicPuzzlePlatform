@@ -173,6 +173,13 @@ const CHECKS: Record<number, (canon: Json, solution: Json) => Expect | null> = {
     const sol = grid(s.states, cells.length, cells[0].length);
     return sol && onOff(sol, "", 1, 2, false);
   },
+  // Akari: { states: rows x cols, 1 bulb, 0 none }; "col,row" -> 1 bulb, 2 marked no-bulb.
+  18: (canon, s) => {
+    const cells = canon.cells as unknown[][] | undefined;
+    if (!Array.isArray(cells) || !Array.isArray(cells[0])) return null;
+    const sol = grid(s.states, cells.length, cells[0].length);
+    return sol && onOff(sol, "", 1, 2, false);
+  },
   // Corner Chain: { states: rows x cols, 1 shaded, 0 white }; "col,row" -> 1 shaded, 2 marked.
   30: (canon, s) => {
     const cells = canon.cells as unknown[][] | undefined;

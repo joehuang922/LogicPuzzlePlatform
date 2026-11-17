@@ -172,6 +172,12 @@ describe("matchesSolution", () => {
     expect(matchesSolution(p, { "2,0": 2 })).toBe(false);
   });
 
+  it("akari: bulbs and marks against the stored grid", () => {
+    const p = puzzle(18, { cells: [[5, -1, 5], [-1, 4, -1], [5, -1, 5]] }, { states: [[0, 1, 0], [1, 0, 1], [0, 1, 0]] });
+    expect(matchesSolution(p, { "1,0": 1, "0,1": 1 })).toBe(true);
+    expect(matchesSolution(p, { "1,0": 2 })).toBe(false);
+  });
+
   it("nurimaze: painted rooms black, marked rooms white", () => {
     const p = puzzle(3, { cells: [[3, 0], [0, 4]] }, { states: [[2, 1], [2, 2]] });
     expect(matchesSolution(p, { "1,0": 1, "0,1": 2 })).toBe(true);

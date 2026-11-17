@@ -96,6 +96,17 @@ Every white cell is illuminated AND no two bulbs illuminate each other AND every
 - For black cells, uses OCR/LLM to detect the presence and value of a number (0–4). Numberless black cells map to `5`.
 - Validates dimensions and cell value ranges (`-1` for white, `0`–`5` for black cells).
 
+## Solver
+
+`player/solver/src/plugins/akari` proves uniqueness at create/edit (the auto-solve gate)
+and stores the solution for the on-track check. One bulb/empty variable per open cell: a
+bulb empties every cell it sees (its row and column stretches), every open cell must be
+lit by a bulb among itself and the cells it sees (one candidate left takes the bulb), and
+a numbered wall holds exactly its count of bulbs beside it. Failed-literal probing runs at
+construction and at every search node. Both samples (read from the images into the
+solver's `fixtures.json`; the JSON example above does not match `board-akari.png`) settle
+with no search in about 10ms.
+
 # Misc
 
 ## Coordinate convention

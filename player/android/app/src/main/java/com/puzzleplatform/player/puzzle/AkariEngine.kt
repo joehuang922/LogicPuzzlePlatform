@@ -149,6 +149,16 @@ object AkariEngine : ShadeMarkEngine {
     }
 
     /**
+     * Every bulb and mark agrees with the stored solution (`solutionRepr.states`, rows x
+     * cols, 1 bulb, 0 none): a bulb must be a bulb there, a mark must not.
+     */
+    override fun matchesSolution(puzzle: Puzzle, userValues: Map<String, Int>): Boolean? {
+        val (rows, cols) = dims(parseCells(puzzle))
+        val states = SolutionCheck.grid(puzzle.solutionRepr?.get("states"), rows, cols) ?: return null
+        return SolutionCheck.matches(userValues, SolutionCheck.onOff(states, "", BULB, MARKED, rowFirst = false))
+    }
+
+    /**
      * True when the bulbs solve the puzzle (port of AkariBoard.tsx validateSolution):
      *  1. no bulb lights another,
      *  2. every white cell is lit,

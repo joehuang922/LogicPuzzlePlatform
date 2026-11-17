@@ -171,4 +171,11 @@ class SolutionCheckTest {
         assertEquals(false, CornerChainEngine.matchesSolution(p, mapOf("1,0" to 1)))
         assertEquals(false, CornerChainEngine.matchesSolution(p, mapOf("2,0" to 2)))
     }
+
+    @Test
+    fun `akari bulbs and marks against the stored grid`() {
+        val p = puzzle(18, """{"cells":[[5,-1,5],[-1,4,-1],[5,-1,5]]}""", """{"states":[[0,1,0],[1,0,1],[0,1,0]]}""")
+        assertEquals(true, AkariEngine.matchesSolution(p, mapOf("1,0" to 1, "0,1" to 1)))
+        assertEquals(false, AkariEngine.matchesSolution(p, mapOf("1,0" to 2)))
+    }
 }
