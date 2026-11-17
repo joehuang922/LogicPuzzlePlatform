@@ -1,0 +1,48 @@
+{
+  "title": "Whimsical Knight Canonical Representation",
+  "description": "A rows x cols lattice of dots with no grid lines. Some cells between the dots hold a gray square. White circles sit on a dot or on the midpoint between two orthogonally neighbouring dots; white squares sit on a dot. Positions use doubled coordinates: dot (r, c) is (2r, 2c). The solver draws one closed loop of orthogonal and knight's-move segments between dots that passes straight through every circle, turns at a right angle at every square, never crosses or branches, and never runs a knight segment over a gray square.",
+  "type": "object",
+  "required": ["rows", "cols", "gray", "circles", "squares"],
+  "additionalProperties": false,
+  "properties": {
+    "rows": {
+      "description": "Number of dot rows.",
+      "type": "integer",
+      "minimum": 2
+    },
+    "cols": {
+      "description": "Number of dot columns.",
+      "type": "integer",
+      "minimum": 2
+    },
+    "gray": {
+      "description": "(rows - 1) x (cols - 1) cells between the dots; 1 = gray square, 0 = empty.",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": { "type": "integer", "enum": [0, 1] }
+      }
+    },
+    "circles": {
+      "description": "White circles: on a dot (dr, dc both even) or an orthogonal midpoint (exactly one odd).",
+      "type": "array",
+      "items": { "$ref": "#/$defs/point" }
+    },
+    "squares": {
+      "description": "White squares: always on a dot (dr, dc both even).",
+      "type": "array",
+      "items": { "$ref": "#/$defs/point" }
+    }
+  },
+  "$defs": {
+    "point": {
+      "type": "object",
+      "required": ["dr", "dc"],
+      "additionalProperties": false,
+      "properties": {
+        "dr": { "description": "Doubled row: 0 <= dr <= 2*(rows - 1).", "type": "integer", "minimum": 0 },
+        "dc": { "description": "Doubled column: 0 <= dc <= 2*(cols - 1).", "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

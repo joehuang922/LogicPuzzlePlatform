@@ -154,6 +154,9 @@ def _build_parser(puzzle_type: int):
     if puzzle_type == 36:
         from puzzle_parsers.zebra_rope.parser import ZebraRopeParser
         return ZebraRopeParser()
+    if puzzle_type == 37:
+        from puzzle_parsers.whimsical_knight.parser import WhimsicalKnightParser
+        return WhimsicalKnightParser()
     return None
 
 

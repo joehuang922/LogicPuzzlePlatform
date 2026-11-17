@@ -28,6 +28,7 @@ from puzzle_parsers.l_ring.models import LRingBoard
 from puzzle_parsers.hashi.models import HashiBoard
 from puzzle_parsers.skeleton_puzzle.models import SkeletonPuzzleBoard
 from puzzle_parsers.zebra_rope.models import ZebraRopeBoard
+from puzzle_parsers.whimsical_knight.models import WhimsicalKnightBoard
 from puzzle_parsers.validate import validate_canon
 
 SCHEMA_DIR = Path(__file__).parents[2] / "schemas" / "canon"
@@ -54,6 +55,7 @@ MODELS = {
     "hashi": HashiBoard,
     "skeleton-puzzle": SkeletonPuzzleBoard,
     "zebra-rope": ZebraRopeBoard,
+    "whimsical-knight": WhimsicalKnightBoard,
 }
 
 

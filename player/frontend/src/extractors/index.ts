@@ -35,6 +35,7 @@ import { lRingExtractor } from "./lRing";
 import { hashiExtractor } from "./hashi";
 import { skeletonPuzzleExtractor } from "./skeletonPuzzle";
 import { zebraRopeExtractor } from "./zebraRope";
+import { whimsicalKnightExtractor } from "./whimsicalKnight";
 
 const extractorRegistry = new Map<number, AnswerExtractor>();
 
@@ -78,6 +79,7 @@ registerExtractor(lRingExtractor);
 registerExtractor(hashiExtractor);
 registerExtractor(skeletonPuzzleExtractor);
 registerExtractor(zebraRopeExtractor);
+registerExtractor(whimsicalKnightExtractor);
 
 export function getExtractor(puzzleType: number): AnswerExtractor | undefined {
   return extractorRegistry.get(puzzleType);

@@ -35,6 +35,7 @@ import { computeLRingProgress } from "./lRing";
 import { computeHashiProgress } from "./hashi";
 import { computeSkeletonPuzzleProgress } from "./skeletonPuzzle";
 import { computeZebraRopeProgress } from "./zebraRope";
+import { computeWhimsicalKnightProgress } from "./whimsicalKnight";
 
 export interface ProgressCalculator {
   puzzleType: number;
@@ -83,6 +84,7 @@ register(computeLRingProgress);
 register(computeHashiProgress);
 register(computeSkeletonPuzzleProgress);
 register(computeZebraRopeProgress);
+register(computeWhimsicalKnightProgress);
 
 export function computeProgress(
   puzzle: PuzzleDefinition,

@@ -101,11 +101,15 @@ fun ZoomableBoard(
     onDrawStart: ((cell: Pair<Int, Int>?) -> Unit)? = null,
     onDrawTo: ((cell: Pair<Int, Int>?) -> Unit)? = null,
     onDrawEnd: (() -> Unit)? = null,
+    // Fractional-coordinate drag, in cell units like [onTapPrecise], for boards whose
+    // targets aren't cells (Whimsical Knight's dots). Fires alongside the cell callbacks.
+    onDrawStartPrecise: ((col: Float, row: Float) -> Unit)? = null,
+    onDrawToPrecise: ((col: Float, row: Float) -> Unit)? = null,
     draw: DrawScope.(cellPx: Float) -> Unit,
 ) {
     if (cols <= 0 || rows <= 0) return
     val density = LocalDensity.current
-    val drawable = onDrawTo != null
+    val drawable = onDrawTo != null || onDrawToPrecise != null
 
     BoxWithConstraints(modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
         val side = boardSide(maxWidth)
@@ -146,8 +150,18 @@ fun ZoomableBoard(
                         transform.fractionalCellAt(off.x, off.y)?.let { (col, row) -> cb(col, row) }
                     }
                 },
-                    onDragStart = { off -> onDrawStart?.invoke(transform.cellAt(off.x, off.y)) },
-                    onDrag = { off -> onDrawTo?.invoke(transform.cellAt(off.x, off.y)) },
+                    onDragStart = { off ->
+                        onDrawStart?.invoke(transform.cellAt(off.x, off.y))
+                        onDrawStartPrecise?.let { cb ->
+                            transform.fractionalCellAt(off.x, off.y)?.let { (col, row) -> cb(col, row) }
+                        }
+                    },
+                    onDrag = { off ->
+                        onDrawTo?.invoke(transform.cellAt(off.x, off.y))
+                        onDrawToPrecise?.let { cb ->
+                            transform.fractionalCellAt(off.x, off.y)?.let { (col, row) -> cb(col, row) }
+                        }
+                    },
                     onDragEnd = { onDrawEnd?.invoke() },
                     onTransform = { centroid, pan, zoom ->
                         transform.transform(centroid.x, centroid.y, pan.x, pan.y, zoom)

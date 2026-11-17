@@ -38,6 +38,7 @@ import LRingEditor from "./LRingEditor";
 import HashiEditor from "./HashiEditor";
 import SkeletonPuzzleEditor from "./SkeletonPuzzleEditor";
 import ZebraRopeEditor from "./ZebraRopeEditor";
+import WhimsicalKnightEditor from "./WhimsicalKnightEditor";
 
 // Puzzle types that have a visual board editor.
 export const EDITOR_TYPE_NAMES = [
@@ -46,7 +47,7 @@ export const EDITOR_TYPE_NAMES = [
   "fillomino", "lits", "choco-banana", "number-link", "akari", "hell-golf",
   "tentaishow", "heyawake", "shikaku", "norinori", "nurikabe", "ripple-effect",
   "hitori", "picto-link", "kuralin", "unequal-sudoku", "corner-chain", "sinkamino", "balance-link", "l-ring", "hashi", "skeleton-puzzle",
-  "zebra-rope",
+  "zebra-rope", "whimsical-knight",
 ];
 
 export function hasVisualEditor(typeName: string | undefined): boolean {
@@ -103,6 +104,7 @@ function CanonEditor({
     case "hashi": return <HashiEditor initialJson={canonRepr} onChange={onChange} />;
     case "skeleton-puzzle": return <SkeletonPuzzleEditor initialJson={canonRepr} onChange={onChange} />;
     case "zebra-rope": return <ZebraRopeEditor initialJson={canonRepr} onChange={onChange} />;
+    case "whimsical-knight": return <WhimsicalKnightEditor initialJson={canonRepr} onChange={onChange} />;
     default: return null;
   }
 }

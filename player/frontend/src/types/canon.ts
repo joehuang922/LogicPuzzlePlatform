@@ -517,3 +517,27 @@ export interface ZebraRopeAnswer {
   // height x width; 0 = unset, 1 = shaded, 2 = marked unshaded (solver aid)
   states: number[][];
 }
+
+// Whimsical Knight (type 37). Points use doubled lattice coordinates: dot (r, c) is
+// (2r, 2c); a midpoint between orthogonal neighbours has exactly one odd coordinate.
+export interface WhimsicalKnightPoint {
+  dr: number;
+  dc: number;
+}
+
+export interface WhimsicalKnightCanon {
+  // dot counts
+  rows: number;
+  cols: number;
+  // (rows - 1) x (cols - 1); 1 = gray square in the cell between dots
+  gray: number[][];
+  // on a dot or an orthogonal midpoint: the loop goes straight through
+  circles: WhimsicalKnightPoint[];
+  // on a dot: the loop turns at a right angle
+  squares: WhimsicalKnightPoint[];
+}
+
+export interface WhimsicalKnightAnswer {
+  // each segment is [[r1, c1], [r2, c2]], the smaller dot first, sorted
+  segments: [number, number][][];
+}

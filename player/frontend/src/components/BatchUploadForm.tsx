@@ -67,6 +67,10 @@ function computeDimensions(typeId: number, canon: Record<string, unknown>): { w?
   if ((typeId === 21 || typeId === 28 || typeId === 36) && typeof canon.width === "number" && typeof canon.height === "number") {
     return { w: canon.width as number, h: canon.height as number };
   }
+  // Whimsical Knight: sized by its dot lattice.
+  if (typeId === 37 && typeof canon.cols === "number" && typeof canon.rows === "number") {
+    return { w: canon.cols as number, h: canon.rows as number };
+  }
   return {};
 }
 

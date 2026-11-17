@@ -35,6 +35,7 @@ import lRingSchema from "../../../../schemas/canon/l-ring.json";
 import hashiSchema from "../../../../schemas/canon/hashi.json";
 import skeletonPuzzleSchema from "../../../../schemas/canon/skeleton-puzzle.json";
 import zebraRopeSchema from "../../../../schemas/canon/zebra-rope.json";
+import whimsicalKnightSchema from "../../../../schemas/canon/whimsical-knight.json";
 
 const ajv = new Ajv();
 
@@ -75,6 +76,7 @@ const validators: Record<number, ValidateFunction> = {
   34: ajv.compile(hashiSchema),
   35: ajv.compile(skeletonPuzzleSchema),
   36: ajv.compile(zebraRopeSchema),
+  37: ajv.compile(whimsicalKnightSchema),
 };
 
 export function validateCanon(puzzleType: number, data: unknown): void {
@@ -282,6 +284,37 @@ const semanticChecks: Record<number, (data: any) => void> = {
       if (seen.has(key)) throw new Error(`Invalid zebra rope: two circles at (${dr},${dc})`);
       seen.add(key);
     }
+  },
+  // Whimsical Knight: the gray grid fits between the dots; circles sit on a dot or an
+  // orthogonal midpoint, squares on a dot, all inside the lattice, one clue per point.
+  37: (data: {
+    rows: number;
+    cols: number;
+    gray: number[][];
+    circles: { dr: number; dc: number }[];
+    squares: { dr: number; dc: number }[];
+  }) => {
+    const { rows, cols, gray, circles, squares } = data;
+    if (gray.length !== rows - 1 || gray.some((row) => row.length !== cols - 1)) {
+      throw new Error(`Invalid whimsical knight: gray must be ${rows - 1}x${cols - 1} for a ${cols}x${rows} lattice`);
+    }
+    const seen = new Set<string>();
+    const place = (kind: string, { dr, dc }: { dr: number; dc: number }) => {
+      if (dr > 2 * (rows - 1) || dc > 2 * (cols - 1)) {
+        throw new Error(`Invalid whimsical knight: ${kind} at (${dr},${dc}) is outside the ${cols}x${rows} lattice`);
+      }
+      if (dr % 2 === 1 && dc % 2 === 1) {
+        throw new Error(`Invalid whimsical knight: ${kind} at (${dr},${dc}) is in a cell, not on a dot or midpoint`);
+      }
+      if (kind === "square" && (dr % 2 === 1 || dc % 2 === 1)) {
+        throw new Error(`Invalid whimsical knight: square at (${dr},${dc}) is not on a dot`);
+      }
+      const key = `${dr},${dc}`;
+      if (seen.has(key)) throw new Error(`Invalid whimsical knight: two clues at (${dr},${dc})`);
+      seen.add(key);
+    };
+    circles.forEach((p) => place("circle", p));
+    squares.forEach((p) => place("square", p));
   },
   // Kuralin: every circle must sit on an interior grid line (edge midpoint or corner,
   // never a cell center), and no two circles may share a spot.

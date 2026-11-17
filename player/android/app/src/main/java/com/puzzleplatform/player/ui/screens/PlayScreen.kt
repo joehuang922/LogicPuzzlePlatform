@@ -102,6 +102,7 @@ import com.puzzleplatform.player.ui.board.TentaishowBoard
 import com.puzzleplatform.player.ui.board.YajilinBoard
 import com.puzzleplatform.player.ui.board.KuralinBoard
 import com.puzzleplatform.player.ui.board.ZebraRopeBoard
+import com.puzzleplatform.player.ui.board.WhimsicalKnightBoard
 import com.puzzleplatform.player.puzzle.NonogramEngine
 import com.puzzleplatform.player.puzzle.NonogramHinter
 import com.puzzleplatform.player.puzzle.PuzzleEngines
@@ -616,6 +617,14 @@ fun PlayScreen(
                                     puzzle = puzzle,
                                     userValues = state.userValues,
                                     onTapCell = vm::tapShadeCell,
+                                    liveValidate = state.liveValidate,
+                                )
+                                // Whimsical Knight: drag dot to dot (orthogonal or knight's move) to
+                                // toggle segments, tap a segment to erase it.
+                                37 -> WhimsicalKnightBoard(
+                                    puzzle = puzzle,
+                                    userValues = state.userValues,
+                                    onApplyChanges = vm::putUserValues,
                                     liveValidate = state.liveValidate,
                                 )
                                 else -> Text("This puzzle type isn't playable in this version yet.")

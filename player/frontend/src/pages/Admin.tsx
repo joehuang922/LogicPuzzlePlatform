@@ -387,6 +387,9 @@ function QuestionForm({
       } else if ((typeId === 28 || typeId === 36) && canon.width && canon.height) {
         w = canon.width;
         h = canon.height;
+      } else if (typeId === 37 && canon.cols && canon.rows) {
+        w = canon.cols;
+        h = canon.rows;
       }
       const res = await createPuzzle({
         puzzleType: typeId,
