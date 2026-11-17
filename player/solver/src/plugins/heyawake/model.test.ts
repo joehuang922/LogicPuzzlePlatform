@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { classify, countSolutions, solve } from "../../drivers";
 import { gate } from "../../gate";
-import { HeyawakeModel, HeyawakeCanon } from "./model";
+import { HeyawakeModel, HeyawakeCanon, listPatterns } from "./model";
 import boards from "./fixtures.json";
 
 const model = (c: HeyawakeCanon) => HeyawakeModel.fromCanon(c);
@@ -111,6 +111,22 @@ describe("small boards", () => {
   });
 });
 
+describe("room patterns", () => {
+  it("lists every shading of a numbered room with no two shaded cells touching", () => {
+    expect(listPatterns(1, 3, 2)).toEqual([0b101]); // both ends
+    expect(listPatterns(2, 2, 2)?.sort()).toEqual([0b0110, 0b1001]); // the two diagonals
+    expect(listPatterns(3, 3, 5)).toEqual([0b101010101]); // the checkerboard
+    expect(listPatterns(2, 2, 3)).toEqual([]); // doesn't fit
+  });
+
+  it("gives up on a room with too many patterns, which then only counts", () => {
+    expect(listPatterns(5, 6, 8)).toBeNull();
+    // A lone 5x6 room numbered 8 still solves by counting (many answers).
+    const c: HeyawakeCanon = { width: 6, height: 5, rooms: [{ r: 0, c: 0, w: 6, h: 5, clue: 8 }] };
+    expect(countSolutions(model(c), 2)).toBe(2);
+  });
+});
+
 describe("agrees with brute force on random small boards", () => {
   let seed = 4321;
   const rand = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x80000000;
@@ -154,9 +170,10 @@ describe("agrees with brute force on random small boards", () => {
 });
 
 describe("sample boards (docs/heyawake)", () => {
+  // Room patterns plus trials settle every sample before any search (one node: the root).
   for (const [name, b] of Object.entries(boards as unknown as Record<string, HeyawakeCanon>)) {
-    it(`proves the ${name} board unique`, () => {
-      expect(classify(model(b), { deadline: Date.now() + 20_000 })).toBe("unique");
+    it(`proves the ${name} board unique by deduction alone`, () => {
+      expect(classify(model(b), { maxNodes: 1 })).toBe("unique");
       expect(isValidSolution(b, solve(model(b))!)).toBe(true);
     }, 30_000);
   }

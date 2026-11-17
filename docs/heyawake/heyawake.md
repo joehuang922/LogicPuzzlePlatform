@@ -156,13 +156,21 @@ the player assigns it any state (black = 1 or white-marked = 2). Unset cells
 
 `player/solver/src/plugins/heyawake` proves uniqueness at create/edit (the auto-solve
 gate) and stores the solution for the on-track check. One shaded/white variable per cell:
-a shaded cell whitens its neighbours, a numbered room holds exactly its count, an
-undecided cell that alone links white cells is white, and the three-room rule becomes
-windows (a room's stretch of a row or column plus the cell either side) that each need a
-shaded cell, so a window with one undecided cell left shades it. Failed-literal probing
-runs at construction and at every search node (on the 17x17 medium sample that cuts the
-proof from 2094 nodes to 16). Four samples (walls read by the parser's classifier,
-numbers from the images, in the solver's `fixtures.json`) prove unique in under 0.1s.
+a shaded cell whitens its neighbours, an undecided cell that alone links white cells is
+white, and the three-room rule becomes windows (a room's stretch of a row or column plus
+the cell either side) that each need a shaded cell.
+
+Room numbers are worked through **shaded patterns**, the way a solver does by hand: rooms
+are rectangles and numbers small, so each numbered room lists every shading of exactly
+that many non-touching cells and keeps the ones consistent with the board (a cell shaded
+in all of them is shaded, in none is white; one left fixes the room). Rooms with up to 8
+patterns left are tried pattern by pattern, fewest first: a pattern that runs into a
+contradiction (often near an edge) drops out, and what all survivors agree on, anywhere
+on the board, is settled. Search branches on the room with the fewest patterns. A room
+over 30 cells or 2000 patterns only counts. Failed-literal probing over every cell also
+runs at construction and at every search node. All four samples (walls read by the
+parser's classifier, numbers from the images, in the solver's `fixtures.json`) settle
+with no search in under 10ms.
 
 # Misc
 
