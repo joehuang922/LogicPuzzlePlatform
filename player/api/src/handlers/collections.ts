@@ -174,7 +174,21 @@ export async function handler(
     return createCollection(event);
   }
   if (method === "PATCH" && hasId && !subResource) {
-    return updateCollection(event);
+    try {
+      return await updateCollection(event);
+    } catch (err: unknown) {
+      // Answer with the database's reason rather than crashing into a bare 502.
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("updateCollection failed", err);
+      if (/unknown column 'sealed'/i.test(message)) {
+        return response(500, {
+          error:
+            "The database has no puzzle_collections.sealed column yet. Run: " +
+            "ALTER TABLE puzzle_collections ADD COLUMN sealed BOOLEAN NOT NULL DEFAULT FALSE",
+        });
+      }
+      return response(500, { error: `Saving the collection failed: ${message}` });
+    }
   }
 
   return response(405, { error: "Method not allowed" });
