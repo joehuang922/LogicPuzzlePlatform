@@ -204,8 +204,9 @@ export default function ZebraRopeBoard({
     [liveValidate, canon, states]
   );
 
-  // Preview: the shaded cells alone, black on gray, so the picture reads at a glance
-  // (the same cells the Android solved thumbnail shows).
+  // Preview: shaded cells black, marked (unshaded) cells white, undecided cells left
+  // gray, so the picture reads at a glance (as Nonogram's; the same cells the Android
+  // preview and solved thumbnail show).
   const THUMB_MAX = 160;
   const thumbCell = Math.max(
     3,
@@ -224,14 +225,14 @@ export default function ZebraRopeBoard({
         >
           {states.flatMap((row, r) =>
             row.map((s, c) =>
-              s === SHADED ? (
+              s === SHADED || s === MARKED ? (
                 <rect
                   key={`tc-${r}-${c}`}
                   x={c * thumbCell}
                   y={r * thumbCell}
                   width={thumbCell}
                   height={thumbCell}
-                  fill="#000"
+                  fill={s === SHADED ? "#000" : "#fff"}
                 />
               ) : null
             )

@@ -124,6 +124,16 @@ class ZebraRopeEngineTest {
     }
 
     @Test
+    fun pictureCells_marksAreWhite() {
+        val board = ZebraRopeEngine.parseBoard(small)
+        val values = mapOf("0,0" to ZebraRopeEngine.SHADED, "1,0" to ZebraRopeEngine.MARKED)
+        val cells = ZebraRopeEngine.pictureCells(board, values)
+        assertEquals(ZebraRopeEngine.FILL_ARGB, cells[0])
+        assertEquals(ZebraRopeEngine.MARK_ARGB, cells[1])
+        assertEquals(ZebraRopeEngine.GROUND_ARGB, cells[2])
+    }
+
+    @Test
     fun registeredAsShadeMarkEngine() {
         assertTrue(PuzzleEngines.forType(36) is ShadeMarkEngine)
         val tap = ShadeCycle.tap(ZebraRopeEngine, small, emptyMap(), 1, 2)

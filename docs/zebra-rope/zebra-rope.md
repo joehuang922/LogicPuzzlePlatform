@@ -92,8 +92,8 @@ With every cell read as shaded (`1`) or unshaded (`0`/`2`): every circle's major
 - Layers, bottom to top: cell fills (shaded dark, marked light yellow), grid lines, ropes, circles.
 - Ropes are drawn as the printed style: a wide mid-gray band with a thin dark outline, round joins, running through cell centres.
 - Circles are about 0.3 cell in diameter with a black outline: white fill, gray fill, or solid black. They get a thin white halo so a black circle stays visible on a shaded cell.
-- **Preview panel**, as in Picto-link and Tentaishow: a small thumbnail above the board showing only the shaded cells, black on light gray, so the emerging picture reads at a glance.
-- **Solved thumbnail (Android):** the engine's `renderThumbnail` returns the shaded cells as black and everything else blank, so a completed puzzle shows its picture in the collection / type view, like Nonogram, Tentaishow and Picto-link.
+- **Preview panel**, as in Nonogram: a small thumbnail above the board with shaded cells black, marked (unshaded) cells white and undecided cells light gray, so the emerging picture reads at a glance.
+- **Solved thumbnail (Android):** the engine's `renderThumbnail` uses the same colours (shaded black, marked white, the rest gray), so a completed puzzle shows its picture in the collection / type view, like Nonogram, Tentaishow and Picto-link.
 
 ### Progress calculation
 

@@ -183,14 +183,25 @@ object ZebraRopeEngine : ShadeMarkEngine {
         return circles to ropes
     }
 
-    /** Row-major packed-ARGB picture: shaded cells black on a grey ground. */
+    /**
+     * Row-major packed-ARGB picture: shaded cells black, marked (unshaded) cells white,
+     * undecided cells on a grey ground, as Nonogram's. Shared by the board's live preview
+     * and the solved collection thumbnail.
+     */
     fun pictureCells(board: Board, userValues: Map<String, Int>): IntArray =
         IntArray(board.rows * board.cols) { i ->
-            if (state(userValues, i / board.cols, i % board.cols) == SHADED) FILL_ARGB else GROUND_ARGB
+            when (state(userValues, i / board.cols, i % board.cols)) {
+                SHADED -> FILL_ARGB
+                MARKED -> MARK_ARGB
+                else -> GROUND_ARGB
+            }
         }
 
     /** Opaque black for a shaded cell of the picture. */
     const val FILL_ARGB: Int = 0xFF000000.toInt()
+
+    /** Opaque white for a marked (unshaded) cell. */
+    const val MARK_ARGB: Int = 0xFFFFFFFF.toInt()
 
     /** Light-grey ground, matching the nonogram and picto link previews. */
     const val GROUND_ARGB: Int = 0xFFD9D9D9.toInt()
