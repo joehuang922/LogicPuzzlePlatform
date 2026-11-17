@@ -13,6 +13,7 @@ import { nuritwinPlugin } from "./plugins/nuritwin";
 import { norinoriPlugin } from "./plugins/norinori";
 import { hitoriPlugin } from "./plugins/hitori";
 import { heyawakePlugin } from "./plugins/heyawake";
+import { nurikabePlugin } from "./plugins/nurikabe";
 
 // A registered plugin with its type parameters erased. The registry is the boundary where
 // per-type Canon/Board/Solution shapes meet the generic drivers, so `any` here is
@@ -42,6 +43,7 @@ register(nuritwinPlugin);
 register(norinoriPlugin);
 register(hitoriPlugin);
 register(heyawakePlugin);
+register(nurikabePlugin);
 
 export function getPlugin(puzzleType: number): AnyPlugin | undefined {
   return registry.get(puzzleType);

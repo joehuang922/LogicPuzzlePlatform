@@ -92,6 +92,19 @@ A grid editor like Number Link / Shikaku: a rectangular array of cells, each hol
 - **Accuracy bar:** judged by digit-recognition correctness (clues-off), analogous to the Number Link / Shikaku metric. Missing or misread clues are the dominant failure mode; the editor's per-cell clue entry covers the remaining misses. Grid geometry must be right, but individual OCR misses are expected and correctable.
 - Validates that `cells` is a rectangular integer grid with all values `>= 0` and at least one positive clue.
 
+## Solver
+
+`player/solver/src/plugins/nurikabe` proves uniqueness at create/edit (the auto-solve
+gate) and stores the solution for the on-track check. One sea/island variable per cell
+(clue cells are island): no 2x2 sea, an undecided cell that alone links sea cells is sea,
+the board holds exactly (cells - sum of clues) sea cells, and island reasoning over the
+connected white groups: two clues in one group or a group past its clue is a dead end; a
+finished island is closed off with sea; a cell touching two clued islands is sea; an
+island with one way out takes it; and every cell is checked for reach (a walk of at most
+clue - size cells from a clued island, never touching another clued island). A cell no
+island reaches is sea. Failed-literal probing runs at construction and at every search
+node. Both samples (in the solver's `fixtures.json`) settle with no search in ~20ms.
+
 # Misc
 
 ## Coordinate convention

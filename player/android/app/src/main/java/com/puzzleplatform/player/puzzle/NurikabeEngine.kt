@@ -117,6 +117,16 @@ object NurikabeEngine : ShadeMarkEngine {
         (userValues[cellKey(c, r)] ?: UNSET) == BLACK
 
     /**
+     * Every sea cell and island mark agrees with the stored solution (`solutionRepr.states`,
+     * rows x cols, 1 sea, 0 island): sea must be sea there, a mark must be island.
+     */
+    override fun matchesSolution(puzzle: Puzzle, userValues: Map<String, Int>): Boolean? {
+        val (rows, cols) = dims(parseCells(puzzle))
+        val states = SolutionCheck.grid(puzzle.solutionRepr?.get("states"), rows, cols) ?: return null
+        return SolutionCheck.matches(userValues, SolutionCheck.onOff(states, "", BLACK, MARKED, rowFirst = false))
+    }
+
+    /**
      * True when the current paint is a full, valid Nurikabe solution (port of
      * NurikabeBoard.tsx validateSolution):
      *  1. all black cells form one orthogonally-connected sea (and there's at least one),

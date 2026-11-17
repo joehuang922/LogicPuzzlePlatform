@@ -155,4 +155,12 @@ class SolutionCheckTest {
         assertEquals(false, HeyawakeEngine.matchesSolution(p, mapOf("3,0" to 2)))
         assertNull(HeyawakeEngine.matchesSolution(puzzle(21, """{"width":3,"height":1,"rooms":[]}""", """{"states":[[1,0,0,1]]}"""), emptyMap()))
     }
+
+    @Test
+    fun `nurikabe sea cells and island marks against the stored grid`() {
+        val p = puzzle(24, """{"cells":[[1,0],[0,0]]}""", """{"states":[[0,1],[1,1]]}""")
+        assertEquals(true, NurikabeEngine.matchesSolution(p, mapOf("1,0" to 1, "1,1" to 1)))
+        assertEquals(false, NurikabeEngine.matchesSolution(p, mapOf("0,1" to 2)))
+        assertNull(NurikabeEngine.matchesSolution(puzzle(24, """{"cells":[[1,0]]}""", """{"states":[[0,1],[1,1]]}"""), emptyMap()))
+    }
 }

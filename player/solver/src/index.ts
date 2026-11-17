@@ -33,3 +33,5 @@ export { hitoriPlugin, HitoriModel } from "./plugins/hitori";
 export type { HitoriCanon } from "./plugins/hitori";
 export { heyawakePlugin, HeyawakeModel } from "./plugins/heyawake";
 export type { HeyawakeCanon } from "./plugins/heyawake";
+export { nurikabePlugin, NurikabeModel } from "./plugins/nurikabe";
+export type { NurikabeCanon } from "./plugins/nurikabe";
