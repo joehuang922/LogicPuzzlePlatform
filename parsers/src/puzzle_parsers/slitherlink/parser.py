@@ -16,6 +16,17 @@ if TYPE_CHECKING:
     from puzzle_parsers.recognition import OcrBackend
 
 
+# Fraction of the cell (between its four dots) cropped for OCR. A clue fills
+# about 60-70% of the cell's height, so a 0.6 crop clipped the top or bottom of
+# a 3 whenever the dot lattice sat a few pixels off. It then read as 2 (or as
+# 1 in the right-hand column of a curved page), and big boards uploaded at
+# Android size (2000px long side) came back with no or many solutions. Anything
+# from 0.7 to 0.9 read 45x31 giants without a miss at full size, 2000px and
+# 1600px; 0.8 sits in the middle. The corner dots that a wider crop can catch
+# are dropped by the OCR's stray-mark filter.
+CLUE_CROP_FRACTION = 0.8
+
+
 class SlitherlinkParser(PuzzleParser):
     puzzle_type = "slitherlink"
 
@@ -69,8 +80,8 @@ class SlitherlinkParser(PuzzleParser):
                 cell_w = ((tr[0] - tl[0]) + (br[0] - bl[0])) / 2
                 cell_h = ((bl[1] - tl[1]) + (br[1] - tr[1])) / 2
 
-                roi_w = int(cell_w * 0.6)
-                roi_h = int(cell_h * 0.6)
+                roi_w = int(cell_w * CLUE_CROP_FRACTION)
+                roi_h = int(cell_h * CLUE_CROP_FRACTION)
                 x1 = max(0, int(cx - roi_w / 2))
                 y1 = max(0, int(cy - roi_h / 2))
                 x2 = min(gray.shape[1], int(cx + roi_w / 2))
