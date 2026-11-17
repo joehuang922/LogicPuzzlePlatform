@@ -10,6 +10,7 @@ import {
   NONE,
   HARD_15X25,
   UNSOLVABLE_15X25,
+  GIANT_50X64,
 } from "./fixtures";
 
 const model = (canon = UNIQUE) => SlitherlinkModel.fromCanon(canon);
@@ -138,6 +139,16 @@ describe("large boards — probing and the loop-closing rule", () => {
   it("proves an unsolvable 15x25 'none' within a tiny node budget", () => {
     expect(classify(model(UNSOLVABLE_15X25), budget)).toBe("none");
   });
+
+  // The largest board on the platform. Run through gate() itself, under the 10s budget
+  // the interactive create path uses, so a slowdown on big boards shows up here first.
+  it("proves the production 50x64 unique through the gate within its default budget", async () => {
+    const { gate, DEFAULT_GATE_BUDGET_MS } = await import("../../gate");
+    expect(classify(model(GIANT_50X64), budget)).toBe("unique");
+    const result = gate(5, GIANT_50X64, { deadline: Date.now() + DEFAULT_GATE_BUDGET_MS });
+    expect(result!.verdict).toBe("unique");
+    expect(isValidSolution(GIANT_50X64, (result!.solution as { edges: never }).edges)).toBe(true);
+  }, 60_000);
 
   it("forces off an edge that would close a loop that is not the whole answer", () => {
     // 2x3 board with a 1 in the bottom-right cell. Drawing the top, left and bottom of the
