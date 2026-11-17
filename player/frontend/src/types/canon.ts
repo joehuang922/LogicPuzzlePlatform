@@ -501,3 +501,19 @@ export interface SkeletonPuzzlePlacement {
 export interface SkeletonPuzzleAnswer {
   placements: SkeletonPuzzlePlacement[];
 }
+
+// Zebra Rope (type 36). Circles share Kuralin's doubled coordinates and colour codes.
+export type ZebraRopeCircle = KuralinCircle;
+
+export interface ZebraRopeCanon {
+  width: number;
+  height: number;
+  // each rope: ordered [row, col] cells; consecutive cells are 8-neighbours
+  ropes: [number, number][][];
+  circles: ZebraRopeCircle[];
+}
+
+export interface ZebraRopeAnswer {
+  // height x width; 0 = unset, 1 = shaded, 2 = marked unshaded (solver aid)
+  states: number[][];
+}

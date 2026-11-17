@@ -38,6 +38,7 @@ import { balanceLinkRenderer } from "./renderers/balanceLink";
 import { lRingRenderer } from "./renderers/lRing";
 import { hashiRenderer } from "./renderers/hashi";
 import { skeletonPuzzleRenderer } from "./renderers/skeletonPuzzle";
+import { zebraRopeRenderer } from "./renderers/zebraRope";
 
 registerRenderer(comboSudokuRenderer);
 registerRenderer(sudokuRenderer);
@@ -74,6 +75,7 @@ registerRenderer(balanceLinkRenderer);
 registerRenderer(lRingRenderer);
 registerRenderer(hashiRenderer);
 registerRenderer(skeletonPuzzleRenderer);
+registerRenderer(zebraRopeRenderer);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

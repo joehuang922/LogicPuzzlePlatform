@@ -34,6 +34,7 @@ import balanceLinkSchema from "../../../../schemas/canon/balance-link.json";
 import lRingSchema from "../../../../schemas/canon/l-ring.json";
 import hashiSchema from "../../../../schemas/canon/hashi.json";
 import skeletonPuzzleSchema from "../../../../schemas/canon/skeleton-puzzle.json";
+import zebraRopeSchema from "../../../../schemas/canon/zebra-rope.json";
 
 const ajv = new Ajv();
 
@@ -73,6 +74,7 @@ const validators: Record<number, ValidateFunction> = {
   33: ajv.compile(lRingSchema),
   34: ajv.compile(hashiSchema),
   35: ajv.compile(skeletonPuzzleSchema),
+  36: ajv.compile(zebraRopeSchema),
 };
 
 export function validateCanon(puzzleType: number, data: unknown): void {
@@ -245,6 +247,41 @@ const semanticChecks: Record<number, (data: any) => void> = {
       throw new Error("Invalid ripple effect: cells rows differ in length");
     }
     checkRoomWalls("ripple effect", rows, cols, edges.h, edges.v);
+  },
+  // Zebra Rope: ropes stay on the grid, step between 8-neighbours and never revisit a
+  // cell; circles sit on interior grid lines (never a cell centre), one per spot. Editors
+  // may hold a half-drawn rope; this keeps one from ever being stored.
+  36: (data: { width: number; height: number; ropes: number[][][]; circles: { dr: number; dc: number }[] }) => {
+    const { width, height, ropes, circles } = data;
+    ropes.forEach((rope, i) => {
+      const seen = new Set<string>();
+      rope.forEach(([r, c], j) => {
+        if (r >= height || c >= width) {
+          throw new Error(`Invalid zebra rope: rope ${i + 1} leaves the ${width}x${height} grid at R${r + 1}C${c + 1}`);
+        }
+        const key = `${r},${c}`;
+        if (seen.has(key)) throw new Error(`Invalid zebra rope: rope ${i + 1} passes R${r + 1}C${c + 1} twice`);
+        seen.add(key);
+        if (j > 0) {
+          const [pr, pc] = rope[j - 1];
+          if (Math.max(Math.abs(pr - r), Math.abs(pc - c)) !== 1) {
+            throw new Error(`Invalid zebra rope: rope ${i + 1} jumps from R${pr + 1}C${pc + 1} to R${r + 1}C${c + 1}`);
+          }
+        }
+      });
+    });
+    const seen = new Set<string>();
+    for (const { dr, dc } of circles) {
+      if (dr > 2 * height - 1 || dc > 2 * width - 1) {
+        throw new Error(`Invalid zebra rope: circle at (${dr},${dc}) is outside the ${width}x${height} grid`);
+      }
+      if (dr % 2 === 1 && dc % 2 === 1) {
+        throw new Error(`Invalid zebra rope: circle at (${dr},${dc}) is at a cell center; circles sit on grid lines`);
+      }
+      const key = `${dr},${dc}`;
+      if (seen.has(key)) throw new Error(`Invalid zebra rope: two circles at (${dr},${dc})`);
+      seen.add(key);
+    }
   },
   // Kuralin: every circle must sit on an interior grid line (edge midpoint or corner,
   // never a cell center), and no two circles may share a spot.

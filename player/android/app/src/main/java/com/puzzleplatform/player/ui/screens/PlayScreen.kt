@@ -101,6 +101,7 @@ import com.puzzleplatform.player.ui.board.UnequalSudokuBoard
 import com.puzzleplatform.player.ui.board.TentaishowBoard
 import com.puzzleplatform.player.ui.board.YajilinBoard
 import com.puzzleplatform.player.ui.board.KuralinBoard
+import com.puzzleplatform.player.ui.board.ZebraRopeBoard
 import com.puzzleplatform.player.puzzle.NonogramEngine
 import com.puzzleplatform.player.puzzle.NonogramHinter
 import com.puzzleplatform.player.puzzle.PuzzleEngines
@@ -607,6 +608,14 @@ fun PlayScreen(
                                     userValues = state.userValues,
                                     onTapCell = vm::tapShadeCell,
                                     onApplyChanges = vm::putUserValues,
+                                    liveValidate = state.liveValidate,
+                                )
+                                // Zebra Rope: the shared shade/mark tap cycle on every cell, ropes and
+                                // circles drawn over it, the shaded picture previewed above.
+                                36 -> ZebraRopeBoard(
+                                    puzzle = puzzle,
+                                    userValues = state.userValues,
+                                    onTapCell = vm::tapShadeCell,
                                     liveValidate = state.liveValidate,
                                 )
                                 else -> Text("This puzzle type isn't playable in this version yet.")

@@ -34,6 +34,7 @@ import { balanceLinkExtractor } from "./balanceLink";
 import { lRingExtractor } from "./lRing";
 import { hashiExtractor } from "./hashi";
 import { skeletonPuzzleExtractor } from "./skeletonPuzzle";
+import { zebraRopeExtractor } from "./zebraRope";
 
 const extractorRegistry = new Map<number, AnswerExtractor>();
 
@@ -76,6 +77,7 @@ registerExtractor(balanceLinkExtractor);
 registerExtractor(lRingExtractor);
 registerExtractor(hashiExtractor);
 registerExtractor(skeletonPuzzleExtractor);
+registerExtractor(zebraRopeExtractor);
 
 export function getExtractor(puzzleType: number): AnswerExtractor | undefined {
   return extractorRegistry.get(puzzleType);

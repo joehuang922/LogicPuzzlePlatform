@@ -151,6 +151,9 @@ def _build_parser(puzzle_type: int):
     if puzzle_type == 35:
         from puzzle_parsers.skeleton_puzzle.parser import SkeletonPuzzleParser
         return SkeletonPuzzleParser()
+    if puzzle_type == 36:
+        from puzzle_parsers.zebra_rope.parser import ZebraRopeParser
+        return ZebraRopeParser()
     return None
 
 

@@ -19,6 +19,7 @@ If any of these are missing, ask before proceeding.
    - **Editor interaction** — how the editor creates/edits puzzles (click to cycle, resize controls, etc.)
    - **Editor appearance** — any differences from the player view (dots for empty cells, extra controls, etc.)
    - **Grid line style** — are the grid lines in the sample images solid or dashed/dotted? This determines whether the parser uses `detect_grid_lines` (solid) or `auto_detect_grid_lines` (dashed — auto-sweeps erode sizes for optimal detection).
+   - **Picture puzzle?** — does the solution draw a picture (Nonogram, Tentaishow, Picto Link, Zebra Rope)? If so the player gets a live preview panel above the board and the Android collection shows a solved thumbnail (Phase 12).
 4. Draft the full documentation file following the template in existing docs (e.g., `docs/nurimaze/nurimaze.md`). Must include all sections:
    - Puzzle Type ID
    - Question structure description + Canonical JSON structure + Sample images
@@ -28,6 +29,7 @@ If any of these are missing, ask before proceeding.
    - Puzzle Editor > Interactions
    - Puzzle Parser (notes on visual parsing challenges)
    - Misc > Coordinate convention
+   - The Android port (Phase 12): its interaction, and the solved thumbnail for a picture puzzle
 5. Copy sample images to `docs/<puzzle-name>/`.
 6. Present the full doc to the user for review. Do NOT proceed until approved.
 
@@ -46,36 +48,32 @@ If any of these are missing, ask before proceeding.
 ## Phase 4: Board component
 
 1. Create `player/frontend/src/components/<PuzzleName>Board.tsx`.
-2. Must accept props: `canon`, `initialUserValues` or `initialAnswer`, `onValuesChange`, `onComplete`, `readonly`.
-3. Must implement solution validation internally and fire `onComplete()` when solved.
+2. Must accept props: `canon`, `initialUserValues` or `initialAnswer`, `onValuesChange`, `onComplete`, `readonly`, and `liveValidate` (the player's "Errors: On" toggle: outline clues the player's decided cells already break).
+3. Must implement solution validation internally and fire `onComplete()` when solved. Put non-trivial rule logic in a pure `<puzzleName>Rules.ts` with a vitest `<puzzleName>Rules.test.ts` beside it (see `sinkaminoRules.ts`, `zebraRopeRules.ts`); the Android engine ports the same functions.
 4. Follow the interaction model from the doc.
 5. If the grid is divided into rooms by thick borders and the player shades cells, fill shaded cells with `ROOM_SHADE` from `player/frontend/src/components/boardColors.ts`, never a near-black like `#333` (it hides the room borders). Draw text on shaded cells in black.
+6. Picture puzzle: draw a small preview above the board when not `readonly` (the solved picture's cells, black on `#d9d9d9`, cells 3-8px, ~160px max), as `PictoLinkBoard.tsx` and `ZebraRopeBoard.tsx` do.
 
 ## Phase 5: Editor component
 
 1. Create `player/frontend/src/components/<PuzzleName>Editor.tsx`.
-2. Must accept `initialJson`, `onComplete`, `onCancel`.
-3. Show a visual editor alongside a JSON textarea (source of truth, bidirectional sync).
+2. Must accept `initialJson` and `onChange(json)`; emit the canon JSON on every edit (and once on mount). The surrounding modal holds the JSON textarea; the editor shows its own textarea only when the JSON doesn't parse.
+3. List format problems (the same ones the API's `semanticChecks` rejects) above the board and block saving on them; see `SinkaminoEditor.tsx`.
 
 ## Phase 6: Admin integration
 
 1. Add the new Board component to `player/frontend/src/components/CanonPreview.tsx`:
    - Import the Board component and canon type.
    - Add a `puzzleType === <ID>` branch that renders the board in readonly mode.
-2. Add the new Editor component to `player/frontend/src/pages/Admin.tsx`:
-   - Import the Editor component.
-   - In both `QuestionForm` and `PuzzleEditRow`: add the type to `isXxx`/`hasEditor` checks, and add an editor branch in the ternary chain.
-3. Add the new Editor component to `player/frontend/src/components/BatchUploadForm.tsx`:
-   - Import the Editor component.
-   - Add the type name to the `hasEditor` array.
-   - Add a branch in `InlineEditor` that renders the new editor.
+2. Register the Editor in `player/frontend/src/components/PuzzleEditorModal.tsx`: import it, add the type name to `EDITOR_TYPE_NAMES`, and add a `case` to `CanonEditor`. Admin and batch upload both pick it up through `hasVisualEditor`.
+3. If the canon has fields the API can't check with JSON Schema alone (paths, positions, uniqueness), add a `semanticChecks[<type_id>]` entry in `player/api/src/lib/schema.ts`.
 4. **Dimension detection**: Add the new type ID to the dimension computation in `player/frontend/src/pages/Admin.tsx` (in the `handleSubmit` function's `if/else if` chain that extracts `w` and `h` from canon). Also verify `computeDimensions` in `BatchUploadForm.tsx` handles the new type ID (it may already be covered by the generic `cells` branch).
 
 ## Phase 7: Renderer
 
 1. Create `player/frontend/src/renderers/<puzzleName>.tsx`.
-2. Register it in `player/frontend/src/components/PuzzleBoard.tsx`.
-3. Must pass `onComplete` through to the board component.
+2. Register it in `player/frontend/src/main.tsx` (`registerRenderer(...)`).
+3. Must pass `onComplete` and `liveValidate` through to the board component, and seed it from `state.restoreValues ?? <values from the saved answer>` so undo/redo restores work (see `renderers/lits.tsx`).
 
 ## Phase 8: Extractor
 
@@ -94,8 +92,8 @@ If any of these are missing, ask before proceeding.
 ## Phase 10: Parser
 
 1. Create `parsers/src/puzzle_parsers/<puzzle_name>/` with `__init__.py`, `__main__.py`, `models.py`, `grid_detector.py`, `parser.py`.
-2. Parser class must extend `PuzzleParser` and implement `_parse()` (base class handles schema validation automatically).
-3. Implement `validate()` method.
+2. Parser class must extend `PuzzleParser` and implement `_parse()` (base class handles schema validation automatically). Its `puzzle_type` must equal the schema's file name (`zebra-rope`, not `zebra_rope`): that's how the schema is found. Set `locates_board = True` and call `self._board_located(image, quad)` once the board is found.
+3. Implement `validate()` method. Add the pydantic model to `MODELS` in `tests/test_schema_consistency.py`.
 4. If the puzzle has number clues in grid cells, read them with EasyOCR through the shared component — never crop cells or call the OCR backend yourself:
    ```python
    from puzzle_parsers.cell_ocr import read_grid_clues
@@ -103,21 +101,39 @@ If any of these are missing, ask before proceeding.
    ```
    `allow_multi_digits=True` for every puzzle except sudoku-style 1-9 boards. Crop margins and the confidence floor are shared (all sources use the same Nikoli font); don't add per-puzzle values. Use `read_cells(self._ocr, rois, allow_multi_digits=...)` only when cells don't come from a line grid. `tests/test_cell_ocr_contract.py` enforces this.
 5. Register the new parser in `lambda_handler.py`: import it and add an `if puzzle_type == <type_id>: return <Parser>(...)` branch to `_build_parser()`. If it reads clues with EasyOCR, pass `ocr_backend=ocr` **and add the type id to `_OCR_TYPES`** — otherwise production builds it with `ocr_backend=None` and every clue reads as empty (the contract test catches this).
+6. Hand-check each sample's parse against the photo (write a debug overlay), save it as `docs/<puzzle-name>/<sample>.canon.json`, and pin it in `tests/test_<puzzle_name>_parser.py` at full size and at the Android upload size (2000px long side). If the rules allow, solve each canon (e.g. CP-SAT via `ortools` in `parsers/.venv`) and check the solution is unique: that confirms both the parse and your reading of the rules.
 
 ## Phase 11: Database
 
 1. Add an `INSERT INTO puzzle_types` entry in `player/api/seed.sql` with the new ID, name, and rule text.
 2. Apply just the new row to the live DB (do NOT run the whole `seed.sql` via `--file` — it is a destructive reset + sample seed). Use the idempotent MySQL upsert with `player/api/db.sh`:
    ```
-   ./player/api/db.sh "INSERT INTO puzzle_types (id, name, rule) VALUES (<id>, '<name>', '<rule>') ON DUPLICATE KEY UPDATE name = VALUES(name), rule = VALUES(rule)"
+   ./player/api/db.sh "INSERT INTO puzzle_types (id, name, jp_label, rule) VALUES (<id>, '<name>', '<jp label>', '<rule>') ON DUPLICATE KEY UPDATE name = VALUES(name), jp_label = VALUES(jp_label), rule = VALUES(rule)"
    ```
    Notes: escape single quotes in the rule text by doubling them (`''`). The DB is MySQL (RDS Data API), so use `ON DUPLICATE KEY UPDATE`, not Postgres `ON CONFLICT`. Aurora Serverless auto-pauses — if the first call returns `DatabaseResumingException`, wait ~12s and retry. Verify with `./player/api/db.sh "SELECT id, name FROM puzzle_types WHERE id = <id>"`.
 
-## Phase 12: Verify
+## Phase 12: Android port
 
-1. Run `npx tsc --noEmit` in `player/frontend/` to verify no type errors.
-2. Run `pytest` in `parsers/` to verify no test regressions.
-3. Summarize what was created and any remaining manual steps (e.g., deploying, adding real puzzles).
+Every new type is ported to the Android player by default. Sources live under `player/android/app/src/main/java/com/puzzleplatform/player/`.
+
+1. Create `puzzle/<PuzzleName>Engine.kt`, an `object` implementing `PuzzleEngine` that ports the web extractor, progress calculator and completion check exactly (same `userValues` keys, so answers sync cross-platform). Register it in `PuzzleEngines` in `puzzle/PuzzleEngine.kt`.
+2. If player input is "shade or mark cells", the engine implements `ShadeMarkEngine` (`puzzle/ShadeCycle.kt`) and the board's `onTapCell` goes to `vm::tapShadeCell`; see CLAUDE.md. Don't hand-roll a cycle.
+3. Create `ui/board/<PuzzleName>Board.kt`, a Compose Canvas board on `ZoomableBoard`, matching the web board's look (same colours, `BoardColors.ROOM_SHADE` for room boards) and supporting `liveValidate` if the web board does.
+4. Add a `<type_id> -> <PuzzleName>Board(...)` branch to the board `when` in `ui/screens/PlayScreen.kt`.
+5. Picture puzzle: override `renderThumbnail` to return a `PuzzleThumbnail` of the solved picture (the collection's solved thumbnails come from it through the engine registry), and draw `PicturePreview` above the board from the same cells (see `PictoLinkEngine.pictureCells`, `ZebraRopeEngine`).
+6. Add `app/src/test/java/com/puzzleplatform/player/puzzle/<PuzzleName>EngineTest.kt` covering extract/restore, progress, completion and the thumbnail. Run `./gradlew --offline -q :app:testDebugUnitTest` in `player/android/`.
+7. Android admin authoring (parse review editor: `AuthoringType`, `BoardDraft`, `<PuzzleName>Authoring.kt`) is a follow-up; ask the user whether they want it now.
+8. Android ships only through `/cut-release`, not by pushing `main`. Tell the user the port is waiting for the next release.
+
+## Phase 13: Verify
+
+Tools are installed in the `player/` workspace and in `parsers/.venv` (system python's OpenCV fails unrelated tests).
+
+1. `player/node_modules/.bin/tsc --noEmit -p player/frontend` and `-p player/api` (no type errors).
+2. `player/node_modules/.bin/vitest run` in `player/frontend/`.
+3. `parsers/.venv/bin/python -m pytest -q` in `parsers/`.
+4. `./gradlew --offline -q :app:testDebugUnitTest` in `player/android/`.
+5. Summarize what was created and any remaining manual steps (adding real puzzles; Android release).
 
 ## Guidelines
 
