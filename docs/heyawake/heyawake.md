@@ -170,7 +170,9 @@ on the board, is settled. Search branches on the room with the fewest patterns. 
 over 30 cells or 2000 patterns only counts. Failed-literal probing over every cell also
 runs at construction and at every search node. All four samples (walls read by the
 parser's classifier, numbers from the images, in the solver's `fixtures.json`) settle
-with no search in under 10ms.
+with no search in under 10ms. Three 45x31 giants (walls by the same classifier, numbers
+read from each room's corner cell; in `fixtures.json` too) prove unique in 0.1-0.3s with
+at most one guess; without the patterns they left ~1000 cells open and timed out.
 
 # Misc
 

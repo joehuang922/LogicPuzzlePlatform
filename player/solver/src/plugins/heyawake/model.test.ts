@@ -169,11 +169,12 @@ describe("agrees with brute force on random small boards", () => {
   }, 60_000);
 });
 
-describe("sample boards (docs/heyawake)", () => {
-  // Room patterns plus trials settle every sample before any search (one node: the root).
+describe("sample boards (docs/heyawake and three 45x31 giants)", () => {
+  // Room patterns plus trials settle every sample with at most a couple of search nodes
+  // (1 = the root alone). Without patterns the giants left ~1000 cells open and timed out.
   for (const [name, b] of Object.entries(boards as unknown as Record<string, HeyawakeCanon>)) {
-    it(`proves the ${name} board unique by deduction alone`, () => {
-      expect(classify(model(b), { maxNodes: 1 })).toBe("unique");
+    it(`proves the ${name} board unique by deduction (a couple of search nodes at most)`, () => {
+      expect(classify(model(b), { maxNodes: name.includes("giant") ? 3 : 1 })).toBe("unique");
       expect(isValidSolution(b, solve(model(b))!)).toBe(true);
     }, 30_000);
   }
