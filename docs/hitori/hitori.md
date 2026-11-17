@@ -112,6 +112,19 @@ A grid editor like the Nurikabe editor. Each cell holds a required positive inte
 - **Accuracy bar:** measured by how many cell values the parser reads correctly. Grid geometry must be right; individual OCR misses are expected and are fixed with the editor's per-cell entry.
 - **Validation:** `cells` must be a rectangular integer grid with every value `>= 1`.
 
+## Solver
+
+`player/solver/src/plugins/hitori` proves uniqueness at create/edit (the auto-solve gate)
+and stores the solution for the on-track check. It uses exactly the rules the completion
+check applies, so a number that repeats nothing may be shaded when that keeps the rules;
+the gate calls a board unique only when exactly one answer would be accepted (both
+samples are unique even so). One shaded/white variable per cell: a white cell shades its
+repeats in its row and column, a shaded cell whitens its neighbours, and an undecided cell
+that is the only link between white cells is white. Then it probes every cell both ways
+and searches, branching on the cell with the most undecided repeats, white first. The 8x8
+settles with no search; the 17x17 (transcribed into the solver's `fixtures.json`) takes
+~0.1s.
+
 # Misc
 
 ## Coordinate convention

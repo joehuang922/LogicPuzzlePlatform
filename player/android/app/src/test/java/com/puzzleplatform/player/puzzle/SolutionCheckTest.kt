@@ -137,4 +137,13 @@ class SolutionCheckTest {
         assertEquals(false, NorinoriEngine.matchesSolution(p, mapOf("c:3,0" to 2)))
         assertNull(NorinoriEngine.matchesSolution(puzzle(23, """{"grids":{"h":[],"v":[[0]]}}""", """{"states":[[1,1,0,1,1]]}"""), emptyMap()))
     }
+
+    @Test
+    fun `hitori shaded cells and marks against the stored grid`() {
+        val p = puzzle(26, """{"cells":[[1,1,1]]}""", """{"states":[[1,0,1]]}""")
+        assertEquals(true, HitoriEngine.matchesSolution(p, mapOf("0,0" to 1, "1,0" to 2)))
+        assertEquals(false, HitoriEngine.matchesSolution(p, mapOf("1,0" to 1)))
+        assertEquals(false, HitoriEngine.matchesSolution(p, mapOf("2,0" to 2)))
+        assertNull(HitoriEngine.matchesSolution(puzzle(26, """{"cells":[[1,1]]}""", """{"states":[[1,0,1]]}"""), emptyMap()))
+    }
 }

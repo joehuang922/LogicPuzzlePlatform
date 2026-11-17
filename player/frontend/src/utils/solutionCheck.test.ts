@@ -142,6 +142,14 @@ describe("matchesSolution", () => {
     expect(matchesSolution(puzzle(23, { grids: { h: [], v: [[0]] } }, { states: [[1, 1, 0, 1, 1]] }), {})).toBeNull();
   });
 
+  it("hitori: shaded cells and marks against the stored grid", () => {
+    const p = puzzle(26, { cells: [[1, 1, 1]] }, { states: [[1, 0, 1]] });
+    expect(matchesSolution(p, { "0,0": 1, "1,0": 2 })).toBe(true);
+    expect(matchesSolution(p, { "1,0": 1 })).toBe(false);
+    expect(matchesSolution(p, { "2,0": 2 })).toBe(false);
+    expect(matchesSolution(puzzle(26, { cells: [[1, 1]] }, { states: [[1, 0, 1]] }), {})).toBeNull();
+  });
+
   it("nurimaze: painted rooms black, marked rooms white", () => {
     const p = puzzle(3, { cells: [[3, 0], [0, 4]] }, { states: [[2, 1], [2, 2]] });
     expect(matchesSolution(p, { "1,0": 1, "0,1": 2 })).toBe(true);

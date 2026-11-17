@@ -11,6 +11,7 @@ import { yajilinPlugin } from "./plugins/yajilin";
 import { rippleEffectPlugin } from "./plugins/ripple-effect";
 import { nuritwinPlugin } from "./plugins/nuritwin";
 import { norinoriPlugin } from "./plugins/norinori";
+import { hitoriPlugin } from "./plugins/hitori";
 
 // A registered plugin with its type parameters erased. The registry is the boundary where
 // per-type Canon/Board/Solution shapes meet the generic drivers, so `any` here is
@@ -38,6 +39,7 @@ register(yajilinPlugin);
 register(rippleEffectPlugin);
 register(nuritwinPlugin);
 register(norinoriPlugin);
+register(hitoriPlugin);
 
 export function getPlugin(puzzleType: number): AnyPlugin | undefined {
   return registry.get(puzzleType);

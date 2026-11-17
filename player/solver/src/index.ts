@@ -29,3 +29,5 @@ export { nuritwinPlugin, NuritwinModel } from "./plugins/nuritwin";
 export type { NuritwinCanon } from "./plugins/nuritwin";
 export { norinoriPlugin, NorinoriModel } from "./plugins/norinori";
 export type { NorinoriCanon } from "./plugins/norinori";
+export { hitoriPlugin, HitoriModel } from "./plugins/hitori";
+export type { HitoriCanon } from "./plugins/hitori";

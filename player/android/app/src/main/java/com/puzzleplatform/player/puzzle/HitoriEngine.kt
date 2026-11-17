@@ -103,6 +103,16 @@ object HitoriEngine : ShadeMarkEngine {
         (userValues[cellKey(c, r)] ?: UNSET) == SHADED
 
     /**
+     * Every shaded cell and mark agrees with the stored solution (`solutionRepr.states`,
+     * rows x cols of 0/1): a shaded cell must be shaded there, a mark must not.
+     */
+    override fun matchesSolution(puzzle: Puzzle, userValues: Map<String, Int>): Boolean? {
+        val (rows, cols) = dims(parseCells(puzzle))
+        val states = SolutionCheck.grid(puzzle.solutionRepr?.get("states"), rows, cols) ?: return null
+        return SolutionCheck.matches(userValues, SolutionCheck.onOff(states, "", SHADED, MARKED, rowFirst = false))
+    }
+
+    /**
      * True when the current paint is a full, valid Hitori solution (port of
      * HitoriBoard.tsx validateSolution). Cells in state 0 (unset) and 2 (marked) both
      * count as unshaded:

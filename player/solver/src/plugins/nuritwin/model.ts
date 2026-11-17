@@ -1,4 +1,5 @@
 import { Branch, ConstraintModel } from "../../types";
+import { connectivityCuts } from "../shading/connectivity";
 
 /**
  * Canonical Nuritwin representation, mirroring the frontend `NuritwinCanon`. `cells` is
@@ -396,63 +397,12 @@ export class NuritwinModel implements ConstraintModel<number[][]> {
 
   /**
    * Shaded connectivity over not-white cells: every shaded cell is reachable from every
-   * other, and an undecided cell that is the only link between shaded cells (an
-   * articulation point with shaded cells on both sides) is shaded. One iterative Tarjan
-   * pass from a shaded root.
+   * other, and an undecided cell that is the only link between shaded cells is shaded.
    */
   private applyConnectivity(force: (x: number, v: number) => boolean): boolean {
-    const { spec, state } = this;
-    const n = spec.cellCount;
-    let total = 0;
-    let root = -1;
-    for (let x = 0; x < n; x++) {
-      if (state[x] === SHADED) {
-        total++;
-        if (root < 0) root = x;
-      }
-    }
-    if (total <= 1) return true;
-
-    const disc = new Int32Array(n).fill(-1);
-    const low = new Int32Array(n);
-    const below = new Int32Array(n); // shaded cells in the DFS subtree
-    const parent = new Int32Array(n).fill(-1);
-    const iter = new Int32Array(n);
-    const stack = new Int32Array(n);
-    const cut: number[] = [];
-    let sp = 0;
-    let time = 0;
-    disc[root] = low[root] = time++;
-    below[root] = 1;
-    stack[sp++] = root;
-    while (sp > 0) {
-      const x = stack[sp - 1];
-      const nb = spec.neighbours[x];
-      if (iter[x] < nb.length) {
-        const y = nb[iter[x]++];
-        if (state[y] === WHITE) continue;
-        if (disc[y] < 0) {
-          disc[y] = low[y] = time++;
-          below[y] = state[y] === SHADED ? 1 : 0;
-          parent[y] = x;
-          stack[sp++] = y;
-        } else if (y !== parent[x] && disc[y] < low[x]) {
-          low[x] = disc[y];
-        }
-        continue;
-      }
-      sp--;
-      if (sp > 0) {
-        const p = stack[sp - 1];
-        if (low[x] < low[p]) low[p] = low[x];
-        below[p] += below[x];
-        // x's subtree hangs off p alone: if it holds shaded cells and so does the rest of
-        // the board, p must be shaded to join them.
-        if (low[x] >= disc[p] && below[x] > 0 && below[x] < total && state[p] === UNDECIDED) cut.push(p);
-      }
-    }
-    if (below[root] !== total) return false;
-    for (const x of cut) if (!force(x, SHADED)) return false;
+    const cuts = connectivityCuts(this.spec.neighbours, this.state, SHADED);
+    if (cuts === null) return false;
+    for (const x of cuts) if (!force(x, SHADED)) return false;
     return true;
   }
 
