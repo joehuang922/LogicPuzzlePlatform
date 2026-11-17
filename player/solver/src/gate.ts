@@ -1,4 +1,4 @@
-import { classify, solve, SearchBudget, SearchBudgetExceeded, Verdict } from "./drivers";
+import { classifyAndSolve, SearchBudget, Verdict } from "./drivers";
 import { getPlugin } from "./registry";
 
 export interface GateResult {
@@ -11,12 +11,13 @@ export interface GateResult {
  * Default wall-clock ceiling for a single gate call, in milliseconds. The gate runs
  * synchronously inside the create/update Lambda (29s API-Gateway timeout) and in the
  * backfill, so proving uniqueness must never run unbounded: a malformed puzzle can blow
- * the search up without limit. 10s leaves ample headroom under the Lambda timeout for the
- * DB write that follows, while being far longer than any well-formed board needs (real
- * puzzles classify in well under a second). On timeout the verdict is `"unknown"` — the
+ * the search up without limit. 15s leaves ample headroom under the Lambda timeout for the
+ * DB write that follows. Most real puzzles classify in well under a second; the largest
+ * (a 50x64 Slitherlink, ~1.4s of probing on a laptop) runs several times slower on the
+ * 1-vCPU Lambda, so 10s was too tight for it. On timeout the verdict is `"unknown"` — the
  * puzzle is flagged for human review, never silently accepted. Override via `gate`'s arg.
  */
-export const DEFAULT_GATE_BUDGET_MS = 10_000;
+export const DEFAULT_GATE_BUDGET_MS = 15_000;
 
 /**
  * Registration gate for a puzzle. Returns null when no solver plugin is registered
@@ -36,20 +37,10 @@ export function gate(puzzleType: number, canon: unknown, budget?: SearchBudget):
   if (!plugin) return null;
 
   const effective: SearchBudget = budget ?? { deadline: Date.now() + DEFAULT_GATE_BUDGET_MS };
-  const verdict = classify(plugin.buildModel(canon), effective);
+  // One search both proves uniqueness and yields the grid, so the model (and any
+  // construction-time deduction) is built once.
+  const { verdict, solution: grid } = classifyAndSolve(plugin.buildModel(canon), effective);
   if (verdict !== "unique") return { verdict, solution: null };
-
-  // Re-solve the unique puzzle to extract its full grid. The puzzle is already proven
-  // unique within budget, so this pass is usually fast; it reuses the same budget as a
-  // backstop. If the proof used up the budget, report "unknown" rather than letting the
-  // budget error escape as if it were a verdict.
-  let grid: unknown;
-  try {
-    grid = solve(plugin.buildModel(canon), effective);
-  } catch (err) {
-    if (err instanceof SearchBudgetExceeded) return { verdict: "unknown", solution: null };
-    throw err;
-  }
   const solution = grid && plugin.serializeSolution ? plugin.serializeSolution(grid) : grid;
   return { verdict, solution };
 }

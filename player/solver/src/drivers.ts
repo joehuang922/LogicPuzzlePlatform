@@ -66,13 +66,21 @@ function makeTicker(budget?: SearchBudget): () => void {
  * unbounded search (the default — unchanged for existing callers).
  */
 export function countSolutions<S>(model: ConstraintModel<S>, cap = 2, budget?: SearchBudget): number {
-  return countFrom(model, cap, makeTicker(budget));
+  return countFrom(model, cap, makeTicker(budget), NOOP);
 }
 
-function countFrom<S>(model: ConstraintModel<S>, cap: number, tick: () => void): number {
+function countFrom<S>(
+  model: ConstraintModel<S>,
+  cap: number,
+  tick: () => void,
+  onSolution: (model: ConstraintModel<S>) => void
+): number {
   tick();
   if (model.isDead()) return 0;
-  if (model.isSolved()) return 1;
+  if (model.isSolved()) {
+    onSolution(model);
+    return 1;
+  }
 
   const branch = model.selectBranch();
   // A live, unsolved model must always yield a branch.
@@ -82,7 +90,7 @@ function countFrom<S>(model: ConstraintModel<S>, cap: number, tick: () => void):
   for (const value of branch.candidates) {
     const next = model.assign(branch.id, value);
     if (next.isDead()) continue;
-    found += countFrom(next, cap - found, tick);
+    found += countFrom(next, cap - found, tick, onSolution);
     if (found >= cap) return cap;
   }
   return found;
@@ -128,11 +136,29 @@ export type Verdict = "unique" | "multiple" | "none" | "unknown";
  * yields `"unknown"` instead of hanging; without one the search runs to completion.
  */
 export function classify<S>(model: ConstraintModel<S>, budget?: SearchBudget): Verdict {
+  return classifyAndSolve(model, budget).verdict;
+}
+
+/**
+ * {@link classify}, also returning the solution when the verdict is `"unique"` (null
+ * otherwise). The uniqueness search already reaches that solution, so keeping it saves
+ * the gate a second build and solve, which on a large board (a 50x64 Slitherlink spends
+ * all its time in construction-time probing) doubled the gate's time.
+ */
+export function classifyAndSolve<S>(
+  model: ConstraintModel<S>,
+  budget?: SearchBudget
+): { verdict: Verdict; solution: S | null } {
+  let first: S | null = null;
+  const keepFirst = (m: ConstraintModel<S>) => {
+    if (first === null) first = m.solution();
+  };
   try {
-    const n = countSolutions(model, 2, budget);
-    return n === 0 ? "none" : n === 1 ? "unique" : "multiple";
+    const n = countFrom(model, 2, makeTicker(budget), keepFirst);
+    if (n === 1) return { verdict: "unique", solution: first };
+    return { verdict: n === 0 ? "none" : "multiple", solution: null };
   } catch (err) {
-    if (err instanceof SearchBudgetExceeded) return "unknown";
+    if (err instanceof SearchBudgetExceeded) return { verdict: "unknown", solution: null };
     throw err;
   }
 }

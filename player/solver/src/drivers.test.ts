@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { classify, countSolutions, solve, SearchBudgetExceeded } from "./drivers";
+import { classify, classifyAndSolve, countSolutions, solve, SearchBudgetExceeded } from "./drivers";
 import { SudokuModel } from "./plugins/sudoku";
 import {
   parseGrid,
@@ -68,6 +68,21 @@ describe("solution production — solve()", () => {
     const t0 = performance.now();
     solve(model(INKALA_HARDEST));
     expect(performance.now() - t0).toBeLessThan(1000);
+  });
+});
+
+describe("classifyAndSolve() — verdict and solution in one search", () => {
+  it("returns the same grid as solve() for a unique puzzle", () => {
+    const r = classifyAndSolve(model(INKALA_HARDEST));
+    expect(r.verdict).toBe("unique");
+    expect(r.solution).toEqual(solve(model(INKALA_HARDEST)));
+    expect(respectsHints(parseGrid(INKALA_HARDEST), r.solution!)).toBe(true);
+  });
+
+  it("returns no solution for 'multiple', 'none' and 'unknown'", () => {
+    expect(classifyAndSolve(model("0".repeat(81)))).toEqual({ verdict: "multiple", solution: null });
+    expect(classifyAndSolve(model(CONTRADICTORY))).toEqual({ verdict: "none", solution: null });
+    expect(classifyAndSolve(model(INKALA_HARDEST), { maxNodes: 1 })).toEqual({ verdict: "unknown", solution: null });
   });
 });
 

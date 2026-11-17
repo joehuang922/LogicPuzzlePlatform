@@ -140,7 +140,7 @@ describe("large boards — probing and the loop-closing rule", () => {
     expect(classify(model(UNSOLVABLE_15X25), budget)).toBe("none");
   });
 
-  // The largest board on the platform. Run through gate() itself, under the 10s budget
+  // The largest board on the platform. Run through gate() itself, under the default budget
   // the interactive create path uses, so a slowdown on big boards shows up here first.
   it("proves the production 50x64 unique through the gate within its default budget", async () => {
     const { gate, DEFAULT_GATE_BUDGET_MS } = await import("../../gate");
