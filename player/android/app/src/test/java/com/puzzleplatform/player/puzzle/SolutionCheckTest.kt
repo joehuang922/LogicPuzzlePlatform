@@ -163,4 +163,12 @@ class SolutionCheckTest {
         assertEquals(false, NurikabeEngine.matchesSolution(p, mapOf("0,1" to 2)))
         assertNull(NurikabeEngine.matchesSolution(puzzle(24, """{"cells":[[1,0]]}""", """{"states":[[0,1],[1,1]]}"""), emptyMap()))
     }
+
+    @Test
+    fun `corner chain shaded cells and marks against the stored grid`() {
+        val p = puzzle(30, """{"cells":[[2,0,0]]}""", """{"states":[[0,0,1]]}""")
+        assertEquals(true, CornerChainEngine.matchesSolution(p, mapOf("2,0" to 1, "1,0" to 2)))
+        assertEquals(false, CornerChainEngine.matchesSolution(p, mapOf("1,0" to 1)))
+        assertEquals(false, CornerChainEngine.matchesSolution(p, mapOf("2,0" to 2)))
+    }
 }

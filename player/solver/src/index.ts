@@ -35,3 +35,5 @@ export { heyawakePlugin, HeyawakeModel } from "./plugins/heyawake";
 export type { HeyawakeCanon } from "./plugins/heyawake";
 export { nurikabePlugin, NurikabeModel } from "./plugins/nurikabe";
 export type { NurikabeCanon } from "./plugins/nurikabe";
+export { cornerChainPlugin, CornerChainModel } from "./plugins/corner-chain";
+export type { CornerChainCanon } from "./plugins/corner-chain";

@@ -101,6 +101,22 @@ Same as Nurikabe: a grid of cells, each holding an optional positive integer clu
 - **Accuracy bar:** grid geometry must be right; individual OCR misses can be fixed in the editor.
 - Validates that `cells` is a rectangular integer grid with all values `>= 0` and at least one positive clue.
 
+## Solver
+
+`player/solver/src/plugins/corner-chain` proves uniqueness at create/edit (the auto-solve
+gate) and stores the solution for the on-track check. One shaded/white variable per cell
+(clues white). Over the connected white groups: different numbers in one group or a group
+past its number is a dead end; a numbered group of full size is closed off; a cell that
+would merge different numbers, or merge past the number, is shaded; a numbered group must
+reach its size (bounded walk) and takes its only way out; an even number lists the
+rectangles of that area that could hold the group (cells in all of them white, cells
+bordering all of them shaded); a closed group must pass the even-rectangle / odd-not
+shape rule. A white cell needs a white neighbour (no single-cell islands). The corner
+network becomes 8-connectivity of the white cells: a cell that alone links them,
+diagonals included, is white. Failed-literal probing at construction and every search
+node. The rule sheet's 5x5 (matching its published answer) and both 10x10 samples settle
+with no search in under 20ms.
+
 # Misc
 
 ## Coordinate convention

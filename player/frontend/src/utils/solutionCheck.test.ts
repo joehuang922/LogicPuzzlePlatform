@@ -165,6 +165,13 @@ describe("matchesSolution", () => {
     expect(matchesSolution(puzzle(24, { cells: [[1, 0]] }, { states: [[0, 1], [1, 1]] }), {})).toBeNull();
   });
 
+  it("corner chain: shaded cells and marks against the stored grid", () => {
+    const p = puzzle(30, { cells: [[2, 0, 0]] }, { states: [[0, 0, 1]] });
+    expect(matchesSolution(p, { "2,0": 1, "1,0": 2 })).toBe(true);
+    expect(matchesSolution(p, { "1,0": 1 })).toBe(false);
+    expect(matchesSolution(p, { "2,0": 2 })).toBe(false);
+  });
+
   it("nurimaze: painted rooms black, marked rooms white", () => {
     const p = puzzle(3, { cells: [[3, 0], [0, 4]] }, { states: [[2, 1], [2, 2]] });
     expect(matchesSolution(p, { "1,0": 1, "0,1": 2 })).toBe(true);

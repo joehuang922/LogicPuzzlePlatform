@@ -35,6 +35,10 @@ object CornerChainEngine : ShadeMarkEngine {
         NurikabeEngine.restoreUserValues(puzzle, answer)
 
     /** True when the current paint is a full, valid solution. Marks count as white. */
+    /** Same canon, keys and `{ states }` solution as Nurikabe: its check applies as is. */
+    override fun matchesSolution(puzzle: Puzzle, userValues: Map<String, Int>): Boolean? =
+        NurikabeEngine.matchesSolution(puzzle, userValues)
+
     override fun isComplete(puzzle: Puzzle, userValues: Map<String, Int>): Boolean {
         val cells = NurikabeEngine.parseCells(puzzle)
         val rows = cells.size
