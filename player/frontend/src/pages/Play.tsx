@@ -8,6 +8,7 @@ import { extractAnswer } from "../extractors";
 import { computeProgress } from "../progress";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { BoardUiMemoryProvider } from "../hooks/useBoardUiState";
+import ZoomFrame from "../components/ZoomFrame";
 import { MoveHistory, sameValues, type Values } from "../utils/moveHistory";
 import { matchesSolution } from "../utils/solutionCheck";
 
@@ -446,9 +447,12 @@ export default function Play() {
         )}
       </div>
       <BoardUiMemoryProvider memory={boardUiMemory}>
-        <div onPointerDownCapture={handleBoardPointerDown}>
-          <PuzzleBoard key={`${boardKey}:${restoreKey}`} puzzle={puzzle} initialAnswer={currentAnswer} restoreValues={restoredValues} onValuesChange={handleValuesChange} onComplete={handleComplete} liveValidate={liveValidate} />
-        </div>
+        {/* Fillomino (14) has its own pan & zoom viewport with keyboard follow. */}
+        <ZoomFrame disabled={puzzle.puzzleType === 14}>
+          <div onPointerDownCapture={handleBoardPointerDown}>
+            <PuzzleBoard key={`${boardKey}:${restoreKey}`} puzzle={puzzle} initialAnswer={currentAnswer} restoreValues={restoredValues} onValuesChange={handleValuesChange} onComplete={handleComplete} liveValidate={liveValidate} />
+          </div>
+        </ZoomFrame>
       </BoardUiMemoryProvider>
 
       <div style={{ marginTop: "1rem" }}>

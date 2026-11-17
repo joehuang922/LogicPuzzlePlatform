@@ -1,3 +1,5 @@
+import { createPortal } from "react-dom";
+
 interface DigitBarProps {
   onDigit: (digit: number) => void;
   onClear: () => void;
@@ -16,7 +18,9 @@ interface DigitBarProps {
 
 export default function DigitBar({ onDigit, onClear, onDismiss, noteMode, onToggleMode, modeDisabled, max = 9, marked }: DigitBarProps) {
   const btn = max > 9 ? smallBtnStyle : digitBtnStyle;
-  return (
+  // Portalled to <body>: the bar is pinned to the screen bottom, and a transformed
+  // ancestor (the Play page's zoom frame) would otherwise move and scale it.
+  return createPortal(
     <div style={max > 9 ? { ...containerStyle, maxWidth: 560, margin: "0 auto" } : containerStyle}>
       {Array.from({ length: max }, (_, i) => i + 1).map((d) => (
         <button
@@ -49,7 +53,8 @@ export default function DigitBar({ onDigit, onClear, onDismiss, noteMode, onTogg
       <button style={{ ...btn, color: "#666", borderColor: "#999" }} onClick={onDismiss}>
         ↩
       </button>
-    </div>
+    </div>,
+    document.body
   );
 }
 
