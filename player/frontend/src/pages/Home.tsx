@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { listPuzzles, listCollections, listPuzzleTypes, listAttempts, getSolvedQuestions, getCollectionProgress, createAttempt, sortCollections, getAttemptSnapshot, Collection, CollectionProgress, Attempt, PuzzleType, Puzzle } from "../api/client";
 import { PuzzleDefinition } from "../types/puzzle";
@@ -307,6 +307,9 @@ export default function Home() {
   const [expandedTypeId, setExpandedTypeId] = useState<number | null>(null);
   const [typePuzzles, setTypePuzzles] = useState<Puzzle[]>([]);
   const [loadingTypePuzzles, setLoadingTypePuzzles] = useState(false);
+  const [typeLoadError, setTypeLoadError] = useState<string | null>(null);
+  // Only the latest type click may write the list (a slow earlier one is dropped).
+  const typeLoadSeq = useRef(0);
   const [typeSolvedIds, setTypeSolvedIds] = useState<Set<string>>(new Set());
   const [typeAttemptedIds, setTypeAttemptedIds] = useState<Set<string>>(new Set());
 
@@ -383,17 +386,24 @@ export default function Home() {
       setExpandedTypeId(null);
       return;
     }
+    const seq = ++typeLoadSeq.current;
     setExpandedTypeId(typeId);
     setLoadingTypePuzzles(true);
+    setTypeLoadError(null);
+    setTypePuzzles([]);
     try {
       const res = await listPuzzles({ puzzleType: String(typeId) });
       const ids = res.puzzles.map((p) => p.id);
       const solvedRes = await getSolvedQuestions(HARDCODED_PLAYER_ID, ids);
+      if (seq !== typeLoadSeq.current) return;
       setTypePuzzles(res.puzzles);
       setTypeSolvedIds(new Set(solvedRes.solvedQuestions));
       setTypeAttemptedIds(new Set(solvedRes.attemptedQuestions ?? []));
+    } catch (e) {
+      if (seq !== typeLoadSeq.current) return;
+      setTypeLoadError(e instanceof Error ? e.message : String(e));
     } finally {
-      setLoadingTypePuzzles(false);
+      if (seq === typeLoadSeq.current) setLoadingTypePuzzles(false);
     }
   }
 
@@ -508,7 +518,7 @@ export default function Home() {
           </thead>
           <tbody>
             {browseTypes.map((t) => {
-              const loaded = expandedTypeId === t.id && !loadingTypePuzzles;
+              const loaded = expandedTypeId === t.id && !loadingTypePuzzles && !typeLoadError;
               return (
                 <Fragment key={t.id}>
                   <tr
@@ -528,6 +538,8 @@ export default function Home() {
                       <td colSpan={3} style={{ padding: "0.75rem 0.5rem", background: "#fafafa" }}>
                         {loadingTypePuzzles ? (
                           <p style={{ margin: 0, fontSize: "0.85rem" }}>Loading questions...</p>
+                        ) : typeLoadError ? (
+                          <p style={{ margin: 0, fontSize: "0.85rem", color: "#c62828" }}>Couldn't load questions: {typeLoadError}</p>
                         ) : typePuzzles.length === 0 ? (
                           <p style={{ margin: 0, fontSize: "0.85rem", color: "#666" }}>No questions of this type.</p>
                         ) : (

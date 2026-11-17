@@ -287,9 +287,26 @@ export function listAttempts(player: number, question: string, opts?: { finished
   return request<{ attempts: Attempt[] }>(url);
 }
 
-export function getSolvedQuestions(player: number, questionIds: string[]) {
-  const url = `/attempts?player=${player}&questions=${questionIds.map(encodeURIComponent).join(",")}`;
-  return request<{ solvedQuestions: string[]; attemptedQuestions: string[] }>(url);
+// Ids go in the query string; API Gateway's edge rejects URLs past ~8 KB with
+// a 414, which 233 sudoku UUIDs already exceed. 100 ids keep a URL under 4 KB.
+const SOLVED_QUESTIONS_BATCH = 100;
+
+export async function getSolvedQuestions(player: number, questionIds: string[]) {
+  const batches: string[][] = [];
+  for (let i = 0; i < questionIds.length; i += SOLVED_QUESTIONS_BATCH) {
+    batches.push(questionIds.slice(i, i + SOLVED_QUESTIONS_BATCH));
+  }
+  const results = await Promise.all(
+    batches.map((ids) =>
+      request<{ solvedQuestions: string[]; attemptedQuestions: string[] }>(
+        `/attempts?player=${player}&questions=${ids.map(encodeURIComponent).join(",")}`
+      )
+    )
+  );
+  return {
+    solvedQuestions: results.flatMap((r) => r.solvedQuestions),
+    attemptedQuestions: results.flatMap((r) => r.attemptedQuestions ?? []),
+  };
 }
 
 export interface CollectionProgress {
