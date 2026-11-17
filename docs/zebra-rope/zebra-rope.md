@@ -84,6 +84,7 @@ With every cell read as shaded (`1`) or unshaded (`0`/`2`): every circle's major
 - Same as Nurikabe: left click cycles a cell empty → shaded → marked → empty; right click cycles backwards. No drag-paint. Every cell is clickable (there are no fixed cells).
 - **Marked** cells are filled light yellow instead of showing a dot, because the ropes and circles make dots hard to see.
 - On Android, the engine implements `ShadeMarkEngine` and the board's `onTapCell` goes to `vm::tapShadeCell` (tap cycles empty → shaded → marked → empty).
+- Android admin review (`ZebraRopeAuthoring`, `ZebraRopeEditor`): Circles mode taps a grid line or corner to cycle its circle (white → gray → black → none); Ropes mode drags through cells to draw a rope (8-neighbour steps, joining a cell within 0.35 of its centre) and taps a rope to delete it; rows and columns are added or removed at the edge.
 
 ### Appearance
 

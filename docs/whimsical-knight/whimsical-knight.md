@@ -136,6 +136,7 @@ Every dot has 0 or 2 segments; the segments form one connected loop; no two segm
 ## Android port
 
 - `WhimsicalKnightEngine` ports extraction, progress and the completion check (same `s:` keys). `WhimsicalKnightBoard` draws one dot per `ZoomableBoard` cell centre and takes drag-to-draw (dot to dot, orthogonal or knight) through `ZoomableBoard`'s fractional drag callbacks (`onDrawStartPrecise` / `onDrawToPrecise`), tap-to-erase, and live validation. Not a picture puzzle, so no preview or solved thumbnail.
+- Admin review (`WhimsicalKnightAuthoring`, `WhimsicalKnightEditor`): a tap snaps to the nearest lattice point — between four dots toggles a gray square, a dot cycles circle → square → none, between two dots toggles a circle; rows and columns of dots are added or removed at the edge.
 
 # Misc
 

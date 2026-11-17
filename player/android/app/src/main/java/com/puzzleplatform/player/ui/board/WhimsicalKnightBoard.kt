@@ -44,6 +44,10 @@ private class KnightDragState {
  * change goes out through [onApplyChanges] (0 drops the key). With [liveValidate] on,
  * crossing segments and knight segments over gray are red, and a broken circle or
  * square is outlined red.
+ *
+ * The Admin review editor passes [onEditTap]: a tap then reports its fractional dot
+ * coordinates (x = column, y = row; dot (r, c) at (c, r)) for toggling a gray square or
+ * cycling a clue, and dragging draws nothing.
  */
 @Composable
 fun WhimsicalKnightBoard(
@@ -52,6 +56,7 @@ fun WhimsicalKnightBoard(
     onApplyChanges: (Map<String, Int>) -> Unit,
     modifier: Modifier = Modifier,
     liveValidate: Boolean = false,
+    onEditTap: ((x: Float, y: Float) -> Unit)? = null,
 ) {
     val board = remember(puzzle.id, puzzle.canonRepr) { WhimsicalKnightEngine.parseBoard(puzzle) }
     val rows = board.rows
@@ -61,6 +66,8 @@ fun WhimsicalKnightBoard(
     val valuesState = rememberUpdatedState(userValues)
     val onApply = rememberUpdatedState(onApplyChanges)
     val drag = remember(puzzle.id) { KnightDragState() }
+    val onEdit = rememberUpdatedState(onEditTap)
+    val editing = onEditTap != null
     val segs = remember(board, userValues) { WhimsicalKnightEngine.segments(board, userValues) }
     val bad = remember(board, segs, liveValidate) {
         if (liveValidate) WhimsicalKnightEngine.badSegments(board, segs) else emptySet()
@@ -117,15 +124,20 @@ fun WhimsicalKnightBoard(
         resetKey = puzzle.id,
         modifier = modifier,
         onTapCell = { _, _ -> },
-        onTapPrecise = { col, row -> tapAt(col, row) },
-        onDrawStartPrecise = { col, row ->
+        onTapPrecise = { col, row ->
+            val edit = onEdit.value
+            if (edit != null) edit(col - 0.5f, row - 0.5f) else tapAt(col, row)
+        },
+        onDrawStartPrecise = if (editing) null else { col, row ->
             drag.last = dotNear(col, row)
             drag.draw = null
         },
-        onDrawToPrecise = { col, row -> dragTo(col, row) },
-        onDrawEnd = {
-            drag.last = null
-            drag.draw = null
+        onDrawToPrecise = if (editing) null else { col, row -> dragTo(col, row) },
+        onDrawEnd = if (editing) null else {
+            {
+                drag.last = null
+                drag.draw = null
+            }
         },
     ) { cell ->
         fun at(dr: Int, dc: Int) = Offset((dc / 2f + 0.5f) * cell, (dr / 2f + 0.5f) * cell)

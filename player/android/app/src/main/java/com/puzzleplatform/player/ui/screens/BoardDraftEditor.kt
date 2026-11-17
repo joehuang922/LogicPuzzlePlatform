@@ -30,6 +30,8 @@ import com.puzzleplatform.player.ui.board.HeyawakeMiniBoard
 import com.puzzleplatform.player.ui.board.HitoriBoard
 import com.puzzleplatform.player.ui.board.KakuroMiniBoard
 import com.puzzleplatform.player.ui.board.KuralinMiniBoard
+import com.puzzleplatform.player.ui.board.WhimsicalKnightMiniBoard
+import com.puzzleplatform.player.ui.board.ZebraRopeMiniBoard
 import com.puzzleplatform.player.ui.board.MasyuMiniBoard
 import com.puzzleplatform.player.ui.board.NonogramMiniBoard
 import com.puzzleplatform.player.ui.board.NurikabeMiniBoard
@@ -352,6 +354,14 @@ fun BoardDraftEditor(
             onSelectCell = onSelectCell,
             onChange = { t -> onChange { it.copy(hellGolf = t(it.hellGolf)) } },
         )
+        AuthoringType.ZEBRA_ROPE -> ZebraRopeEditor(
+            draft = board.zebraRope,
+            onChange = { t -> onChange { it.copy(zebraRope = t(it.zebraRope)) } },
+        )
+        AuthoringType.WHIMSICAL_KNIGHT -> WhimsicalKnightEditor(
+            draft = board.whimsicalKnight,
+            onChange = { t -> onChange { it.copy(whimsicalKnight = t(it.whimsicalKnight)) } },
+        )
         AuthoringType.CHOCO_BANANA -> ClueGridEditor(
             authoring = ChocoBananaAuthoring,
             draft = board.chocoBanana,
@@ -425,6 +435,9 @@ fun BoardDraftMiniBoard(type: AuthoringType, board: BoardDraft, size: Dp) {
         AuthoringType.CHOCO_BANANA ->
             ClueGridMiniBoard(draft = board.chocoBanana, hasProblems = hasProblems, size = size)
         AuthoringType.HELL_GOLF -> HellGolfMiniBoard(draft = board.hellGolf, hasProblems = hasProblems, size = size)
+        AuthoringType.ZEBRA_ROPE -> ZebraRopeMiniBoard(draft = board.zebraRope, hasProblems = hasProblems, size = size)
+        AuthoringType.WHIMSICAL_KNIGHT ->
+            WhimsicalKnightMiniBoard(draft = board.whimsicalKnight, hasProblems = hasProblems, size = size)
         AuthoringType.HEYAWAKE -> HeyawakeMiniBoard(draft = board.heyawake, hasProblems = hasProblems, size = size)
         AuthoringType.PICTO_LINK ->
             PictoLinkMiniBoard(draft = board.pictoLink, hasProblems = hasProblems, size = size)

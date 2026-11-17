@@ -365,6 +365,14 @@ fun AdminQuestionScreen(
                                     "Tap a tile to review its photo and grid side by side, fix mis-read " +
                                         "balls, goals or lakes, and set its title. A red tile has no balls, " +
                                         "a ball count that differs from its goals, or a ball that can't move."
+                                AuthoringType.ZEBRA_ROPE ->
+                                    "Tap a tile to review its photo and grid side by side, fix mis-read " +
+                                        "ropes or circles, and set its title. A red tile has no clues or a " +
+                                        "rope or circle that can't be right."
+                                AuthoringType.WHIMSICAL_KNIGHT ->
+                                    "Tap a tile to review its photo and dots side by side, fix mis-read " +
+                                        "gray squares, circles or squares, and set its title. A red tile has " +
+                                        "no clues or a clue that can't be right."
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -644,6 +652,14 @@ private fun ReviewScreen(
                     AuthoringType.HELL_GOLF ->
                         "Compare the photo with the grid — pinch to zoom the photo, tap a cell to type its " +
                             "ball's number or make it a lake or goal, delete a phantom line, or add a missed one."
+                    AuthoringType.ZEBRA_ROPE ->
+                        "Compare the photo with the grid — pinch to zoom the photo. In Circles, tap a grid " +
+                            "line or corner to cycle its circle; in Ropes, drag through cells to draw a rope, " +
+                            "or tap one to delete it. Add or remove a row or column at the edge."
+                    AuthoringType.WHIMSICAL_KNIGHT ->
+                        "Compare the photo with the dots — pinch to zoom the photo, tap between four dots " +
+                            "to toggle a gray square, tap a dot or between two dots to cycle its clue, or add " +
+                            "or remove a row or column of dots at the edge."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

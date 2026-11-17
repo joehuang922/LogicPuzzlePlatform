@@ -42,6 +42,10 @@ private val CIRCLE_FILL = listOf(Color.White, Color(0xFF111111), Color(0xFFAAAAA
  * [liveValidate] on, a rope or circle the decided cells already break is outlined red.
  * Above the board sits a small preview of the shaded cells, the same picture the
  * collection thumbnail shows once solved. Two fingers pan/zoom via [ZoomableBoard].
+ *
+ * The Admin review editor passes [onTapPoint] (a tap at fractional cell coordinates, for
+ * cycling a circle) and the precise drag callbacks (for drawing a rope, shown as
+ * [draftRope]); taps then don't shade cells, and the preview is left out.
  */
 @Composable
 fun ZebraRopeBoard(
@@ -50,6 +54,11 @@ fun ZebraRopeBoard(
     onTapCell: (col: Int, row: Int) -> Unit,
     modifier: Modifier = Modifier,
     liveValidate: Boolean = false,
+    onTapPoint: ((col: Float, row: Float) -> Unit)? = null,
+    onDrawStartPrecise: ((col: Float, row: Float) -> Unit)? = null,
+    onDrawToPrecise: ((col: Float, row: Float) -> Unit)? = null,
+    onDrawEnd: (() -> Unit)? = null,
+    draftRope: List<Pair<Int, Int>> = emptyList(),
 ) {
     val board = remember(puzzle.id, puzzle.canonRepr) { ZebraRopeEngine.parseBoard(puzzle) }
     val rows = board.rows
@@ -60,6 +69,9 @@ fun ZebraRopeBoard(
     // restart when these change), so read the freshest values/callback through state.
     val valuesState = rememberUpdatedState(userValues)
     val onTap = rememberUpdatedState(onTapCell)
+    val onPoint = rememberUpdatedState(onTapPoint)
+    val draftState = rememberUpdatedState(draftRope)
+    val editing = onTapPoint != null
     val broken = remember(board, userValues, liveValidate) {
         if (liveValidate) ZebraRopeEngine.brokenClues(board, userValues) else emptySet<Int>() to emptySet()
     }
@@ -70,13 +82,17 @@ fun ZebraRopeBoard(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        PicturePreview(picture, rows, cols, ZebraRopeEngine.GROUND_ARGB)
+        if (!editing) PicturePreview(picture, rows, cols, ZebraRopeEngine.GROUND_ARGB)
 
         ZoomableBoard(
             cols = cols,
             rows = rows,
             resetKey = puzzle.id,
-            onTapCell = { col, row -> onTap.value(col, row) },
+            onTapCell = { col, row -> if (onPoint.value == null) onTap.value(col, row) },
+            onTapPrecise = if (editing) { col, row -> onPoint.value?.invoke(col, row) } else null,
+            onDrawStartPrecise = onDrawStartPrecise,
+            onDrawToPrecise = onDrawToPrecise,
+            onDrawEnd = onDrawEnd,
         ) { cell ->
             val boardW = cols * cell
             val boardH = rows * cell
@@ -117,17 +133,24 @@ fun ZebraRopeBoard(
             }
 
             board.ropes.forEachIndexed { i, rope -> drawRope(rope, cell, i in broken.second) }
+            if (draftState.value.size >= 2) drawRope(draftState.value, cell, error = false, highlight = true)
             board.circles.forEachIndexed { i, circle -> drawZebraCircle(circle, cell, i in broken.first) }
         }
     }
 }
 
-private fun DrawScope.drawRope(rope: List<Pair<Int, Int>>, cell: Float, error: Boolean) {
+private val DRAFT_ROPE = Color(0xFF1976D2)
+
+private fun DrawScope.drawRope(rope: List<Pair<Int, Int>>, cell: Float, error: Boolean, highlight: Boolean = false) {
     val path = Path()
     rope.forEachIndexed { j, (r, c) ->
         val x = (c + 0.5f) * cell
         val y = (r + 0.5f) * cell
         if (j == 0) path.moveTo(x, y) else path.lineTo(x, y)
+    }
+    if (highlight) {
+        drawPath(path, DRAFT_ROPE.copy(alpha = 0.7f), style = Stroke(width = cell * 0.24f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        return
     }
     drawPath(
         path,

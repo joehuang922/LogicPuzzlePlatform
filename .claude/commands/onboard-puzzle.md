@@ -29,7 +29,7 @@ If any of these are missing, ask before proceeding.
    - Puzzle Editor > Interactions
    - Puzzle Parser (notes on visual parsing challenges)
    - Misc > Coordinate convention
-   - The Android port (Phase 12): its interaction, and the solved thumbnail for a picture puzzle
+   - The Android port (Phase 12): its player interaction, its admin review editor (how a parsed board is corrected on the phone), and the solved thumbnail for a picture puzzle
 5. Copy sample images to `docs/<puzzle-name>/`.
 6. Present the full doc to the user for review. Do NOT proceed until approved.
 
@@ -114,16 +114,34 @@ If any of these are missing, ask before proceeding.
 
 ## Phase 12: Android port
 
-Every new type is ported to the Android player by default. Sources live under `player/android/app/src/main/java/com/puzzleplatform/player/`.
+Every new type is ported to Android by default: the player, and the admin authoring flow that uploads photos, parses them and lets the board be corrected before it's created. Without authoring the type is missing from the Android admin's type dropdown. Sources live under `player/android/app/src/main/java/com/puzzleplatform/player/`.
+
+### Player
 
 1. Create `puzzle/<PuzzleName>Engine.kt`, an `object` implementing `PuzzleEngine` that ports the web extractor, progress calculator and completion check exactly (same `userValues` keys, so answers sync cross-platform). Register it in `PuzzleEngines` in `puzzle/PuzzleEngine.kt`.
 2. If player input is "shade or mark cells", the engine implements `ShadeMarkEngine` (`puzzle/ShadeCycle.kt`) and the board's `onTapCell` goes to `vm::tapShadeCell`; see CLAUDE.md. Don't hand-roll a cycle.
 3. Create `ui/board/<PuzzleName>Board.kt`, a Compose Canvas board on `ZoomableBoard`, matching the web board's look (same colours, `BoardColors.ROOM_SHADE` for room boards) and supporting `liveValidate` if the web board does.
 4. Add a `<type_id> -> <PuzzleName>Board(...)` branch to the board `when` in `ui/screens/PlayScreen.kt`.
 5. Picture puzzle: override `renderThumbnail` to return a `PuzzleThumbnail` of the solved picture (the collection's solved thumbnails come from it through the engine registry), and draw `PicturePreview` above the board from the same cells (see `PictoLinkEngine.pictureCells`, `ZebraRopeEngine`).
-6. Add `app/src/test/java/com/puzzleplatform/player/puzzle/<PuzzleName>EngineTest.kt` covering extract/restore, progress, completion and the thumbnail. Run `./gradlew --offline -q :app:testDebugUnitTest` in `player/android/`.
-7. Android admin authoring (parse review editor: `AuthoringType`, `BoardDraft`, `<PuzzleName>Authoring.kt`) is a follow-up; ask the user whether they want it now.
-8. Android ships only through `/cut-release`, not by pushing `main`. Tell the user the port is waiting for the next release.
+6. Add `app/src/test/java/com/puzzleplatform/player/puzzle/<PuzzleName>EngineTest.kt` covering extract/restore, progress, completion and the thumbnail.
+7. A board whose targets aren't cells (dots, edge midpoints) reads fractional positions from `ZoomableBoard`: `onTapPrecise` for taps, `onDrawStartPrecise` / `onDrawToPrecise` for drags (see `WhimsicalKnightBoard`).
+
+### Admin authoring
+
+The Android analog of the web editor, used to review a parsed board (batch upload) and to edit a stored question. Model it on the closest existing type (`KuralinAuthoring` for points on grid lines, `SinkaminoAuthoring` for dragged paths, `ZebraRopeAuthoring` / `WhimsicalKnightAuthoring` for both).
+
+8. Create `puzzle/<PuzzleName>Authoring.kt`, a pure object (no Android types): `PUZZLE_TYPE`, `draftFromCanon`, `canonFromDraft`, `previewPuzzle` (a throwaway `Puzzle` for the review board, its id keyed on the size), the edit operations (cycle/toggle a clue, extend/add/remove a path, add/remove a row or column at the bottom/right), `formatProblems` (port of the web editor's, which the API rejects too) and `problems` (format problems plus overridable misread warnings, e.g. "No clues"). The draft can be the engine's own board type.
+9. Add the type to `AuthoringType` in `puzzle/BatchAuthoring.kt` (label, the `jp_label` from `seed.sql`, `PUZZLE_TYPE`); `AuthoringTypeTest` checks the label.
+10. Wire it into `puzzle/BoardDraft.kt`: a draft field, and a branch in `problems`, `formatProblems`, `toCanon` and `fromCanon`.
+11. Create `ui/screens/<PuzzleName>Editor.kt`: the draft on the player board with edit hooks (the board takes optional callbacks, e.g. `onTapPoint`, `onEditTap`, precise drags; in edit mode taps don't play and a picture preview is hidden), the problems list, mode chips if taps and drags edit different things, and add/remove row/column buttons. Add a branch for it in `ui/screens/BoardDraftEditor.kt`.
+12. Create `ui/board/<PuzzleName>MiniBoard.kt`, the batch tile's thumbnail (framed red when `hasProblems`), and add it to `BoardDraftMiniBoard` in `BoardDraftEditor.kt`.
+13. Add the batch hint and the review hint for the type to the two `when (type)` blocks in `ui/screens/AdminQuestionScreen.kt`.
+14. Add `<PuzzleName>AuthoringTest.kt`: round-trip each `docs/<puzzle-name>/*.canon.json` sample through `BoardDraft.fromCanon(...).toCanon(...)` with no problems (tests run from the app module, so the path is `../../../docs/...`), plus the edit operations and format problems.
+
+### Ship
+
+15. Run `./gradlew --offline -q :app:testDebugUnitTest` in `player/android/`.
+16. Android ships only through `/cut-release`, not by pushing `main`. Tell the user the port is waiting for the next release.
 
 ## Phase 13: Verify
 

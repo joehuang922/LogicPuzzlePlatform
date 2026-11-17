@@ -49,6 +49,9 @@ data class BoardDraft(
     val pencils: ClueGridDraft = ClueGridDraft(),
     val chocoBanana: ClueGridDraft = ClueGridDraft(),
     val hellGolf: ClueGridDraft = ClueGridDraft(),
+    val zebraRope: ZebraRopeEngine.Board = ZebraRopeEngine.Board(0, 0, emptyList(), emptyList()),
+    val whimsicalKnight: WhimsicalKnightEngine.Board =
+        WhimsicalKnightEngine.Board(0, 0, emptyList(), emptyList(), emptyList()),
 ) {
     /**
      * What the type's misread check finds wrong with this board — the list that turns
@@ -90,6 +93,8 @@ data class BoardDraft(
         AuthoringType.PENCILS -> PencilsAuthoring.problems(pencils)
         AuthoringType.CHOCO_BANANA -> ChocoBananaAuthoring.problems(chocoBanana)
         AuthoringType.HELL_GOLF -> HellGolfAuthoring.problems(hellGolf)
+        AuthoringType.ZEBRA_ROPE -> ZebraRopeAuthoring.problems(zebraRope)
+        AuthoringType.WHIMSICAL_KNIGHT -> WhimsicalKnightAuthoring.problems(whimsicalKnight)
     }
 
     /**
@@ -115,6 +120,8 @@ data class BoardDraft(
         AuthoringType.SINKAMINO -> SinkaminoAuthoring.formatProblems(sinkamino)
         AuthoringType.PENCILS -> PencilsAuthoring.formatProblems(pencils)
         AuthoringType.SKELETON_PUZZLE -> SkeletonPuzzleAuthoring.formatProblems(skeletonPuzzle)
+        AuthoringType.ZEBRA_ROPE -> ZebraRopeAuthoring.formatProblems(zebraRope)
+        AuthoringType.WHIMSICAL_KNIGHT -> WhimsicalKnightAuthoring.formatProblems(whimsicalKnight)
         else -> emptyList()
     }
 
@@ -197,6 +204,13 @@ data class BoardDraft(
             CanonBoard(ChocoBananaAuthoring.canonFromDraft(chocoBanana), chocoBanana.cols, chocoBanana.rows)
         AuthoringType.HELL_GOLF ->
             CanonBoard(HellGolfAuthoring.canonFromDraft(hellGolf), hellGolf.cols, hellGolf.rows)
+        AuthoringType.ZEBRA_ROPE ->
+            CanonBoard(ZebraRopeAuthoring.canonFromDraft(zebraRope), zebraRope.cols, zebraRope.rows)
+        AuthoringType.WHIMSICAL_KNIGHT -> CanonBoard(
+            WhimsicalKnightAuthoring.canonFromDraft(whimsicalKnight),
+            whimsicalKnight.cols,
+            whimsicalKnight.rows,
+        )
     }
 
     companion object {
@@ -240,6 +254,9 @@ data class BoardDraft(
             AuthoringType.PENCILS -> BoardDraft(pencils = PencilsAuthoring.draftFromCanon(canon))
             AuthoringType.CHOCO_BANANA -> BoardDraft(chocoBanana = ChocoBananaAuthoring.draftFromCanon(canon))
             AuthoringType.HELL_GOLF -> BoardDraft(hellGolf = HellGolfAuthoring.draftFromCanon(canon))
+            AuthoringType.ZEBRA_ROPE -> BoardDraft(zebraRope = ZebraRopeAuthoring.draftFromCanon(canon))
+            AuthoringType.WHIMSICAL_KNIGHT ->
+                BoardDraft(whimsicalKnight = WhimsicalKnightAuthoring.draftFromCanon(canon))
         }
     }
 }
