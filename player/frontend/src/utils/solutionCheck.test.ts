@@ -178,6 +178,13 @@ describe("matchesSolution", () => {
     expect(matchesSolution(p, { "1,0": 2 })).toBe(false);
   });
 
+  it("fillomino: numbers must match, walls must sit between different numbers", () => {
+    const p = puzzle(14, { cells: [[1, 2, 0]] }, { numbers: [[1, 2, 2]], edges: { h: [], v: [[1, 0]] } });
+    expect(matchesSolution(p, { "c:2,0": 2, "v:0,0": 1 })).toBe(true);
+    expect(matchesSolution(p, { "c:2,0": 3 })).toBe(false);
+    expect(matchesSolution(p, { "v:0,1": 1 })).toBe(false); // a wall inside the 2-room
+  });
+
   it("nurimaze: painted rooms black, marked rooms white", () => {
     const p = puzzle(3, { cells: [[3, 0], [0, 4]] }, { states: [[2, 1], [2, 2]] });
     expect(matchesSolution(p, { "1,0": 1, "0,1": 2 })).toBe(true);

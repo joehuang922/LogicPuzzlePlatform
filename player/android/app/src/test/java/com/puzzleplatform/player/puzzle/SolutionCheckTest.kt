@@ -178,4 +178,12 @@ class SolutionCheckTest {
         assertEquals(true, AkariEngine.matchesSolution(p, mapOf("1,0" to 1, "0,1" to 1)))
         assertEquals(false, AkariEngine.matchesSolution(p, mapOf("1,0" to 2)))
     }
+
+    @Test
+    fun `fillomino numbers must match and walls sit between different numbers`() {
+        val p = puzzle(14, """{"cells":[[1,2,0]]}""", """{"numbers":[[1,2,2]],"edges":{"h":[],"v":[[1,0]]}}""")
+        assertEquals(true, FillominoEngine.matchesSolution(p, mapOf("c:2,0" to 2, "v:0,0" to 1)))
+        assertEquals(false, FillominoEngine.matchesSolution(p, mapOf("c:2,0" to 3)))
+        assertEquals(false, FillominoEngine.matchesSolution(p, mapOf("v:0,1" to 1)))
+    }
 }

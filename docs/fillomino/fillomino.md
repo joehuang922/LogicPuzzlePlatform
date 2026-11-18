@@ -103,6 +103,22 @@ All cells are filled with a positive integer AND all internal borders are placed
 - Uses LLM recognizer (Gemini) to classify each cell as empty or containing a positive integer (including multi-digit numbers like 11).
 - Validates that all cell values are non-negative integers.
 
+## Solver
+
+`player/solver/src/plugins/fillomino` proves uniqueness at create/edit (the auto-solve
+gate) and stores the solution (numbers, plus walls wherever the numbers change) for the
+on-track check. It works on the numbers alone: a filling is an answer exactly when every
+connected group of equal numbers has as many cells as its number (and the board is more
+than one room). Each cell keeps the set of values it can still take (1..62): a group past
+its number is a dead end, a full group bars its number from the cells around it, a cell
+can't take a number that would merge groups past it, a group short of its number must
+reach its size and takes its only way out, and a cell keeps a number only if enough
+connected cells could take it. Failed-literal probing over every (cell, value) runs at
+construction and every search node; trials re-check only the groups near the change. The
+three samples settle with no search: 10x10 ~40ms, 17x17 ~0.5s, 37x23 ~2.7s. (The JSON
+example under "Canonical JSON structure" misreads `board-fillomino.png`; the solver's
+`fixtures.json` has the board as printed.)
+
 # Misc
 
 ## Coordinate convention

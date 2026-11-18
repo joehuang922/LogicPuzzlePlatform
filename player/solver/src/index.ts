@@ -39,3 +39,5 @@ export { cornerChainPlugin, CornerChainModel } from "./plugins/corner-chain";
 export type { CornerChainCanon } from "./plugins/corner-chain";
 export { akariPlugin, AkariModel } from "./plugins/akari";
 export type { AkariCanon } from "./plugins/akari";
+export { fillominoPlugin, FillominoModel } from "./plugins/fillomino";
+export type { FillominoCanon, FillominoSolution } from "./plugins/fillomino";

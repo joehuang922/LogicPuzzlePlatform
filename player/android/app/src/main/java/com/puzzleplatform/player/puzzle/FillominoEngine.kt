@@ -211,6 +211,28 @@ object FillominoEngine : PuzzleEngine {
     }
 
     /**
+     * Every entered number equals the stored solution's (`solutionRepr.numbers`), and every
+     * drawn wall sits where the solution's numbers change (between two rooms).
+     */
+    override fun matchesSolution(puzzle: Puzzle, userValues: Map<String, Int>): Boolean? {
+        val (rows, cols) = dims(parseCells(puzzle))
+        val sol = SolutionCheck.grid(puzzle.solutionRepr?.get("numbers"), rows, cols) ?: return null
+        return SolutionCheck.matches(userValues) { key, value ->
+            val cell = SolutionCheck.pair(key, "c:")
+            val h = SolutionCheck.pair(key, "h:")
+            val v = SolutionCheck.pair(key, "v:")
+            when {
+                cell != null -> if (value >= 1) sol.getOrNull(cell.second)?.getOrNull(cell.first) == value else null
+                h != null && value == 1 && h.first + 1 < rows && h.second < cols ->
+                    sol[h.first][h.second] != sol[h.first + 1][h.second]
+                v != null && value == 1 && v.first < rows && v.second + 1 < cols ->
+                    sol[v.first][v.second] != sol[v.first][v.second + 1]
+                else -> null
+            }
+        }
+    }
+
+    /**
      * True when every cell is filled, at least one wall is drawn, each room of size N
      * holds only the digit N, and no two wall-separated adjacent rooms share a number
      * (port of FillominoBoard.tsx validateSolution).

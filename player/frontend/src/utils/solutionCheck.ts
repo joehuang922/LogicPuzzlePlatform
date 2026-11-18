@@ -228,6 +228,26 @@ const CHECKS: Record<number, (canon: Json, solution: Json) => Expect | null> = {
     };
     return (key, value) => checks[key[0]]?.(key, value) ?? null;
   },
+  // Fillomino: { numbers: rows x cols, edges }; "c:col,row" -> the entered number, which
+  // must match; "h:row,col" / "v:row,col" -> 1 a wall, which must sit where the solution's
+  // numbers change (between two rooms).
+  14: (canon, s) => {
+    const cells = canon.cells as unknown[][] | undefined;
+    if (!Array.isArray(cells) || !Array.isArray(cells[0])) return null;
+    const rows = cells.length;
+    const cols = cells[0].length;
+    const sol = grid(s.numbers, rows, cols);
+    if (!sol) return null;
+    return (key, value) => {
+      const cr = pair(key, "c:");
+      if (cr) return value >= 1 ? sol[cr[1]]?.[cr[0]] === value : null;
+      const h = pair(key, "h:");
+      if (h && value === 1 && h[0] + 1 < rows && h[1] < cols) return sol[h[0]][h[1]] !== sol[h[0] + 1][h[1]];
+      const v = pair(key, "v:");
+      if (v && value === 1 && v[0] < rows && v[1] + 1 < cols) return sol[v[0]][v[1]] !== sol[v[0]][v[1] + 1];
+      return null;
+    };
+  },
   // LITS: { shaded: rows x cols of 0/1 }; "c:col,row" -> 1 shaded, 2 marked unshaded.
   15: (canon, s) => {
     const g = canon.grids as { h?: unknown[]; v?: unknown[][] } | undefined;
