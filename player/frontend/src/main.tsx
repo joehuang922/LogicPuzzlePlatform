@@ -40,6 +40,7 @@ import { hashiRenderer } from "./renderers/hashi";
 import { skeletonPuzzleRenderer } from "./renderers/skeletonPuzzle";
 import { zebraRopeRenderer } from "./renderers/zebraRope";
 import { whimsicalKnightRenderer } from "./renderers/whimsicalKnight";
+import { ominoTreeRenderer } from "./renderers/ominoTree";
 
 registerRenderer(comboSudokuRenderer);
 registerRenderer(sudokuRenderer);
@@ -78,6 +79,7 @@ registerRenderer(hashiRenderer);
 registerRenderer(skeletonPuzzleRenderer);
 registerRenderer(zebraRopeRenderer);
 registerRenderer(whimsicalKnightRenderer);
+registerRenderer(ominoTreeRenderer);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

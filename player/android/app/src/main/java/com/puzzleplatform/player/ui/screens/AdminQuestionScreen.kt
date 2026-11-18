@@ -373,6 +373,10 @@ fun AdminQuestionScreen(
                                     "Tap a tile to review its photo and dots side by side, fix mis-read " +
                                         "gray squares, circles or squares, and set its title. A red tile has " +
                                         "no clues or a clue that can't be right."
+                                AuthoringType.OMINO_TREE ->
+                                    "Tap a tile to review its photo and grid side by side, fix mis-read " +
+                                        "numbers or arrows, and set its title. A red tile has no arrows or an " +
+                                        "arrow that can't be right."
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -660,6 +664,10 @@ private fun ReviewScreen(
                         "Compare the photo with the dots — pinch to zoom the photo, tap between four dots " +
                             "to toggle a gray square, tap a dot or between two dots to cycle its clue, or add " +
                             "or remove a row or column of dots at the edge."
+                    AuthoringType.OMINO_TREE ->
+                        "Compare the photo with the grid — pinch to zoom the photo. In Numbers, tap a cell " +
+                            "to type its number; in Arrows, tap an edge to cycle its arrow. Add or remove a " +
+                            "row or column at the edge."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

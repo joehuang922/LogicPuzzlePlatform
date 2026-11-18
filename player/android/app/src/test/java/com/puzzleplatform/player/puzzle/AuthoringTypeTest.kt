@@ -35,6 +35,6 @@ class AuthoringTypeTest {
         // Incubating types come last in the dropdown.
         val ordered = AuthoringType.ordered
         assertEquals(ordered.sortedBy { it.incubating }, ordered)
-        assertEquals(AuthoringType.WHIMSICAL_KNIGHT, ordered.last())
+        assertEquals(listOf(AuthoringType.WHIMSICAL_KNIGHT, AuthoringType.OMINO_TREE), ordered.takeLast(2))
     }
 }

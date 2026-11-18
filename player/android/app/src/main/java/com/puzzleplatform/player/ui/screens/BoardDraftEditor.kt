@@ -22,6 +22,7 @@ import com.puzzleplatform.player.ui.board.AkariBoard
 import com.puzzleplatform.player.ui.board.BlackCellMiniBoard
 import com.puzzleplatform.player.ui.board.ComboSudokuMiniBoard
 import com.puzzleplatform.player.ui.board.ClueGridMiniBoard
+import com.puzzleplatform.player.ui.board.OminoTreeMiniBoard
 import com.puzzleplatform.player.ui.board.DigitBar
 import com.puzzleplatform.player.ui.board.DoubleChocoMiniBoard
 import com.puzzleplatform.player.ui.board.FillominoBoard
@@ -362,6 +363,12 @@ fun BoardDraftEditor(
             draft = board.whimsicalKnight,
             onChange = { t -> onChange { it.copy(whimsicalKnight = t(it.whimsicalKnight)) } },
         )
+        AuthoringType.OMINO_TREE -> OminoTreeEditor(
+            draft = board.ominoTree,
+            selectedCell = selectedCell,
+            onSelectCell = onSelectCell,
+            onChange = { t -> onChange { it.copy(ominoTree = t(it.ominoTree)) } },
+        )
         AuthoringType.CHOCO_BANANA -> ClueGridEditor(
             authoring = ChocoBananaAuthoring,
             draft = board.chocoBanana,
@@ -438,6 +445,7 @@ fun BoardDraftMiniBoard(type: AuthoringType, board: BoardDraft, size: Dp) {
         AuthoringType.ZEBRA_ROPE -> ZebraRopeMiniBoard(draft = board.zebraRope, hasProblems = hasProblems, size = size)
         AuthoringType.WHIMSICAL_KNIGHT ->
             WhimsicalKnightMiniBoard(draft = board.whimsicalKnight, hasProblems = hasProblems, size = size)
+        AuthoringType.OMINO_TREE -> OminoTreeMiniBoard(draft = board.ominoTree, hasProblems = hasProblems, size = size)
         AuthoringType.HEYAWAKE -> HeyawakeMiniBoard(draft = board.heyawake, hasProblems = hasProblems, size = size)
         AuthoringType.PICTO_LINK ->
             PictoLinkMiniBoard(draft = board.pictoLink, hasProblems = hasProblems, size = size)

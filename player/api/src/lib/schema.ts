@@ -36,6 +36,7 @@ import hashiSchema from "../../../../schemas/canon/hashi.json";
 import skeletonPuzzleSchema from "../../../../schemas/canon/skeleton-puzzle.json";
 import zebraRopeSchema from "../../../../schemas/canon/zebra-rope.json";
 import whimsicalKnightSchema from "../../../../schemas/canon/whimsical-knight.json";
+import ominoTreeSchema from "../../../../schemas/canon/omino-tree.json";
 
 const ajv = new Ajv();
 
@@ -77,6 +78,7 @@ const validators: Record<number, ValidateFunction> = {
   35: ajv.compile(skeletonPuzzleSchema),
   36: ajv.compile(zebraRopeSchema),
   37: ajv.compile(whimsicalKnightSchema),
+  38: ajv.compile(ominoTreeSchema),
 };
 
 export function validateCanon(puzzleType: number, data: unknown): void {
@@ -315,6 +317,27 @@ const semanticChecks: Record<number, (data: any) => void> = {
     };
     circles.forEach((p) => place("circle", p));
     squares.forEach((p) => place("square", p));
+  },
+  // Omino Tree: numbers fill the rows x cols grid; every arrow starts and ends inside it,
+  // and no two arrows share an edge.
+  38: (data: { rows: number; cols: number; numbers: number[][]; arrows: { r: number; c: number; dir: string }[] }) => {
+    const { rows, cols, numbers, arrows } = data;
+    if (numbers.length !== rows || numbers.some((row) => row.length !== cols)) {
+      throw new Error(`Invalid omino tree: numbers must be ${rows}x${cols}`);
+    }
+    const step: Record<string, [number, number]> = { up: [-1, 0], down: [1, 0], left: [0, -1], right: [0, 1] };
+    const seen = new Set<string>();
+    for (const { r, c, dir } of arrows) {
+      const [dr, dc] = step[dir];
+      const r2 = r + dr;
+      const c2 = c + dc;
+      if (r >= rows || c >= cols || r2 < 0 || r2 >= rows || c2 < 0 || c2 >= cols) {
+        throw new Error(`Invalid omino tree: arrow ${dir} from (${r},${c}) leaves the ${cols}x${rows} grid`);
+      }
+      const key = `${Math.min(r, r2)},${Math.min(c, c2)},${dr === 0 ? "v" : "h"}`;
+      if (seen.has(key)) throw new Error(`Invalid omino tree: two arrows on the edge at (${r},${c}) ${dir}`);
+      seen.add(key);
+    }
   },
   // Kuralin: every circle must sit on an interior grid line (edge midpoint or corner,
   // never a cell center), and no two circles may share a spot.

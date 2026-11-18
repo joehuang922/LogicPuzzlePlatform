@@ -52,6 +52,7 @@ data class BoardDraft(
     val zebraRope: ZebraRopeEngine.Board = ZebraRopeEngine.Board(0, 0, emptyList(), emptyList()),
     val whimsicalKnight: WhimsicalKnightEngine.Board =
         WhimsicalKnightEngine.Board(0, 0, emptyList(), emptyList(), emptyList()),
+    val ominoTree: OminoTreeEngine.Board = OminoTreeEngine.Board(0, 0, emptyList(), emptyList()),
 ) {
     /**
      * What the type's misread check finds wrong with this board — the list that turns
@@ -95,6 +96,7 @@ data class BoardDraft(
         AuthoringType.HELL_GOLF -> HellGolfAuthoring.problems(hellGolf)
         AuthoringType.ZEBRA_ROPE -> ZebraRopeAuthoring.problems(zebraRope)
         AuthoringType.WHIMSICAL_KNIGHT -> WhimsicalKnightAuthoring.problems(whimsicalKnight)
+        AuthoringType.OMINO_TREE -> OminoTreeAuthoring.problems(ominoTree)
     }
 
     /**
@@ -122,6 +124,7 @@ data class BoardDraft(
         AuthoringType.SKELETON_PUZZLE -> SkeletonPuzzleAuthoring.formatProblems(skeletonPuzzle)
         AuthoringType.ZEBRA_ROPE -> ZebraRopeAuthoring.formatProblems(zebraRope)
         AuthoringType.WHIMSICAL_KNIGHT -> WhimsicalKnightAuthoring.formatProblems(whimsicalKnight)
+        AuthoringType.OMINO_TREE -> OminoTreeAuthoring.formatProblems(ominoTree)
         else -> emptyList()
     }
 
@@ -211,6 +214,8 @@ data class BoardDraft(
             whimsicalKnight.cols,
             whimsicalKnight.rows,
         )
+        AuthoringType.OMINO_TREE ->
+            CanonBoard(OminoTreeAuthoring.canonFromDraft(ominoTree), ominoTree.cols, ominoTree.rows)
     }
 
     companion object {
@@ -257,6 +262,7 @@ data class BoardDraft(
             AuthoringType.ZEBRA_ROPE -> BoardDraft(zebraRope = ZebraRopeAuthoring.draftFromCanon(canon))
             AuthoringType.WHIMSICAL_KNIGHT ->
                 BoardDraft(whimsicalKnight = WhimsicalKnightAuthoring.draftFromCanon(canon))
+            AuthoringType.OMINO_TREE -> BoardDraft(ominoTree = OminoTreeAuthoring.draftFromCanon(canon))
         }
     }
 }

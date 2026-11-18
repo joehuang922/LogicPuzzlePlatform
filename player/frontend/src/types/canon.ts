@@ -541,3 +541,30 @@ export interface WhimsicalKnightAnswer {
   // each segment is [[r1, c1], [r2, c2]], the smaller dot first, sorted
   segments: [number, number][][];
 }
+
+// Omino Tree (type 38). Cells are (r, c), row 0 at the top.
+export type OminoTreeDir = "up" | "down" | "left" | "right";
+
+export interface OminoTreeArrow {
+  // start cell; the end cell is its neighbour in `dir`
+  r: number;
+  c: number;
+  dir: OminoTreeDir;
+}
+
+export interface OminoTreeCanon {
+  rows: number;
+  cols: number;
+  // rows x cols; 0 = no number, n > 0 = the size of the cell's block
+  numbers: number[][];
+  arrows: OminoTreeArrow[];
+}
+
+export interface OminoTreeAnswer {
+  grids: {
+    // (rows - 1) x cols; 1 = wall between (r, c) and (r + 1, c)
+    h: number[][];
+    // rows x (cols - 1); 1 = wall between (r, c) and (r, c + 1)
+    v: number[][];
+  };
+}

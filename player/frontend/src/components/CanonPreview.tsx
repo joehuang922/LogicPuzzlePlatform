@@ -35,7 +35,8 @@ import HashiBoard from "./HashiBoard";
 import SkeletonPuzzleBoard from "./SkeletonPuzzleBoard";
 import ZebraRopeBoard from "./ZebraRopeBoard";
 import WhimsicalKnightBoard from "./WhimsicalKnightBoard";
-import { NurimazeCanon, DoubleChocoCanon, SlitherlinkCanon, NonogramCanon, MasyuCanon, PencilsCanon, NuritwinCanon, SlalomCanon, ShakashakaCanon, KakuroCanon, YajilinCanon, FillominoCanon, LitsCanon, ChocoBananaCanon, NumberLinkCanon, AkariCanon, HellGolfCanon, TentaishowCanon, HeyawakeCanon, ShikakuCanon, NorinoriCanon, NurikabeCanon, RippleEffectCanon, HitoriCanon, PictoLinkCanon, KuralinCanon, UnequalSudokuCanon, CornerChainCanon, SinkaminoCanon, BalanceLinkCanon, LRingCanon, HashiCanon, SkeletonPuzzleCanon, ZebraRopeCanon, WhimsicalKnightCanon } from "../types/canon";
+import OminoTreeBoard from "./OminoTreeBoard";
+import { NurimazeCanon, DoubleChocoCanon, SlitherlinkCanon, NonogramCanon, MasyuCanon, PencilsCanon, NuritwinCanon, SlalomCanon, ShakashakaCanon, KakuroCanon, YajilinCanon, FillominoCanon, LitsCanon, ChocoBananaCanon, NumberLinkCanon, AkariCanon, HellGolfCanon, TentaishowCanon, HeyawakeCanon, ShikakuCanon, NorinoriCanon, NurikabeCanon, RippleEffectCanon, HitoriCanon, PictoLinkCanon, KuralinCanon, UnequalSudokuCanon, CornerChainCanon, SinkaminoCanon, BalanceLinkCanon, LRingCanon, HashiCanon, SkeletonPuzzleCanon, ZebraRopeCanon, WhimsicalKnightCanon, OminoTreeCanon } from "../types/canon";
 
 export default function CanonPreview({ puzzleType, canonRepr }: { puzzleType: number; canonRepr: string }) {
   let parsed: Record<string, unknown>;
@@ -161,6 +162,9 @@ export default function CanonPreview({ puzzleType, canonRepr }: { puzzleType: nu
   }
   if (puzzleType === 37 && parsed.gray && parsed.circles) {
     return <WhimsicalKnightBoard canon={parsed as unknown as WhimsicalKnightCanon} readonly />;
+  }
+  if (puzzleType === 38 && parsed.numbers && parsed.arrows) {
+    return <OminoTreeBoard canon={parsed as unknown as OminoTreeCanon} readonly />;
   }
   return <p style={{ color: "#666", fontSize: "0.85rem" }}>No preview available for this puzzle type.</p>;
 }

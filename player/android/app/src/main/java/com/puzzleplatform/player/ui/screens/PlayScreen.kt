@@ -103,6 +103,7 @@ import com.puzzleplatform.player.ui.board.YajilinBoard
 import com.puzzleplatform.player.ui.board.KuralinBoard
 import com.puzzleplatform.player.ui.board.ZebraRopeBoard
 import com.puzzleplatform.player.ui.board.WhimsicalKnightBoard
+import com.puzzleplatform.player.ui.board.OminoTreeBoard
 import com.puzzleplatform.player.puzzle.NonogramEngine
 import com.puzzleplatform.player.puzzle.NonogramHinter
 import com.puzzleplatform.player.puzzle.PuzzleEngines
@@ -625,6 +626,13 @@ fun PlayScreen(
                                     puzzle = puzzle,
                                     userValues = state.userValues,
                                     onApplyChanges = vm::putUserValues,
+                                    liveValidate = state.liveValidate,
+                                )
+                                38 -> OminoTreeBoard(
+                                    puzzle = puzzle,
+                                    userValues = state.userValues,
+                                    // Walls keyed "h:r,c"/"v:r,c" -> 1, as in Double Choco.
+                                    onSetEdge = vm::setUserValue,
                                     liveValidate = state.liveValidate,
                                 )
                                 else -> Text("This puzzle type isn't playable in this version yet.")

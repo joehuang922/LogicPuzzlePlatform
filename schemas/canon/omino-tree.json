@@ -1,0 +1,41 @@
+{
+  "title": "Omino Tree Canonical Representation",
+  "description": "A rows x cols grid with dashed interior lines. Some cells hold a number; gray arrows sit on interior edges, each pointing from its start cell into the orthogonally adjacent end cell. The solver draws walls to divide the board into blocks: a number is its block's size; the two cells of an arrow are in different blocks, and the end block is the start block in the same orientation plus one cell; every block holds at least one arrow start or end.",
+  "type": "object",
+  "required": ["rows", "cols", "numbers", "arrows"],
+  "additionalProperties": false,
+  "properties": {
+    "rows": {
+      "description": "Number of cell rows.",
+      "type": "integer",
+      "minimum": 2
+    },
+    "cols": {
+      "description": "Number of cell columns.",
+      "type": "integer",
+      "minimum": 2
+    },
+    "numbers": {
+      "description": "rows x cols; 0 = no number, n > 0 = the size of the cell's block.",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "arrows": {
+      "description": "Arrows by start cell and the direction to the end cell, which must be inside the grid. At most one arrow per edge.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["r", "c", "dir"],
+        "additionalProperties": false,
+        "properties": {
+          "r": { "description": "Start cell row.", "type": "integer", "minimum": 0 },
+          "c": { "description": "Start cell column.", "type": "integer", "minimum": 0 },
+          "dir": { "type": "string", "enum": ["up", "down", "left", "right"] }
+        }
+      }
+    }
+  }
+}

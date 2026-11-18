@@ -134,6 +134,7 @@ enum class AuthoringType(
     HELL_GOLF("Hell Golf", "ヘルゴルフ", HellGolfAuthoring.PUZZLE_TYPE),
     ZEBRA_ROPE("Zebra Rope", "シマシマロープ", ZebraRopeAuthoring.PUZZLE_TYPE),
     WHIMSICAL_KNIGHT("Whimsical Knight", "気まぐれナイト", WhimsicalKnightAuthoring.PUZZLE_TYPE, incubating = true),
+    OMINO_TREE("Omino Tree", "オミノツリー", OminoTreeAuthoring.PUZZLE_TYPE, incubating = true),
     ;
 
     companion object {
