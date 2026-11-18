@@ -185,6 +185,17 @@ describe("matchesSolution", () => {
     expect(matchesSolution(p, { "v:0,1": 1 })).toBe(false); // a wall inside the 2-room
   });
 
+  it("pencils: trails, placed heads and walls against the stored answer", () => {
+    // 1x3, nothing given: body (0,0), head (0,1) pointing right, trail to (0,2).
+    const sol = { trails: { h: [[0, 1]], v: [] }, heads: [[0, -4, 0]], edges: { h: [], v: [[1, 0]] } };
+    const p = puzzle(8, { cells: [[0, 0, 0]] }, sol);
+    expect(matchesSolution(p, { "th:0,1": 1, "hd:0,1": -4, "ev:0,0": 1 })).toBe(true);
+    expect(matchesSolution(p, { "th:0,0": 1 })).toBe(false);
+    expect(matchesSolution(p, { "hd:0,1": -3 })).toBe(false);
+    expect(matchesSolution(p, { "ev:0,1": 1 })).toBe(false);
+    expect(matchesSolution(puzzle(8, { cells: [[0, 0]] }, sol), {})).toBeNull();
+  });
+
   it("nurimaze: painted rooms black, marked rooms white", () => {
     const p = puzzle(3, { cells: [[3, 0], [0, 4]] }, { states: [[2, 1], [2, 2]] });
     expect(matchesSolution(p, { "1,0": 1, "0,1": 2 })).toBe(true);

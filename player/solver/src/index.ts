@@ -41,3 +41,5 @@ export { akariPlugin, AkariModel } from "./plugins/akari";
 export type { AkariCanon } from "./plugins/akari";
 export { fillominoPlugin, FillominoModel } from "./plugins/fillomino";
 export type { FillominoCanon, FillominoSolution } from "./plugins/fillomino";
+export { pencilsPlugin, PencilsModel } from "./plugins/pencils";
+export type { PencilsCanon, PencilsSolution } from "./plugins/pencils";

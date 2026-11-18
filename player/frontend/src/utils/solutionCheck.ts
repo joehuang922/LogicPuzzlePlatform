@@ -248,6 +248,32 @@ const CHECKS: Record<number, (canon: Json, solution: Json) => Expect | null> = {
       return null;
     };
   },
+  // Pencils: { trails: { h, v }, heads, edges: { h, v } }; "th:r,c" / "tv:r,c" -> 1 a
+  // trail segment, "hd:r,c" -> a placed head's direction code, "eh:r,c" / "ev:r,c" -> 1 a
+  // wall: each must be in the solution there.
+  8: (canon, s) => {
+    const cells = canon.cells as unknown[][] | undefined;
+    if (!Array.isArray(cells) || !Array.isArray(cells[0])) return null;
+    const rows = cells.length;
+    const cols = cells[0].length;
+    const t = s.trails as Json | undefined;
+    const e = s.edges as Json | undefined;
+    const layers: Record<string, number[][] | null> = {
+      th: grid(t?.h, rows, cols - 1),
+      tv: grid(t?.v, rows - 1, cols),
+      hd: grid(s.heads, rows, cols),
+      eh: grid(e?.h, rows - 1, cols),
+      ev: grid(e?.v, rows, cols - 1),
+    };
+    if (Object.values(layers).some((g) => !g)) return null;
+    return (key, value) => {
+      const layer = layers[key.slice(0, 2)];
+      const rc = layer && key[2] === ":" ? pair(key.slice(3)) : null;
+      if (!layer || !rc || value === 0) return null;
+      const want = layer[rc[0]]?.[rc[1]];
+      return want === undefined ? null : want === value;
+    };
+  },
   // LITS: { shaded: rows x cols of 0/1 }; "c:col,row" -> 1 shaded, 2 marked unshaded.
   15: (canon, s) => {
     const g = canon.grids as { h?: unknown[]; v?: unknown[][] } | undefined;

@@ -186,4 +186,15 @@ class SolutionCheckTest {
         assertEquals(false, FillominoEngine.matchesSolution(p, mapOf("c:2,0" to 3)))
         assertEquals(false, FillominoEngine.matchesSolution(p, mapOf("v:0,1" to 1)))
     }
+
+    @Test
+    fun `pencils trails heads and walls against the stored answer`() {
+        val sol = """{"trails":{"h":[[0,1]],"v":[]},"heads":[[0,-4,0]],"edges":{"h":[],"v":[[1,0]]}}"""
+        val p = puzzle(8, """{"cells":[[0,0,0]]}""", sol)
+        assertEquals(true, PencilsEngine.matchesSolution(p, mapOf("th:0,1" to 1, "hd:0,1" to -4, "ev:0,0" to 1)))
+        assertEquals(false, PencilsEngine.matchesSolution(p, mapOf("th:0,0" to 1)))
+        assertEquals(false, PencilsEngine.matchesSolution(p, mapOf("hd:0,1" to -3)))
+        assertEquals(false, PencilsEngine.matchesSolution(p, mapOf("ev:0,1" to 1)))
+        assertEquals(null, PencilsEngine.matchesSolution(puzzle(8, """{"cells":[[0,0]]}""", sol), emptyMap()))
+    }
 }

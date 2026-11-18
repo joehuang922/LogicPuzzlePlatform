@@ -288,6 +288,31 @@ object PencilsEngine : PuzzleEngine {
     override fun computeProgress(puzzle: Puzzle, userValues: Map<String, Int>): Double =
         PencilsRules.progress(parseCells(puzzle), userValues)
 
+    /**
+     * "th:r,c" / "tv:r,c" -> 1 a trail segment, "hd:r,c" -> a placed head's direction,
+     * "eh:r,c" / "ev:r,c" -> 1 a wall: each must be in the stored answer there.
+     */
+    override fun matchesSolution(puzzle: Puzzle, userValues: Map<String, Int>): Boolean? {
+        val (rows, cols) = dims(parseCells(puzzle))
+        val sol = puzzle.solutionRepr ?: return null
+        val trails = sol["trails"] as? JsonObject
+        val edges = sol["edges"] as? JsonObject
+        val layers = mapOf(
+            "th" to (SolutionCheck.grid(trails?.get("h"), rows, cols - 1) ?: return null),
+            "tv" to (SolutionCheck.grid(trails?.get("v"), rows - 1, cols) ?: return null),
+            "hd" to (SolutionCheck.grid(sol["heads"], rows, cols) ?: return null),
+            "eh" to (SolutionCheck.grid(edges?.get("h"), rows - 1, cols) ?: return null),
+            "ev" to (SolutionCheck.grid(edges?.get("v"), rows, cols - 1) ?: return null),
+        )
+        return SolutionCheck.matches(userValues) { key, value ->
+            val layer = layers[key.substringBefore(':', "")] ?: return@matches null
+            val (r, c) = SolutionCheck.pair(key.substringAfter(':')) ?: return@matches null
+            if (value == 0) return@matches null
+            val want = layer.getOrNull(r)?.getOrNull(c) ?: return@matches null
+            want == value
+        }
+    }
+
     override fun isComplete(puzzle: Puzzle, userValues: Map<String, Int>): Boolean {
         val cells = parseCells(puzzle)
         val (rows, cols) = dims(cells)

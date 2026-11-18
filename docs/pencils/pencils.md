@@ -77,6 +77,28 @@ The answer encodes three layers: trail lines between cell centers (horizontal an
 
 All cells are covered (every cell is part of exactly one pencil's head, body, or trail), all pencil constraints (body length = number, trail length = body length, no overlaps/crossings) are satisfied simultaneously.
 
+## Solver
+
+`player/solver/src/plugins/pencils` proves uniqueness at create/edit (the auto-solve gate)
+and stores the solution (trails, placed heads, walls around every body) for the on-track
+check. Every pencil is one path through cells: body end, a straight 1xN body, the head,
+then a trail of N steps, and the pencils cover the board. So the variables are the edges
+between neighbouring cells, each none, body link or trail link:
+
+- each cell takes one role (body end, straight body middle, head with one body and one
+  trail link, trail middle, trail end); a number is a body cell, a given head has its body
+  on the side away from where it points;
+- each number lists the placements of its body (N cells in a line through it, the head at
+  either end) and fixes what all live ones agree on;
+- along every chain of decided links: one head at most, a finished body fixes the trail's
+  length and vice versa, a chain that reaches its length is capped, no loops.
+
+It solves by the documented rules, which are a little stricter than the board's completion
+check: that check also accepts a rectangular (not 1xN) body, a head in the middle of its
+trail and a number on a trail. Failed-literal probing over every (edge, value) runs at
+construction and every search node, with propagation re-running only the rules on changed
+edges. 10x10 ~35ms (no search), 17x17 ~0.2s, 45x31 ~1.4s (a short search).
+
 ## Puzzle Player
 
 ### Interactions
