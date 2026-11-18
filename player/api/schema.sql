@@ -9,7 +9,10 @@ CREATE TABLE IF NOT EXISTS puzzle_types (
   id           INT          NOT NULL PRIMARY KEY,
   name         VARCHAR(128) NOT NULL,
   jp_label     VARCHAR(128) NOT NULL,
-  rule         TEXT         NOT NULL
+  rule         TEXT         NOT NULL,
+  -- Experimental, reader-invented types from a single magazine appearance (few
+  -- puzzles, not published periodically). Listed after every other type.
+  incubating   TINYINT(1)   NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS puzzle_collections (

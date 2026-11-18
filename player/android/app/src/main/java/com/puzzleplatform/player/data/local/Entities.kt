@@ -21,6 +21,7 @@ data class PuzzleTypeEntity(
     val name: String,
     val jpLabel: String,
     val rule: String,
+    @ColumnInfo(defaultValue = "0") val incubating: Boolean = false,
 )
 
 @Entity(tableName = "collections")

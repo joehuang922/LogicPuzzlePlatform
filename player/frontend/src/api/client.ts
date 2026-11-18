@@ -247,6 +247,20 @@ export interface PuzzleType {
   rule: string;
   /** Live puzzles of this type. */
   puzzleCount?: number;
+  /**
+   * Experimental, reader-invented type from a single magazine appearance (few puzzles,
+   * not published periodically). Listed after every other type.
+   */
+  incubating?: boolean;
+}
+
+/** Type order for every list and dropdown: regular types by id, then incubating ones by id. */
+export function comparePuzzleTypes(a: PuzzleType, b: PuzzleType): number {
+  return Number(!!a.incubating) - Number(!!b.incubating) || a.id - b.id;
+}
+
+export function sortPuzzleTypes(types: PuzzleType[]): PuzzleType[] {
+  return [...types].sort(comparePuzzleTypes);
 }
 
 export function listPuzzleTypes() {

@@ -19,6 +19,7 @@ If any of these are missing, ask before proceeding.
    - **Editor interaction** — how the editor creates/edits puzzles (click to cycle, resize controls, etc.)
    - **Editor appearance** — any differences from the player view (dots for empty cells, extra controls, etc.)
    - **Grid line style** — are the grid lines in the sample images solid or dashed/dotted? This determines whether the parser uses `detect_grid_lines` (solid) or `auto_detect_grid_lines` (dashed — auto-sweeps erode sizes for optimal detection).
+   - **Incubating?** — is this an experimental, reader-invented type from a single magazine appearance (a handful of puzzles, not published periodically, e.g. Whimsical Knight)? Incubating types are listed after every other type in all views and dropdowns (web and Android). Default no.
    - **Picture puzzle?** — does the solution draw a picture (Nonogram, Tentaishow, Picto Link, Zebra Rope)? If so the player gets a live preview panel above the board and the Android collection shows a solved thumbnail (Phase 12).
 4. Draft the full documentation file following the template in existing docs (e.g., `docs/nurimaze/nurimaze.md`). Must include all sections:
    - Puzzle Type ID
@@ -105,12 +106,13 @@ If any of these are missing, ask before proceeding.
 
 ## Phase 11: Database
 
-1. Add an `INSERT INTO puzzle_types` entry in `player/api/seed.sql` with the new ID, name, and rule text.
+1. Add an `INSERT INTO puzzle_types` entry in `player/api/seed.sql` with the new ID, name, and rule text. If the type is incubating, add its id to the `UPDATE puzzle_types SET incubating = 1 WHERE id IN (...)` line after the inserts.
 2. Apply just the new row to the live DB (do NOT run the whole `seed.sql` via `--file` — it is a destructive reset + sample seed). Use the idempotent MySQL upsert with `player/api/db.sh`:
    ```
    ./player/api/db.sh "INSERT INTO puzzle_types (id, name, jp_label, rule) VALUES (<id>, '<name>', '<jp label>', '<rule>') ON DUPLICATE KEY UPDATE name = VALUES(name), jp_label = VALUES(jp_label), rule = VALUES(rule)"
    ```
    Notes: escape single quotes in the rule text by doubling them (`''`). The DB is MySQL (RDS Data API), so use `ON DUPLICATE KEY UPDATE`, not Postgres `ON CONFLICT`. Aurora Serverless auto-pauses — if the first call returns `DatabaseResumingException`, wait ~12s and retry. Verify with `./player/api/db.sh "SELECT id, name FROM puzzle_types WHERE id = <id>"`.
+3. Incubating type: `./player/api/db.sh "UPDATE puzzle_types SET incubating = 1 WHERE id = <id>"`.
 
 ## Phase 12: Android port
 
@@ -131,7 +133,7 @@ Every new type is ported to Android by default: the player, and the admin author
 The Android analog of the web editor, used to review a parsed board (batch upload) and to edit a stored question. Model it on the closest existing type (`KuralinAuthoring` for points on grid lines, `SinkaminoAuthoring` for dragged paths, `ZebraRopeAuthoring` / `WhimsicalKnightAuthoring` for both).
 
 8. Create `puzzle/<PuzzleName>Authoring.kt`, a pure object (no Android types): `PUZZLE_TYPE`, `draftFromCanon`, `canonFromDraft`, `previewPuzzle` (a throwaway `Puzzle` for the review board, its id keyed on the size), the edit operations (cycle/toggle a clue, extend/add/remove a path, add/remove a row or column at the bottom/right), `formatProblems` (port of the web editor's, which the API rejects too) and `problems` (format problems plus overridable misread warnings, e.g. "No clues"). The draft can be the engine's own board type.
-9. Add the type to `AuthoringType` in `puzzle/BatchAuthoring.kt` (label, the `jp_label` from `seed.sql`, `PUZZLE_TYPE`); `AuthoringTypeTest` checks the label.
+9. Add the type to `AuthoringType` in `puzzle/BatchAuthoring.kt` (label, the `jp_label` from `seed.sql`, `PUZZLE_TYPE`, and `incubating = true` for an incubating type); `AuthoringTypeTest` checks the label and the flag against `seed.sql`.
 10. Wire it into `puzzle/BoardDraft.kt`: a draft field, and a branch in `problems`, `formatProblems`, `toCanon` and `fromCanon`.
 11. Create `ui/screens/<PuzzleName>Editor.kt`: the draft on the player board with edit hooks (the board takes optional callbacks, e.g. `onTapPoint`, `onEditTap`, precise drags; in edit mode taps don't play and a picture preview is hidden), the problems list, mode chips if taps and drags edit different things, and add/remove row/column buttons. Add a branch for it in `ui/screens/BoardDraftEditor.kt`.
 12. Create `ui/board/<PuzzleName>MiniBoard.kt`, the batch tile's thumbnail (framed red when `hasProblems`), and add it to `BoardDraftMiniBoard` in `BoardDraftEditor.kt`.

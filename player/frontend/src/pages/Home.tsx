@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { listPuzzles, listCollections, listPuzzleTypes, listAttempts, getSolvedQuestions, getCollectionProgress, createAttempt, sortCollections, getAttemptSnapshot, Collection, CollectionProgress, Attempt, PuzzleType, Puzzle } from "../api/client";
+import { sortPuzzleTypes, listPuzzles, listCollections, listPuzzleTypes, listAttempts, getSolvedQuestions, getCollectionProgress, createAttempt, sortCollections, getAttemptSnapshot, Collection, CollectionProgress, Attempt, PuzzleType, Puzzle } from "../api/client";
 import { PuzzleDefinition } from "../types/puzzle";
 import { DIFFICULTY_LABELS } from "../constants";
 import { extractAnswer } from "../extractors";
@@ -459,10 +459,9 @@ export default function Home() {
     );
   }
 
-  // Types that have puzzles, in type order (puzzleCount absent: list it anyway).
-  const browseTypes = puzzleTypes
-    .filter((t) => (t.puzzleCount ?? 1) > 0)
-    .sort((a, b) => a.id - b.id);
+  // Types that have puzzles, in type order with incubating types last (puzzleCount
+  // absent: list it anyway).
+  const browseTypes = sortPuzzleTypes(puzzleTypes.filter((t) => (t.puzzleCount ?? 1) > 0));
 
   return (
     <div>

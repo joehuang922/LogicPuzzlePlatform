@@ -12,7 +12,10 @@ CREATE TABLE IF NOT EXISTS puzzle_types (
   id           INT          NOT NULL PRIMARY KEY,
   name         VARCHAR(128) NOT NULL,
   jp_label     VARCHAR(128) NOT NULL,
-  rule         TEXT         NOT NULL
+  rule         TEXT         NOT NULL,
+  -- Experimental, reader-invented types from a single magazine appearance (few
+  -- puzzles, not published periodically). Listed after every other type.
+  incubating   TINYINT(1)   NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS puzzle_collections (
@@ -107,6 +110,9 @@ INSERT INTO puzzle_types (id, name, jp_label, rule) VALUES
   (35, 'skeleton-puzzle', 'スケルトンパズル', 'Fit every word of the list into the board, one kana per cell, reading left to right or top to bottom. Each run of two or more cells holds exactly one word of its length, every word is used once, and where two words cross they share the same kana. Small kana such as ッ or ゃ are written full-size.'),
   (36, 'zebra-rope', 'シマシマロープ', 'Shade some cells. A circle tells which kind of cell is the majority of the cells touching it: black means more shaded cells, white means more unshaded cells, gray means equal numbers. The cells each gray rope passes through are all unshaded, all shaded, or alternate shaded and unshaded along the rope. A rope crossing a cell corner diagonally passes only the two cells it joins, not the other cells at that corner.'),
   (37, 'whimsical-knight', '気まぐれナイト', 'Draw segments between dots to form a single closed loop. A segment runs one step up, down, left or right, or a knight''s move (1x2). The loop passes through the centre of every white circle and white square: it goes straight through a circle and turns at a right angle at a square. A knight segment may not pass over a gray square. Segments may not cross or branch.');
+
+-- Incubating types (see the column comment): listed after every other type.
+UPDATE puzzle_types SET incubating = 1 WHERE id IN (37);
 
 -- Seed sample puzzle: sudoku (difficulty 4 = hard)
 INSERT INTO puzzle_questions (id, puzzle_type, title, difficulty, width, height, canon_repr) VALUES (

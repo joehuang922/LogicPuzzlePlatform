@@ -20,7 +20,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SnapshotEntity::class,
         CollectionDownloadEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -55,13 +55,20 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v3 -> v4: add puzzle_types.incubating, so offline lists still put incubating types last. */
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE puzzle_types ADD COLUMN incubating INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
                     "puzzle-player.db",
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { instance = it }
             }
     }
 }

@@ -184,7 +184,13 @@ data class PuzzleType(
     // Live puzzles of the type; null when read from the Room cache, which doesn't
     // store it (Home's type view then lists every type).
     val puzzleCount: Int? = null,
+    // Experimental, reader-invented type from a single magazine appearance (few puzzles,
+    // not published periodically). Listed after every other type.
+    val incubating: Boolean = false,
 )
+
+/** Type order for every list: regular types by id, then incubating ones by id. */
+fun List<PuzzleType>.inTypeOrder(): List<PuzzleType> = sortedWith(compareBy({ it.incubating }, { it.id }))
 
 @Serializable
 data class PuzzleTypeListResponse(val puzzleTypes: List<PuzzleType>)

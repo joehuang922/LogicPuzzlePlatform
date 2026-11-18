@@ -15,9 +15,9 @@ import kotlinx.serialization.json.JsonObject
  * canonRepr / currentAnswer are kept as raw JSON strings on both sides.
  */
 
-fun PuzzleType.toEntity() = PuzzleTypeEntity(id, name, jpLabel, rule)
+fun PuzzleType.toEntity() = PuzzleTypeEntity(id, name, jpLabel, rule, incubating)
 
-fun PuzzleTypeEntity.toModel() = PuzzleType(id, name, jpLabel, rule)
+fun PuzzleTypeEntity.toModel() = PuzzleType(id, name, jpLabel, rule, incubating = incubating)
 
 fun Collection.toEntity() =
     CollectionEntity(id, name, publisher, publishAt, coverSrc, puzzleCount, sealed)

@@ -21,4 +21,20 @@ class AuthoringTypeTest {
             assertEquals("jp label for $t", jpLabels[t.puzzleType], t.jpLabel)
         }
     }
+
+    @Test
+    fun `incubating flags match the server seed`() {
+        val seed = File("../../api/seed.sql").readText()
+        val incubating = Regex("""UPDATE puzzle_types SET incubating = 1 WHERE id IN \(([^)]*)\)""")
+            .findAll(seed)
+            .flatMap { m -> m.groupValues[1].split(",").map { it.trim().toInt() } }
+            .toSet()
+        for (t in AuthoringType.entries) {
+            assertEquals("incubating for $t", t.puzzleType in incubating, t.incubating)
+        }
+        // Incubating types come last in the dropdown.
+        val ordered = AuthoringType.ordered
+        assertEquals(ordered.sortedBy { it.incubating }, ordered)
+        assertEquals(AuthoringType.WHIMSICAL_KNIGHT, ordered.last())
+    }
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, FormEvent } from "react";
 import {
   listPuzzleTypes,
+  sortPuzzleTypes,
   listCollections,
   sortCollections,
   listPuzzles,
@@ -465,7 +466,7 @@ function QuestionForm({
           <label>Puzzle type *</label>
           <select style={inputStyle} value={puzzleType} onChange={(e) => setPuzzleType(e.target.value)}>
             <option value="">— Select —</option>
-            {puzzleTypes.map((pt) => (
+            {sortPuzzleTypes(puzzleTypes).map((pt) => (
               <option key={pt.id} value={pt.id}>{pt.jpLabel}</option>
             ))}
           </select>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { unzip } from "fflate";
-import { parseImage, createPuzzle, isGateTimeout, PuzzleType, Collection } from "../api/client";
+import { parseImage, createPuzzle, isGateTimeout, PuzzleType, Collection, sortPuzzleTypes } from "../api/client";
 import OverrideGateButton from "./OverrideGateButton";
 import { extractBase64, blobToDataUrl } from "../utils/image";
 import { cardStyle, fieldStyle, inputStyle, errorStyle } from "../styles/admin";
@@ -518,7 +518,7 @@ export default function BatchUploadForm({
           <label style={{ fontSize: "0.8rem", fontWeight: "bold" }}>Puzzle type *</label>
           <select style={inputStyle} value={puzzleType} onChange={(e) => handlePuzzleTypeChange(e.target.value)}>
             <option value="">— Select —</option>
-            {puzzleTypes.map((pt) => (
+            {sortPuzzleTypes(puzzleTypes).map((pt) => (
               <option key={pt.id} value={pt.id}>{pt.jpLabel}</option>
             ))}
           </select>

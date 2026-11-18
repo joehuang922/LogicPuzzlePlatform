@@ -796,7 +796,7 @@ private fun TypeDropdown(
             expanded = expanded && enabled,
             onDismissRequest = { expanded = false },
         ) {
-            for (t in AuthoringType.entries) {
+            for (t in AuthoringType.ordered) {
                 DropdownMenuItem(
                     text = { Text(t.jpLabel) },
                     onClick = { onSelect(t); expanded = false },

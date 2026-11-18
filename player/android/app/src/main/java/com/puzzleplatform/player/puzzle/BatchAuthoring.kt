@@ -89,7 +89,14 @@ object BatchRules {
  * Predefined so the dropdown never waits on the network; it must match `jp_label` in
  * `player/api/seed.sql` (checked by `AuthoringTypeTest`).
  */
-enum class AuthoringType(val label: String, val jpLabel: String, val puzzleType: Int) {
+enum class AuthoringType(
+    val label: String,
+    val jpLabel: String,
+    val puzzleType: Int,
+    // Experimental one-off type, listed last; must match `incubating` in seed.sql (also
+    // checked by `AuthoringTypeTest`).
+    val incubating: Boolean = false,
+) {
     SUDOKU("Sudoku", "数独", SudokuAuthoring.PUZZLE_TYPE),
     COMBO_SUDOKU("Combo Sudoku", "合体数独", ComboSudokuAuthoring.PUZZLE_TYPE),
     NONOGRAM("Nonogram", "お絵かきロジック", NonogramAuthoring.PUZZLE_TYPE),
@@ -126,10 +133,13 @@ enum class AuthoringType(val label: String, val jpLabel: String, val puzzleType:
     CHOCO_BANANA("Choco Banana", "チョコバナナ", ChocoBananaAuthoring.PUZZLE_TYPE),
     HELL_GOLF("Hell Golf", "ヘルゴルフ", HellGolfAuthoring.PUZZLE_TYPE),
     ZEBRA_ROPE("Zebra Rope", "シマシマロープ", ZebraRopeAuthoring.PUZZLE_TYPE),
-    WHIMSICAL_KNIGHT("Whimsical Knight", "気まぐれナイト", WhimsicalKnightAuthoring.PUZZLE_TYPE),
+    WHIMSICAL_KNIGHT("Whimsical Knight", "気まぐれナイト", WhimsicalKnightAuthoring.PUZZLE_TYPE, incubating = true),
     ;
 
     companion object {
+        /** Dropdown order: as declared, with incubating types last. */
+        val ordered: List<AuthoringType> get() = entries.sortedBy { it.incubating }
+
         /** The authoring type a stored question of [puzzleType] is edited as, if any. */
         fun forPuzzleType(puzzleType: Int): AuthoringType? = entries.firstOrNull { it.puzzleType == puzzleType }
     }

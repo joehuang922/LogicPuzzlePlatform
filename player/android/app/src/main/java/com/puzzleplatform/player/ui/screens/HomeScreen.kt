@@ -52,6 +52,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.puzzleplatform.player.data.model.inTypeOrder
 import com.puzzleplatform.player.data.model.Collection
 import com.puzzleplatform.player.data.model.Puzzle
 import com.puzzleplatform.player.data.model.PuzzleType
@@ -140,7 +141,7 @@ fun HomeScreen(
                     // type) or types first (each opening onto its puzzles by collection).
                     val browseTypes = state.puzzleTypes
                         .filter { (it.puzzleCount ?: 1) > 0 }
-                        .sortedBy { it.id }
+                        .inTypeOrder()
                     if (state.collections.isNotEmpty() || browseTypes.isNotEmpty()) {
                         item(key = "browse-header") {
                             BrowseHeader(state.browseMode, onModeChange = vm::setBrowseMode)
