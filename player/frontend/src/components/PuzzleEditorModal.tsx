@@ -40,6 +40,7 @@ import SkeletonPuzzleEditor from "./SkeletonPuzzleEditor";
 import ZebraRopeEditor from "./ZebraRopeEditor";
 import WhimsicalKnightEditor from "./WhimsicalKnightEditor";
 import OminoTreeEditor from "./OminoTreeEditor";
+import MinusRoomEditor from "./MinusRoomEditor";
 
 // Puzzle types that have a visual board editor.
 export const EDITOR_TYPE_NAMES = [
@@ -48,7 +49,7 @@ export const EDITOR_TYPE_NAMES = [
   "fillomino", "lits", "choco-banana", "number-link", "akari", "hell-golf",
   "tentaishow", "heyawake", "shikaku", "norinori", "nurikabe", "ripple-effect",
   "hitori", "picto-link", "kuralin", "unequal-sudoku", "corner-chain", "sinkamino", "balance-link", "l-ring", "hashi", "skeleton-puzzle",
-  "zebra-rope", "whimsical-knight", "omino-tree",
+  "zebra-rope", "whimsical-knight", "omino-tree", "minus-room",
 ];
 
 export function hasVisualEditor(typeName: string | undefined): boolean {
@@ -107,6 +108,7 @@ function CanonEditor({
     case "zebra-rope": return <ZebraRopeEditor initialJson={canonRepr} onChange={onChange} />;
     case "whimsical-knight": return <WhimsicalKnightEditor initialJson={canonRepr} onChange={onChange} />;
     case "omino-tree": return <OminoTreeEditor initialJson={canonRepr} onChange={onChange} />;
+    case "minus-room": return <MinusRoomEditor initialJson={canonRepr} onChange={onChange} />;
     default: return null;
   }
 }

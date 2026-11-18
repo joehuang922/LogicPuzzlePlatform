@@ -41,6 +41,7 @@ import { skeletonPuzzleRenderer } from "./renderers/skeletonPuzzle";
 import { zebraRopeRenderer } from "./renderers/zebraRope";
 import { whimsicalKnightRenderer } from "./renderers/whimsicalKnight";
 import { ominoTreeRenderer } from "./renderers/ominoTree";
+import { minusRoomRenderer } from "./renderers/minusRoom";
 
 registerRenderer(comboSudokuRenderer);
 registerRenderer(sudokuRenderer);
@@ -80,6 +81,7 @@ registerRenderer(skeletonPuzzleRenderer);
 registerRenderer(zebraRopeRenderer);
 registerRenderer(whimsicalKnightRenderer);
 registerRenderer(ominoTreeRenderer);
+registerRenderer(minusRoomRenderer);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

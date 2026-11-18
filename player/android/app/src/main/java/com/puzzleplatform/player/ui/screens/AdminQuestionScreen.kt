@@ -377,6 +377,10 @@ fun AdminQuestionScreen(
                                     "Tap a tile to review its photo and grid side by side, fix mis-read " +
                                         "numbers or arrows, and set its title. A red tile has no arrows or an " +
                                         "arrow that can't be right."
+                                AuthoringType.MINUS_ROOM ->
+                                    "Tap a tile to review its photo and grid side by side, fix mis-read " +
+                                        "walls, numbers, circles or the 1〜N range, and set its title. A red " +
+                                        "tile has a wall that ends inside a room or a value out of range."
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -668,6 +672,10 @@ private fun ReviewScreen(
                         "Compare the photo with the grid — pinch to zoom the photo. In Numbers, tap a cell " +
                             "to type its number; in Arrows, tap an edge to cycle its arrow. Add or remove a " +
                             "row or column at the edge."
+                    AuthoringType.MINUS_ROOM ->
+                        "Compare the photo with the grid — pinch to zoom the photo, check the range (Max). " +
+                            "In Numbers, tap a cell to type its given; in Walls, tap a line to toggle a wall; " +
+                            "in Circles, tap a line and type its difference. Add or remove a row or column at the edge."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

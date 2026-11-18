@@ -104,6 +104,8 @@ import com.puzzleplatform.player.ui.board.KuralinBoard
 import com.puzzleplatform.player.ui.board.ZebraRopeBoard
 import com.puzzleplatform.player.ui.board.WhimsicalKnightBoard
 import com.puzzleplatform.player.ui.board.OminoTreeBoard
+import com.puzzleplatform.player.ui.board.MinusRoomBoard
+import com.puzzleplatform.player.puzzle.MinusRoomEngine
 import com.puzzleplatform.player.puzzle.NonogramEngine
 import com.puzzleplatform.player.puzzle.NonogramHinter
 import com.puzzleplatform.player.puzzle.PuzzleEngines
@@ -180,7 +182,12 @@ fun PlayScreen(
                     val cellHasAnswer = (state.userValues[selected] ?: 0) > 0
                     // A sudoku above 9x9 takes digits up to N (16-30); the bar becomes a
                     // pad of 1..N, marking the selected cell's pencil marks in note mode.
-                    val maxDigit = if (type == 1) state.puzzle?.let { SudokuEngine.dims(it).size } ?: 9 else 9
+                    // Minus Room takes 1..max, the puzzle's own range.
+                    val maxDigit = when (type) {
+                        1 -> state.puzzle?.let { SudokuEngine.dims(it).size } ?: 9
+                        39 -> state.puzzle?.let { MinusRoomEngine.parseBoard(it).max } ?: 9
+                        else -> 9
+                    }
                     val noteMode = state.noteMode && !cellHasAnswer
                     DigitBar(
                         onDigit = vm::enterDigit,
@@ -633,6 +640,15 @@ fun PlayScreen(
                                     userValues = state.userValues,
                                     // Walls keyed "h:r,c"/"v:r,c" -> 1, as in Double Choco.
                                     onSetEdge = vm::setUserValue,
+                                    liveValidate = state.liveValidate,
+                                )
+                                39 -> MinusRoomBoard(
+                                    puzzle = puzzle,
+                                    userValues = state.userValues,
+                                    // As Ripple Effect: tap a non-given cell, the DigitBar (1..max)
+                                    // enters its number keyed "col,row".
+                                    selectedCell = state.selectedCell,
+                                    onSelectCell = vm::selectCell,
                                     liveValidate = state.liveValidate,
                                 )
                                 else -> Text("This puzzle type isn't playable in this version yet.")

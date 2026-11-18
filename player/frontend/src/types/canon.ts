@@ -568,3 +568,29 @@ export interface OminoTreeAnswer {
     v: number[][];
   };
 }
+
+// Minus Room (type 39). Cells are (r, c), row 0 at the top; circles use doubled
+// coordinates: cell (r, c) is (2r, 2c), an edge has exactly one odd coordinate.
+export interface MinusRoomCircle {
+  dr: number;
+  dc: number;
+  // the difference of its two cells
+  value: number;
+}
+
+export interface MinusRoomCanon {
+  rows: number;
+  cols: number;
+  // cells take 1..max
+  max: number;
+  // rows x cols; 0 = empty, 1..max = given
+  cells: number[][];
+  // room walls: h (rows - 1) x cols, v rows x (cols - 1); 1 = wall
+  edges: { h: number[][]; v: number[][] };
+  circles: MinusRoomCircle[];
+}
+
+export interface MinusRoomAnswer {
+  // rows x cols, givens included; 0 = empty
+  numbers: number[][];
+}

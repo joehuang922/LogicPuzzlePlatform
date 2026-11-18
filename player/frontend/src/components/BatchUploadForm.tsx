@@ -67,8 +67,8 @@ function computeDimensions(typeId: number, canon: Record<string, unknown>): { w?
   if ((typeId === 21 || typeId === 28 || typeId === 36) && typeof canon.width === "number" && typeof canon.height === "number") {
     return { w: canon.width as number, h: canon.height as number };
   }
-  // Whimsical Knight (dot lattice) and Omino Tree (cells): sized by rows / cols.
-  if ((typeId === 37 || typeId === 38) && typeof canon.cols === "number" && typeof canon.rows === "number") {
+  // Whimsical Knight (dot lattice), Omino Tree and Minus Room (cells): sized by rows / cols.
+  if ((typeId === 37 || typeId === 38 || typeId === 39) && typeof canon.cols === "number" && typeof canon.rows === "number") {
     return { w: canon.cols as number, h: canon.rows as number };
   }
   return {};

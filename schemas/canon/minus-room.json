@@ -1,0 +1,49 @@
+{
+  "title": "Minus Room Canonical Representation",
+  "description": "A rows x cols grid divided into rooms by thick walls. Some cells hold a given number; circled numbers sit on edges between two adjacent cells. The solver fills every cell with 1..max so that, inside each room, a block of equal adjacent numbers k has exactly k cells and no room holds two blocks of one number; a circle is the difference of its two cells; equal numbers never form a 2x2 clump.",
+  "type": "object",
+  "required": ["rows", "cols", "max", "cells", "edges", "circles"],
+  "additionalProperties": false,
+  "properties": {
+    "rows": { "description": "Number of cell rows.", "type": "integer", "minimum": 2 },
+    "cols": { "description": "Number of cell columns.", "type": "integer", "minimum": 2 },
+    "max": { "description": "Largest number; cells take 1..max.", "type": "integer", "minimum": 1, "maximum": 9 },
+    "cells": {
+      "description": "rows x cols; 0 = empty, 1..max = a given number.",
+      "type": "array",
+      "items": { "type": "array", "items": { "type": "integer", "minimum": 0 } }
+    },
+    "edges": {
+      "description": "Room walls. Board perimeter is an implicit wall.",
+      "type": "object",
+      "required": ["h", "v"],
+      "additionalProperties": false,
+      "properties": {
+        "h": {
+          "description": "(rows-1) x cols; 1 = wall between (r, c) and (r+1, c).",
+          "type": "array",
+          "items": { "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 1 } }
+        },
+        "v": {
+          "description": "rows x (cols-1); 1 = wall between (r, c) and (r, c+1).",
+          "type": "array",
+          "items": { "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 1 } }
+        }
+      }
+    },
+    "circles": {
+      "description": "Circled differences on edges, in doubled coordinates: cell (r, c) is (2r, 2c); an edge has exactly one odd coordinate.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["dr", "dc", "value"],
+        "additionalProperties": false,
+        "properties": {
+          "dr": { "type": "integer", "minimum": 0 },
+          "dc": { "type": "integer", "minimum": 0 },
+          "value": { "description": "The difference, 0..max-1.", "type": "integer", "minimum": 0 }
+        }
+      }
+    }
+  }
+}

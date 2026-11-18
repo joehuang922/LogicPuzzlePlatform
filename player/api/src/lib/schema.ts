@@ -37,6 +37,7 @@ import skeletonPuzzleSchema from "../../../../schemas/canon/skeleton-puzzle.json
 import zebraRopeSchema from "../../../../schemas/canon/zebra-rope.json";
 import whimsicalKnightSchema from "../../../../schemas/canon/whimsical-knight.json";
 import ominoTreeSchema from "../../../../schemas/canon/omino-tree.json";
+import minusRoomSchema from "../../../../schemas/canon/minus-room.json";
 
 const ajv = new Ajv();
 
@@ -79,6 +80,7 @@ const validators: Record<number, ValidateFunction> = {
   36: ajv.compile(zebraRopeSchema),
   37: ajv.compile(whimsicalKnightSchema),
   38: ajv.compile(ominoTreeSchema),
+  39: ajv.compile(minusRoomSchema),
 };
 
 export function validateCanon(puzzleType: number, data: unknown): void {
@@ -336,6 +338,38 @@ const semanticChecks: Record<number, (data: any) => void> = {
       }
       const key = `${Math.min(r, r2)},${Math.min(c, c2)},${dr === 0 ? "v" : "h"}`;
       if (seen.has(key)) throw new Error(`Invalid omino tree: two arrows on the edge at (${r},${c}) ${dir}`);
+      seen.add(key);
+    }
+  },
+  // Minus Room: cells fit rows x cols with givens in 1..max; walls fit and every wall
+  // separates two rooms; circles sit on an edge between two cells, one per edge, with a
+  // difference below max.
+  39: (data: {
+    rows: number;
+    cols: number;
+    max: number;
+    cells: number[][];
+    edges: { h: number[][]; v: number[][] };
+    circles: { dr: number; dc: number; value: number }[];
+  }) => {
+    const { rows, cols, max, cells, edges, circles } = data;
+    if (cells.length !== rows || cells.some((row) => row.length !== cols)) {
+      throw new Error(`Invalid minus room: cells must be ${rows}x${cols}`);
+    }
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (cells[r][c] > max) throw new Error(`Invalid minus room: given ${cells[r][c]} at (${r},${c}) is above ${max}`);
+      }
+    }
+    checkRoomWalls("minus room", rows, cols, edges.h, edges.v);
+    const seen = new Set<string>();
+    for (const { dr, dc, value } of circles) {
+      if ((dr + dc) % 2 !== 1 || dr > 2 * (rows - 1) || dc > 2 * (cols - 1)) {
+        throw new Error(`Invalid minus room: circle at (${dr},${dc}) is not on an edge between two cells`);
+      }
+      if (value > max - 1) throw new Error(`Invalid minus room: circle ${value} at (${dr},${dc}) is ${max} or more`);
+      const key = `${dr},${dc}`;
+      if (seen.has(key)) throw new Error(`Invalid minus room: two circles at (${dr},${dc})`);
       seen.add(key);
     }
   },

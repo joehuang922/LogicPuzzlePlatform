@@ -23,6 +23,7 @@ import com.puzzleplatform.player.ui.board.BlackCellMiniBoard
 import com.puzzleplatform.player.ui.board.ComboSudokuMiniBoard
 import com.puzzleplatform.player.ui.board.ClueGridMiniBoard
 import com.puzzleplatform.player.ui.board.OminoTreeMiniBoard
+import com.puzzleplatform.player.ui.board.MinusRoomMiniBoard
 import com.puzzleplatform.player.ui.board.DigitBar
 import com.puzzleplatform.player.ui.board.DoubleChocoMiniBoard
 import com.puzzleplatform.player.ui.board.FillominoBoard
@@ -369,6 +370,12 @@ fun BoardDraftEditor(
             onSelectCell = onSelectCell,
             onChange = { t -> onChange { it.copy(ominoTree = t(it.ominoTree)) } },
         )
+        AuthoringType.MINUS_ROOM -> MinusRoomEditor(
+            draft = board.minusRoom,
+            selectedCell = selectedCell,
+            onSelectCell = onSelectCell,
+            onChange = { t -> onChange { it.copy(minusRoom = t(it.minusRoom)) } },
+        )
         AuthoringType.CHOCO_BANANA -> ClueGridEditor(
             authoring = ChocoBananaAuthoring,
             draft = board.chocoBanana,
@@ -446,6 +453,7 @@ fun BoardDraftMiniBoard(type: AuthoringType, board: BoardDraft, size: Dp) {
         AuthoringType.WHIMSICAL_KNIGHT ->
             WhimsicalKnightMiniBoard(draft = board.whimsicalKnight, hasProblems = hasProblems, size = size)
         AuthoringType.OMINO_TREE -> OminoTreeMiniBoard(draft = board.ominoTree, hasProblems = hasProblems, size = size)
+        AuthoringType.MINUS_ROOM -> MinusRoomMiniBoard(draft = board.minusRoom, hasProblems = hasProblems, size = size)
         AuthoringType.HEYAWAKE -> HeyawakeMiniBoard(draft = board.heyawake, hasProblems = hasProblems, size = size)
         AuthoringType.PICTO_LINK ->
             PictoLinkMiniBoard(draft = board.pictoLink, hasProblems = hasProblems, size = size)

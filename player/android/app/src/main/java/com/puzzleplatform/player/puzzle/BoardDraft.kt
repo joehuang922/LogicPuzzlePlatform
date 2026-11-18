@@ -53,6 +53,8 @@ data class BoardDraft(
     val whimsicalKnight: WhimsicalKnightEngine.Board =
         WhimsicalKnightEngine.Board(0, 0, emptyList(), emptyList(), emptyList()),
     val ominoTree: OminoTreeEngine.Board = OminoTreeEngine.Board(0, 0, emptyList(), emptyList()),
+    val minusRoom: MinusRoomEngine.Board =
+        MinusRoomEngine.Board(0, 0, 4, emptyList(), emptyList(), emptyList(), emptyList()),
 ) {
     /**
      * What the type's misread check finds wrong with this board — the list that turns
@@ -97,6 +99,7 @@ data class BoardDraft(
         AuthoringType.ZEBRA_ROPE -> ZebraRopeAuthoring.problems(zebraRope)
         AuthoringType.WHIMSICAL_KNIGHT -> WhimsicalKnightAuthoring.problems(whimsicalKnight)
         AuthoringType.OMINO_TREE -> OminoTreeAuthoring.problems(ominoTree)
+        AuthoringType.MINUS_ROOM -> MinusRoomAuthoring.problems(minusRoom)
     }
 
     /**
@@ -125,6 +128,7 @@ data class BoardDraft(
         AuthoringType.ZEBRA_ROPE -> ZebraRopeAuthoring.formatProblems(zebraRope)
         AuthoringType.WHIMSICAL_KNIGHT -> WhimsicalKnightAuthoring.formatProblems(whimsicalKnight)
         AuthoringType.OMINO_TREE -> OminoTreeAuthoring.formatProblems(ominoTree)
+        AuthoringType.MINUS_ROOM -> MinusRoomAuthoring.formatProblems(minusRoom)
         else -> emptyList()
     }
 
@@ -216,6 +220,8 @@ data class BoardDraft(
         )
         AuthoringType.OMINO_TREE ->
             CanonBoard(OminoTreeAuthoring.canonFromDraft(ominoTree), ominoTree.cols, ominoTree.rows)
+        AuthoringType.MINUS_ROOM ->
+            CanonBoard(MinusRoomAuthoring.canonFromDraft(minusRoom), minusRoom.cols, minusRoom.rows)
     }
 
     companion object {
@@ -263,6 +269,7 @@ data class BoardDraft(
             AuthoringType.WHIMSICAL_KNIGHT ->
                 BoardDraft(whimsicalKnight = WhimsicalKnightAuthoring.draftFromCanon(canon))
             AuthoringType.OMINO_TREE -> BoardDraft(ominoTree = OminoTreeAuthoring.draftFromCanon(canon))
+            AuthoringType.MINUS_ROOM -> BoardDraft(minusRoom = MinusRoomAuthoring.draftFromCanon(canon))
         }
     }
 }
