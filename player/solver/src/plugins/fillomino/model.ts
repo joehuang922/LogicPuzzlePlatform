@@ -18,20 +18,6 @@ export interface FillominoSolution {
  * model; no real puzzle comes close.
  */
 const MAX_VALUE = 62;
-/**
- * Probing tries every value of cells with at most this many left. A wide-open cell (an
- * unclued area allows many sizes) costs a propagation per value and rarely yields
- * anything; the search settles it instead. Probing is optional deduction, so the cap
- * doesn't affect correctness.
- */
-const PROBE_MAX_VALUES = 64;
-/**
- * After a removal, the room rule re-checks only values up to this: an area too small for
- * a big number is rare once the full check at construction has run, and each re-check
- * walks up to that many cells. Skipping a deduction is always sound (`isSolved` checks
- * the full rule).
- */
-const ROOM_RECHECK_MAX = 12;
 
 interface Spec {
   rows: number;
@@ -44,7 +30,7 @@ interface Spec {
    * Reusable marks for the room rule's area counts: a cell is "known big" for the current
    * count when big[x] === the count's stamp. Saves a board-sized array per count.
    */
-  scratch: { big: Int32Array; stamp: number };
+  scratch: { big: Int32Array; stamp: number; area: Int32Array; inArea: Int32Array; areaStamp: number };
   /** Reusable arrays for `applyGroups` (never reentered: it doesn't call propagate). */
   groupScratch: {
     groupOf: Int32Array;
@@ -84,7 +70,7 @@ function buildSpec(canon: FillominoCanon): Spec {
   return {
     rows, cols, cellCount, clue, neighbours,
     maxValue: Math.min(MAX_VALUE, cellCount),
-    scratch: { big: new Int32Array(cellCount), stamp: 0 },
+    scratch: { big: new Int32Array(cellCount), stamp: 0, area: new Int32Array(cellCount), inArea: new Int32Array(cellCount), areaStamp: 0 },
     groupScratch: {
       groupOf: new Int32Array(cellCount),
       cellsFlat: new Int32Array(cellCount),
@@ -208,8 +194,14 @@ export class FillominoModel implements ConstraintModel<FillominoSolution> {
     return this.checkFull();
   }
 
+  /**
+   * A cell down to two values is a plain binary choice. Otherwise grow a group short of
+   * its number: at its way out with the fewest options, the exit either joins it (v) or
+   * doesn't (-v, "remove v"). Branching on an open cell's value instead tries every size
+   * a free area allows, dozens of values that each fail the same way. Once every group is
+   * complete, the undecided cell with the fewest values left, smallest value first.
+   */
   selectBranch(): Branch | null {
-    // The undecided cell with the fewest values left, smallest value first.
     let best = -1;
     let bestSize = Infinity;
     for (let x = 0; x < this.spec.cellCount; x++) {
@@ -220,11 +212,55 @@ export class FillominoModel implements ConstraintModel<FillominoSolution> {
         if (n === 2) break;
       }
     }
-    return best < 0 ? null : { id: best, candidates: this.values(best) };
+    if (best < 0) return null;
+    if (bestSize > 2) {
+      const grow = this.growthBranch();
+      if (grow) return grow;
+    }
+    return { id: best, candidates: this.values(best) };
   }
 
+  /** The exit of a short group with the fewest exits, as a join / don't-join branch. */
+  private growthBranch(): Branch | null {
+    const { spec } = this;
+    const n = spec.cellCount;
+    const seen = new Uint8Array(n);
+    const exitSeen = new Int32Array(n).fill(-1);
+    let bestExit = -1;
+    let bestValue = 0;
+    let bestExits = Infinity;
+    for (let s = 0; s < n; s++) {
+      const v = this.fixed(s);
+      if (!v || seen[s]) continue;
+      const cells = [s];
+      seen[s] = 1;
+      let exits = 0;
+      let exit = -1;
+      for (let i = 0; i < cells.length; i++) {
+        for (const y of spec.neighbours[cells[i]]) {
+          if (seen[y] && this.fixed(y) === v) continue;
+          if (this.fixed(y) === v) {
+            seen[y] = 1;
+            cells.push(y);
+          } else if (exitSeen[y] !== s && this.has(y, v)) {
+            exitSeen[y] = s;
+            exits++;
+            exit = y;
+          }
+        }
+      }
+      if (cells.length < v && exits > 0 && exits < bestExits) {
+        bestExits = exits;
+        bestExit = exit;
+        bestValue = v;
+      }
+    }
+    return bestExit < 0 ? null : { id: bestExit, candidates: [bestValue, -bestValue] };
+  }
+
+  /** `value` fixes the cell; a negative value removes `-value` from it instead. */
   assign(id: number, value: number): ConstraintModel<FillominoSolution> {
-    const m = this.with(id, value);
+    const m = value > 0 ? this.with(id, value) : this.has(id, -value) ? this.without(id, -value) : this.toDead();
     return m.dead ? m : m.probe();
   }
 
@@ -581,6 +617,8 @@ export class FillominoModel implements ConstraintModel<FillominoSolution> {
   /**
    * The room rule after removals: removing v from a cell can only shrink the v-capable
    * areas next to it, so only those are re-counted (and only until they reach v cells).
+   * Every value is re-checked: in a wide open area the big values (an unclued room of
+   * 20, 40 cells) are what's left to rule out, and only their areas shrinking does it.
    */
   private applyRoomLocal(): boolean {
     const { scratch } = this.spec;
@@ -592,7 +630,6 @@ export class FillominoModel implements ConstraintModel<FillominoSolution> {
       for (let i = 0; i < batch.length; i += 2) {
         const x = batch[i];
         const v = batch[i + 1];
-        if (v > ROOM_RECHECK_MAX) continue;
         let stamp = stampOf.get(v);
         if (stamp === undefined) stampOf.set(v, (stamp = ++scratch.stamp));
         for (const y of this.spec.neighbours[x]) if (scratch.big[y] !== stamp && this.has(y, v)) this.checkArea(y, v, stamp);
@@ -609,25 +646,31 @@ export class FillominoModel implements ConstraintModel<FillominoSolution> {
    * mistaken for a separate small area. Small areas lose v, so they're never reached.)
    */
   private checkArea(start: number, v: number, stamp: number): void {
-    const big = this.spec.scratch.big;
-    const area = [start];
-    const inArea = new Set<number>([start]);
+    const scratch = this.spec.scratch;
+    const { big, area, inArea } = scratch;
+    const mark = ++scratch.areaStamp;
+    const w = word(v);
+    const b = bitOf(v);
+    const dom = this.dom;
+    let n = 0;
+    area[n++] = start;
+    inArea[start] = mark;
     let isBig = false;
-    for (let i = 0; i < area.length && area.length < v && !isBig; i++) {
+    for (let i = 0; i < n && n < v && !isBig; i++) {
       for (const y of this.spec.neighbours[area[i]]) {
-        if (inArea.has(y) || !this.has(y, v)) continue;
+        if (inArea[y] === mark || !(dom[2 * y + w] & b)) continue;
         if (big[y] === stamp) {
           isBig = true;
           break;
         }
-        inArea.add(y);
-        area.push(y);
+        inArea[y] = mark;
+        area[n++] = y;
       }
     }
-    if (isBig || area.length >= v) {
-      for (const x of area) big[x] = stamp;
+    if (isBig || n >= v) {
+      for (let i = 0; i < n; i++) big[area[i]] = stamp;
     } else {
-      for (const x of area) this.remove(x, v);
+      for (let i = 0; i < n; i++) this.remove(area[i], v);
     }
   }
 
