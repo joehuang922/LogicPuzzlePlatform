@@ -18,6 +18,7 @@ import { cornerChainPlugin } from "./plugins/corner-chain";
 import { akariPlugin } from "./plugins/akari";
 import { fillominoPlugin } from "./plugins/fillomino";
 import { pencilsPlugin } from "./plugins/pencils";
+import { shikakuPlugin } from "./plugins/shikaku";
 
 // A registered plugin with its type parameters erased. The registry is the boundary where
 // per-type Canon/Board/Solution shapes meet the generic drivers, so `any` here is
@@ -52,6 +53,7 @@ register(cornerChainPlugin);
 register(akariPlugin);
 register(fillominoPlugin);
 register(pencilsPlugin);
+register(shikakuPlugin);
 
 export function getPlugin(puzzleType: number): AnyPlugin | undefined {
   return registry.get(puzzleType);

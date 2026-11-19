@@ -197,4 +197,12 @@ class SolutionCheckTest {
         assertEquals(false, PencilsEngine.matchesSolution(p, mapOf("ev:0,1" to 1)))
         assertEquals(null, PencilsEngine.matchesSolution(puzzle(8, """{"cells":[[0,0]]}""", sol), emptyMap()))
     }
+
+    @Test
+    fun `shikaku drawn rectangles must be the solution's`() {
+        val p = puzzle(22, """{"cells":[[1,2,0]]}""", """{"rects":[{"r":0,"c":0,"w":1,"h":1},{"r":0,"c":1,"w":2,"h":1}]}""")
+        assertEquals(true, ShikakuEngine.matchesSolution(p, mapOf("rect:0,1" to 2001)))
+        assertEquals(false, ShikakuEngine.matchesSolution(p, mapOf("rect:0,0" to 2001)))
+        assertEquals(false, ShikakuEngine.matchesSolution(p, mapOf("rect:0,2" to 1001)))
+    }
 }

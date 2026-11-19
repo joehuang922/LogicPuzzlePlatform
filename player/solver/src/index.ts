@@ -43,3 +43,5 @@ export { fillominoPlugin, FillominoModel } from "./plugins/fillomino";
 export type { FillominoCanon, FillominoSolution } from "./plugins/fillomino";
 export { pencilsPlugin, PencilsModel } from "./plugins/pencils";
 export type { PencilsCanon, PencilsSolution } from "./plugins/pencils";
+export { shikakuPlugin, ShikakuModel } from "./plugins/shikaku";
+export type { ShikakuCanon, ShikakuSolution, ShikakuRect } from "./plugins/shikaku";

@@ -196,6 +196,13 @@ describe("matchesSolution", () => {
     expect(matchesSolution(puzzle(8, { cells: [[0, 0]] }, sol), {})).toBeNull();
   });
 
+  it("shikaku: drawn rectangles must be the solution's", () => {
+    const p = puzzle(22, { cells: [[1, 2, 0]] }, { rects: [{ r: 0, c: 0, w: 1, h: 1 }, { r: 0, c: 1, w: 2, h: 1 }] });
+    expect(matchesSolution(p, { "rect:0,1": 2001 })).toBe(true);
+    expect(matchesSolution(p, { "rect:0,0": 2001 })).toBe(false); // 2x1 at the corner
+    expect(matchesSolution(p, { "rect:0,2": 1001 })).toBe(false);
+  });
+
   it("nurimaze: painted rooms black, marked rooms white", () => {
     const p = puzzle(3, { cells: [[3, 0], [0, 4]] }, { states: [[2, 1], [2, 2]] });
     expect(matchesSolution(p, { "1,0": 1, "0,1": 2 })).toBe(true);

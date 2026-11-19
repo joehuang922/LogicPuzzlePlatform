@@ -274,6 +274,20 @@ const CHECKS: Record<number, (canon: Json, solution: Json) => Expect | null> = {
       return want === undefined ? null : want === value;
     };
   },
+  // Shikaku: { rects: [{ r, c, w, h }] }; "rect:r,c" -> w * 1000 + h, a rectangle drawn
+  // with its top-left corner there, which must be one of the solution's rectangles.
+  22: (_canon, s) => {
+    if (!Array.isArray(s.rects)) return null;
+    const want = new Map<string, number>();
+    for (const q of s.rects as Record<string, unknown>[]) {
+      if (![q?.r, q?.c, q?.w, q?.h].every(Number.isInteger)) return null;
+      want.set(`${q.r},${q.c}`, (q.w as number) * 1000 + (q.h as number));
+    }
+    return (key, value) => {
+      if (!key.startsWith("rect:") || value <= 0) return null;
+      return want.get(key.slice(5)) === value;
+    };
+  },
   // LITS: { shaded: rows x cols of 0/1 }; "c:col,row" -> 1 shaded, 2 marked unshaded.
   15: (canon, s) => {
     const g = canon.grids as { h?: unknown[]; v?: unknown[][] } | undefined;

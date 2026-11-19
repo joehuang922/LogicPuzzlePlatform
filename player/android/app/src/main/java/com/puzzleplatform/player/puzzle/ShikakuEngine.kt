@@ -140,6 +140,19 @@ object ShikakuEngine : PuzzleEngine {
         return result
     }
 
+    /**
+     * "rect:r,c" -> encodeWH(w, h): every drawn rectangle must be one of the stored
+     * answer's (the answer read back the way a saved one is restored).
+     */
+    override fun matchesSolution(puzzle: Puzzle, userValues: Map<String, Int>): Boolean? {
+        val sol = puzzle.solutionRepr ?: return null
+        if (sol["rects"] !is JsonArray) return null
+        val want = restoreUserValues(puzzle, sol)
+        return SolutionCheck.matches(userValues) { key, value ->
+            if (!key.startsWith("rect:") || value <= 0) null else want[key] == value
+        }
+    }
+
     /** How many clue cells fall inside a rectangle, and (if exactly one) that clue's value. */
     private fun clueInfo(rect: Rect, cells: List<List<Int>>): Pair<Int, Int> {
         var count = 0

@@ -79,6 +79,22 @@ The answer is the list of rectangles that tile the grid. Each rectangle is descr
 
 The whole grid is partitioned into rectangles such that: every cell is covered exactly once, each rectangle contains exactly one clue, and each clue value equals the area of its rectangle.
 
+## Solver
+
+`player/solver/src/plugins/shikaku` proves uniqueness at create/edit (the auto-solve gate)
+and stores the solution (`{ rects }`) for the on-track check. One variable per clue, its
+domain every rectangle of the clue's area that holds it and no other clue. Two rules run to
+a fixpoint:
+
+- a clue with no rectangle left is a dead end; the cells all its remaining rectangles share
+  (their intersection, itself a rectangle) are its own, so other clues' rectangles over them
+  go (with one rectangle left, that is the placement);
+- a cell no clue can reach is a dead end; a cell only one clue can reach must be covered by
+  it, so that clue's rectangles missing the cell go.
+
+Failed-literal probing over every live rectangle runs at construction and every search node.
+The five Nikoli samples settle with no search in under 10ms each.
+
 ## Puzzle Player
 
 ### Interactions
