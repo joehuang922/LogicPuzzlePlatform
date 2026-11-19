@@ -114,12 +114,15 @@ its number is a dead end, a full group bars its number from the cells around it,
 can't take a number that would merge groups past it, a group short of its number must
 reach its size and takes its only way out, and a cell keeps a number only if enough
 connected cells could take it (re-checked for every value after each removal: in a wide
-open area the big values are what's left to rule out). Failed-literal probing over every
-(cell, value) runs at construction and every search node; trials re-check only the groups
-near the change. The search grows a group short of its number at its way out with the
-fewest options (join / don't join) rather than trying every size an open cell allows. The
-samples settle with no search: 10x10 ~10ms, 17x17 ~0.3s, the 17x17 library puzzle
-`359dd1cb` ~0.6s, 37x23 ~2s. The 36x20 "私の脱帽パズル" (`82e83961`) still times out. (The JSON
+open area the big values are what's left to rule out). Failed-literal probing runs at
+construction and every search node, at each cell beside a fixed one: first the values of
+its fixed neighbours as a set (if the cell can't take anything else, it takes one of
+them), then each value up to 12 alone; trials re-check only the groups near the change.
+The search grows a group short of its number at its way out with the fewest options
+(join / don't join) rather than trying every size an open cell allows. The samples settle
+with no search: 10x10 ~10ms, 17x17 ~0.1s, 37x23 ~0.5s, and the library puzzles 17x17
+`359dd1cb` ~0.15s and 36x20 `82e83961` ~1.1s (one binary guess; times on a laptop, the API Lambda is a few times
+slower). (The JSON
 example under "Canonical JSON structure" misreads `board-fillomino.png`; the solver's
 `fixtures.json` has the board as printed.)
 

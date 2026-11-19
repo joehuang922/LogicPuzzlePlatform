@@ -166,9 +166,11 @@ describe("agrees with brute force on random small boards", () => {
 });
 
 describe("sample boards (docs/fillomino)", () => {
-  for (const [name, b] of Object.entries(boards as unknown as Record<string, FillominoCanon>)) {
-    it(`proves the ${name} board unique by deduction alone`, () => {
-      expect(classify(model(b), { maxNodes: 1 })).toBe("unique");
+  // `maxNodes` (default 1: deduction alone) bounds the search a board may need.
+  for (const [name, b] of Object.entries(boards as unknown as Record<string, FillominoCanon & { maxNodes?: number }>)) {
+    const maxNodes = b.maxNodes ?? 1;
+    it(`proves the ${name} board unique ${maxNodes === 1 ? "by deduction alone" : `within ${maxNodes} search nodes`}`, () => {
+      expect(classify(model(b), { maxNodes })).toBe("unique");
       expect(isValidSolution(b, solve(model(b))!)).toBe(true);
     }, 60_000);
   }

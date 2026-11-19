@@ -18,6 +18,13 @@ export interface FillominoSolution {
  * model; no real puzzle comes close.
  */
 const MAX_VALUE = 62;
+/**
+ * Probing tries the values of a cell one by one only up to this. A big value fails a trial
+ * mostly by taking the cell from the small groups around it, which the neighbour-values
+ * trial (see `probe`) finds at once; trying each of 40 sizes in a wide open area made up
+ * most of the probing time. Probing is optional deduction, so the cap is always sound.
+ */
+const PROBE_MAX_VALUE = 12;
 
 interface Spec {
   rows: number;
@@ -293,14 +300,34 @@ export class FillominoModel implements ConstraintModel<FillominoSolution> {
 
   // -- propagation ------------------------------------------------------------
 
-  /** Failed-literal probing over every (cell, value), to a fixpoint. */
+  /**
+   * Failed-literal probing, to a fixpoint, at every cell beside a fixed one. First the
+   * values of its fixed neighbours as a set: if the cell can't take anything else (it
+   * would cut off the groups around it), it takes one of them. Then each value up to
+   * PROBE_MAX_VALUE alone.
+   */
   private probe(): FillominoModel {
     let m: FillominoModel = this;
     for (let changed = true; changed && !m.dead; ) {
       changed = false;
       for (let x = 0; x < m.spec.cellCount && !m.dead; x++) {
         if (m.fixed(x) || !m.spec.neighbours[x].some((y) => m.fixed(y))) continue;
+        const near = [0, 0];
+        for (const y of m.spec.neighbours[x]) {
+          const u = m.fixed(y);
+          if (u) near[word(u)] |= bitOf(u);
+        }
+        const inLo = m.dom[2 * x] & near[0];
+        const inHi = m.dom[2 * x + 1] & near[1];
+        if ((inLo || inHi) && (m.dom[2 * x] & ~near[0] || m.dom[2 * x + 1] & ~near[1])) {
+          if (m.restricted(x, ~inLo, ~inHi, true).dead) {
+            m = m.restricted(x, inLo, inHi);
+            changed = true;
+            if (m.dead || m.fixed(x)) continue;
+          }
+        }
         for (const v of m.values(x)) {
+          if (v > PROBE_MAX_VALUE) break;
           if (m.dead || !m.has(x, v)) continue;
           if (m.with(x, v, true).dead) {
             m = m.without(x, v);
@@ -310,6 +337,14 @@ export class FillominoModel implements ConstraintModel<FillominoSolution> {
       }
     }
     return m;
+  }
+
+  /** A copy with cell x's values cut down to the given words, propagated. */
+  private restricted(x: number, lo: number, hi: number, local = false): FillominoModel {
+    const m = new FillominoModel(this.spec, Int32Array.from(this.dom), false);
+    for (const v of this.values(x)) if (!((v <= 31 ? lo : hi) & bitOf(v))) m.remove(x, v);
+    if (!m.dom[2 * x] && !m.dom[2 * x + 1]) return m.toDead();
+    return m.propagate(local);
   }
 
   private toDead(): FillominoModel {
