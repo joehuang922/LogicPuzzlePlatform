@@ -95,8 +95,16 @@ async function listPuzzles(
   const srcCollection = event.queryStringParameters?.srcCollection;
   const limit = event.queryStringParameters?.limit;
   const validation = event.queryStringParameters?.validation;
+  // "recent": only puzzles with at least one attempt (any player), most recently
+  // played first. Home's top list.
+  const played = event.queryStringParameters?.played === "recent";
 
   let sql = PUZZLE_SELECT;
+  if (played) {
+    sql += `
+  JOIN (SELECT question, MAX(changed_at) AS last_played
+        FROM player_attempt GROUP BY question) pa ON pa.question = pq.id`;
+  }
   const params: { name: string; value: any }[] = [];
   // Hide soft-deleted puzzles from listings (getPuzzle still resolves them).
   const conditions: string[] = ["pq.deleted_at IS NULL"];
@@ -130,7 +138,7 @@ async function listPuzzles(
     sql += " WHERE " + conditions.join(" AND ");
   }
 
-  sql += " ORDER BY pq.created_at DESC";
+  sql += played ? " ORDER BY pa.last_played DESC" : " ORDER BY pq.created_at DESC";
 
   if (limit && Number(limit) > 0) {
     sql += ` LIMIT ${Number(limit)}`;

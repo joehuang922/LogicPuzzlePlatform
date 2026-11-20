@@ -88,12 +88,15 @@ export function listPuzzles(filters?: {
   // "flagged" restricts to puzzles the gate could not uniquely solve
   // (validation_status IN ('multiple','none','unknown')) — the editorial review set.
   validation?: "flagged";
+  // "recent": only puzzles someone has attempted, most recently played first.
+  played?: "recent";
 }) {
   const params = new URLSearchParams();
   if (filters?.puzzleType) params.set("puzzleType", filters.puzzleType);
   if (filters?.srcCollection != null) params.set("srcCollection", String(filters.srcCollection));
   if (filters?.limit != null) params.set("limit", String(filters.limit));
   if (filters?.validation) params.set("validation", filters.validation);
+  if (filters?.played) params.set("played", filters.played);
   const qs = params.toString();
   return request<{ puzzles: Puzzle[] }>(`/puzzles${qs ? `?${qs}` : ""}`);
 }

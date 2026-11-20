@@ -67,7 +67,6 @@ export function groupByCollection<P extends Groupable>(puzzles: P[]): TypeCollec
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(p);
   }
-  const lower = (s: string | null) => (s ?? "").toLowerCase();
   return [...groups.entries()]
     .sort(([a], [b]) => {
       if (a === null) return b === null ? 0 : 1;
@@ -76,6 +75,34 @@ export function groupByCollection<P extends Groupable>(puzzles: P[]): TypeCollec
     })
     .map(([name, items]) => ({
       collectionName: name ?? "Uncategorized",
-      puzzles: [...items].sort((a, b) => lower(a.title).localeCompare(lower(b.title))),
+      puzzles: sortByTitle(items),
     }));
+}
+
+const lower = (s: string | null) => (s ?? "").toLowerCase();
+
+function sortByTitle<P extends { title: string | null }>(puzzles: P[]): P[] {
+  return [...puzzles].sort((a, b) => lower(a.title).localeCompare(lower(b.title)));
+}
+
+export interface CollectionTypeGroup<P> {
+  typeId: number;
+  puzzles: P[];
+}
+
+/**
+ * One collection's puzzles grouped by type: types by id, puzzles by title within
+ * each, case-insensitive (the collection-first view).
+ */
+export function groupByType<P extends { puzzleType: number; title: string | null }>(
+  puzzles: P[],
+): CollectionTypeGroup<P>[] {
+  const groups = new Map<number, P[]>();
+  for (const p of puzzles) {
+    if (!groups.has(p.puzzleType)) groups.set(p.puzzleType, []);
+    groups.get(p.puzzleType)!.push(p);
+  }
+  return [...groups.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([typeId, items]) => ({ typeId, puzzles: sortByTitle(items) }));
 }

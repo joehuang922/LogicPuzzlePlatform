@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groupByCollection, sizeTag } from "./puzzleBrowse";
+import { groupByCollection, groupByType, sizeTag } from "./puzzleBrowse";
 
 const p = (puzzleType: number, width: number | null, height: number | null, canonRepr: Record<string, unknown> = {}) =>
   ({ puzzleType, width, height, canonRepr });
@@ -38,5 +38,15 @@ describe("groupByCollection", () => {
     expect(groups.map((g) => g.collectionName)).toEqual(["alpha", "Vol 2", "Uncategorized"]);
     expect(groups[0].puzzles.map((x) => x.title)).toEqual(["a1", "B2"]);
     expect(groups[1].puzzles.map((x) => x.title)).toEqual(["a", "b"]);
+  });
+});
+
+describe("groupByType", () => {
+  it("orders types by id and titles case-insensitively within each", () => {
+    const p = (puzzleType: number, title: string | null) => ({ puzzleType, title });
+    const groups = groupByType([p(5, "b"), p(2, "Zeta"), p(5, "A"), p(2, "alpha"), p(5, null)]);
+    expect(groups.map((g) => g.typeId)).toEqual([2, 5]);
+    expect(groups[0].puzzles.map((x) => x.title)).toEqual(["alpha", "Zeta"]);
+    expect(groups[1].puzzles.map((x) => x.title)).toEqual([null, "A", "b"]);
   });
 });

@@ -4,7 +4,7 @@ import { sortPuzzleTypes, listPuzzles, listCollections, listPuzzleTypes, listAtt
 import { PuzzleDefinition } from "../types/puzzle";
 import { DIFFICULTY_LABELS } from "../constants";
 import { extractAnswer } from "../extractors";
-import { groupByCollection, sizeTag, SizeTag } from "../utils/puzzleBrowse";
+import { groupByCollection, groupByType, sizeTag, SizeTag } from "../utils/puzzleBrowse";
 
 const HARDCODED_PLAYER_ID = 1;
 
@@ -255,16 +255,13 @@ function CollectionPuzzleList({
   onPuzzleClick: (puzzle: Puzzle) => void;
 }) {
   const puzzleTypeMap = Object.fromEntries(puzzleTypes.map((pt) => [pt.id, pt.jpLabel]));
-  const groupedByType = puzzles.reduce<Record<number, Puzzle[]>>((acc, p) => {
-    (acc[p.puzzleType] ??= []).push(p);
-    return acc;
-  }, {});
+  const groupedByType = groupByType(puzzles);
 
   const sort = useSort();
 
   return (
     <div>
-      {Object.entries(groupedByType).map(([typeId, items]) => {
+      {groupedByType.map(({ typeId, puzzles: items }) => {
         const typeSolved = items.filter((p) => solvedIds.has(p.id)).length;
         return (
           <div key={typeId} style={{ marginBottom: "0.75rem" }}>
@@ -319,7 +316,7 @@ export default function Home() {
   }
 
   useEffect(() => {
-    Promise.all([listPuzzles({ limit: 10 }), listCollections(), listPuzzleTypes()])
+    Promise.all([listPuzzles({ played: "recent", limit: 10 }), listCollections(), listPuzzleTypes()])
       .then(([puzzleRes, collectionRes, ptRes]) => {
         setPuzzles(puzzleRes.puzzles as PuzzleDefinition[]);
         const sortedCollections = withDefaultCollection(collectionRes.collections, collectionRes.uncollectedCount ?? 0);
@@ -447,7 +444,9 @@ export default function Home() {
   if (loading) return <p>Loading puzzles...</p>;
   if (error) return <p style={{ color: "red" }}>Error: {error}</p>;
 
-  if (puzzles.length === 0) {
+  // Collections include the default one for uncollected puzzles, so this is empty
+  // only when there are no puzzles at all.
+  if (collections.length === 0) {
     return (
       <div style={{ textAlign: "center", marginTop: "3rem" }}>
         <h2>No puzzles available</h2>
@@ -465,7 +464,7 @@ export default function Home() {
 
   return (
     <div>
-      <h2>Recent Puzzles</h2>
+      {puzzles.length > 0 && <h2>Recently Played</h2>}
       <ul>
         {puzzles.map((p) => (
           <li key={p.id}>
