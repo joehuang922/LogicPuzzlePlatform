@@ -1,5 +1,6 @@
 package com.puzzleplatform.player.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -149,12 +150,17 @@ fun PlayScreen(
         }
     }
 
+    // Back (the system gesture or the top bar arrow) never silently drops unsaved
+    // moves: with any, it asks to save, discard or keep playing.
+    val requestBack: () -> Unit = { vm.requestExit(onBack) }
+    BackHandler(onBack = requestBack)
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(state.puzzle?.title ?: "Play") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = requestBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
@@ -705,6 +711,28 @@ fun PlayScreen(
                 }
             }
         }
+    }
+
+    // Leave with unsaved progress
+    if (state.confirmExit) {
+        AlertDialog(
+            onDismissRequest = vm::dismissExit,
+            title = { Text("Leave this puzzle?") },
+            text = { Text("You have moves that aren't saved. Save them before leaving?") },
+            confirmButton = {
+                Column(horizontalAlignment = Alignment.End) {
+                    TextButton(onClick = { vm.saveAndExit(onBack) }, enabled = !state.saving) {
+                        Text(if (state.saving) "Saving…" else "Save & exit")
+                    }
+                    TextButton(onClick = { vm.dismissExit(); onBack() }, enabled = !state.saving) {
+                        Text("Exit without saving", color = MaterialTheme.colorScheme.error)
+                    }
+                    TextButton(onClick = vm::dismissExit, enabled = !state.saving) {
+                        Text("Keep playing")
+                    }
+                }
+            },
+        )
     }
 
     // Load-snapshot dialog

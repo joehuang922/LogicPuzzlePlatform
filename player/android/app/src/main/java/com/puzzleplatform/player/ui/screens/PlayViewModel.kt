@@ -63,7 +63,16 @@ data class PlayUiState(
     // the one already shown. Set when a cell is freshly selected; cleared after the first
     // digit so 1 then 2 -> 12. In state so the number pad can show a typing cursor.
     val freshDigitEntry: Boolean = true,
-)
+    // The board as last saved (or restored / loaded / finished). Leaving the play
+    // screen while [userValues] differs from it asks the player to save or discard.
+    val savedValues: Map<String, Int> = emptyMap(),
+    // The leave-with-unsaved-progress dialog is showing.
+    val confirmExit: Boolean = false,
+) {
+    /** The board has moves that leaving the screen would lose. */
+    val hasUnsavedChanges: Boolean
+        get() = puzzle != null && userValues != savedValues
+}
 
 /**
  * A hint surfaced to the player. Mirrors the web client's HintView:
@@ -130,6 +139,7 @@ class PlayViewModel(
                         loading = false,
                         puzzle = puzzle,
                         userValues = values,
+                        savedValues = values,
                         elapsedSeconds = elapsed,
                         progress = progress,
                         puzzleEdited = edited,
@@ -466,22 +476,56 @@ class PlayViewModel(
     }
 
     fun save() {
+        saveSnapshot(onSaved = null)
+    }
+
+    /**
+     * Save a snapshot of the current board. [onSaved] runs after a successful save
+     * (the leave dialog's "Save & exit"); on failure the player stays on the board.
+     */
+    private fun saveSnapshot(onSaved: (() -> Unit)?) {
         val puzzle = _state.value.puzzle ?: return
         val eng = engine ?: return
+        if (_state.value.saving) return
+        val values = _state.value.userValues
         _state.update { it.copy(saving = true) }
         viewModelScope.launch {
             try {
                 repo.saveSnapshot(
                     attemptId = attemptId,
-                    currentAnswer = eng.extractAnswer(puzzle, _state.value.userValues),
+                    currentAnswer = eng.extractAnswer(puzzle, values),
                     progress = _state.value.progress / 100.0,
                     elapsedSeconds = _state.value.elapsedSeconds,
                 )
-                _state.update { it.copy(saving = false, toast = "Progress saved.") }
+                _state.update { it.copy(saving = false, savedValues = values, toast = "Progress saved.") }
+                onSaved?.invoke()
             } catch (e: Exception) {
-                _state.update { it.copy(saving = false, toast = "Save failed: ${e.message}") }
+                _state.update { it.copy(saving = false, confirmExit = false, toast = "Save failed: ${e.message}") }
             }
         }
+    }
+
+    /**
+     * Back was requested (system back gesture or the top bar arrow). Leaves at once
+     * when nothing would be lost; otherwise asks first, so a stray swipe can't throw
+     * away an unsaved solve.
+     */
+    fun requestExit(leave: () -> Unit) {
+        if (_state.value.hasUnsavedChanges) {
+            _state.update { it.copy(confirmExit = true) }
+        } else {
+            leave()
+        }
+    }
+
+    fun dismissExit() = _state.update { it.copy(confirmExit = false) }
+
+    /** Leave-dialog "Save & exit": save, then leave once the save succeeded. */
+    fun saveAndExit(leave: () -> Unit) {
+        saveSnapshot(onSaved = {
+            _state.update { it.copy(confirmExit = false) }
+            leave()
+        })
     }
 
     fun clearToast() = _state.update { it.copy(toast = null) }
@@ -511,6 +555,7 @@ class PlayViewModel(
                 _state.update {
                     it.copy(
                         userValues = values,
+                        savedValues = values,
                         elapsedSeconds = snap.elapsedSeconds,
                         progress = eng.computeProgress(puzzle, values),
                         snapshots = null,
@@ -533,7 +578,9 @@ class PlayViewModel(
         completed = true
         timerJob?.cancel()
         val finalTime = _state.value.elapsedSeconds
-        _state.update { it.copy(finalTime = finalTime, showCongrats = true) }
+        // The finished board is persisted right away (with a retry in the congrats
+        // dialog), so leaving afterwards loses nothing.
+        _state.update { it.copy(finalTime = finalTime, showCongrats = true, savedValues = it.userValues) }
         persistCompletion(finalTime)
     }
 
