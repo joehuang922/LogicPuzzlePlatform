@@ -23,6 +23,7 @@ import CanonPreview from "../components/CanonPreview";
 import BatchUploadForm from "../components/BatchUploadForm";
 import OverrideGateButton from "../components/OverrideGateButton";
 import { extractBase64 } from "../utils/image";
+import { normalizeTitles, patternError, suggestPattern, TitleChange } from "../utils/titleNormalize";
 import { cardStyle, fieldStyle, inputStyle, errorStyle } from "../styles/admin";
 import { DIFFICULTY_OPTIONS, DIFFICULTY_LABELS } from "../constants";
 
@@ -146,7 +147,15 @@ function CollectionForm({ onCreated }: { onCreated: () => void }) {
  * upload), and Done saves. "Sealed" lives only here: a sealed collection drops out
  * of every create / move-to picker, and the API refuses puzzles into it.
  */
-function EditCollectionForm({ collections, onSaved }: { collections: Collection[]; onSaved: () => void }) {
+function EditCollectionForm({
+  collections,
+  puzzleTypes,
+  onSaved,
+}: {
+  collections: Collection[];
+  puzzleTypes: PuzzleType[];
+  onSaved: () => void;
+}) {
   const [selectedId, setSelectedId] = useState("");
   const [name, setName] = useState("");
   const [publisher, setPublisher] = useState("");
@@ -238,6 +247,131 @@ function EditCollectionForm({ collections, onSaved }: { collections: Collection[
           </button>
         </form>
       )}
+      {selectedId && <TitleNormalizer key={selectedId} collectionId={Number(selectedId)} puzzleTypes={puzzleTypes} />}
+    </div>
+  );
+}
+
+/**
+ * Rewrite a collection's numbered question titles to one pattern with zero-padded
+ * numbers ("Q<number>. <text>"), so title sorting reads 01, 02, ..., 10. Suggests
+ * the pattern most titles already follow; previews every rename before applying.
+ */
+function TitleNormalizer({ collectionId, puzzleTypes }: { collectionId: number; puzzleTypes: PuzzleType[] }) {
+  const [puzzles, setPuzzles] = useState<Puzzle[] | null>(null);
+  const [pattern, setPattern] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  const typeLabel = (id: number) => puzzleTypes.find((t) => t.id === id)?.jpLabel ?? `Type ${id}`;
+
+  async function open() {
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await listPuzzles({ srcCollection: collectionId });
+      setPuzzles(res.puzzles);
+      setPattern(suggestPattern(res.puzzles.map((p) => p.title)));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load questions");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const patternProblem = patternError(pattern);
+  const changes: TitleChange[] = puzzles && !patternProblem ? normalizeTitles(puzzles, pattern) : [];
+  const renames = changes.filter((c) => c.newTitle !== c.oldTitle);
+  const conflicts = changes.filter((c) => c.conflict);
+
+  async function apply() {
+    setApplying(true);
+    setError(null);
+    setSuccess(null);
+    const results = await Promise.allSettled(renames.map((c) => updatePuzzle(c.id, { title: c.newTitle })));
+    const failed = results.filter((r) => r.status === "rejected").length;
+    const done = new Map(renames.filter((_, i) => results[i].status === "fulfilled").map((c) => [c.id, c.newTitle]));
+    setPuzzles((prev) => prev && prev.map((p) => (done.has(p.id) ? { ...p, title: done.get(p.id)! } : p)));
+    if (failed) setError(`${failed} of ${renames.length} renames failed`);
+    else setSuccess(`Renamed ${renames.length} question(s)`);
+    setApplying(false);
+  }
+
+  if (!puzzles) {
+    return (
+      <div style={{ marginTop: "1rem", borderTop: "1px solid #eee", paddingTop: "0.75rem" }}>
+        <button type="button" onClick={open} disabled={loading} style={{ padding: "0.4rem 0.9rem" }}>
+          {loading ? "Loading..." : "Normalize titles"}
+        </button>
+        {error && <span style={{ ...errorStyle, marginLeft: "0.5rem" }}>{error}</span>}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ marginTop: "1rem", borderTop: "1px solid #eee", paddingTop: "0.75rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+      <h3 style={{ margin: 0 }}>Normalize titles</h3>
+      <div style={fieldStyle}>
+        <label>Pattern</label>
+        <input style={inputStyle} value={pattern} onChange={(e) => setPattern(e.target.value)} />
+        <span style={{ fontSize: "0.8rem", color: "#666" }}>
+          {"<number>"} is the title's first number, zero-padded to the widest one; {"<text>"} is what follows it.
+          Titles without a number are left alone.
+        </span>
+        {patternProblem && <span style={errorStyle}>{patternProblem}</span>}
+      </div>
+      {!patternProblem && (
+        renames.length === 0 ? (
+          <p style={{ margin: 0, fontSize: "0.85rem", color: "#666" }}>All titles already match.</p>
+        ) : (
+          <table style={{ borderCollapse: "collapse", fontSize: "0.8rem" }}>
+            <thead>
+              <tr style={{ borderBottom: "1px solid #ddd", textAlign: "left" }}>
+                <th style={{ padding: "0.25rem" }}>Type</th>
+                <th style={{ padding: "0.25rem" }}>Current</th>
+                <th style={{ padding: "0.25rem" }}>New</th>
+              </tr>
+            </thead>
+            <tbody>
+              {changes
+                .filter((c) => c.newTitle !== c.oldTitle || c.conflict)
+                .map((c) => (
+                  <tr key={c.id} style={{ borderBottom: "1px solid #f0f0f0", background: c.conflict ? "#fde8e8" : undefined }}>
+                    <td style={{ padding: "0.25rem" }}>{typeLabel(c.puzzleType)}</td>
+                    <td style={{ padding: "0.25rem" }}>{c.oldTitle || "(none)"}</td>
+                    <td style={{ padding: "0.25rem" }}>
+                      {c.newTitle || "(none)"}
+                      {c.conflict && <span style={{ color: "#c00", marginLeft: "0.4rem" }}>duplicate</span>}
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        )
+      )}
+      {conflicts.length > 0 && (
+        <span style={errorStyle}>
+          Some questions of the same type would share a title. Change the pattern or fix those titles first.
+        </span>
+      )}
+      {error && <span style={errorStyle}>{error}</span>}
+      {success && <span style={{ color: "green", fontSize: "0.85rem" }}>{success}</span>}
+      <div style={{ display: "flex", gap: "0.5rem" }}>
+        <button
+          type="button"
+          onClick={apply}
+          disabled={applying || !!patternProblem || renames.length === 0 || conflicts.length > 0}
+          style={{ padding: "0.4rem 0.9rem" }}
+        >
+          {applying ? "Renaming..." : `Rename ${renames.length}`}
+        </button>
+        <button type="button" onClick={() => setPuzzles(null)} disabled={applying} style={{ padding: "0.4rem 0.9rem" }}>
+          Close
+        </button>
+      </div>
     </div>
   );
 }
@@ -1305,7 +1439,7 @@ export default function Admin() {
       <ReviewQueue puzzleTypes={puzzleTypes} collections={collections} />
       <CollectionBrowser collections={collections} puzzleTypes={puzzleTypes} onDataChanged={loadData} />
       <CollectionForm onCreated={loadData} />
-      <EditCollectionForm collections={collections} onSaved={loadData} />
+      <EditCollectionForm collections={collections} puzzleTypes={puzzleTypes} onSaved={loadData} />
       <BatchUploadForm puzzleTypes={puzzleTypes} collections={targets} />
       <QuestionForm puzzleTypes={puzzleTypes} collections={targets} />
     </div>
