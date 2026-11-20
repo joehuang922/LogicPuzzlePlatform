@@ -17,6 +17,7 @@ from puzzle_parsers.metadata_extract import (
     MetadataExtractor,
     context_crop,
     metadata_from_response,
+    scale_difficulty,
 )
 from puzzle_parsers.recognition import CellRecognizer
 
@@ -81,13 +82,13 @@ def _page() -> Image.Image:
 def test_number_and_author():
     assert metadata_from_response(
         {"number": "4", "title_text": None, "author": "セダム"}
-    ) == {"title": "4", "author": "セダム"}
+    ) == {"title": "4", "author": "セダム", "difficulty": None}
 
 
 def test_number_and_title_text_combine():
     assert metadata_from_response(
         {"number": "30", "title_text": "ふわふわゆらり", "author": None}
-    ) == {"title": "30 ふわふわゆらり", "author": None}
+    ) == {"title": "30 ふわふわゆらり", "author": None, "difficulty": None}
 
 
 def test_full_width_number_is_normalized():
@@ -102,7 +103,7 @@ def test_non_numeric_number_is_dropped():
 
 @pytest.mark.parametrize("raw", [None, [], "4", {"number": "null", "author": ""}])
 def test_junk_yields_nothing(raw):
-    assert metadata_from_response(raw) == {"title": None, "author": None}
+    assert metadata_from_response(raw) == {"title": None, "author": None, "difficulty": None}
 
 
 def test_overlong_author_is_dropped():
@@ -111,6 +112,61 @@ def test_overlong_author_is_dropped():
 
 def test_whitespace_is_collapsed():
     assert metadata_from_response({"author": "  Joe\n Smith "})["author"] == "Joe Smith"
+
+
+# --- difficulty -------------------------------------------------------------
+
+def _levels(scale):
+    return [scale_difficulty(level, scale) for level in range(1, scale + 1)]
+
+
+def test_ten_level_scale():
+    assert _levels(10) == [1, 2, 2, 3, 3, 3, 4, 4, 4, 5]
+
+
+def test_five_level_scale_has_no_super_levels():
+    assert _levels(5) == [2, 3, 3, 4, 4]
+
+
+@pytest.mark.parametrize("scale, expected", [
+    (3, [2, 3, 4]),
+    (4, [2, 3, 4, 5]),
+    (6, [2, 2, 3, 3, 4, 4]),
+    (7, [2, 2, 3, 3, 4, 4, 4]),
+    (8, [1, 2, 2, 3, 3, 4, 4, 5]),
+])
+def test_other_scales(scale, expected):
+    assert _levels(scale) == expected
+
+
+@pytest.mark.parametrize("level, scale", [(1, 2), (0, 5), (6, 5), (1, 0)])
+def test_unusable_scale(level, scale):
+    assert scale_difficulty(level, scale) is None
+
+
+@pytest.mark.parametrize("raw, expected", [
+    ({"difficulty_face": 1}, 2),
+    ({"difficulty_face": 2}, 3),
+    ({"difficulty_face": 3}, 4),
+    ({"difficulty_face": "4"}, 5),
+    ({"difficulty_level": 2, "difficulty_scale": 5}, 3),
+    ({"difficulty_level": "４", "difficulty_scale": "5"}, 4),
+    ({"difficulty_level": 3, "difficulty_scale": None}, None),
+    ({"difficulty_word": "Easy"}, 2),
+    ({"difficulty_word": "very_hard"}, 5),
+    ({"difficulty_word": "tricky"}, None),
+    ({"difficulty_face": 9}, None),
+    ({"difficulty_face": True}, None),
+    ({}, None),
+])
+def test_difficulty_from_response(raw, expected):
+    assert metadata_from_response(raw)["difficulty"] == expected
+
+
+def test_parser_difficulty_merged():
+    rec = _FakeRecognizer({"number": "4", "difficulty_face": 3})
+    data = _BoardParser(MetadataExtractor(rec)).parse(_page())
+    assert data.metadata.difficulty == 4
 
 
 # --- context_crop -----------------------------------------------------------
@@ -140,7 +196,7 @@ def test_crop_is_downscaled():
 def test_extractor_sends_crop_and_prompt():
     rec = _FakeRecognizer({"number": "1", "author": "みのり"})
     crop = np.zeros((50, 80, 3), np.uint8)
-    assert MetadataExtractor(rec).extract(crop) == {"title": "1", "author": "みのり"}
+    assert MetadataExtractor(rec).extract(crop) == {"title": "1", "author": "みのり", "difficulty": None}
     assert rec.images[0].size == (80, 50)
     assert "RED" in rec.prompts[0]
 
@@ -289,4 +345,5 @@ def test_eval_fixtures_point_at_real_images():
     assert cases
     for case in cases:
         assert (root / case["image"]).is_file(), case["image"]
-        assert set(case) == {"image", "type", "title", "author"}
+        assert {"image", "type", "title", "author"} <= set(case) <= {"image", "type", "title", "author", "difficulty"}
+        assert case.get("difficulty") in (None, 1, 2, 3, 4, 5)

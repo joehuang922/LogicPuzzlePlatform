@@ -580,6 +580,8 @@ function QuestionForm({
         // Pre-fill from the scan, but never overwrite what the admin typed.
         setTitle((t) => t || res.metadata?.title || "");
         setAuthor((a) => a || res.metadata?.author || "");
+        const parsedDifficulty = res.metadata?.difficulty;
+        if (parsedDifficulty) setDifficulty((d) => d || String(parsedDifficulty));
         setParseError(null);
       } catch (err: unknown) {
         setParseError(err instanceof Error ? err.message : "Parse failed");

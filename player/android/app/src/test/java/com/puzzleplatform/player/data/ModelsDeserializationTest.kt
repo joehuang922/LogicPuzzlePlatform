@@ -197,10 +197,11 @@ class ModelsDeserializationTest {
 
     @Test
     fun parseResponse_readsMetadata() {
-        val raw = """{ "canon": { "hints": [] }, "metadata": { "title": "4", "author": null } }"""
+        val raw = """{ "canon": { "hints": [] }, "metadata": { "title": "4", "author": null, "difficulty": 4 } }"""
         val res = json.decodeFromString<ParseImageResponse>(raw)
         assertEquals("4", res.metadata?.title)
         assertNull(res.metadata?.author)
+        assertEquals(4, res.metadata?.difficulty)
     }
 
     @Test

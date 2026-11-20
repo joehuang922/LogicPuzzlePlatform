@@ -23,6 +23,8 @@ interface BatchItem {
   title: string;
   author: string;
   difficulty: number;
+  // The admin picked this item's difficulty; a parsed one no longer replaces it.
+  difficultyEdited?: boolean;
   checked: boolean;
   editorOpen: boolean;
   // Outcome of "Create All" for this item: the new puzzle id, or the API's rejection
@@ -392,7 +394,8 @@ export default function BatchUploadForm({
       const base64 = extractBase64(dataUrl);
       const res = await parseImage(base64, Number(puzzleType));
 
-      // Pre-fill title/author from the scan, but never overwrite what the admin typed.
+      // Pre-fill title/author/difficulty from the scan, but never overwrite what the
+      // admin entered. An unreadable difficulty keeps the batch default.
       setItems((prev) => prev.map((item) => item.id === itemId ? {
         ...item,
         status: "success",
@@ -401,6 +404,7 @@ export default function BatchUploadForm({
         error: undefined,
         title: item.title || res.metadata?.title || "",
         author: item.author || res.metadata?.author || "",
+        difficulty: !item.difficultyEdited && res.metadata?.difficulty ? res.metadata.difficulty : item.difficulty,
       } : item));
     } catch (err: unknown) {
       updateItem(itemId, {
@@ -606,7 +610,7 @@ export default function BatchUploadForm({
                 overrideDisabled={creating}
                 onTitleChange={(t) => updateItem(item.id, { title: t })}
                 onAuthorChange={(a) => updateItem(item.id, { author: a })}
-                onDifficultyChange={(d) => updateItem(item.id, { difficulty: d })}
+                onDifficultyChange={(d) => updateItem(item.id, { difficulty: d, difficultyEdited: true })}
                 onCanonChange={(json) => updateItem(item.id, { canonRepr: json, allowUnverified: false })}
                 onToggleEditor={() => updateItem(item.id, { editorOpen: !item.editorOpen })}
               />

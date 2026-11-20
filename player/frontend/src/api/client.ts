@@ -431,8 +431,11 @@ const PARSE_TIMEOUT_MS: number | null = import.meta.env.VITE_PARSER_URL
 
 export interface ParseImageResponse {
   canon: Record<string, unknown>;
-  /** Best-effort title/author read from around the board; absent on older parsers. */
-  metadata?: { title: string | null; author: string | null };
+  /**
+   * Best-effort title/author/difficulty (1..5) read from around the board; absent
+   * on older parsers.
+   */
+  metadata?: { title: string | null; author: string | null; difficulty?: number | null };
 }
 
 export async function parseImage(image: string, puzzleType: number) {

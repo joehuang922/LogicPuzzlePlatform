@@ -1,8 +1,9 @@
-"""Measure title/author extraction against hand-labelled sample scans.
+"""Measure title/author/difficulty extraction against hand-labelled sample scans.
 
 Runs only grid detection plus the metadata call for each entry in
 ``metadata_expected.json`` (no cell OCR), then prints per-image results and
 exact-match rates. Comparison is NFKC-normalized, so full-width "！" matches "!".
+Difficulty (1..5) is scored only on entries that carry a "difficulty" key.
 Costs one Gemini call per image and needs ``GEMINI_API_KEY``.
 
 Usage::
@@ -50,6 +51,12 @@ def _norm(value: str | None) -> str | None:
     return " ".join(unicodedata.normalize("NFKC", value).split())
 
 
+def _same(found: object, expected: object) -> bool:
+    if isinstance(expected, str) or isinstance(found, str):
+        return _norm(found) == _norm(expected)  # type: ignore[arg-type]
+    return found == expected
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--type", help="only evaluate this puzzle type")
@@ -66,7 +73,8 @@ def main() -> None:
     if args.crops:
         args.crops.mkdir(parents=True, exist_ok=True)
 
-    hits = {"title": 0, "author": 0}
+    hits = {"title": 0, "author": 0, "difficulty": 0}
+    labelled = {"title": 0, "author": 0, "difficulty": 0}
     for case in cases:
         path = _REPO_ROOT / case["image"]
         image = cv2.imread(str(path))
@@ -76,26 +84,27 @@ def main() -> None:
         try:
             found = extractor.extract(crop)
         except Exception as exc:  # noqa: BLE001 - report and keep evaluating
-            found = {"title": None, "author": None}
+            found = {"title": None, "author": None, "difficulty": None}
             print(f"  ! {path.name}: {type(exc).__name__}: {exc}")
 
         marks = []
-        for field in ("title", "author"):
-            ok = _norm(found[field]) == _norm(case[field])
+        all_ok = True
+        for field in hits:
+            if field not in case:
+                continue
+            ok = _same(found[field], case[field])
+            labelled[field] += 1
             hits[field] += ok
+            all_ok &= ok
             marks.append(
                 f"{field}={found[field]!r}"
                 + ("" if ok else f" (expected {case[field]!r})")
             )
-        status = "ok  " if all(_norm(found[f]) == _norm(case[f]) for f in hits) else "MISS"
+        status = "ok  " if all_ok else "MISS"
         print(f"{status} {path.name}: " + ", ".join(marks))
 
-    n = len(cases)
-    if n:
-        print(
-            f"\ntitle {hits['title']}/{n}  author {hits['author']}/{n}  "
-            f"({n} images)"
-        )
+    if cases:
+        print("\n" + "  ".join(f"{f} {hits[f]}/{labelled[f]}" for f in hits) + f"  ({len(cases)} images)")
 
 
 if __name__ == "__main__":

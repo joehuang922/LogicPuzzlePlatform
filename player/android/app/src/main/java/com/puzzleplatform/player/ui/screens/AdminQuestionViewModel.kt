@@ -190,6 +190,8 @@ class AdminQuestionViewModel(
                     // Pre-fill from the scan, but never overwrite what the admin typed.
                     title = it.title.ifBlank { res.metadata?.title.orEmpty() },
                     author = it.author.ifBlank { res.metadata?.author.orEmpty() },
+                    // Unread (null) keeps inheriting the batch default.
+                    difficulty = it.difficulty ?: res.metadata?.difficulty?.takeIf { d -> d in 1..5 },
                 )
             }
         } catch (e: Exception) {

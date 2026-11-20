@@ -1,4 +1,4 @@
-"""Best-effort title / author extraction from the page around a puzzle board.
+"""Best-effort title / author / difficulty extraction from the page around a board.
 
 Magazine and book scans print a small header next to each board: an ordinal
 ("4", "QUESTION 30"), sometimes a short title ("ふわふわゆらり"), and often the
@@ -6,6 +6,13 @@ setter's name after a 作 marker ("作●セダム"). Locating that header with 
 brittle — it sits above, left of, or right of the board depending on the
 publication — so we hand a vision LLM a crop of the page around the board, with
 the board outlined in red, and ask it to transcribe the header.
+
+Difficulty comes in three forms, all mapped onto the platform's five levels
+(1 very easy .. 5 super hard) here rather than by the model:
+- Nikoli's face icon (smiling / serious / scared / agonized = easy .. super hard);
+- a k-of-n scale (stars, "Lv.7/10"), see :func:`scale_difficulty`;
+- a printed word ("Easy", "上級"), which the model classifies itself.
+Anything else is left unset, so the client keeps its default difficulty.
 
 The crop is generous on every side (headers live up to a board-height away, e.g.
 a nonogram's "QUESTION 30" above its clue area) and the red outline is what
@@ -46,7 +53,9 @@ puzzle (above it, to its left, or to its right; the box may be slightly off and 
 include the header) and transcribe it.
 
 Return JSON only, with exactly these keys:
-{"number": string or null, "title_text": string or null, "author": string or null}
+{"number": string or null, "title_text": string or null, "author": string or null,
+ "difficulty_face": integer or null, "difficulty_level": integer or null,
+ "difficulty_scale": integer or null, "difficulty_word": string or null}
 
 - "number": the puzzle's ordinal / question number, digits only \
 (e.g. "4" for a black box with 4, "30" for "QUESTION 30").
@@ -55,6 +64,20 @@ Return JSON only, with exactly these keys:
 - "author": the puzzle setter's name. It usually follows a 作 marker \
 ("作●セダム" -> "セダム", "作●四代目久方七" -> "四代目久方七", "作・…", \
 "作者 …") or "by …". Leave out the marker itself.
+
+The target puzzle's difficulty, if printed in its header, takes one of three \
+forms. Fill only the fields of the form you see; the rest are null.
+- A small face icon (often with a "?" below it): "difficulty_face" is 1 for a \
+smiling face, 2 for a serious face with a straight mouth, 3 for a worried or \
+scared face (frowning mouth, often a sweat or tear drop), 4 for an agonized \
+face (furrowed, angry brows and a distressed or gritted mouth).
+- A level on a scale, such as filled stars (★★☆☆☆), "Lv.7/10" or "難易度 3/5": \
+"difficulty_level" is the level (number of filled marks), "difficulty_scale" \
+the scale's size (filled plus empty marks, or the printed maximum). Leave \
+"difficulty_scale" null if the maximum is not shown.
+- A word such as "Easy", "Normal", "Hard", "初級", "中級", "上級", "やさしい", \
+"むずかしい": "difficulty_word" is one of "very_easy", "easy", "normal", "hard", \
+"very_hard" (e.g. "Medium" -> "normal", "Expert" -> "very_hard").
 
 The page is Japanese: kanji, hiragana and katakana, sometimes mixed with Latin \
 letters and digits (a pen name may be partly or wholly romaji). The header may be \
@@ -126,15 +149,93 @@ def _clean(value: object, max_len: int) -> str | None:
     return text
 
 
-def metadata_from_response(raw: object) -> dict[str, str | None]:
-    """Turn the model's JSON into ``{"title", "author"}``, dropping junk.
+# Platform difficulty levels, as in the API: 1 very easy .. 5 super hard.
+VERY_EASY, EASY, NORMAL, HARD, SUPER_HARD = 1, 2, 3, 4, 5
+
+# Nikoli's faces: smiling, serious, scared, agonized.
+_FACE_DIFFICULTY = {1: EASY, 2: NORMAL, 3: HARD, 4: SUPER_HARD}
+
+_WORD_DIFFICULTY = {
+    "very_easy": VERY_EASY,
+    "easy": EASY,
+    "normal": NORMAL,
+    "hard": HARD,
+    "very_hard": SUPER_HARD,
+}
+
+# From this many levels up, a scale's single lowest / highest level reads as
+# very easy / super hard: each of easy, normal and hard still spans two levels.
+SUPER_LEVELS_FROM = 8
+
+
+def scale_difficulty(level: int, scale: int) -> int | None:
+    """Map level ``level`` of a ``scale``-level difficulty scale to 1..5.
+
+    Three levels read easy / normal / hard; four, easy .. super hard (like
+    Nikoli's faces). Longer scales split into easy / normal / hard as evenly as
+    they go, the harder buckets taking the remainder; from
+    ``SUPER_LEVELS_FROM`` levels the two end levels split off as very easy and
+    super hard first. So a 5-level scale reads 1 / 2-3 / 4-5 and a 10-level one
+    1 / 2-3 / 4-6 / 7-9 / 10. None for a scale under 3 or a level off it.
+    """
+    if scale < 3 or not 1 <= level <= scale:
+        return None
+    if scale == 3:
+        return (EASY, NORMAL, HARD)[level - 1]
+    if scale == 4:
+        return (EASY, NORMAL, HARD, SUPER_HARD)[level - 1]
+    if scale >= SUPER_LEVELS_FROM:
+        if level == 1:
+            return VERY_EASY
+        if level == scale:
+            return SUPER_HARD
+        level, scale = level - 1, scale - 2
+    base, extra = divmod(scale, 3)
+    upper = 0
+    for bucket, size in enumerate((base, base + (extra >= 2), base + (extra >= 1))):
+        upper += size
+        if level <= upper:
+            return EASY + bucket
+    raise AssertionError("unreachable")
+
+
+def _int(value: object) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        text = unicodedata.normalize("NFKC", value).strip()
+        if text.isdigit():
+            return int(text)
+    return None
+
+
+def difficulty_from_response(raw: dict) -> int | None:
+    """The 1..5 difficulty from the model's difficulty fields, or None."""
+    face = _int(raw.get("difficulty_face"))
+    if face in _FACE_DIFFICULTY:
+        return _FACE_DIFFICULTY[face]
+    level, scale = _int(raw.get("difficulty_level")), _int(raw.get("difficulty_scale"))
+    if level is not None and scale is not None:
+        found = scale_difficulty(level, scale)
+        if found is not None:
+            return found
+    word = raw.get("difficulty_word")
+    if isinstance(word, str):
+        return _WORD_DIFFICULTY.get(word.strip().lower())
+    return None
+
+
+def metadata_from_response(raw: object) -> dict[str, str | int | None]:
+    """Turn the model's JSON into ``{"title", "author", "difficulty"}``, dropping junk.
 
     The ordinal and the title text combine into one title ("30 ふわふわゆらり");
     either may be missing. A non-numeric "number" is discarded rather than
     trusted, since the prompt asks for digits only.
     """
     if not isinstance(raw, dict):
-        return {"title": None, "author": None}
+        return {"title": None, "author": None, "difficulty": None}
 
     number = _clean(raw.get("number"), 8)
     if number is not None:
@@ -145,16 +246,20 @@ def metadata_from_response(raw: object) -> dict[str, str | None]:
     parts = [p for p in (number, title_text) if p]
     title = " ".join(parts) if parts else None
 
-    return {"title": title, "author": _clean(raw.get("author"), MAX_AUTHOR_LEN)}
+    return {
+        "title": title,
+        "author": _clean(raw.get("author"), MAX_AUTHOR_LEN),
+        "difficulty": difficulty_from_response(raw),
+    }
 
 
 class MetadataExtractor:
-    """Reads a board's title / author from the page with one vision-LLM call."""
+    """Reads a board's title / author / difficulty from the page with one vision-LLM call."""
 
     def __init__(self, recognizer: CellRecognizer) -> None:
         self._recognizer = recognizer
 
-    def extract(self, crop: NDArray) -> dict[str, str | None]:
+    def extract(self, crop: NDArray) -> dict[str, str | int | None]:
         """Read the header from a crop made by :func:`context_crop`."""
         rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
         raw = self._recognizer.recognize_image(Image.fromarray(rgb), METADATA_PROMPT)

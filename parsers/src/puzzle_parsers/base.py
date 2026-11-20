@@ -123,6 +123,7 @@ class PuzzleParser(ABC):
         data.metadata = current.model_copy(update={
             "title": current.title or found.get("title"),
             "author": current.author or found.get("author"),
+            "difficulty": current.difficulty or found.get("difficulty"),
         })
 
     @property

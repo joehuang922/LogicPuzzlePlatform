@@ -243,11 +243,13 @@ def handler(event, context):
             "headers": HEADERS,
             "body": json.dumps({
                 "canon": result.grid,
-                # Best-effort title/author read from around the board; either
-                # may be null. Clients only use it to pre-fill editable fields.
+                # Best-effort title/author/difficulty (1..5) read from around the
+                # board; any may be null. Clients only use it to pre-fill
+                # editable fields.
                 "metadata": {
                     "title": result.metadata.title,
                     "author": result.metadata.author,
+                    "difficulty": result.metadata.difficulty,
                 },
             }),
         }
