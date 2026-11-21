@@ -94,6 +94,7 @@ object PuzzleEngines {
         WhimsicalKnightEngine,
         OminoTreeEngine,
         MinusRoomEngine,
+        TilePaintEngine,
     ).associateBy { it.puzzleType }
 
     fun forType(puzzleType: Int): PuzzleEngine? = engines[puzzleType]

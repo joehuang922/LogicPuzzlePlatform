@@ -163,6 +163,10 @@ def _build_parser(puzzle_type: int):
     if puzzle_type == 39:
         from puzzle_parsers.minus_room.parser import MinusRoomParser
         return MinusRoomParser(ocr_backend=ocr)
+    if puzzle_type == 40:
+        # Clue cells hold two numbers each: read with Gemini, like Kakuro.
+        from puzzle_parsers.tile_paint.parser import TilePaintParser
+        return TilePaintParser()
     return None
 
 

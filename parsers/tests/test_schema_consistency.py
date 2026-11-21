@@ -31,6 +31,7 @@ from puzzle_parsers.zebra_rope.models import ZebraRopeBoard
 from puzzle_parsers.whimsical_knight.models import WhimsicalKnightBoard
 from puzzle_parsers.omino_tree.models import OminoTreeBoard
 from puzzle_parsers.minus_room.models import MinusRoomBoard
+from puzzle_parsers.tile_paint.models import TilePaintBoard
 from puzzle_parsers.validate import validate_canon
 
 SCHEMA_DIR = Path(__file__).parents[2] / "schemas" / "canon"
@@ -60,6 +61,7 @@ MODELS = {
     "whimsical-knight": WhimsicalKnightBoard,
     "omino-tree": OminoTreeBoard,
     "minus-room": MinusRoomBoard,
+    "tile-paint": TilePaintBoard,
 }
 
 

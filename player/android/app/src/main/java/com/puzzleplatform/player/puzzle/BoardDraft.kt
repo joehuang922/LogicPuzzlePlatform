@@ -55,6 +55,7 @@ data class BoardDraft(
     val ominoTree: OminoTreeEngine.Board = OminoTreeEngine.Board(0, 0, emptyList(), emptyList()),
     val minusRoom: MinusRoomEngine.Board =
         MinusRoomEngine.Board(0, 0, 4, emptyList(), emptyList(), emptyList(), emptyList()),
+    val tilePaint: TilePaintEngine.Board = TilePaintEngine.Board(emptyList(), emptyList(), emptyList()),
 ) {
     /**
      * What the type's misread check finds wrong with this board — the list that turns
@@ -100,6 +101,7 @@ data class BoardDraft(
         AuthoringType.WHIMSICAL_KNIGHT -> WhimsicalKnightAuthoring.problems(whimsicalKnight)
         AuthoringType.OMINO_TREE -> OminoTreeAuthoring.problems(ominoTree)
         AuthoringType.MINUS_ROOM -> MinusRoomAuthoring.problems(minusRoom)
+        AuthoringType.TILE_PAINT -> TilePaintAuthoring.problems(tilePaint)
     }
 
     /**
@@ -129,6 +131,7 @@ data class BoardDraft(
         AuthoringType.WHIMSICAL_KNIGHT -> WhimsicalKnightAuthoring.formatProblems(whimsicalKnight)
         AuthoringType.OMINO_TREE -> OminoTreeAuthoring.formatProblems(ominoTree)
         AuthoringType.MINUS_ROOM -> MinusRoomAuthoring.formatProblems(minusRoom)
+        AuthoringType.TILE_PAINT -> TilePaintAuthoring.formatProblems(tilePaint)
         else -> emptyList()
     }
 
@@ -222,6 +225,8 @@ data class BoardDraft(
             CanonBoard(OminoTreeAuthoring.canonFromDraft(ominoTree), ominoTree.cols, ominoTree.rows)
         AuthoringType.MINUS_ROOM ->
             CanonBoard(MinusRoomAuthoring.canonFromDraft(minusRoom), minusRoom.cols, minusRoom.rows)
+        AuthoringType.TILE_PAINT ->
+            CanonBoard(TilePaintAuthoring.canonFromDraft(tilePaint), tilePaint.cols, tilePaint.rows)
     }
 
     companion object {
@@ -270,6 +275,7 @@ data class BoardDraft(
                 BoardDraft(whimsicalKnight = WhimsicalKnightAuthoring.draftFromCanon(canon))
             AuthoringType.OMINO_TREE -> BoardDraft(ominoTree = OminoTreeAuthoring.draftFromCanon(canon))
             AuthoringType.MINUS_ROOM -> BoardDraft(minusRoom = MinusRoomAuthoring.draftFromCanon(canon))
+            AuthoringType.TILE_PAINT -> BoardDraft(tilePaint = TilePaintAuthoring.draftFromCanon(canon))
         }
     }
 }

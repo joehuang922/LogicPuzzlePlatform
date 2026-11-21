@@ -102,6 +102,7 @@ import com.puzzleplatform.player.ui.board.UnequalSudokuBoard
 import com.puzzleplatform.player.ui.board.TentaishowBoard
 import com.puzzleplatform.player.ui.board.YajilinBoard
 import com.puzzleplatform.player.ui.board.KuralinBoard
+import com.puzzleplatform.player.ui.board.TilePaintBoard
 import com.puzzleplatform.player.ui.board.ZebraRopeBoard
 import com.puzzleplatform.player.ui.board.WhimsicalKnightBoard
 import com.puzzleplatform.player.ui.board.OminoTreeBoard
@@ -655,6 +656,13 @@ fun PlayScreen(
                                     // enters its number keyed "col,row".
                                     selectedCell = state.selectedCell,
                                     onSelectCell = vm::selectCell,
+                                    liveValidate = state.liveValidate,
+                                )
+                                // Tile Paint: the shared shade/mark tap cycle, applied to the whole tile.
+                                40 -> TilePaintBoard(
+                                    puzzle = puzzle,
+                                    userValues = state.userValues,
+                                    onTapCell = vm::tapShadeCell,
                                     liveValidate = state.liveValidate,
                                 )
                                 else -> Text("This puzzle type isn't playable in this version yet.")

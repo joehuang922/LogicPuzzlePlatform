@@ -177,26 +177,31 @@ mode.
 
 ## Puzzle Parser
 
-`parsers/src/puzzle_parsers/tile_paint/`.
+`parsers/src/puzzle_parsers/tile_paint/` (design notes in `grid_detector.py`).
 
-- **Board:** the shared `rectify_board` (which flattens). The small and medium
-  photos also show parts of neighbouring boards and the rule example, so the
-  largest complete bordered grid is chosen. Grid lines are solid
-  (`detect_grid_lines` / `find_grid_lines`); the big board's thin lines are
-  faint and dense (~40 rows), the medium photo is tilted.
-- **Clue cells:** a cell is a clue cell when it carries the upper-left to
-  lower-right diagonal (dark pixels along the diagonal, little on the
-  anti-diagonal). The top row and left column are expected to be clue cells.
-- **Clue numbers:** a clue cell holds up to two numbers in its triangles, so it
-  goes through `cell_classify.classify_cells` with `DualIntegerTarget` (like
-  Kakuro), not EasyOCR. Numbers are multi-digit (up to the run length, 15 on
-  the samples) and 0 is a clue.
-- **Walls:** `grid_utils.classify_border_thickness(warped_gray, grid)`; edges
-  beside clue cells are written as `1`.
-- `validate()` reports format problems and misread warnings as above.
-- Each sample's parse is hand-checked and pinned as
-  `docs/tile-paint/<sample>.canon.json`, at full and Android size; a CP-SAT
-  solve confirms a unique solution.
+- **Board and grid:** the shared `rectify_board` (which flattens) and `find_grid_lines`.
+  The small and medium photos also show parts of neighbouring boards and the rule
+  example; the complete board is picked. The big board's page curls at the bottom left.
+- **Clue cells:** a cell is a clue cell when its upper-left to lower-right diagonal is
+  ink (29 probes on an adaptive threshold): tile cells score 0, clue cells 0.7-1.0; the
+  cut is 0.4. The blank top-left corner (no diagonal) is a clue cell when both its
+  neighbours are.
+- **Walls:** `grid_utils.classify_border_thickness`; edges beside clue cells are then
+  written as 1 (clue | tile) or 0 (clue | clue).
+- **Clue numbers:** the shared Gemini classifier (`classify_cells` with
+  `DualIntegerTarget`, as Kakuro) on the whole clue cell. EasyOCR was tried and dropped:
+  the strip clues cross the diagonal (the 3 of a 13, the 2 of a 12), so every crop that
+  erased the line cut those digits. The classifier reports an empty half as 0, the same
+  as a printed 0, so `half_ink` decides which halves hold a number: the diagonal is taken
+  out by a 45-degree opening (it follows a line the curled page bent), and the ink left
+  is grouped into marks on either side of the fitted diagonal. A number whose run is
+  empty is dropped.
+- **Accuracy:** all three samples parse exactly (walls, clue cells and every number,
+  including 0 clues) at full size and 2000 px with live Gemini reads. The answer keys
+  are `board-tile-paint-{small,medium,big}.canon.json`; each has a unique solution
+  (`*.solution.json`, CP-SAT), which checks the parse and the rules reading together.
+- `validate()` checks shape, walls that close off tiles, and every number within its
+  run; a board with no numbers fails.
 
 ## Android port
 
@@ -205,12 +210,12 @@ mode.
   `TilePaintBoard` on `ZoomableBoard` with `liveValidate`, `PicturePreview`
   above the board, and `renderThumbnail` for the collection.
 - **Admin review editor** (`TilePaintAuthoring`, `TilePaintEditor`): mode chips
-  **Walls** (tap an edge to toggle its wall) and **Clues** (tap a cell to toggle
-  clue / tile; tap a clue cell's upper-right or lower-left triangle to edit that
-  number in a number field, blank = none), add / remove row and column at the
-  bottom / right, and the problems list. Builds on `WallRoomsAuthoring` and the
-  Kakuro clue-cell field. `TilePaintMiniBoard` for the batch tile, framed red on
-  problems.
+  **Walls** (tap a line between two tile cells to toggle its wall) and **Clues** (tap a
+  cell to select it; a button toggles it between tile and clue cell, and two number
+  fields set a clue cell's right / down numbers, blank = none), add / remove row and
+  column at the bottom / right (new cells are single-cell tiles; the clue row / column
+  continues), and the problems list, also marked on the board. `TilePaintMiniBoard` for
+  the batch tile (clue cells tinted), framed red on problems.
 
 # Misc
 

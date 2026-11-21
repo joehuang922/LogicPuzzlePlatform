@@ -133,6 +133,7 @@ enum class AuthoringType(
     CHOCO_BANANA("Choco Banana", "チョコバナナ", ChocoBananaAuthoring.PUZZLE_TYPE),
     HELL_GOLF("Hell Golf", "ヘルゴルフ", HellGolfAuthoring.PUZZLE_TYPE),
     ZEBRA_ROPE("Zebra Rope", "シマシマロープ", ZebraRopeAuthoring.PUZZLE_TYPE),
+    TILE_PAINT("Tile Paint", "タイルペイント", TilePaintAuthoring.PUZZLE_TYPE),
     WHIMSICAL_KNIGHT("Whimsical Knight", "気まぐれナイト", WhimsicalKnightAuthoring.PUZZLE_TYPE, incubating = true),
     OMINO_TREE("Omino Tree", "オミノツリー", OminoTreeAuthoring.PUZZLE_TYPE, incubating = true),
     MINUS_ROOM("Minus Room", "マイナルーム", MinusRoomAuthoring.PUZZLE_TYPE, incubating = true),

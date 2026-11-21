@@ -381,6 +381,10 @@ fun AdminQuestionScreen(
                                     "Tap a tile to review its photo and grid side by side, fix mis-read " +
                                         "walls, numbers, circles or the 1〜N range, and set its title. A red " +
                                         "tile has a wall that ends inside a room or a value out of range."
+                                AuthoringType.TILE_PAINT ->
+                                    "Tap a tile to review its photo and grid side by side, fix mis-read " +
+                                        "walls, clue cells or clue numbers, and set its title. A red tile has a " +
+                                        "wall that ends inside a tile, a clue with no cells or one too big for them."
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -676,6 +680,11 @@ private fun ReviewScreen(
                         "Compare the photo with the grid — pinch to zoom the photo, check the range (Max). " +
                             "In Numbers, tap a cell to type its given; in Walls, tap a line to toggle a wall; " +
                             "in Circles, tap a line and type its difference. Add or remove a row or column at the edge."
+                    AuthoringType.TILE_PAINT ->
+                        "Compare the photo with the grid — pinch to zoom the photo. In Walls, tap a line " +
+                            "between two tile cells to toggle its wall; in Clues, tap a cell to select it, toggle " +
+                            "it between tile and clue cell, and type its right and down numbers. Add or remove " +
+                            "a row or column at the edge."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
