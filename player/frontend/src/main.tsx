@@ -43,6 +43,7 @@ import { whimsicalKnightRenderer } from "./renderers/whimsicalKnight";
 import { ominoTreeRenderer } from "./renderers/ominoTree";
 import { minusRoomRenderer } from "./renderers/minusRoom";
 import { tilePaintRenderer } from "./renderers/tilePaint";
+import { countryRoadRenderer } from "./renderers/countryRoad";
 
 registerRenderer(comboSudokuRenderer);
 registerRenderer(sudokuRenderer);
@@ -84,6 +85,7 @@ registerRenderer(whimsicalKnightRenderer);
 registerRenderer(ominoTreeRenderer);
 registerRenderer(minusRoomRenderer);
 registerRenderer(tilePaintRenderer);
+registerRenderer(countryRoadRenderer);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

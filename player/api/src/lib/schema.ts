@@ -39,6 +39,7 @@ import whimsicalKnightSchema from "../../../../schemas/canon/whimsical-knight.js
 import ominoTreeSchema from "../../../../schemas/canon/omino-tree.json";
 import minusRoomSchema from "../../../../schemas/canon/minus-room.json";
 import tilePaintSchema from "../../../../schemas/canon/tile-paint.json";
+import countryRoadSchema from "../../../../schemas/canon/country-road.json";
 
 const ajv = new Ajv();
 
@@ -83,6 +84,7 @@ const validators: Record<number, ValidateFunction> = {
   38: ajv.compile(ominoTreeSchema),
   39: ajv.compile(minusRoomSchema),
   40: ajv.compile(tilePaintSchema),
+  41: ajv.compile(countryRoadSchema),
 };
 
 export function validateCanon(puzzleType: number, data: unknown): void {
@@ -379,6 +381,25 @@ const semanticChecks: Record<number, (data: any) => void> = {
   // (edges beside a clue cell are ignored); every clue number has a run of tile cells.
   // Mirrors tilePaintFormatProblems in frontend/src/components/tilePaintRules.ts.
   40: (data: TilePaintCanonData) => checkTilePaint(data),
+  // Country Road: walls fit the cells and every wall separates two rooms; a room holds at
+  // most one number. Mirrors countryRoadFormatProblems in
+  // frontend/src/components/countryRoadRules.ts.
+  41: (data: { cells: number[][]; grids: { h: number[][]; v: number[][] } }) => {
+    checkCellsAndRoomWalls("country road", data);
+    const { cells, grids } = data;
+    const rows = cells.length;
+    const cols = cells[0].length;
+    const room = roomIds(rows, cols, grids.h, grids.v);
+    const numbered = new Map<number, string>();
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (cells[r][c] <= 0) continue;
+        const prev = numbered.get(room[r][c]);
+        if (prev) throw new Error(`Invalid country road: two numbers in one room (${prev} and R${r + 1}C${c + 1})`);
+        numbered.set(room[r][c], `R${r + 1}C${c + 1}`);
+      }
+    }
+  },
   // Kuralin: every circle must sit on an interior grid line (edge midpoint or corner,
   // never a cell center), and no two circles may share a spot.
   28: (data: { width: number; height: number; circles: { dr: number; dc: number }[] }) => {
@@ -422,31 +443,7 @@ function checkRoomWalls(name: string, rows: number, cols: number, h: number[][],
   if (!fits(h, rows - 1, cols) || !fits(v, rows, cols - 1)) {
     throw new Error(`Invalid ${name}: walls don't match the ${cols}x${rows} grid`);
   }
-  const room = Array.from({ length: rows }, () => Array<number>(cols).fill(-1));
-  let next = 0;
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      if (room[r][c] >= 0) continue;
-      room[r][c] = next;
-      const stack: [number, number][] = [[r, c]];
-      while (stack.length > 0) {
-        const [cr, cc] = stack.pop()!;
-        const open: [number, number, boolean][] = [
-          [cr - 1, cc, cr > 0 && h[cr - 1][cc] === 0],
-          [cr + 1, cc, cr < rows - 1 && h[cr][cc] === 0],
-          [cr, cc - 1, cc > 0 && v[cr][cc - 1] === 0],
-          [cr, cc + 1, cc < cols - 1 && v[cr][cc] === 0],
-        ];
-        for (const [nr, nc, passable] of open) {
-          if (passable && room[nr][nc] < 0) {
-            room[nr][nc] = next;
-            stack.push([nr, nc]);
-          }
-        }
-      }
-      next++;
-    }
-  }
+  const room = roomIds(rows, cols, h, v);
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const inside =
@@ -568,4 +565,34 @@ function checkTilePaint(data: TilePaintCanonData): void {
       }
     }
   }
+}
+
+/** Room id of every cell: cells joined across edges without a wall (h / v as in checkRoomWalls). */
+function roomIds(rows: number, cols: number, h: number[][], v: number[][]): number[][] {
+  const room = Array.from({ length: rows }, () => Array<number>(cols).fill(-1));
+  let next = 0;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (room[r][c] >= 0) continue;
+      room[r][c] = next;
+      const stack: [number, number][] = [[r, c]];
+      while (stack.length > 0) {
+        const [cr, cc] = stack.pop()!;
+        const open: [number, number, boolean][] = [
+          [cr - 1, cc, cr > 0 && h[cr - 1][cc] === 0],
+          [cr + 1, cc, cr < rows - 1 && h[cr][cc] === 0],
+          [cr, cc - 1, cc > 0 && v[cr][cc - 1] === 0],
+          [cr, cc + 1, cc < cols - 1 && v[cr][cc] === 0],
+        ];
+        for (const [nr, nc, passable] of open) {
+          if (passable && room[nr][nc] < 0) {
+            room[nr][nc] = next;
+            stack.push([nr, nc]);
+          }
+        }
+      }
+      next++;
+    }
+  }
+  return room;
 }

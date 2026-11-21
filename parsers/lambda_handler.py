@@ -21,7 +21,7 @@ _parsers: dict = {}
 # either does OCR via the Gemini vision API or has no text to read, so it must
 # not pay the ~7s EasyOCR model-load cost. Keep this in sync with the
 # ``ocr_backend=`` arguments in ``_PARSER_FACTORIES``.
-_OCR_TYPES = frozenset({1, 2, 4, 5, 7, 9, 11, 14, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 29, 30, 34, 38, 39})
+_OCR_TYPES = frozenset({1, 2, 4, 5, 7, 9, 11, 14, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 29, 30, 34, 38, 39, 41})
 
 
 def _get_ocr():
@@ -167,6 +167,9 @@ def _build_parser(puzzle_type: int):
         # Clue cells hold two numbers each: read with Gemini, like Kakuro.
         from puzzle_parsers.tile_paint.parser import TilePaintParser
         return TilePaintParser()
+    if puzzle_type == 41:
+        from puzzle_parsers.country_road.parser import CountryRoadParser
+        return CountryRoadParser(ocr_backend=ocr)
     return None
 
 

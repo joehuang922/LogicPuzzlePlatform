@@ -39,6 +39,7 @@ import { computeWhimsicalKnightProgress } from "./whimsicalKnight";
 import { computeOminoTreeProgress } from "./ominoTree";
 import { computeMinusRoomProgress } from "./minusRoom";
 import { computeTilePaintProgress } from "./tilePaint";
+import { computeCountryRoadProgress } from "./countryRoad";
 
 export interface ProgressCalculator {
   puzzleType: number;
@@ -91,6 +92,7 @@ register(computeWhimsicalKnightProgress);
 register(computeOminoTreeProgress);
 register(computeMinusRoomProgress);
 register(computeTilePaintProgress);
+register(computeCountryRoadProgress);
 
 export function computeProgress(
   puzzle: PuzzleDefinition,

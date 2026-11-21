@@ -616,3 +616,26 @@ export interface TilePaintAnswer {
   // rows x cols; 0 = unset, 1 = shaded, 2 = marked; clue cells 0
   states: number[][];
 }
+
+// Country Road (type 41). Rooms are cells joined across edges without a wall.
+export interface CountryRoadCanon {
+  // rows x cols; 0 = no number, N >= 1 = the room's number, printed in this cell
+  cells: number[][];
+  grids: {
+    // (rows - 1) x cols; 1 = wall between (r, c) and (r + 1, c)
+    h: number[][];
+    // rows x (cols - 1); 1 = wall between (r, c) and (r, c + 1)
+    v: number[][];
+  };
+}
+
+export interface CountryRoadAnswer {
+  edges: {
+    // rows x (cols - 1); 1 = loop segment between (r, c) and (r, c + 1)
+    h: number[][];
+    // (rows - 1) x cols; 1 = loop segment between (r, c) and (r + 1, c)
+    v: number[][];
+  };
+  // rows x cols; 0 none, 1 = × (unused), 2 = • (used); solving aids only
+  marks: number[][];
+}

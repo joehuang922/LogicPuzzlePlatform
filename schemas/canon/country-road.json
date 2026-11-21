@@ -1,0 +1,59 @@
+{
+  "title": "Country Road Canonical Representation",
+  "description": "Rectangle grid divided into rooms by thick walls; a room may hold one number, the count of its cells the loop passes through",
+  "type": "object",
+  "required": [
+    "cells",
+    "grids"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "cells": {
+      "description": "m x n grid: 0 = no number, positive integer = the room number printed in that cell",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "minItems": 1
+      },
+      "minItems": 1
+    },
+    "grids": {
+      "type": "object",
+      "required": [
+        "h",
+        "v"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "h": {
+          "description": "(m-1) x n array: h[r][c] = thick border below cell[r][c]. 0=thin, 1=thick",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "v": {
+          "description": "m x (n-1) array: v[r][c] = thick border right of cell[r][c]. 0=thin, 1=thick",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        }
+      }
+    }
+  }
+}

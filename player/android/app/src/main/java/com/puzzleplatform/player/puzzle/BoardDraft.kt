@@ -56,6 +56,7 @@ data class BoardDraft(
     val minusRoom: MinusRoomEngine.Board =
         MinusRoomEngine.Board(0, 0, 4, emptyList(), emptyList(), emptyList(), emptyList()),
     val tilePaint: TilePaintEngine.Board = TilePaintEngine.Board(emptyList(), emptyList(), emptyList()),
+    val countryRoad: CountryRoadEngine.Board = CountryRoadEngine.Board(emptyList(), emptyList(), emptyList()),
 ) {
     /**
      * What the type's misread check finds wrong with this board — the list that turns
@@ -102,6 +103,7 @@ data class BoardDraft(
         AuthoringType.OMINO_TREE -> OminoTreeAuthoring.problems(ominoTree)
         AuthoringType.MINUS_ROOM -> MinusRoomAuthoring.problems(minusRoom)
         AuthoringType.TILE_PAINT -> TilePaintAuthoring.problems(tilePaint)
+        AuthoringType.COUNTRY_ROAD -> CountryRoadAuthoring.problems(countryRoad)
     }
 
     /**
@@ -132,6 +134,7 @@ data class BoardDraft(
         AuthoringType.OMINO_TREE -> OminoTreeAuthoring.formatProblems(ominoTree)
         AuthoringType.MINUS_ROOM -> MinusRoomAuthoring.formatProblems(minusRoom)
         AuthoringType.TILE_PAINT -> TilePaintAuthoring.formatProblems(tilePaint)
+        AuthoringType.COUNTRY_ROAD -> CountryRoadAuthoring.formatProblems(countryRoad)
         else -> emptyList()
     }
 
@@ -227,6 +230,8 @@ data class BoardDraft(
             CanonBoard(MinusRoomAuthoring.canonFromDraft(minusRoom), minusRoom.cols, minusRoom.rows)
         AuthoringType.TILE_PAINT ->
             CanonBoard(TilePaintAuthoring.canonFromDraft(tilePaint), tilePaint.cols, tilePaint.rows)
+        AuthoringType.COUNTRY_ROAD ->
+            CanonBoard(CountryRoadAuthoring.canonFromDraft(countryRoad), countryRoad.cols, countryRoad.rows)
     }
 
     companion object {
@@ -276,6 +281,7 @@ data class BoardDraft(
             AuthoringType.OMINO_TREE -> BoardDraft(ominoTree = OminoTreeAuthoring.draftFromCanon(canon))
             AuthoringType.MINUS_ROOM -> BoardDraft(minusRoom = MinusRoomAuthoring.draftFromCanon(canon))
             AuthoringType.TILE_PAINT -> BoardDraft(tilePaint = TilePaintAuthoring.draftFromCanon(canon))
+            AuthoringType.COUNTRY_ROAD -> BoardDraft(countryRoad = CountryRoadAuthoring.draftFromCanon(canon))
         }
     }
 }

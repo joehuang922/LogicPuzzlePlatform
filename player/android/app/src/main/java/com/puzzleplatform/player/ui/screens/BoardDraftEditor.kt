@@ -24,6 +24,7 @@ import com.puzzleplatform.player.ui.board.ComboSudokuMiniBoard
 import com.puzzleplatform.player.ui.board.ClueGridMiniBoard
 import com.puzzleplatform.player.ui.board.OminoTreeMiniBoard
 import com.puzzleplatform.player.ui.board.MinusRoomMiniBoard
+import com.puzzleplatform.player.ui.board.CountryRoadMiniBoard
 import com.puzzleplatform.player.ui.board.TilePaintMiniBoard
 import com.puzzleplatform.player.ui.board.DigitBar
 import com.puzzleplatform.player.ui.board.DoubleChocoMiniBoard
@@ -381,6 +382,10 @@ fun BoardDraftEditor(
             draft = board.tilePaint,
             onChange = { t -> onChange { it.copy(tilePaint = t(it.tilePaint)) } },
         )
+        AuthoringType.COUNTRY_ROAD -> CountryRoadEditor(
+            draft = board.countryRoad,
+            onChange = { t -> onChange { it.copy(countryRoad = t(it.countryRoad)) } },
+        )
         AuthoringType.CHOCO_BANANA -> ClueGridEditor(
             authoring = ChocoBananaAuthoring,
             draft = board.chocoBanana,
@@ -460,6 +465,7 @@ fun BoardDraftMiniBoard(type: AuthoringType, board: BoardDraft, size: Dp) {
         AuthoringType.OMINO_TREE -> OminoTreeMiniBoard(draft = board.ominoTree, hasProblems = hasProblems, size = size)
         AuthoringType.MINUS_ROOM -> MinusRoomMiniBoard(draft = board.minusRoom, hasProblems = hasProblems, size = size)
         AuthoringType.TILE_PAINT -> TilePaintMiniBoard(draft = board.tilePaint, hasProblems = hasProblems, size = size)
+        AuthoringType.COUNTRY_ROAD -> CountryRoadMiniBoard(draft = board.countryRoad, hasProblems = hasProblems, size = size)
         AuthoringType.HEYAWAKE -> HeyawakeMiniBoard(draft = board.heyawake, hasProblems = hasProblems, size = size)
         AuthoringType.PICTO_LINK ->
             PictoLinkMiniBoard(draft = board.pictoLink, hasProblems = hasProblems, size = size)
