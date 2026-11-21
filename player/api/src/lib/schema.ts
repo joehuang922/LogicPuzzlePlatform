@@ -38,6 +38,7 @@ import zebraRopeSchema from "../../../../schemas/canon/zebra-rope.json";
 import whimsicalKnightSchema from "../../../../schemas/canon/whimsical-knight.json";
 import ominoTreeSchema from "../../../../schemas/canon/omino-tree.json";
 import minusRoomSchema from "../../../../schemas/canon/minus-room.json";
+import tilePaintSchema from "../../../../schemas/canon/tile-paint.json";
 
 const ajv = new Ajv();
 
@@ -81,6 +82,7 @@ const validators: Record<number, ValidateFunction> = {
   37: ajv.compile(whimsicalKnightSchema),
   38: ajv.compile(ominoTreeSchema),
   39: ajv.compile(minusRoomSchema),
+  40: ajv.compile(tilePaintSchema),
 };
 
 export function validateCanon(puzzleType: number, data: unknown): void {
@@ -373,6 +375,10 @@ const semanticChecks: Record<number, (data: any) => void> = {
       seen.add(key);
     }
   },
+  // Tile Paint: walls fit the grid; a wall between two tile cells must separate two tiles
+  // (edges beside a clue cell are ignored); every clue number has a run of tile cells.
+  // Mirrors tilePaintFormatProblems in frontend/src/components/tilePaintRules.ts.
+  40: (data: TilePaintCanonData) => checkTilePaint(data),
   // Kuralin: every circle must sit on an interior grid line (edge midpoint or corner,
   // never a cell center), and no two circles may share a spot.
   28: (data: { width: number; height: number; circles: { dr: number; dc: number }[] }) => {
@@ -502,5 +508,64 @@ function checkSkeletonPuzzle(data: { cells: number[][]; words: { word: string }[
   }
   for (const m of data.marks ?? []) {
     if (!isCell(m.r, m.c)) throw new Error(`Invalid skeleton-puzzle: mark at R${m.r + 1}C${m.c + 1} is not on a cell`);
+  }
+}
+
+type TilePaintClue = { right: number | null; down: number | null } | null;
+type TilePaintCanonData = { cells: TilePaintClue[][]; grids: { h: number[][]; v: number[][] } };
+
+function checkTilePaint(data: TilePaintCanonData): void {
+  const { cells, grids } = data;
+  const rows = cells.length;
+  const cols = cells[0].length;
+  if (cells.some((row) => row.length !== cols)) {
+    throw new Error("Invalid tile paint: cells rows differ in length");
+  }
+  const fits = (grid: number[][], height: number, width: number) =>
+    grid.length === height && grid.every((line) => line.length === width);
+  if (!fits(grids.h, rows - 1, cols) || !fits(grids.v, rows, cols - 1)) {
+    throw new Error(`Invalid tile paint: walls don't match the ${cols}x${rows} grid`);
+  }
+  const isTile = (r: number, c: number) => r < rows && c < cols && cells[r][c] === null;
+  // Tiles: tile cells joined across open edges.
+  const tile = Array.from({ length: rows }, () => Array<number>(cols).fill(-1));
+  let next = 0;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (!isTile(r, c) || tile[r][c] >= 0) continue;
+      tile[r][c] = next;
+      const stack: [number, number][] = [[r, c]];
+      while (stack.length > 0) {
+        const [cr, cc] = stack.pop()!;
+        const open: [number, number, boolean][] = [
+          [cr - 1, cc, cr > 0 && grids.h[cr - 1][cc] === 0],
+          [cr + 1, cc, cr < rows - 1 && grids.h[cr][cc] === 0],
+          [cr, cc - 1, cc > 0 && grids.v[cr][cc - 1] === 0],
+          [cr, cc + 1, cc < cols - 1 && grids.v[cr][cc] === 0],
+        ];
+        for (const [nr, nc, passable] of open) {
+          if (passable && isTile(nr, nc) && tile[nr][nc] < 0) {
+            tile[nr][nc] = next;
+            stack.push([nr, nc]);
+          }
+        }
+      }
+      next++;
+    }
+  }
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const inside =
+        (isTile(r, c) && isTile(r + 1, c) && grids.h[r][c] === 1 && tile[r][c] === tile[r + 1][c]) ||
+        (isTile(r, c) && isTile(r, c + 1) && grids.v[r][c] === 1 && tile[r][c] === tile[r][c + 1]);
+      if (inside) throw new Error(`Invalid tile paint: a wall at R${r + 1}C${c + 1} doesn't close off a tile`);
+      const clue = cells[r][c];
+      if (clue?.right != null && !isTile(r, c + 1)) {
+        throw new Error(`Invalid tile paint: the right clue at R${r + 1}C${c + 1} has no cells to count`);
+      }
+      if (clue?.down != null && !isTile(r + 1, c)) {
+        throw new Error(`Invalid tile paint: the down clue at R${r + 1}C${c + 1} has no cells to count`);
+      }
+    }
   }
 }

@@ -1,0 +1,13 @@
+{
+  "cells": [
+    [{"right": null, "down": null}, {"right": null, "down": 1}, {"right": null, "down": 4}, {"right": null, "down": 1}, {"right": null, "down": 2}],
+    [{"right": 1, "down": null}, null, null, null, null],
+    [{"right": 2, "down": null}, null, null, null, null],
+    [{"right": 3, "down": null}, null, null, null, null],
+    [{"right": 2, "down": null}, null, null, null, null]
+  ],
+  "grids": {
+    "h": [[0, 1, 1, 1, 1], [0, 1, 0, 1, 1], [0, 1, 1, 1, 1], [0, 1, 1, 1, 0]],
+    "v": [[0, 0, 0, 0], [1, 1, 1, 1], [1, 1, 1, 0], [1, 1, 0, 1], [1, 1, 1, 1]]
+  }
+}

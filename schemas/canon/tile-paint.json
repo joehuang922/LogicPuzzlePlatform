@@ -1,0 +1,49 @@
+{
+  "title": "Tile Paint Canonical Representation",
+  "description": "Grid of clue cells (Kakuro-style right/down shaded-cell counts) and tile cells; thick walls divide the tile cells into tiles that are shaded whole or not at all.",
+  "type": "object",
+  "required": ["cells", "grids"],
+  "additionalProperties": false,
+  "properties": {
+    "cells": {
+      "description": "rows x cols array. null = tile cell; an object = clue cell with the shaded count of its run to the right and below (null = no number).",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["right", "down"],
+              "additionalProperties": false,
+              "properties": {
+                "right": { "type": ["integer", "null"], "minimum": 0 },
+                "down": { "type": ["integer", "null"], "minimum": 0 }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "grids": {
+      "type": "object",
+      "required": ["h", "v"],
+      "additionalProperties": false,
+      "properties": {
+        "h": {
+          "description": "(rows-1) x cols: h[r][c] = 1 when a wall lies below cell (r, c).",
+          "type": "array",
+          "items": { "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 1 } }
+        },
+        "v": {
+          "description": "rows x (cols-1): v[r][c] = 1 when a wall lies right of cell (r, c).",
+          "type": "array",
+          "items": { "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 1 } }
+        }
+      }
+    }
+  }
+}

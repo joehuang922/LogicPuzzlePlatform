@@ -594,3 +594,25 @@ export interface MinusRoomAnswer {
   // rows x cols, givens included; 0 = empty
   numbers: number[][];
 }
+
+// Tile Paint (type 40). cells[r][c] is null for a tile cell or a Kakuro-style clue cell
+// counting the shaded cells of its run to the right / below (null = no number).
+export interface TilePaintClue {
+  right: number | null;
+  down: number | null;
+}
+
+export interface TilePaintCanon {
+  cells: (TilePaintClue | null)[][];
+  grids: {
+    // (rows - 1) x cols; 1 = wall between (r, c) and (r + 1, c)
+    h: number[][];
+    // rows x (cols - 1); 1 = wall between (r, c) and (r, c + 1)
+    v: number[][];
+  };
+}
+
+export interface TilePaintAnswer {
+  // rows x cols; 0 = unset, 1 = shaded, 2 = marked; clue cells 0
+  states: number[][];
+}

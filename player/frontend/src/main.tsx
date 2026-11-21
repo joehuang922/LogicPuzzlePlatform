@@ -42,6 +42,7 @@ import { zebraRopeRenderer } from "./renderers/zebraRope";
 import { whimsicalKnightRenderer } from "./renderers/whimsicalKnight";
 import { ominoTreeRenderer } from "./renderers/ominoTree";
 import { minusRoomRenderer } from "./renderers/minusRoom";
+import { tilePaintRenderer } from "./renderers/tilePaint";
 
 registerRenderer(comboSudokuRenderer);
 registerRenderer(sudokuRenderer);
@@ -82,6 +83,7 @@ registerRenderer(zebraRopeRenderer);
 registerRenderer(whimsicalKnightRenderer);
 registerRenderer(ominoTreeRenderer);
 registerRenderer(minusRoomRenderer);
+registerRenderer(tilePaintRenderer);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
