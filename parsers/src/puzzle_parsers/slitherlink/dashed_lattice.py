@@ -97,7 +97,7 @@ class DashedLattice:
             cv2.GaussianBlur(gray, (3, 3), 0), 255,
             cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, block, _INK_OFFSET,
         )
-        self.thickness = t = _line_thickness(ink)
+        self.thickness = t = _dash_stroke_px(ink)
         ink = _erase_digits(ink, t, pitch)
 
         close = max(3, int(_CLOSE_FRAC * pitch))
@@ -273,8 +273,11 @@ def _morph(mask: NDArray, op: int, size: tuple[int, int]) -> NDArray:
     return cv2.morphologyEx(mask, op, cv2.getStructuringElement(cv2.MORPH_RECT, size))
 
 
-def _line_thickness(ink: NDArray) -> float:
-    """Grid-line thickness: the commonest ink run length across both axes.
+def _dash_stroke_px(ink: NDArray) -> float:
+    """Stroke width of the dashes (px): the commonest ink run length across both axes.
+
+    Only tells bold clue digits from the grid line (``_erase_digits``); a
+    slitherlink board has no walls, so this is not wall classification.
 
     Every dash crosses many scan lines at its thickness, so that run length
     outnumbers the digits' (thicker) strokes and the dashes' own lengths.
