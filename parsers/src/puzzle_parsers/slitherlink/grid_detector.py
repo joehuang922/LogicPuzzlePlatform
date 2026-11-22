@@ -1,5 +1,8 @@
 """Grid detection for slitherlink puzzles via dot (intersection) detection.
 
+Dashed-line pages with no dots (Gakken) go through ``dashed_lattice`` instead,
+which finds the line crossings and hands them to the same lattice fit.
+
 Pipeline:
 1. Threshold to binary, find small circular blobs (the intersection dots)
 2. Filter by area and circularity to keep only dots
@@ -44,31 +47,24 @@ class SlitherlinkGeometry:
 def detect_slitherlink_grid(
     image: NDArray, debug_dir: str | None = None,
 ) -> SlitherlinkGeometry:
+    """Find the board's node lattice: dots at the vertices, else dashed lines.
+
+    Most sources print a dot at every vertex. Gakken prints dashed grid lines
+    and no dots; a page whose dots don't form a well-supported lattice is read
+    as a dashed one (``dashed_lattice``). Both feed the same lattice fit.
+    """
     debug_path = Path(debug_dir) if debug_dir else None
     if debug_path:
         debug_path.mkdir(parents=True, exist_ok=True)
 
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-    dots = _detect_dots(gray)
-    pitch = _estimate_pitch(dots)
-    if pitch > 0:
-        # Redetect against the local background: dots on a curled page edge
-        # (bent away from the camera) print lighter and smaller, and a global
-        # Otsu threshold drops whole rows of them.
-        local = _detect_dots(gray, pitch=pitch)
-        if len(local) >= len(dots):
-            dots = local
-
-    if debug_path:
-        vis = image.copy()
-        for (cx, cy) in dots:
-            cv2.circle(vis, (int(cx), int(cy)), 5, (0, 0, 255), 2)
-        cv2.imwrite(str(debug_path / "01_dots_raw.png"), vis)
-
-    pitch = _estimate_pitch(dots)
-
-    dot_grid = _fit_lattice_grid(dots, pitch, gray.shape)
+    dot_grid = _dot_lattice(image, gray, debug_path)
+    if dot_grid is None:
+        dot_grid = _dashed_lattice(image, gray, debug_path)
+    if dot_grid is None:
+        h, w = gray.shape[:2]
+        dot_grid = _synthetic_grid(w, h, 11, 11)
 
     if debug_path:
         vis = image.copy()
@@ -96,6 +92,97 @@ def detect_slitherlink_grid(
         cell_h=cell_h,
         cell_w=cell_w,
     )
+
+
+# A dot board has a dot at nearly every node (digits sit inside cells, never on
+# a vertex): the three dot samples have every node backed at full size, 2000px
+# and 1600px. The Gakken dashed samples find no dot lattice at all; round
+# glyphs could still chain into a small sparse one, which this bar rejects.
+_DOT_SUPPORT_MIN = 0.7
+
+
+def _dot_lattice(image: NDArray, gray: NDArray, debug_path: Path | None) -> NDArray | None:
+    dots = _detect_dots(gray)
+    pitch = _estimate_pitch(dots)
+    if pitch > 0:
+        # Redetect against the local background: dots on a curled page edge
+        # (bent away from the camera) print lighter and smaller, and a global
+        # Otsu threshold drops whole rows of them.
+        local = _detect_dots(gray, pitch=pitch)
+        if len(local) >= len(dots):
+            dots = local
+
+    if debug_path:
+        vis = image.copy()
+        for (cx, cy) in dots:
+            cv2.circle(vis, (int(cx), int(cy)), 5, (0, 0, 255), 2)
+        cv2.imwrite(str(debug_path / "01_dots_raw.png"), vis)
+
+    pitch = _estimate_pitch(dots)
+    fit = _fit_lattice_grid(dots, pitch)
+    if fit is None:
+        return None
+    grid, support = fit
+    if support < _DOT_SUPPORT_MIN or min(grid.shape[:2]) < 3:
+        return None
+    return grid
+
+
+# Any lattice row/column with a couple of crossings survives the fit's trim;
+# ``DashedLattice.refine_rows_cols`` decides board membership by the dashes.
+_DASHED_OCCUPANCY_FRAC = 0.1
+
+
+def _dashed_lattice(image: NDArray, gray: NDArray, debug_path: Path | None) -> NDArray | None:
+    from puzzle_parsers.grid_utils import estimate_cell_pitch
+    from puzzle_parsers.slitherlink.dashed_lattice import (
+        DESKEW_MIN,
+        WORK_PITCH,
+        DashedLattice,
+        deskew_angle,
+    )
+
+    # The line masks are found with axis-aligned kernels and the pitch with
+    # axis projections, so level a tilted photo first and map the nodes back.
+    angle = deskew_angle(gray)
+    rot = None
+    if abs(angle) >= DESKEW_MIN:
+        h, w = gray.shape[:2]
+        rot = cv2.getRotationMatrix2D((w / 2, h / 2), angle, 1.0)
+        gray = cv2.warpAffine(gray, rot, (w, h), flags=cv2.INTER_CUBIC, borderValue=255)
+
+    # Find lines at a fixed cell size: at full resolution a photo's paper grain
+    # thresholds into specks that bridge into stray crossings (Q86 full size
+    # misread 22 clues, at 2000px none). Nodes are scaled back for cropping.
+    pitch = estimate_cell_pitch(gray)
+    if pitch is None:
+        return None
+    scale = min(1.0, WORK_PITCH / pitch)
+    if scale < 1.0:
+        gray = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+
+    lattice = DashedLattice(gray)
+    if debug_path:
+        vis = cv2.merge([lattice.v_lines, np.zeros_like(lattice.h_lines), lattice.h_lines])
+        for (cx, cy) in lattice.points:
+            cv2.circle(vis, (int(cx), int(cy)), 6, (0, 255, 0), -1)
+        cv2.imwrite(str(debug_path / "01_dashed_lines.png"), vis)
+    if lattice.pitch is None or len(lattice.points) < 10:
+        return None
+    # Crossings under a faint stretch of line are sparse, and the default trim
+    # would drop those rows (Q90's top six at 2000px). The pitch comes from the page's autocorrelation: at small sizes a frayed
+    # crossing leaves specks that throw off a nearest-neighbour estimate.
+    fit = _fit_lattice_grid(lattice.points, lattice.pitch, occupancy_frac=_DASHED_OCCUPANCY_FRAC)
+    if fit is None:
+        return None
+    grid = lattice.refine_rows_cols(fit[0])
+    if min(grid.shape[:2]) < 3:
+        return None
+    grid = grid / scale
+    if rot is not None:
+        inv = cv2.invertAffineTransform(rot)
+        grid = grid @ inv[:, :2].T + inv[:, 2]
+    return grid
 
 
 def _estimate_pitch(dots: NDArray) -> float:
@@ -252,41 +339,41 @@ def _dominant_block(idx: NDArray, frac: float = 0.5) -> tuple[int, int]:
 
 
 def _fit_lattice_grid(
-    dots: NDArray, pitch: float, img_shape: tuple[int, ...],
-) -> NDArray:
-    """Isolate the puzzle board and build its dot_grid.
+    dots: NDArray, pitch: float, occupancy_frac: float = 0.5,
+) -> tuple[NDArray, float] | None:
+    """Isolate the puzzle board and build its node grid from lattice points.
 
     Keeps the largest neighbour-connected component (the board), numbers its
-    dots by walking the lattice (``_walk_lattice``), trims stray bleed-in
+    points by walking the lattice (``_walk_lattice``), trims stray bleed-in
     rows/columns via the occupancy histogram, then emits the grid -- each node
-    at its real dot when present, otherwise interpolated along its traced dot
-    row and column (``_fill_missing``).
+    at its real point when present, otherwise interpolated along its traced
+    row and column (``_fill_missing``). Returns the grid and the share of its
+    nodes backed by a real point, or ``None`` when no lattice is found.
+
+    ``occupancy_frac`` is the trim's bar (see ``_dominant_block``). A caller
+    that checks board membership itself can lower it to keep sparse rows.
     """
     if len(dots) < 10 or pitch <= 0:
-        h, w = img_shape[:2]
-        return _synthetic_grid(w, h, 11, 11)
+        return None
 
     comp = _largest_component(dots, pitch)
     if len(comp) < 10:
-        h, w = img_shape[:2]
-        return _synthetic_grid(w, h, 11, 11)
+        return None
 
     cx, cy, _, _ = _fit_affine_lattice(comp, pitch)
     basis = np.array([[cx[0], cy[0]], [cx[1], cy[1]]])  # col step, row step
     comp, node_rows, node_cols = _walk_lattice(comp, pitch, basis)
     if len(comp) < 10:
-        h, w = img_shape[:2]
-        return _synthetic_grid(w, h, 11, 11)
+        return None
 
     # Trim stray rows/columns and recover the board's node-index window.
     r_base = int(node_rows.min())
     c_base = int(node_cols.min())
-    r_off, n_dot_rows = _dominant_block(node_rows)
-    c_off, n_dot_cols = _dominant_block(node_cols)
+    r_off, n_dot_rows = _dominant_block(node_rows, occupancy_frac)
+    c_off, n_dot_cols = _dominant_block(node_cols, occupancy_frac)
 
     if n_dot_rows < 2 or n_dot_cols < 2:
-        h, w = img_shape[:2]
-        return _synthetic_grid(w, h, 11, 11)
+        return None
 
     r0 = r_base + r_off
     c0 = c_base + c_off
@@ -295,7 +382,8 @@ def _fit_lattice_grid(
     rr, cc = node_rows - r0, node_cols - c0
     keep = (rr >= 0) & (rr < n_dot_rows) & (cc >= 0) & (cc < n_dot_cols)
     grid[rr[keep], cc[keep]] = comp[keep]
-    return _fill_missing(grid, cx, cy, r0, c0)
+    support = float(np.mean(~np.isnan(grid[:, :, 0])))
+    return _fill_missing(grid, cx, cy, r0, c0), support
 
 
 # A step to a neighbour must land within this fraction of a lattice step of an

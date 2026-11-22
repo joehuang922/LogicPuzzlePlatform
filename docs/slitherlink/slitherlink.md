@@ -27,6 +27,12 @@ A grid of cells defined by dots at intersections. Some cells contain a number cl
 - [board-slitherlink.jpg](slitherlink/board-slitherlink.jpg) — small board
 - [board-slitherlink-medium-1.jpg](slitherlink/board-slitherlink-medium-1.jpg) — medium board
 - [board-slitherlink-medium-2.jpg](slitherlink/board-slitherlink-medium-2.jpg) — medium board (variant)
+- [board-slitherlink-gakken-10x10.jpg](slitherlink/board-slitherlink-gakken-10x10.jpg) — Gakken style (dashed lines, no dots), beside a neighbouring puzzle
+- [board-slitherlink-gakken-15x20.jpg](slitherlink/board-slitherlink-gakken-15x20.jpg) — Gakken style, with the next puzzle just below
+- [board-slitherlink-gakken-40x35.jpg](slitherlink/board-slitherlink-gakken-40x35.jpg) — Gakken style, 40x35 on a curved page
+
+Each Gakken sample has a `.canon.json` beside it (the 40x35 one is the parser's
+EasyOCR read, identical at full size and 2000px, checked by eye).
 
 ## Answer structure description
 
@@ -81,11 +87,20 @@ At least one edge exists AND the edges form a single connected loop with no bran
 
 ## Puzzle Parser
 
-- Detects the dot grid using image processing (finds intersection points).
-- Determines grid dimensions from dot spacing.
-- Extracts cell ROIs from the center of each cell region.
-- Uses LLM recognizer (Gemini) to classify each cell as empty or containing a digit 0-3.
-- Validates that all cell values are in the range -1 to 3.
+Two page styles share one parser (type 5); the detector picks the style from the page:
+
+- **Dot lattice** (most sources): a dot at every vertex. Dots are found as round
+  blobs and fitted to a lattice that follows a curved page.
+- **Dashed lines** (Gakken): thin dashed grid lines, outer border included, and no
+  dots. Used when the page has no well-supported dot lattice (a dot page has a dot
+  at 100% of its nodes; a dashed page yields none). The line crossings stand in for
+  the dots: the page is levelled and scaled to ~80px cells, digits are erased, the
+  dashes are joined into lines, and their crossings feed the same lattice fit. The
+  board is then the longest run of lines joined by dashed edges, which excludes a
+  neighbouring puzzle a fraction of a cell away (`slitherlink/dashed_lattice.py`).
+
+Either way the result is the grid of vertex positions; each cell's centre crop is
+read with EasyOCR (`cell_ocr.read_cells`, single digits 0-3), empty cells are -1.
 
 # Misc
 
