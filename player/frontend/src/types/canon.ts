@@ -462,6 +462,19 @@ export interface LRingAnswer {
 export type PerfectLRingCanon = LRingCanon;
 export type PerfectLRingAnswer = LRingAnswer;
 
+export interface MannequinGate2Canon {
+  rows: number;
+  cols: number;
+  // Each line lists every cell it passes through, in order, as [row, col]; consecutive
+  // cells are 8-neighbours.
+  lines: number[][][];
+}
+
+export interface MannequinGate2Answer {
+  // rows x cols; 1 = shaded
+  shaded: number[][];
+}
+
 export interface HashiCanon {
   // rows x cols lattice points; 0 = no island, 1-8 = an island with that number
   cells: number[][];

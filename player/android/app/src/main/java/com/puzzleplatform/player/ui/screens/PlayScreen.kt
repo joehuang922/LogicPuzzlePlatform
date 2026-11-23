@@ -62,6 +62,7 @@ import com.puzzleplatform.player.data.model.Puzzle
 import com.puzzleplatform.player.ui.DIFFICULTY_LABELS
 import com.puzzleplatform.player.ui.board.AkariBoard
 import com.puzzleplatform.player.ui.board.HitoriBoard
+import com.puzzleplatform.player.ui.board.MannequinGate2Board
 import com.puzzleplatform.player.ui.board.DigitBar
 import com.puzzleplatform.player.ui.board.EntryFocus
 import com.puzzleplatform.player.ui.board.LocalBoardMaxSide
@@ -393,6 +394,13 @@ fun PlayScreen(
                                     userValues = state.userValues,
                                     liveValidate = state.liveValidate,
                                     onSetEdge = vm::setUserValue,
+                                )
+                                // Shade/mark tap cycle; lines that break a rule turn red with Errors on.
+                                43 -> MannequinGate2Board(
+                                    puzzle = puzzle,
+                                    userValues = state.userValues,
+                                    liveValidate = state.liveValidate,
+                                    onTapCell = vm::tapShadeCell,
                                 )
                                 // L-Ring plus the corner rule; bad corners get a red dot with Errors on.
                                 42 -> LRingBoard(

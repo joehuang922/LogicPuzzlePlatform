@@ -36,6 +36,7 @@ import SinkaminoEditor from "./SinkaminoEditor";
 import BalanceLinkEditor from "./BalanceLinkEditor";
 import LRingEditor from "./LRingEditor";
 import PerfectLRingEditor from "./PerfectLRingEditor";
+import MannequinGate2Editor from "./MannequinGate2Editor";
 import HashiEditor from "./HashiEditor";
 import SkeletonPuzzleEditor from "./SkeletonPuzzleEditor";
 import ZebraRopeEditor from "./ZebraRopeEditor";
@@ -52,7 +53,7 @@ export const EDITOR_TYPE_NAMES = [
   "fillomino", "lits", "choco-banana", "number-link", "akari", "hell-golf",
   "tentaishow", "heyawake", "shikaku", "norinori", "nurikabe", "ripple-effect",
   "hitori", "picto-link", "kuralin", "unequal-sudoku", "corner-chain", "sinkamino", "balance-link", "l-ring", "hashi", "skeleton-puzzle",
-  "zebra-rope", "whimsical-knight", "omino-tree", "minus-room", "tile-paint", "country-road", "perfect-l-ring",
+  "zebra-rope", "whimsical-knight", "omino-tree", "minus-room", "tile-paint", "country-road", "perfect-l-ring", "mannequin-gate-2",
 ];
 
 export function hasVisualEditor(typeName: string | undefined): boolean {
@@ -107,6 +108,7 @@ function CanonEditor({
     case "balance-link": return <BalanceLinkEditor initialJson={canonRepr} onChange={onChange} />;
     case "l-ring": return <LRingEditor initialJson={canonRepr} onChange={onChange} />;
     case "perfect-l-ring": return <PerfectLRingEditor initialJson={canonRepr} onChange={onChange} />;
+    case "mannequin-gate-2": return <MannequinGate2Editor initialJson={canonRepr} onChange={onChange} />;
     case "hashi": return <HashiEditor initialJson={canonRepr} onChange={onChange} />;
     case "skeleton-puzzle": return <SkeletonPuzzleEditor initialJson={canonRepr} onChange={onChange} />;
     case "zebra-rope": return <ZebraRopeEditor initialJson={canonRepr} onChange={onChange} />;

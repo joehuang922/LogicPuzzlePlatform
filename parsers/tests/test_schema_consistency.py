@@ -26,6 +26,7 @@ from puzzle_parsers.sinkamino.models import SinkaminoBoard
 from puzzle_parsers.balance_link.models import BalanceLinkBoard
 from puzzle_parsers.l_ring.models import LRingBoard
 from puzzle_parsers.perfect_l_ring.models import PerfectLRingBoard
+from puzzle_parsers.mannequin_gate_2.models import MannequinGate2Board
 from puzzle_parsers.hashi.models import HashiBoard
 from puzzle_parsers.skeleton_puzzle.models import SkeletonPuzzleBoard
 from puzzle_parsers.zebra_rope.models import ZebraRopeBoard
@@ -58,6 +59,7 @@ MODELS = {
     "balance-link": BalanceLinkBoard,
     "l-ring": LRingBoard,
     "perfect-l-ring": PerfectLRingBoard,
+    "mannequin-gate-2": MannequinGate2Board,
     "hashi": HashiBoard,
     "skeleton-puzzle": SkeletonPuzzleBoard,
     "zebra-rope": ZebraRopeBoard,

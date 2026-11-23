@@ -45,6 +45,7 @@ data class BoardDraft(
     val balanceLink: ClueGridDraft = ClueGridDraft(),
     val lRing: ClueGridDraft = ClueGridDraft(),
     val perfectLRing: ClueGridDraft = ClueGridDraft(),
+    val mannequinGate2: MannequinGate2Rules.Board = MannequinGate2Rules.Board(0, 0, emptyList()),
     val hashi: ClueGridDraft = ClueGridDraft(),
     val skeletonPuzzle: SkeletonRules.Board = SkeletonRules.Board(),
     val pencils: ClueGridDraft = ClueGridDraft(),
@@ -95,6 +96,7 @@ data class BoardDraft(
         AuthoringType.BALANCE_LINK -> BalanceLinkAuthoring.problems(balanceLink)
         AuthoringType.L_RING -> LRingAuthoring.problems(lRing)
         AuthoringType.PERFECT_L_RING -> PerfectLRingAuthoring.problems(perfectLRing)
+        AuthoringType.MANNEQUIN_GATE_2 -> MannequinGate2Authoring.problems(mannequinGate2)
         AuthoringType.HASHI -> HashiAuthoring.problems(hashi)
         AuthoringType.SKELETON_PUZZLE -> SkeletonPuzzleAuthoring.problems(skeletonPuzzle)
         AuthoringType.PENCILS -> PencilsAuthoring.problems(pencils)
@@ -137,6 +139,7 @@ data class BoardDraft(
         AuthoringType.MINUS_ROOM -> MinusRoomAuthoring.formatProblems(minusRoom)
         AuthoringType.TILE_PAINT -> TilePaintAuthoring.formatProblems(tilePaint)
         AuthoringType.COUNTRY_ROAD -> CountryRoadAuthoring.formatProblems(countryRoad)
+        AuthoringType.MANNEQUIN_GATE_2 -> MannequinGate2Authoring.formatProblems(mannequinGate2)
         else -> emptyList()
     }
 
@@ -211,6 +214,8 @@ data class BoardDraft(
             CanonBoard(LRingAuthoring.canonFromDraft(lRing), lRing.cols, lRing.rows)
         AuthoringType.PERFECT_L_RING ->
             CanonBoard(PerfectLRingAuthoring.canonFromDraft(perfectLRing), perfectLRing.cols, perfectLRing.rows)
+        AuthoringType.MANNEQUIN_GATE_2 ->
+            CanonBoard(MannequinGate2Authoring.canonFromDraft(mannequinGate2), mannequinGate2.cols, mannequinGate2.rows)
         AuthoringType.HASHI ->
             CanonBoard(HashiAuthoring.canonFromDraft(hashi), hashi.cols, hashi.rows)
         AuthoringType.SKELETON_PUZZLE ->
@@ -275,6 +280,7 @@ data class BoardDraft(
             AuthoringType.BALANCE_LINK -> BoardDraft(balanceLink = BalanceLinkAuthoring.draftFromCanon(canon))
             AuthoringType.L_RING -> BoardDraft(lRing = LRingAuthoring.draftFromCanon(canon))
             AuthoringType.PERFECT_L_RING -> BoardDraft(perfectLRing = PerfectLRingAuthoring.draftFromCanon(canon))
+            AuthoringType.MANNEQUIN_GATE_2 -> BoardDraft(mannequinGate2 = MannequinGate2Authoring.draftFromCanon(canon))
             AuthoringType.HASHI -> BoardDraft(hashi = HashiAuthoring.draftFromCanon(canon))
             AuthoringType.SKELETON_PUZZLE -> BoardDraft(skeletonPuzzle = SkeletonPuzzleAuthoring.draftFromCanon(canon))
             AuthoringType.PENCILS -> BoardDraft(pencils = PencilsAuthoring.draftFromCanon(canon))

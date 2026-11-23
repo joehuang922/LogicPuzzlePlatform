@@ -369,6 +369,10 @@ fun AdminQuestionScreen(
                                     "Tap a tile to review its photo and grid side by side, fix mis-read " +
                                         "ropes or circles, and set its title. A red tile has no clues or a " +
                                         "rope or circle that can't be right."
+                                AuthoringType.MANNEQUIN_GATE_2 ->
+                                    "Tap a tile to review its photo and grid side by side, fix mis-read " +
+                                        "gray lines, and set its title. A red tile has no lines or a line " +
+                                        "that can't be right."
                                 AuthoringType.WHIMSICAL_KNIGHT ->
                                     "Tap a tile to review its photo and dots side by side, fix mis-read " +
                                         "gray squares, circles or squares, and set its title. A red tile has " +
@@ -672,6 +676,10 @@ private fun ReviewScreen(
                         "Compare the photo with the grid — pinch to zoom the photo. In Circles, tap a grid " +
                             "line or corner to cycle its circle; in Ropes, drag through cells to draw a rope, " +
                             "or tap one to delete it. Add or remove a row or column at the edge."
+                    AuthoringType.MANNEQUIN_GATE_2 ->
+                        "Compare the photo with the grid — pinch to zoom the photo, drag cell to cell " +
+                            "(diagonals too) to draw a missed line, switch to Delete and tap a cell to remove " +
+                            "a wrong line, or add or remove a row or column at the edge."
                     AuthoringType.WHIMSICAL_KNIGHT ->
                         "Compare the photo with the dots — pinch to zoom the photo, tap between four dots " +
                             "to toggle a gray square, tap a dot or between two dots to cycle its clue, or add " +

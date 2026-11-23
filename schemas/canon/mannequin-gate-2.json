@@ -1,0 +1,25 @@
+{
+  "title": "Mannequin Gate 2 Canonical Representation",
+  "description": "Rectangular grid with gray lines drawn through cell centres. Shade cells so every line passes through exactly two shaded cells, crossing lines have different gate sizes (unshaded cells between a line's two shaded cells), and all unshaded cells are orthogonally connected.",
+  "type": "object",
+  "required": ["rows", "cols", "lines"],
+  "additionalProperties": false,
+  "properties": {
+    "rows": { "type": "integer", "minimum": 1 },
+    "cols": { "type": "integer", "minimum": 1 },
+    "lines": {
+      "description": "Each line lists every cell it passes through, in order, as [row, col]; consecutive cells are 8-neighbours.",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "minItems": 2,
+        "items": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": { "type": "integer", "minimum": 0 }
+        }
+      }
+    }
+  }
+}

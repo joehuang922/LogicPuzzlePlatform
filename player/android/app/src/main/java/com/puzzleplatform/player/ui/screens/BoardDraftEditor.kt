@@ -25,6 +25,7 @@ import com.puzzleplatform.player.ui.board.ComboSudokuMiniBoard
 import com.puzzleplatform.player.ui.board.ClueGridMiniBoard
 import com.puzzleplatform.player.ui.board.OminoTreeMiniBoard
 import com.puzzleplatform.player.ui.board.MinusRoomMiniBoard
+import com.puzzleplatform.player.ui.board.MannequinGate2MiniBoard
 import com.puzzleplatform.player.ui.board.CountryRoadMiniBoard
 import com.puzzleplatform.player.ui.board.TilePaintMiniBoard
 import com.puzzleplatform.player.ui.board.DigitBar
@@ -374,6 +375,10 @@ fun BoardDraftEditor(
             draft = board.whimsicalKnight,
             onChange = { t -> onChange { it.copy(whimsicalKnight = t(it.whimsicalKnight)) } },
         )
+        AuthoringType.MANNEQUIN_GATE_2 -> MannequinGate2Editor(
+            draft = board.mannequinGate2,
+            onChange = { t -> onChange { it.copy(mannequinGate2 = t(it.mannequinGate2)) } },
+        )
         AuthoringType.OMINO_TREE -> OminoTreeEditor(
             draft = board.ominoTree,
             selectedCell = selectedCell,
@@ -471,6 +476,8 @@ fun BoardDraftMiniBoard(type: AuthoringType, board: BoardDraft, size: Dp) {
         AuthoringType.ZEBRA_ROPE -> ZebraRopeMiniBoard(draft = board.zebraRope, hasProblems = hasProblems, size = size)
         AuthoringType.WHIMSICAL_KNIGHT ->
             WhimsicalKnightMiniBoard(draft = board.whimsicalKnight, hasProblems = hasProblems, size = size)
+        AuthoringType.MANNEQUIN_GATE_2 ->
+            MannequinGate2MiniBoard(draft = board.mannequinGate2, hasProblems = hasProblems, size = size)
         AuthoringType.OMINO_TREE -> OminoTreeMiniBoard(draft = board.ominoTree, hasProblems = hasProblems, size = size)
         AuthoringType.MINUS_ROOM -> MinusRoomMiniBoard(draft = board.minusRoom, hasProblems = hasProblems, size = size)
         AuthoringType.TILE_PAINT -> TilePaintMiniBoard(draft = board.tilePaint, hasProblems = hasProblems, size = size)

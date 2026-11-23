@@ -33,6 +33,7 @@ import sinkaminoSchema from "../../../../schemas/canon/sinkamino.json";
 import balanceLinkSchema from "../../../../schemas/canon/balance-link.json";
 import lRingSchema from "../../../../schemas/canon/l-ring.json";
 import perfectLRingSchema from "../../../../schemas/canon/perfect-l-ring.json";
+import mannequinGate2Schema from "../../../../schemas/canon/mannequin-gate-2.json";
 import hashiSchema from "../../../../schemas/canon/hashi.json";
 import skeletonPuzzleSchema from "../../../../schemas/canon/skeleton-puzzle.json";
 import zebraRopeSchema from "../../../../schemas/canon/zebra-rope.json";
@@ -87,6 +88,7 @@ const validators: Record<number, ValidateFunction> = {
   40: ajv.compile(tilePaintSchema),
   41: ajv.compile(countryRoadSchema),
   42: ajv.compile(perfectLRingSchema),
+  43: ajv.compile(mannequinGate2Schema),
 };
 
 export function validateCanon(puzzleType: number, data: unknown): void {
@@ -418,6 +420,34 @@ const semanticChecks: Record<number, (data: any) => void> = {
       if (seen.has(key)) throw new Error(`Invalid kuralin: two circles at (${dr},${dc})`);
       seen.add(key);
     }
+  },
+  // Mannequin Gate 2: every line's cells are on the board, consecutive cells are
+  // 8-neighbours, no line visits a cell twice, and no two lines share a step (a photo
+  // can't tell them apart). Mirrors formatProblems in mannequinGate2Rules.ts.
+  43: (data: { rows: number; cols: number; lines: number[][][] }) => {
+    const { rows, cols, lines } = data;
+    const at = (r: number, c: number) => `R${r + 1}C${c + 1}`;
+    const steps = new Map<string, number>();
+    lines.forEach((line, i) => {
+      const seen = new Set<string>();
+      line.forEach(([r, c], k) => {
+        if (r >= rows || c >= cols) throw new Error(`Invalid mannequin gate 2: line ${i + 1} leaves the board at ${at(r, c)}`);
+        const key = `${r},${c}`;
+        if (seen.has(key)) throw new Error(`Invalid mannequin gate 2: line ${i + 1} visits ${at(r, c)} twice`);
+        seen.add(key);
+        if (k === 0) return;
+        const [pr, pc] = line[k - 1];
+        if (Math.max(Math.abs(r - pr), Math.abs(c - pc)) !== 1) {
+          throw new Error(`Invalid mannequin gate 2: line ${i + 1} jumps from ${at(pr, pc)} to ${at(r, c)}`);
+        }
+        const step = [`${pr},${pc}`, key].sort().join("|");
+        const other = steps.get(step);
+        if (other !== undefined && other !== i) {
+          throw new Error(`Invalid mannequin gate 2: lines ${other + 1} and ${i + 1} share the step ${at(pr, pc)}-${at(r, c)}`);
+        }
+        steps.set(step, i);
+      });
+    });
   },
 };
 

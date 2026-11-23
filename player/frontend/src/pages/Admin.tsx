@@ -522,7 +522,7 @@ function QuestionForm({
       } else if ((typeId === 28 || typeId === 36) && canon.width && canon.height) {
         w = canon.width;
         h = canon.height;
-      } else if ((typeId === 37 || typeId === 38 || typeId === 39) && canon.cols && canon.rows) {
+      } else if ((typeId === 37 || typeId === 38 || typeId === 39 || typeId === 43) && canon.cols && canon.rows) {
         w = canon.cols;
         h = canon.rows;
       }

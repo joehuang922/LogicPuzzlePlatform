@@ -71,6 +71,7 @@ object PuzzleEngines {
         BalanceLinkEngine,
         LRingEngine,
         PerfectLRingEngine,
+        MannequinGate2Engine,
         HashiEngine,
         SkeletonPuzzleEngine,
         PencilsEngine,

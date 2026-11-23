@@ -38,9 +38,9 @@ class AuthoringTypeTest {
         assertEquals(
             listOf(
                 AuthoringType.WHIMSICAL_KNIGHT, AuthoringType.OMINO_TREE, AuthoringType.MINUS_ROOM,
-                AuthoringType.PERFECT_L_RING,
+                AuthoringType.PERFECT_L_RING, AuthoringType.MANNEQUIN_GATE_2,
             ),
-            ordered.takeLast(4),
+            ordered.takeLast(5),
         )
     }
 }

@@ -86,6 +86,7 @@ NAME_TO_TYPE: dict[str, int] = {
     "balance_link": 32,
     "l_ring": 33,
     "perfect_l_ring": 42,
+    "mannequin_gate_2": 43,
     "hashi": 34,
     "skeleton_puzzle": 35,
 }
