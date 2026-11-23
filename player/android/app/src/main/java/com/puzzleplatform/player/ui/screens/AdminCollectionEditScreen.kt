@@ -22,7 +22,9 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -40,6 +42,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.puzzleplatform.player.data.model.Collection
+import com.puzzleplatform.player.puzzle.TitleNormalize
 
 /**
  * Edit a collection: pick one from the list, then every property (cover by URL, with a
@@ -152,6 +155,19 @@ fun AdminCollectionEditScreen(
                 if (state.saved) {
                     Text("Saved.", color = MaterialTheme.colorScheme.primary)
                 }
+
+                HorizontalDivider()
+                val normalizer = state.normalizer
+                if (normalizer == null) {
+                    OutlinedButton(onClick = vm::openNormalizer) { Text("Normalize titles") }
+                } else {
+                    TitleNormalizerPanel(
+                        state = normalizer,
+                        onPatternChange = vm::setNormalizerPattern,
+                        onApply = vm::applyNormalizer,
+                        onClose = vm::closeNormalizer,
+                    )
+                }
             }
         }
     }
@@ -192,6 +208,93 @@ private fun CollectionPicker(
                     onClick = { onSelect(c.id); expanded = false },
                 )
             }
+        }
+    }
+}
+
+/**
+ * Rewrite the collection's numbered titles to one pattern with zero-padded numbers,
+ * previewing every rename first. Twin of the web admin's TitleNormalizer.
+ */
+@Composable
+private fun TitleNormalizerPanel(
+    state: TitleNormalizerState,
+    onPatternChange: (String) -> Unit,
+    onApply: () -> Unit,
+    onClose: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Normalize titles", style = MaterialTheme.typography.titleMedium)
+        if (state.puzzles == null) {
+            CircularProgressIndicator()
+            return@Column
+        }
+        val patternError = state.patternError
+        OutlinedTextField(
+            value = state.pattern,
+            onValueChange = onPatternChange,
+            label = { Text("Pattern") },
+            singleLine = true,
+            isError = patternError != null,
+            supportingText = {
+                Text(
+                    patternError ?: "${TitleNormalize.NUMBER_TOKEN} is the title's first number, zero-padded " +
+                        "to the widest one; ${TitleNormalize.TEXT_TOKEN} is what follows it. Titles without " +
+                        "a number are left alone."
+                )
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        val changes = state.changes
+        val renames = changes.count { it.renamed }
+        val conflicts = changes.any { it.conflict }
+        val typeLabel = state.puzzles.associate { it.id to it.puzzleTypeJpLabel }
+        if (patternError == null) {
+            if (renames == 0) {
+                Text(
+                    "All titles already match.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            for (c in changes) {
+                if (!c.renamed && !c.conflict) continue
+                val color = if (c.conflict) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                Column {
+                    Text(
+                        typeLabel[c.id].orEmpty(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        "${c.oldTitle ?: "(none)"}  →  ${c.newTitle ?: "(none)"}" +
+                            if (c.conflict) "  (duplicate)" else "",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = color,
+                    )
+                }
+            }
+        }
+        if (conflicts) {
+            Text(
+                "Some questions of the same type would share a title. Change the pattern or fix those titles first.",
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+        state.error?.let { Text("Error: $it", color = MaterialTheme.colorScheme.error) }
+        state.message?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = onApply,
+                enabled = !state.applying && patternError == null && renames > 0 && !conflicts,
+            ) {
+                if (state.applying) {
+                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                } else {
+                    Text("Rename $renames")
+                }
+            }
+            OutlinedButton(onClick = onClose, enabled = !state.applying) { Text("Close") }
         }
     }
 }

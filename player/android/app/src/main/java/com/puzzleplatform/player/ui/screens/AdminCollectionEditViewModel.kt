@@ -5,11 +5,16 @@ import androidx.lifecycle.viewModelScope
 import com.puzzleplatform.player.data.AdminRepository
 import com.puzzleplatform.player.data.ServiceLocator
 import com.puzzleplatform.player.data.model.Collection
+import com.puzzleplatform.player.data.model.Puzzle
+import com.puzzleplatform.player.data.model.UpdatePuzzleRequest
+import com.puzzleplatform.player.puzzle.TitleNormalize
 import com.puzzleplatform.player.data.model.UpdateCollectionRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 
 data class AdminCollectionEditUiState(
@@ -28,7 +33,29 @@ data class AdminCollectionEditUiState(
     val error: String? = null,
     // Set once the server accepts the edit.
     val saved: Boolean = false,
+    val normalizer: TitleNormalizerState? = null,
 )
+
+/**
+ * The "Normalize titles" panel: the picked collection's questions and the pattern
+ * being tried. [puzzles] is null while they load.
+ */
+data class TitleNormalizerState(
+    val puzzles: List<Puzzle>? = null,
+    val pattern: String = "",
+    val applying: Boolean = false,
+    val error: String? = null,
+    val message: String? = null,
+) {
+    val patternError: String? get() = TitleNormalize.patternError(pattern)
+
+    /** Every question's outcome; empty while loading or when the pattern is invalid. */
+    val changes: List<TitleNormalize.Change>
+        get() = if (puzzles == null || patternError != null) emptyList() else TitleNormalize.normalize(
+            puzzles.map { TitleNormalize.Item(it.id, it.puzzleType, it.title) },
+            pattern,
+        )
+}
 
 /**
  * Edit a collection: pick one, change any property, Done saves. Android twin of the
@@ -66,6 +93,7 @@ class AdminCollectionEditViewModel(
                 sealed = c.sealed,
                 error = null,
                 saved = false,
+                normalizer = null,
             )
         }
     }
@@ -75,6 +103,82 @@ class AdminCollectionEditViewModel(
     fun setPublishAt(v: String) = _state.update { it.copy(publishAt = v, saved = false) }
     fun setCoverSrc(v: String) = _state.update { it.copy(coverSrc = v, saved = false) }
     fun setSealed(v: Boolean) = _state.update { it.copy(sealed = v, saved = false) }
+
+    // --- Title normalizer (twin of the web admin's TitleNormalizer) ---
+
+    /** Load the picked collection's questions and suggest the pattern most already follow. */
+    fun openNormalizer() {
+        val id = _state.value.selectedId ?: return
+        _state.update { it.copy(normalizer = TitleNormalizerState()) }
+        viewModelScope.launch {
+            try {
+                val puzzles = repo.listCollectionPuzzles(id)
+                updateNormalizer(id) {
+                    it.copy(puzzles = puzzles, pattern = TitleNormalize.suggestPattern(puzzles.map { p -> p.title }))
+                }
+            } catch (e: Exception) {
+                updateNormalizer(id) { it.copy(puzzles = emptyList(), error = repo.serverMessage(e)) }
+            }
+        }
+    }
+
+    fun closeNormalizer() = _state.update { it.copy(normalizer = null) }
+
+    fun setNormalizerPattern(v: String) =
+        _state.update { s -> s.copy(normalizer = s.normalizer?.copy(pattern = v, error = null, message = null)) }
+
+    /**
+     * Rename every changed question. The PATCH carries all metadata, so each one
+     * resends its own author / difficulty / collection / special; no board, so the
+     * solver gate doesn't re-run. Refused while any rename would duplicate a title.
+     */
+    fun applyNormalizer() {
+        val id = _state.value.selectedId ?: return
+        val n = _state.value.normalizer ?: return
+        val puzzles = n.puzzles ?: return
+        if (n.applying) return
+        val changes = n.changes
+        if (changes.any { it.conflict }) return
+        val byId = puzzles.associateBy { it.id }
+        val renames = changes.filter { it.renamed }
+        if (renames.isEmpty()) return
+        _state.update { it.copy(normalizer = n.copy(applying = true, error = null, message = null)) }
+        viewModelScope.launch {
+            val results = renames.map { c ->
+                async {
+                    val p = byId.getValue(c.id)
+                    runCatching {
+                        repo.updatePuzzle(
+                            p.id,
+                            UpdatePuzzleRequest(
+                                title = c.newTitle.orEmpty(),
+                                author = p.author.orEmpty(),
+                                difficulty = p.difficulty,
+                                srcCollection = p.srcCollection ?: 0,
+                                special = p.special,
+                            ),
+                        )
+                    }
+                }
+            }.awaitAll()
+            val done = results.mapNotNull { it.getOrNull() }.associateBy { it.id }
+            val failed = results.count { it.isFailure }
+            updateNormalizer(id) { st ->
+                st.copy(
+                    puzzles = st.puzzles?.map { done[it.id] ?: it },
+                    applying = false,
+                    error = if (failed > 0) "$failed of ${renames.size} renames failed" else null,
+                    message = if (failed == 0) "Renamed ${renames.size} question(s)" else null,
+                )
+            }
+        }
+    }
+
+    /** Update the panel only if it's still open on the same collection. */
+    private fun updateNormalizer(collectionId: Int, f: (TitleNormalizerState) -> TitleNormalizerState) =
+        _state.update { s ->
+            if (s.selectedId != collectionId || s.normalizer == null) s else s.copy(normalizer = f(s.normalizer))
+        }
 
     /** Save every field; blank optional ones are cleared. Name is required. */
     fun save() {
