@@ -858,7 +858,9 @@ def _track_ink(proj: NDArray, lines: list[int]) -> list[int]:
         lo = max(0, int(round(expected)) - tol)
         hi = min(size, int(round(expected)) + tol + 1)
         if hi <= lo:
-            return int(round(expected))
+            # The window lies wholly past an end (a pass drifted off the
+            # board): stay on it, or the caller indexes past the projection.
+            return min(max(int(round(expected)), 0), size - 1)
         score = smooth[lo:hi].copy()
         if step:
             ahead = np.arange(lo, hi) + int(round(step))

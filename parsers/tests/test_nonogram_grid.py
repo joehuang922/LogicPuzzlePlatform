@@ -42,6 +42,9 @@ def _android(img):
         ("board-nonogram-pale-red.jpg", 40, 35),
         # Curved two-page spread: the grid edges bow more than their width.
         ("board-nonogram-spread.jpg", 60, 50),
+        # Landscape photo: at Android size a line-tracking pass ran off the
+        # board and find_grid_lines raised IndexError.
+        ("board-nonogram-landscape.jpg", 35, 40),
     ],
 )
 def test_grid_size(name, rows, cols, android):

@@ -49,6 +49,7 @@ A grid of m rows × n columns of empty cells. Numeric clues are given along the 
 - [board-nonogram-wavy.jpg](board-nonogram-wavy.jpg) — 40×35 board on a wavy page (thin lines bend ~half a cell; the count is snapped to whole 5-cell blocks)
 - [board-nonogram-pale-red.jpg](board-nonogram-pale-red.jpg) — 40×35 board in pale red ink (lines read from the darkest colour channel, not luminance)
 - [board-nonogram-spread.jpg](board-nonogram-spread.jpg) — 60×50 board on a curved two-page spread (grid edges bow ~15px)
+- [board-nonogram-landscape.jpg](board-nonogram-landscape.jpg) — 35×40 board photographed sideways; at Android size its line tracking ran past the board edge and crashed the shared grid finder
 
 ## Answer structure description
 
