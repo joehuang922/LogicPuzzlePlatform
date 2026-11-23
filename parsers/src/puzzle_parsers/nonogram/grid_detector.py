@@ -16,7 +16,7 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
-from puzzle_parsers.grid_utils import find_grid_lines
+from puzzle_parsers.grid_utils import find_grid_lines, ink_intensity
 
 
 @dataclass
@@ -101,7 +101,7 @@ def _unshear(image: NDArray) -> NDArray | None:
     tilts one family more than the other) and undone with one affine map.
     Returns ``None`` when both are already level.
     """
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    gray = ink_intensity(image)
     scale = min(1.0, _UNSHEAR_SIDE / max(gray.shape))
     small = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
     _, ink = cv2.threshold(small, 128, 255, cv2.THRESH_BINARY_INV)
@@ -138,7 +138,7 @@ def _straighten(image: NDArray, grid_rect: tuple[int, int, int, int]) -> NDArray
     Returns ``None`` when the grid is already upright or its border can't be
     fitted (keep the first pass rather than warp on a bad quad).
     """
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    gray = ink_intensity(image)
     quad = _fit_grid_corners(gray, grid_rect)
     if quad is None:
         return None
@@ -235,7 +235,7 @@ def _detect(
     if debug_path:
         debug_path.mkdir(parents=True, exist_ok=True)
 
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    gray = ink_intensity(image)
     h_img, w_img = gray.shape
 
     # Threshold to binary (ink is dark on light background)
@@ -249,14 +249,21 @@ def _detect(
     # Crop to the outer rectangle for further analysis
     roi = thresh[outer_y : outer_y + outer_h, outer_x : outer_x + outer_w]
 
-    # Detect thick horizontal lines using morphology
-    # A thick horizontal line has significant horizontal extent
+    # Long lines survive an opening a quarter of the board long. A curved page
+    # bows a line more than its own width over that run (a 4px grid edge
+    # drifted 15px), which breaks it up, so first thicken the ink across the
+    # line by ~0.5% of the board each side: far less than half a cell, so
+    # neighbouring lines never merge.
+    bend_x = 2 * max(1, outer_w // 200) + 1
+    bend_y = 2 * max(1, outer_h // 200) + 1
     h_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (outer_w // 4, 1))
-    h_lines = cv2.morphologyEx(roi, cv2.MORPH_OPEN, h_kernel)
-
-    # Detect thick vertical lines
+    h_lines = cv2.morphologyEx(
+        cv2.dilate(roi, np.ones((bend_y, 1), np.uint8)), cv2.MORPH_OPEN, h_kernel
+    )
     v_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, outer_h // 4))
-    v_lines = cv2.morphologyEx(roi, cv2.MORPH_OPEN, v_kernel)
+    v_lines = cv2.morphologyEx(
+        cv2.dilate(roi, np.ones((1, bend_x), np.uint8)), cv2.MORPH_OPEN, v_kernel
+    )
 
     # Find horizontal line y-positions (project to y axis)
     h_proj = np.sum(h_lines, axis=1)

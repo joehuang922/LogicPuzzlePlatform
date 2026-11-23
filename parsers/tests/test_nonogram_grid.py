@@ -38,6 +38,10 @@ def _android(img):
         ("board-nonogram-keystoned.jpg", 30, 30),
         # Wavy page: the whole-width count reads 39 rows; snapped to 5-cell blocks.
         ("board-nonogram-wavy.jpg", 40, 35),
+        # Pale red ink: its grid edge vanished under a luminance threshold.
+        ("board-nonogram-pale-red.jpg", 40, 35),
+        # Curved two-page spread: the grid edges bow more than their width.
+        ("board-nonogram-spread.jpg", 60, 50),
     ],
 )
 def test_grid_size(name, rows, cols, android):

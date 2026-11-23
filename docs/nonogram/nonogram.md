@@ -47,6 +47,8 @@ A grid of m rows × n columns of empty cells. Numeric clues are given along the 
 - [board-nonogram-big.jpg](board-nonogram-big.jpg) — 35×35 large board
 - [board-nonogram-keystoned.jpg](board-nonogram-keystoned.jpg) — 30×30 board photographed at an angle (lines slope ~3%; read only after the detector shears them level)
 - [board-nonogram-wavy.jpg](board-nonogram-wavy.jpg) — 40×35 board on a wavy page (thin lines bend ~half a cell; the count is snapped to whole 5-cell blocks)
+- [board-nonogram-pale-red.jpg](board-nonogram-pale-red.jpg) — 40×35 board in pale red ink (lines read from the darkest colour channel, not luminance)
+- [board-nonogram-spread.jpg](board-nonogram-spread.jpg) — 60×50 board on a curved two-page spread (grid edges bow ~15px)
 
 ## Answer structure description
 
