@@ -55,11 +55,75 @@ def detect_nonogram_grid(
     it come along), and detect again. The returned geometry's ``image`` is the
     image its coordinates refer to; crop clues from that, not the input.
     """
-    first = _detect(image, debug_dir)
+    try:
+        first = _detect(image, debug_dir)
+    except ValueError:
+        # A keystoned or tilted photo can slope the lines so far that none
+        # survives the quarter-width opening in ``_detect``. Shear them level
+        # and retry; ``_straighten`` then removes what perspective is left.
+        level = _unshear(image)
+        if level is None:
+            raise
+        image = level
+        first = _detect(image, debug_dir)
     straight = _straighten(image, first.grid_rect)
     if straight is None:
         return first
     return _detect(straight, debug_dir)
+
+
+# Longest side the slope search runs at, and the slopes it tries (±0.08 ≈ ±4.6°).
+_UNSHEAR_SIDE = 800
+_UNSHEAR_SLOPES = np.linspace(-0.08, 0.08, 161)
+
+
+def _line_slope(lines: NDArray) -> float:
+    """Slope ``dy/dx`` that best levels the horizontal strokes in ``lines``.
+
+    Shears the mask by each candidate slope and keeps the one whose row
+    projection is most peaked (sum of squares): level lines stack into
+    single rows.
+    """
+    h, w = lines.shape
+    best_s, best_score = 0.0, -1.0
+    for s in _UNSHEAR_SLOPES:
+        sheared = cv2.warpAffine(lines, np.float32([[1, 0, 0], [-s, 1, 0]]), (w, h))
+        score = float(np.square(sheared.sum(axis=1, dtype=np.float64)).sum())
+        if score > best_score:
+            best_s, best_score = float(s), score
+    return best_s
+
+
+def _unshear(image: NDArray) -> NDArray | None:
+    """Shear ``image`` so its grid lines run level and plumb.
+
+    Horizontal and vertical slopes are measured separately (a keystoned page
+    tilts one family more than the other) and undone with one affine map.
+    Returns ``None`` when both are already level.
+    """
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    scale = min(1.0, _UNSHEAR_SIDE / max(gray.shape))
+    small = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+    _, ink = cv2.threshold(small, 128, 255, cv2.THRESH_BINARY_INV)
+    k = max(9, _UNSHEAR_SIDE // 32)
+    h_lines = cv2.morphologyEx(ink, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_RECT, (k, 1)))
+    v_lines = cv2.morphologyEx(ink, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_RECT, (1, k)))
+    sh = _line_slope(h_lines)  # y drifts by sh per px of x
+    sv = _line_slope(np.ascontiguousarray(v_lines.T))  # x drifts by sv per px of y
+    if sh == 0.0 and sv == 0.0:
+        return None
+
+    h_img, w_img = image.shape[:2]
+    # Inverse of (x, y) -> (x + sv*y, y + sh*x), recentred on the image middle.
+    fwd = np.float64([[1, sv], [sh, 1]])
+    inv = np.linalg.inv(fwd)
+    centre = np.float64([w_img / 2, h_img / 2])
+    M = np.hstack([inv, (centre - inv @ centre)[:, None]]).astype(np.float32)
+    return cv2.warpAffine(
+        image, M, (w_img, h_img),
+        flags=cv2.INTER_LINEAR,
+        borderMode=cv2.BORDER_CONSTANT, borderValue=(255, 255, 255),
+    )
 
 
 # Corners already within this many px of an upright rectangle: leave as is.
