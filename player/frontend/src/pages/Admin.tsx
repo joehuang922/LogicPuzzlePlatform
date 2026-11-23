@@ -936,7 +936,7 @@ function comparePuzzles(a: Puzzle, b: Puzzle, key: SortKey, dir: SortDir): numbe
   let cmp = 0;
   switch (key) {
     case "title":
-      cmp = (a.title || "").localeCompare(b.title || "");
+      cmp = (a.title || "").toLowerCase().localeCompare((b.title || "").toLowerCase());
       break;
     case "difficulty":
       cmp = a.difficulty - b.difficulty;
@@ -1139,7 +1139,8 @@ function CollectionBrowser({
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  // Title A→Z by default, like the player's collection view.
+  const [sortKey, setSortKey] = useState<SortKey>("title");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   const puzzleTypeMap = Object.fromEntries(puzzleTypes.map((pt) => [pt.id, pt.jpLabel]));
@@ -1154,7 +1155,6 @@ function CollectionBrowser({
   }
 
   function sortItems(items: Puzzle[]): Puzzle[] {
-    if (!sortKey) return items;
     return [...items].sort((a, b) => comparePuzzles(a, b, sortKey, sortDir));
   }
 
@@ -1166,7 +1166,8 @@ function CollectionBrowser({
     setExpandedId(collectionId);
     setChecked(new Set());
     setEditingId(null);
-    setSortKey(null);
+    setSortKey("title");
+    setSortDir("asc");
     setLoadingPuzzles(true);
     try {
       const res = await listPuzzles({
