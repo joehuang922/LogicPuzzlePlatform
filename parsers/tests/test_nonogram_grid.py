@@ -34,6 +34,8 @@ def _android(img):
         ("board-nonogram-medium.jpg", 25, 25),
         ("board-nonogram-titled.jpg", 25, 25),
         ("board-nonogram-big.jpg", 35, 35),
+        # Keystoned photo: no separator line survives until the page is sheared level.
+        ("board-nonogram-keystoned.jpg", 30, 30),
     ],
 )
 def test_grid_size(name, rows, cols, android):

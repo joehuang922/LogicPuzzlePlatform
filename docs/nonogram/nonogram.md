@@ -45,6 +45,7 @@ A grid of m rows × n columns of empty cells. Numeric clues are given along the 
 - [board-nonogram.jpg](board-nonogram.jpg) — 11×10 small board
 - [board-nonogram-medium.jpg](board-nonogram-medium.jpg) — 25×25 medium board
 - [board-nonogram-big.jpg](board-nonogram-big.jpg) — 35×35 large board
+- [board-nonogram-keystoned.jpg](board-nonogram-keystoned.jpg) — 30×30 board photographed at an angle (lines slope ~3%; read only after the detector shears them level)
 
 ## Answer structure description
 
