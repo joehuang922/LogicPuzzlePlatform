@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.puzzleplatform.player.data.AdminRepository
 import com.puzzleplatform.player.data.ServiceLocator
+import com.puzzleplatform.player.data.api.retryServerErrors
 import com.puzzleplatform.player.data.model.Collection
 import com.puzzleplatform.player.data.model.Puzzle
 import com.puzzleplatform.player.data.model.UpdatePuzzleRequest
@@ -16,6 +17,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 
 data class AdminCollectionEditUiState(
     val loading: Boolean = true,
@@ -63,6 +66,9 @@ data class TitleNormalizerState(
  * out of every create / move-to picker ([CollectionDropdown]) and the API refuses
  * puzzles into it.
  */
+// Renames in flight at once; leaves room under the account's 10 concurrent Lambdas.
+private const val RENAME_CONCURRENCY = 3
+
 class AdminCollectionEditViewModel(
     private val repo: AdminRepository = ServiceLocator.adminRepository,
 ) : ViewModel() {
@@ -144,20 +150,27 @@ class AdminCollectionEditViewModel(
         if (renames.isEmpty()) return
         _state.update { it.copy(normalizer = n.copy(applying = true, error = null, message = null)) }
         viewModelScope.launch {
+            // A few at a time, retrying throttles: all at once overruns the account's
+            // Lambda concurrency cap and most renames come back 5xx.
+            val permits = Semaphore(RENAME_CONCURRENCY)
             val results = renames.map { c ->
                 async {
                     val p = byId.getValue(c.id)
-                    runCatching {
-                        repo.updatePuzzle(
-                            p.id,
-                            UpdatePuzzleRequest(
-                                title = c.newTitle.orEmpty(),
-                                author = p.author.orEmpty(),
-                                difficulty = p.difficulty,
-                                srcCollection = p.srcCollection ?: 0,
-                                special = p.special,
-                            ),
-                        )
+                    permits.withPermit {
+                        runCatching {
+                            retryServerErrors {
+                                repo.updatePuzzle(
+                                    p.id,
+                                    UpdatePuzzleRequest(
+                                        title = c.newTitle.orEmpty(),
+                                        author = p.author.orEmpty(),
+                                        difficulty = p.difficulty,
+                                        srcCollection = p.srcCollection ?: 0,
+                                        special = p.special,
+                                    ),
+                                )
+                            }
+                        }
                     }
                 }
             }.awaitAll()

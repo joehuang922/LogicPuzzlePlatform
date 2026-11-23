@@ -24,6 +24,7 @@ import BatchUploadForm from "../components/BatchUploadForm";
 import OverrideGateButton from "../components/OverrideGateButton";
 import { extractBase64 } from "../utils/image";
 import { normalizeTitles, patternError, suggestPattern, TitleChange } from "../utils/titleNormalize";
+import { runLimited, withRetry } from "../utils/runLimited";
 import { cardStyle, fieldStyle, inputStyle, errorStyle } from "../styles/admin";
 import { DIFFICULTY_OPTIONS, DIFFICULTY_LABELS } from "../constants";
 
@@ -257,6 +258,9 @@ function EditCollectionForm({
  * numbers ("Q<number>. <text>"), so title sorting reads 01, 02, ..., 10. Suggests
  * the pattern most titles already follow; previews every rename before applying.
  */
+// Renames in flight at once; leaves room under the account's 10 concurrent Lambdas.
+const RENAME_CONCURRENCY = 3;
+
 function TitleNormalizer({ collectionId, puzzleTypes }: { collectionId: number; puzzleTypes: PuzzleType[] }) {
   const [puzzles, setPuzzles] = useState<Puzzle[] | null>(null);
   const [pattern, setPattern] = useState("");
@@ -291,7 +295,11 @@ function TitleNormalizer({ collectionId, puzzleTypes }: { collectionId: number; 
     setApplying(true);
     setError(null);
     setSuccess(null);
-    const results = await Promise.allSettled(renames.map((c) => updatePuzzle(c.id, { title: c.newTitle })));
+    // A few at a time, retrying throttles: all at once overruns the account's Lambda
+    // concurrency cap and most renames come back 5xx.
+    const results = await runLimited(renames, RENAME_CONCURRENCY, (c) =>
+      withRetry(() => updatePuzzle(c.id, { title: c.newTitle })),
+    );
     const failed = results.filter((r) => r.status === "rejected").length;
     const done = new Map(renames.filter((_, i) => results[i].status === "fulfilled").map((c) => [c.id, c.newTitle]));
     setPuzzles((prev) => prev && prev.map((p) => (done.has(p.id) ? { ...p, title: done.get(p.id)! } : p)));
