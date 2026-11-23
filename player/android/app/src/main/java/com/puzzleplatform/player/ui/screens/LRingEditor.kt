@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.puzzleplatform.player.puzzle.ClueGridDraft
 import com.puzzleplatform.player.puzzle.LRingAuthoring
+import com.puzzleplatform.player.puzzle.LRingFamilyAuthoring
 import com.puzzleplatform.player.puzzle.LRingRules
 import com.puzzleplatform.player.ui.board.LRingBoard
 import com.puzzleplatform.player.ui.board.drawLRingArrow
@@ -29,7 +30,7 @@ import com.puzzleplatform.player.ui.board.drawLRingArrow
  * (tap a cell to select it), any warnings, and chips for the selected cell — empty or an
  * arrow up / right / down / left; or delete its row/column (a parser's phantom line). Add
  * row/column append an empty line for one the parser missed. Every edit goes straight to
- * [onChange]; [selectedCell] is "col,row".
+ * [onChange]; [selectedCell] is "col,row". Perfect L-Ring passes its own [authoring].
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -38,6 +39,7 @@ fun LRingEditor(
     selectedCell: String?,
     onSelectCell: (String?) -> Unit,
     onChange: ((ClueGridDraft) -> ClueGridDraft) -> Unit,
+    authoring: LRingFamilyAuthoring = LRingAuthoring,
 ) {
     val selected = selectedCell?.split(",")?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 2 }
     val selCol = selected?.get(0)
@@ -51,14 +53,14 @@ fun LRingEditor(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        for (problem in LRingAuthoring.problems(draft)) {
+        for (problem in authoring.problems(draft)) {
             Text(problem, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         }
 
         if (draft.rows > 0 && draft.cols > 0) {
             // No loop is drawn here, so the edge writes are dropped.
             LRingBoard(
-                puzzle = LRingAuthoring.previewPuzzle(draft),
+                puzzle = authoring.previewPuzzle(draft),
                 userValues = emptyMap(),
                 liveValidate = false,
                 onSetEdge = { _, _ -> },
@@ -81,13 +83,13 @@ fun LRingEditor(
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 FilterChip(
                     selected = value == LRingRules.EMPTY,
-                    onClick = { onChange { LRingAuthoring.setCell(it, selCol, selRow, LRingRules.EMPTY) } },
+                    onClick = { onChange { authoring.setCell(it, selCol, selRow, LRingRules.EMPTY) } },
                     label = { Text("Empty") },
                 )
                 for ((code, _, name) in LRingRules.ARROWS) {
                     FilterChip(
                         selected = value == code,
-                        onClick = { onChange { LRingAuthoring.setCell(it, selCol, selRow, code) } },
+                        onClick = { onChange { authoring.setCell(it, selCol, selRow, code) } },
                         label = { Text(name) },
                         leadingIcon = {
                             Canvas(Modifier.size(18.dp)) { drawLRingArrow(code, center, size.minDimension) }
@@ -99,14 +101,14 @@ fun LRingEditor(
                 OutlinedButton(
                     onClick = {
                         onSelectCell(null)
-                        onChange { LRingAuthoring.removeRow(it, selRow) }
+                        onChange { authoring.removeRow(it, selRow) }
                     },
                     enabled = draft.rows > 1,
                 ) { Text("Delete row ${selRow + 1}") }
                 OutlinedButton(
                     onClick = {
                         onSelectCell(null)
-                        onChange { LRingAuthoring.removeCol(it, selCol) }
+                        onChange { authoring.removeCol(it, selCol) }
                     },
                     enabled = draft.cols > 1,
                 ) { Text("Delete column ${selCol + 1}") }
@@ -114,11 +116,11 @@ fun LRingEditor(
         }
 
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            TextButton(onClick = { onChange(LRingAuthoring::addRow) }) {
+            TextButton(onClick = { onChange(authoring::addRow) }) {
                 Icon(Icons.Filled.Add, contentDescription = null)
                 Text("Add row")
             }
-            TextButton(onClick = { onChange(LRingAuthoring::addCol) }) {
+            TextButton(onClick = { onChange(authoring::addCol) }) {
                 Icon(Icons.Filled.Add, contentDescription = null)
                 Text("Add column")
             }

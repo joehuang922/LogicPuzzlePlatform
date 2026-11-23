@@ -341,7 +341,7 @@ fun AdminQuestionScreen(
                                     "Tap a tile to review its photo and grid side by side, fix mis-read " +
                                         "black cells or symbols, and set its title. A red tile has a symbol " +
                                         "that can't be paired."
-                                AuthoringType.L_RING ->
+                                AuthoringType.L_RING, AuthoringType.PERFECT_L_RING ->
                                     "Tap a tile to review its photo and grid side by side, fix mis-read " +
                                         "arrows, and set its title. A red tile has no arrows or an arrow " +
                                         "pointing off the board."
@@ -650,7 +650,7 @@ private fun ReviewScreen(
                     AuthoringType.BALANCE_LINK ->
                         "Compare the photo with the grid — pinch to zoom the photo, tap a cell to make it " +
                             "empty or black or pick its symbol's shape and colour, delete a phantom line, or add a missed one."
-                    AuthoringType.L_RING ->
+                    AuthoringType.L_RING, AuthoringType.PERFECT_L_RING ->
                         "Compare the photo with the grid — pinch to zoom the photo, tap a cell to make it " +
                             "empty or pick its arrow's direction, delete a phantom line, or add a missed one."
                     AuthoringType.HASHI ->

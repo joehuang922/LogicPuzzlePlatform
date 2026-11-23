@@ -1,11 +1,20 @@
 /**
- * L-Ring (type 33) rules, shared by the board, progress and tests.
+ * L-Ring (type 33) and Perfect L-Ring (type 42) rules, shared by the board, progress and
+ * tests.
  *
  * Cells: 0 = empty, 1-4 = an arrow pointing up / right / down / left. A single loop runs
  * through cell centres, passes every arrow cell and turns there; the arm in the arrow's
  * direction (segments walked straight from the arrow cell until the loop turns) is
  * exactly one longer than the other arm.
+ *
+ * Perfect L-Ring adds one rule (`perfect`): wherever the loop turns in a cell without an
+ * arrow, its two arms must not differ by exactly one.
  */
+
+export interface LRingOptions {
+  /** Perfect L-Ring: unarrowed turns may not have arms that differ by exactly one. */
+  perfect?: boolean;
+}
 
 export interface Edges {
   h: number[][];
@@ -90,6 +99,30 @@ export function arrowState(cells: number[][], e: Edges, r: number, c: number): A
   return main === side + 1 ? "ok" : "bad";
 }
 
+/** True when the loop turns at (r, c): exactly one horizontal and one vertical segment. */
+function isTurn(e: Edges, r: number, c: number): boolean {
+  const hor = (linked(e, r, c, 0, 1) ? 1 : 0) + (linked(e, r, c, 0, -1) ? 1 : 0);
+  const ver = (linked(e, r, c, 1, 0) ? 1 : 0) + (linked(e, r, c, -1, 0) ? 1 : 0);
+  return hor === 1 && ver === 1;
+}
+
+/**
+ * Perfect L-Ring's corner rule at an unarrowed cell (r, c). "bad" when the loop turns
+ * there and its two arms are decided and differ by exactly one; "ok" when they are
+ * decided and don't; "open" when the cell holds an arrow, isn't a turn, or an arm is
+ * still undecided.
+ */
+export function cornerState(cells: number[][], e: Edges, r: number, c: number): ArrowState {
+  if (isArrow(cells[r][c]) || !isTurn(e, r, c)) return "open";
+  const rows = cells.length;
+  const cols = cells[0].length;
+  const [a, b] = DIRS.filter(([dr, dc]) => linked(e, r, c, dr, dc)).map(([dr, dc]) =>
+    armLength(e, r, c, dr, dc, rows, cols)
+  );
+  if (a === null || b === null) return "open";
+  return Math.abs(a - b) === 1 ? "bad" : "ok";
+}
+
 export function satisfiedArrows(cells: number[][], e: Edges): number {
   let n = 0;
   for (let r = 0; r < cells.length; r++)
@@ -98,8 +131,11 @@ export function satisfiedArrows(cells: number[][], e: Edges): number {
   return n;
 }
 
-/** One closed loop (every cell degree 0 or 2, all loop cells connected) and every arrow ok. */
-export function validateLRing(cells: number[][], e: Edges): boolean {
+/**
+ * One closed loop (every cell degree 0 or 2, all loop cells connected) and every arrow ok.
+ * With `perfect`, also every unarrowed turn ok.
+ */
+export function validateLRing(cells: number[][], e: Edges, options: LRingOptions = {}): boolean {
   const rows = cells.length;
   const cols = cells[0]?.length ?? 0;
   let loopCells = 0;
@@ -113,6 +149,7 @@ export function validateLRing(cells: number[][], e: Edges): boolean {
         start ??= [r, c];
       }
       if (isArrow(cells[r][c]) && arrowState(cells, e, r, c) !== "ok") return false;
+      if (options.perfect && !isArrow(cells[r][c]) && isTurn(e, r, c) && cornerState(cells, e, r, c) !== "ok") return false;
     }
   }
   if (!start) return false;

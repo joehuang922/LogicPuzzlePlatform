@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { LRingCanon, LRingAnswer } from "../types/canon";
-import { arrowState, isArrow, validateLRing } from "./lRingRules";
+import { arrowState, cornerState, isArrow, validateLRing } from "./lRingRules";
 import { LRingArrow } from "./lRingArrow";
 
 interface LRingBoardProps {
@@ -10,6 +10,8 @@ interface LRingBoardProps {
   onComplete?: () => void;
   readonly?: boolean;
   liveValidate?: boolean;
+  /** Perfect L-Ring (type 42): unarrowed turns may not have arms that differ by one. */
+  perfect?: boolean;
 }
 
 const CELL_SIZE = 36;
@@ -19,9 +21,11 @@ const ERROR_COLOR = "#d33";
 /**
  * L-Ring (type 33). Drawing is Masyu's: drag through neighbouring cells; if the first
  * edge crossed was drawn the drag erases, otherwise it draws. With live validation on,
- * an arrow whose L can no longer work is drawn red.
+ * an arrow whose L can no longer work is drawn red. With `perfect` (Perfect L-Ring, type
+ * 42) the corner rule joins the completion check, and live validation puts a red dot on
+ * an unarrowed turn whose decided arms differ by exactly one.
  */
-export default function LRingBoard({ canon, initialAnswer, onAnswerChange, onComplete, readonly, liveValidate }: LRingBoardProps) {
+export default function LRingBoard({ canon, initialAnswer, onAnswerChange, onComplete, readonly, liveValidate, perfect }: LRingBoardProps) {
   const { cells } = canon;
   const rows = cells.length;
   const cols = cells[0].length;
@@ -47,11 +51,11 @@ export default function LRingBoard({ canon, initialAnswer, onAnswerChange, onCom
 
   useEffect(() => {
     if (completedRef.current) return;
-    if (validateLRing(cells, { h: hEdges, v: vEdges })) {
+    if (validateLRing(cells, { h: hEdges, v: vEdges }, { perfect })) {
       completedRef.current = true;
       onComplete?.();
     }
-  }, [hEdges, vEdges, cells, onComplete]);
+  }, [hEdges, vEdges, cells, onComplete, perfect]);
 
   const getCellFromPoint = useCallback(
     (clientX: number, clientY: number): { r: number; c: number } | null => {
@@ -171,6 +175,17 @@ export default function LRingBoard({ canon, initialAnswer, onAnswerChange, onCom
               ) : null
             )
           )}
+
+          {/* Perfect L-Ring: unarrowed turns whose arms differ by exactly one */}
+          {perfect && liveValidate &&
+            cells.flatMap((row, r) =>
+              row.map((_, c) =>
+                cornerState(cells, edges, r, c) === "bad" ? (
+                  <circle key={`cb-${r}-${c}`} cx={(c + 0.5) * CELL_SIZE} cy={(r + 0.5) * CELL_SIZE} r={CELL_SIZE * 0.17}
+                    fill={ERROR_COLOR} pointerEvents="none" />
+                ) : null
+              )
+            )}
 
           <rect x={0} y={0} width={cols * CELL_SIZE} height={rows * CELL_SIZE} fill="none" stroke="#222" strokeWidth={2} pointerEvents="none" />
         </g>

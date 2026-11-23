@@ -36,8 +36,11 @@ class AuthoringTypeTest {
         val ordered = AuthoringType.ordered
         assertEquals(ordered.sortedBy { it.incubating }, ordered)
         assertEquals(
-            listOf(AuthoringType.WHIMSICAL_KNIGHT, AuthoringType.OMINO_TREE, AuthoringType.MINUS_ROOM),
-            ordered.takeLast(3),
+            listOf(
+                AuthoringType.WHIMSICAL_KNIGHT, AuthoringType.OMINO_TREE, AuthoringType.MINUS_ROOM,
+                AuthoringType.PERFECT_L_RING,
+            ),
+            ordered.takeLast(4),
         )
     }
 }

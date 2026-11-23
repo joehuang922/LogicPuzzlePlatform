@@ -145,6 +145,9 @@ def _build_parser(puzzle_type: int):
     if puzzle_type == 33:
         from puzzle_parsers.l_ring.parser import LRingParser
         return LRingParser()
+    if puzzle_type == 42:
+        from puzzle_parsers.perfect_l_ring.parser import PerfectLRingParser
+        return PerfectLRingParser()
     if puzzle_type == 34:
         from puzzle_parsers.hashi.parser import HashiParser
         return HashiParser(ocr_backend=ocr)

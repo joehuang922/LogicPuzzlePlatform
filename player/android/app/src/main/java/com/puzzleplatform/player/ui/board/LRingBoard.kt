@@ -35,6 +35,9 @@ private val SELECT_FILL = Color(0xFFE0E8FF)
  * fingers pan/zoom via [ZoomableBoard]. Arrows sit under the loop; when [liveValidate]
  * is on, an arrow whose L can no longer work ([LRingRules.arrowState] BAD) is red.
  *
+ * With [perfect] (Perfect L-Ring, type 42) and [liveValidate], an unarrowed turn whose
+ * decided arms differ by exactly one ([LRingRules.cornerState] BAD) gets a red dot.
+ *
  * The Admin review editor passes [onTapCell] to select a cell and [selectedCell]
  * ("col,row") to highlight it.
  */
@@ -47,6 +50,7 @@ fun LRingBoard(
     modifier: Modifier = Modifier,
     onTapCell: (col: Int, row: Int) -> Unit = { _, _ -> },
     selectedCell: String? = null,
+    perfect: Boolean = false,
 ) {
     // Keyed on the canon too: the Admin review editor changes it under a stable id.
     val cells = remember(puzzle.id, puzzle.canonRepr) { LRingEngine.parseCells(puzzle) }
@@ -107,6 +111,17 @@ fun LRingBoard(
                 if (values[MasyuEngine.vKey(r, c)] != 1) continue
                 val x = (c + 0.5f) * cell
                 drawLine(SEGMENT, Offset(x, (r + 0.5f) * cell), Offset(x, (r + 1.5f) * cell), segWidth, cap = StrokeCap.Round)
+            }
+        }
+
+        // Perfect L-Ring: unarrowed turns whose arms differ by exactly one.
+        if (perfect && edges != null) {
+            for (r in 0 until rows) {
+                for (c in 0 until cells[r].size) {
+                    if (LRingRules.cornerState(cells, edges, r, c) == LRingRules.ArrowState.BAD) {
+                        drawCircle(ERROR_COLOR, radius = cell * 0.17f, center = Offset((c + 0.5f) * cell, (r + 0.5f) * cell))
+                    }
+                }
             }
         }
 

@@ -6,6 +6,8 @@ import { LRingArrow } from "./lRingArrow";
 interface LRingEditorProps {
   initialJson: string;
   onChange: (json: string) => void;
+  /** Type name shown in the invalid-JSON message (Perfect L-Ring reuses this editor). */
+  label?: string;
 }
 
 const CELL_SIZE = 36;
@@ -22,7 +24,7 @@ function parseCanon(json: string): LRingCanon | null {
 }
 
 /** Click a cell to cycle empty -> up -> right -> down -> left -> empty; right-click goes back. */
-export default function LRingEditor({ initialJson, onChange }: LRingEditorProps) {
+export default function LRingEditor({ initialJson, onChange, label = "L-Ring" }: LRingEditorProps) {
   const [jsonText, setJsonText] = useState(initialJson);
   const [newRows, setNewRows] = useState(8);
   const [newCols, setNewCols] = useState(8);
@@ -58,7 +60,7 @@ export default function LRingEditor({ initialJson, onChange }: LRingEditorProps)
   if (!canon) {
     return (
       <div style={{ padding: "1rem", border: "2px solid #c33", borderRadius: 8, background: "#fff8f8" }}>
-        <p style={{ color: "#c33", margin: "0 0 1rem" }}>Invalid L-Ring JSON. Fix the textarea or create a new board.</p>
+        <p style={{ color: "#c33", margin: "0 0 1rem" }}>Invalid {label} JSON. Fix the textarea or create a new board.</p>
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "1rem" }}>
           <label style={{ fontSize: "0.85rem" }}>Rows:</label>
           <input type="number" onFocus={(e) => e.currentTarget.select()} value={newRows} onChange={(e) => setNewRows(Number(e.target.value))} style={{ width: 50 }} min={2} />

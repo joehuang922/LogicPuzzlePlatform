@@ -458,6 +458,10 @@ export interface LRingAnswer {
   edges: { h: number[][]; v: number[][] };
 }
 
+/** Perfect L-Ring (type 42): L-Ring's question and answer, with one more rule. */
+export type PerfectLRingCanon = LRingCanon;
+export type PerfectLRingAnswer = LRingAnswer;
+
 export interface HashiCanon {
   // rows x cols lattice points; 0 = no island, 1-8 = an island with that number
   cells: number[][];

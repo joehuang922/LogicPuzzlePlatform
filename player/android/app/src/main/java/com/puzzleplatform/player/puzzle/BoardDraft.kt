@@ -44,6 +44,7 @@ data class BoardDraft(
     val sinkamino: SinkaminoGrid = SinkaminoGrid(emptyList(), emptyList()),
     val balanceLink: ClueGridDraft = ClueGridDraft(),
     val lRing: ClueGridDraft = ClueGridDraft(),
+    val perfectLRing: ClueGridDraft = ClueGridDraft(),
     val hashi: ClueGridDraft = ClueGridDraft(),
     val skeletonPuzzle: SkeletonRules.Board = SkeletonRules.Board(),
     val pencils: ClueGridDraft = ClueGridDraft(),
@@ -93,6 +94,7 @@ data class BoardDraft(
         AuthoringType.SINKAMINO -> SinkaminoAuthoring.problems(sinkamino)
         AuthoringType.BALANCE_LINK -> BalanceLinkAuthoring.problems(balanceLink)
         AuthoringType.L_RING -> LRingAuthoring.problems(lRing)
+        AuthoringType.PERFECT_L_RING -> PerfectLRingAuthoring.problems(perfectLRing)
         AuthoringType.HASHI -> HashiAuthoring.problems(hashi)
         AuthoringType.SKELETON_PUZZLE -> SkeletonPuzzleAuthoring.problems(skeletonPuzzle)
         AuthoringType.PENCILS -> PencilsAuthoring.problems(pencils)
@@ -207,6 +209,8 @@ data class BoardDraft(
             CanonBoard(BalanceLinkAuthoring.canonFromDraft(balanceLink), balanceLink.cols, balanceLink.rows)
         AuthoringType.L_RING ->
             CanonBoard(LRingAuthoring.canonFromDraft(lRing), lRing.cols, lRing.rows)
+        AuthoringType.PERFECT_L_RING ->
+            CanonBoard(PerfectLRingAuthoring.canonFromDraft(perfectLRing), perfectLRing.cols, perfectLRing.rows)
         AuthoringType.HASHI ->
             CanonBoard(HashiAuthoring.canonFromDraft(hashi), hashi.cols, hashi.rows)
         AuthoringType.SKELETON_PUZZLE ->
@@ -270,6 +274,7 @@ data class BoardDraft(
             AuthoringType.SINKAMINO -> BoardDraft(sinkamino = SinkaminoAuthoring.draftFromCanon(canon))
             AuthoringType.BALANCE_LINK -> BoardDraft(balanceLink = BalanceLinkAuthoring.draftFromCanon(canon))
             AuthoringType.L_RING -> BoardDraft(lRing = LRingAuthoring.draftFromCanon(canon))
+            AuthoringType.PERFECT_L_RING -> BoardDraft(perfectLRing = PerfectLRingAuthoring.draftFromCanon(canon))
             AuthoringType.HASHI -> BoardDraft(hashi = HashiAuthoring.draftFromCanon(canon))
             AuthoringType.SKELETON_PUZZLE -> BoardDraft(skeletonPuzzle = SkeletonPuzzleAuthoring.draftFromCanon(canon))
             AuthoringType.PENCILS -> BoardDraft(pencils = PencilsAuthoring.draftFromCanon(canon))

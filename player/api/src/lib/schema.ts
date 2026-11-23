@@ -32,6 +32,7 @@ import cornerChainSchema from "../../../../schemas/canon/corner-chain.json";
 import sinkaminoSchema from "../../../../schemas/canon/sinkamino.json";
 import balanceLinkSchema from "../../../../schemas/canon/balance-link.json";
 import lRingSchema from "../../../../schemas/canon/l-ring.json";
+import perfectLRingSchema from "../../../../schemas/canon/perfect-l-ring.json";
 import hashiSchema from "../../../../schemas/canon/hashi.json";
 import skeletonPuzzleSchema from "../../../../schemas/canon/skeleton-puzzle.json";
 import zebraRopeSchema from "../../../../schemas/canon/zebra-rope.json";
@@ -85,6 +86,7 @@ const validators: Record<number, ValidateFunction> = {
   39: ajv.compile(minusRoomSchema),
   40: ajv.compile(tilePaintSchema),
   41: ajv.compile(countryRoadSchema),
+  42: ajv.compile(perfectLRingSchema),
 };
 
 export function validateCanon(puzzleType: number, data: unknown): void {

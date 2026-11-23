@@ -394,6 +394,14 @@ fun PlayScreen(
                                     liveValidate = state.liveValidate,
                                     onSetEdge = vm::setUserValue,
                                 )
+                                // L-Ring plus the corner rule; bad corners get a red dot with Errors on.
+                                42 -> LRingBoard(
+                                    puzzle = puzzle,
+                                    userValues = state.userValues,
+                                    liveValidate = state.liveValidate,
+                                    onSetEdge = vm::setUserValue,
+                                    perfect = true,
+                                )
                                 // Drag island to island to cycle a bridge; over-full islands turn red with Errors on.
                                 34 -> HashiBoard(
                                     puzzle = puzzle,

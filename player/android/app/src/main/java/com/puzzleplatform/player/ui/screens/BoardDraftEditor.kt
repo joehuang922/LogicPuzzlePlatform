@@ -8,6 +8,7 @@ import com.puzzleplatform.player.puzzle.AkariAuthoring
 import com.puzzleplatform.player.puzzle.BoardDraft
 import com.puzzleplatform.player.puzzle.CornerChainAuthoring
 import com.puzzleplatform.player.puzzle.FillominoAuthoring
+import com.puzzleplatform.player.puzzle.PerfectLRingAuthoring
 import com.puzzleplatform.player.puzzle.HitoriAuthoring
 import com.puzzleplatform.player.puzzle.LitsAuthoring
 import com.puzzleplatform.player.puzzle.NorinoriAuthoring
@@ -334,6 +335,13 @@ fun BoardDraftEditor(
             onSelectCell = onSelectCell,
             onChange = { t -> onChange { it.copy(lRing = t(it.lRing)) } },
         )
+        AuthoringType.PERFECT_L_RING -> LRingEditor(
+            draft = board.perfectLRing,
+            selectedCell = selectedCell,
+            onSelectCell = onSelectCell,
+            onChange = { t -> onChange { it.copy(perfectLRing = t(it.perfectLRing)) } },
+            authoring = PerfectLRingAuthoring,
+        )
         AuthoringType.HASHI -> HashiEditor(
             draft = board.hashi,
             selectedCell = selectedCell,
@@ -453,6 +461,7 @@ fun BoardDraftMiniBoard(type: AuthoringType, board: BoardDraft, size: Dp) {
         AuthoringType.SINKAMINO -> SinkaminoMiniBoard(draft = board.sinkamino, hasProblems = hasProblems, size = size)
         AuthoringType.BALANCE_LINK -> BalanceLinkMiniBoard(draft = board.balanceLink, hasProblems = hasProblems, size = size)
         AuthoringType.L_RING -> LRingMiniBoard(draft = board.lRing, hasProblems = hasProblems, size = size)
+        AuthoringType.PERFECT_L_RING -> LRingMiniBoard(draft = board.perfectLRing, hasProblems = hasProblems, size = size)
         AuthoringType.HASHI -> HashiMiniBoard(draft = board.hashi, hasProblems = hasProblems, size = size)
         AuthoringType.SKELETON_PUZZLE -> SkeletonPuzzleMiniBoard(draft = board.skeletonPuzzle, hasProblems = hasProblems, size = size)
         AuthoringType.PENCILS -> PencilsMiniBoard(draft = board.pencils, hasProblems = hasProblems, size = size)

@@ -4,13 +4,15 @@ import com.puzzleplatform.player.data.model.Puzzle
 import kotlinx.serialization.json.JsonObject
 
 /**
- * The L-Ring rules shared by play and authoring, a port of
- * frontend/src/components/lRingRules.ts. Pure, so it's unit-testable.
+ * The L-Ring (type 33) and Perfect L-Ring (type 42) rules shared by play and authoring, a
+ * port of frontend/src/components/lRingRules.ts. Pure, so it's unit-testable.
  *
  * Cells: 0 = empty, 1-4 = an arrow pointing up / right / down / left. A single loop runs
  * through cell centres, passes every arrow cell and turns there; the arm in the arrow's
  * direction (segments walked straight from the arrow cell until the loop turns) is
- * exactly one longer than the other arm.
+ * exactly one longer than the other arm. Perfect L-Ring adds the corner rule (`perfect`):
+ * wherever the loop turns in a cell without an arrow, its two arms may not differ by
+ * exactly one.
  */
 object LRingRules {
     const val EMPTY = 0
@@ -73,6 +75,27 @@ object LRingRules {
         return if (main == side + 1) ArrowState.OK else ArrowState.BAD
     }
 
+    /** True when the loop turns at (r, c): exactly one horizontal and one vertical segment. */
+    private fun isTurn(e: MasyuEngine.Edges, r: Int, c: Int): Boolean {
+        val hor = (if (linked(e, r, c, 0, 1)) 1 else 0) + (if (linked(e, r, c, 0, -1)) 1 else 0)
+        val ver = (if (linked(e, r, c, 1, 0)) 1 else 0) + (if (linked(e, r, c, -1, 0)) 1 else 0)
+        return hor == 1 && ver == 1
+    }
+
+    /**
+     * Perfect L-Ring's corner rule at an unarrowed cell. BAD when the loop turns there and
+     * its two arms are decided and differ by exactly one; OK when decided and they don't;
+     * OPEN when the cell holds an arrow, isn't a turn, or an arm is undecided.
+     */
+    fun cornerState(cells: List<List<Int>>, e: MasyuEngine.Edges, r: Int, c: Int): ArrowState {
+        if (isArrow(cells.getOrNull(r)?.getOrNull(c) ?: EMPTY) || !isTurn(e, r, c)) return ArrowState.OPEN
+        val rows = cells.size
+        val cols = cells.maxOfOrNull { it.size } ?: 0
+        val arms = DIRS.filter { (dr, dc) -> linked(e, r, c, dr, dc) }
+            .map { (dr, dc) -> armLength(e, r, c, dr, dc, rows, cols) ?: return ArrowState.OPEN }
+        return if (kotlin.math.abs(arms[0] - arms[1]) == 1) ArrowState.BAD else ArrowState.OK
+    }
+
     fun satisfiedArrows(cells: List<List<Int>>, e: MasyuEngine.Edges): Int {
         var n = 0
         for (r in cells.indices) for (c in cells[r].indices) {
@@ -81,8 +104,11 @@ object LRingRules {
         return n
     }
 
-    /** One closed loop (every cell degree 0 or 2, all loop cells connected) and every arrow OK. */
-    fun isSolved(cells: List<List<Int>>, e: MasyuEngine.Edges): Boolean {
+    /**
+     * One closed loop (every cell degree 0 or 2, all loop cells connected) and every arrow
+     * OK. With [perfect], also every unarrowed turn OK.
+     */
+    fun isSolved(cells: List<List<Int>>, e: MasyuEngine.Edges, perfect: Boolean = false): Boolean {
         val rows = cells.size
         val cols = cells.maxOfOrNull { it.size } ?: 0
         var loopCells = 0
@@ -96,6 +122,9 @@ object LRingRules {
                     if (start == null) start = r to c
                 }
                 if (isArrow(cells[r].getOrNull(c) ?: EMPTY) && arrowState(cells, e, r, c) != ArrowState.OK) return false
+                if (perfect && !isArrow(cells[r].getOrNull(c) ?: EMPTY) && isTurn(e, r, c) &&
+                    cornerState(cells, e, r, c) != ArrowState.OK
+                ) return false
             }
         }
         val first = start ?: return false
@@ -142,5 +171,28 @@ object LRingEngine : PuzzleEngine {
     override fun isComplete(puzzle: Puzzle, userValues: Map<String, Int>): Boolean {
         val cells = parseCells(puzzle)
         return LRingRules.isSolved(cells, MasyuEngine.edges(cells, userValues))
+    }
+}
+
+/**
+ * Perfect L-Ring (puzzle type 42): L-Ring's question, answer, transport and progress
+ * (satisfied arrows / all arrows), with the corner rule added to the completion check.
+ * Ports frontend/src/progress/perfectLRing.ts and `validateLRing(..., { perfect: true })`.
+ */
+object PerfectLRingEngine : PuzzleEngine {
+    override val puzzleType: Int = 42
+
+    override fun extractAnswer(puzzle: Puzzle, userValues: Map<String, Int>): JsonObject =
+        LRingEngine.extractAnswer(puzzle, userValues)
+
+    override fun restoreUserValues(puzzle: Puzzle, answer: JsonObject): Map<String, Int> =
+        LRingEngine.restoreUserValues(puzzle, answer)
+
+    override fun computeProgress(puzzle: Puzzle, userValues: Map<String, Int>): Double =
+        LRingEngine.computeProgress(puzzle, userValues)
+
+    override fun isComplete(puzzle: Puzzle, userValues: Map<String, Int>): Boolean {
+        val cells = LRingEngine.parseCells(puzzle)
+        return LRingRules.isSolved(cells, MasyuEngine.edges(cells, userValues), perfect = true)
     }
 }

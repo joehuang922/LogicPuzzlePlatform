@@ -70,6 +70,7 @@ object PuzzleEngines {
         SinkaminoEngine,
         BalanceLinkEngine,
         LRingEngine,
+        PerfectLRingEngine,
         HashiEngine,
         SkeletonPuzzleEngine,
         PencilsEngine,

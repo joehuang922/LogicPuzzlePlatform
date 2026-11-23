@@ -31,6 +31,7 @@ import CornerChainBoard from "./CornerChainBoard";
 import SinkaminoBoard from "./SinkaminoBoard";
 import BalanceLinkBoard from "./BalanceLinkBoard";
 import LRingBoard from "./LRingBoard";
+import PerfectLRingBoard from "./PerfectLRingBoard";
 import HashiBoard from "./HashiBoard";
 import SkeletonPuzzleBoard from "./SkeletonPuzzleBoard";
 import ZebraRopeBoard from "./ZebraRopeBoard";
@@ -39,7 +40,7 @@ import OminoTreeBoard from "./OminoTreeBoard";
 import MinusRoomBoard from "./MinusRoomBoard";
 import TilePaintBoard from "./TilePaintBoard";
 import CountryRoadBoard from "./CountryRoadBoard";
-import { NurimazeCanon, DoubleChocoCanon, SlitherlinkCanon, NonogramCanon, MasyuCanon, PencilsCanon, NuritwinCanon, SlalomCanon, ShakashakaCanon, KakuroCanon, YajilinCanon, FillominoCanon, LitsCanon, ChocoBananaCanon, NumberLinkCanon, AkariCanon, HellGolfCanon, TentaishowCanon, HeyawakeCanon, ShikakuCanon, NorinoriCanon, NurikabeCanon, RippleEffectCanon, HitoriCanon, PictoLinkCanon, KuralinCanon, UnequalSudokuCanon, CornerChainCanon, SinkaminoCanon, BalanceLinkCanon, LRingCanon, HashiCanon, SkeletonPuzzleCanon, ZebraRopeCanon, WhimsicalKnightCanon, OminoTreeCanon, MinusRoomCanon, TilePaintCanon, CountryRoadCanon } from "../types/canon";
+import { NurimazeCanon, DoubleChocoCanon, SlitherlinkCanon, NonogramCanon, MasyuCanon, PencilsCanon, NuritwinCanon, SlalomCanon, ShakashakaCanon, KakuroCanon, YajilinCanon, FillominoCanon, LitsCanon, ChocoBananaCanon, NumberLinkCanon, AkariCanon, HellGolfCanon, TentaishowCanon, HeyawakeCanon, ShikakuCanon, NorinoriCanon, NurikabeCanon, RippleEffectCanon, HitoriCanon, PictoLinkCanon, KuralinCanon, UnequalSudokuCanon, CornerChainCanon, SinkaminoCanon, BalanceLinkCanon, LRingCanon, PerfectLRingCanon, HashiCanon, SkeletonPuzzleCanon, ZebraRopeCanon, WhimsicalKnightCanon, OminoTreeCanon, MinusRoomCanon, TilePaintCanon, CountryRoadCanon } from "../types/canon";
 
 export default function CanonPreview({ puzzleType, canonRepr }: { puzzleType: number; canonRepr: string }) {
   let parsed: Record<string, unknown>;
@@ -153,6 +154,9 @@ export default function CanonPreview({ puzzleType, canonRepr }: { puzzleType: nu
   }
   if (puzzleType === 33 && parsed.cells) {
     return <LRingBoard canon={parsed as unknown as LRingCanon} readonly />;
+  }
+  if (puzzleType === 42 && parsed.cells) {
+    return <PerfectLRingBoard canon={parsed as unknown as PerfectLRingCanon} readonly />;
   }
   if (puzzleType === 34 && parsed.cells) {
     return <HashiBoard canon={parsed as unknown as HashiCanon} readonly />;

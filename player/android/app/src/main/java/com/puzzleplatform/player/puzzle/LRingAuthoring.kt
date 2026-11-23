@@ -1,16 +1,17 @@
 package com.puzzleplatform.player.puzzle
 
 /**
- * Authoring for L-Ring (type 33), the analog of frontend/src/components/LRingEditor.tsx.
+ * Authoring for the L-Ring family, the analog of frontend/src/components/LRingEditor.tsx.
  * The canon `{ cells }` is an int grid (0 empty, 1-4 an arrow up/right/down/left), so the
  * draft is a [ClueGridDraft]; [setCell] writes any of them.
  *
  * No format rules (any grid of 0-4 is a valid canon), so [problems] are overridable
  * misread warnings: an unknown code, or an arrow pointing straight off the board (its
- * arm can't exist).
+ * arm can't exist). L-Ring (type 33) and Perfect L-Ring (type 42) share the question, so
+ * they share this; the review screen takes either.
  */
-object LRingAuthoring : ClueGridAuthoring(33, "l-ring", "えるりんぐ") {
-    const val PUZZLE_TYPE = 33
+open class LRingFamilyAuthoring(puzzleType: Int, typeName: String, jpLabel: String) :
+    ClueGridAuthoring(puzzleType, typeName, jpLabel) {
 
     /** Set (col, row) to empty or an arrow code. */
     fun setCell(draft: ClueGridDraft, col: Int, row: Int, value: Int): ClueGridDraft =
@@ -33,4 +34,14 @@ object LRingAuthoring : ClueGridAuthoring(33, "l-ring", "えるりんぐ") {
             }
         }
     }
+}
+
+/** L-Ring (type 33). */
+object LRingAuthoring : LRingFamilyAuthoring(33, "l-ring", "えるりんぐ") {
+    const val PUZZLE_TYPE = 33
+}
+
+/** Perfect L-Ring (type 42): L-Ring's question, so L-Ring's authoring. */
+object PerfectLRingAuthoring : LRingFamilyAuthoring(42, "perfect-l-ring", "完全えるりんぐ") {
+    const val PUZZLE_TYPE = 42
 }

@@ -138,6 +138,7 @@ enum class AuthoringType(
     WHIMSICAL_KNIGHT("Whimsical Knight", "気まぐれナイト", WhimsicalKnightAuthoring.PUZZLE_TYPE, incubating = true),
     OMINO_TREE("Omino Tree", "オミノツリー", OminoTreeAuthoring.PUZZLE_TYPE, incubating = true),
     MINUS_ROOM("Minus Room", "マイナルーム", MinusRoomAuthoring.PUZZLE_TYPE, incubating = true),
+    PERFECT_L_RING("Perfect L-Ring", "完全えるりんぐ", PerfectLRingAuthoring.PUZZLE_TYPE, incubating = true),
     ;
 
     companion object {
