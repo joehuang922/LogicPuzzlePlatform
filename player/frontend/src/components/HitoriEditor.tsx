@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect} from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { HitoriCanon } from "../types/canon";
 
 interface HitoriEditorProps {
@@ -49,6 +49,9 @@ export default function HitoriEditor({ initialJson, onChange }: HitoriEditorProp
   const [jsonText, setJsonText] = useState(initialJson);
   const [newRows, setNewRows] = useState(8);
   const [newCols, setNewCols] = useState(8);
+  const [selected, setSelected] = useState<{ r: number; c: number } | null>(null);
+  const [inputBuffer, setInputBuffer] = useState("");
+  const bufferTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const canon = useMemo(() => parseCanon(jsonText), [jsonText]);
 
   useEffect(() => {
@@ -73,23 +76,57 @@ export default function HitoriEditor({ initialJson, onChange }: HitoriEditorProp
     [canon, rows, cols, updateJson]
   );
 
-  const handleCellClick = useCallback(
-    (r: number, c: number) => {
-      if (!canon) return;
-      const current = canon.cells[r][c];
-      const input = prompt(
-        `Enter number for cell (row ${r}, col ${c}). Current: ${current}. Must be a positive integer.`
-      );
-      if (input === null) return;
-      const num = parseInt(input, 10);
+  const setCellValue = useCallback(
+    (r: number, c: number, value: number) => {
       // Cells can't be empty: anything that isn't a positive integer keeps the old value.
-      if (isNaN(num) || num < 1) return;
+      if (!canon || !(value >= 1)) return;
       const newCells = canon.cells.map((row) => [...row]);
-      newCells[r][c] = num;
+      newCells[r][c] = value;
       updateJson({ cells: newCells });
     },
     [canon, updateJson]
   );
+
+  // Select a cell (click again to deselect), then type its number. No
+  // window.prompt: a browser that has blocked the site's dialogs makes it
+  // return null silently, so clicking looked like it did nothing.
+  const handleCellClick = useCallback((r: number, c: number) => {
+    setSelected((prev) => (prev && prev.r === r && prev.c === c ? null : { r, c }));
+    setInputBuffer("");
+  }, []);
+
+  // Digits set the selected cell (multi-digit via a short buffer); arrows move.
+  useEffect(() => {
+    if (!selected || !canon) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      const { r, c } = selected;
+      if (/^[0-9]$/.test(e.key)) {
+        e.preventDefault();
+        if (bufferTimeoutRef.current) clearTimeout(bufferTimeoutRef.current);
+        const next = inputBuffer + e.key;
+        setInputBuffer(next);
+        setCellValue(r, c, parseInt(next, 10));
+        bufferTimeoutRef.current = setTimeout(() => setInputBuffer(""), 1000);
+      } else if (e.key.startsWith("Arrow")) {
+        // Escape is left to the editor modal (it closes it).
+        e.preventDefault();
+        const nr = r + (e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0);
+        const nc = c + (e.key === "ArrowLeft" ? -1 : e.key === "ArrowRight" ? 1 : 0);
+        if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
+          setSelected({ r: nr, c: nc });
+          setInputBuffer("");
+        }
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [selected, canon, inputBuffer, setCellValue, rows, cols]);
+
+  // Clear selection if the board shrinks out from under it.
+  useEffect(() => {
+    if (selected && (selected.r >= rows || selected.c >= cols)) setSelected(null);
+  }, [selected, rows, cols]);
 
   const handleCreateBoard = () => {
     if (newRows >= 2 && newCols >= 2) {
@@ -180,7 +217,7 @@ export default function HitoriEditor({ initialJson, onChange }: HitoriEditorProp
           />
         </div>
         <div style={{ fontSize: "0.75rem", color: "#666", marginLeft: "auto" }}>
-          Click cell to set its number
+          Click a cell, then type its number (arrows move)
         </div>
       </div>
 
@@ -198,6 +235,7 @@ export default function HitoriEditor({ initialJson, onChange }: HitoriEditorProp
                 const c = i % cols;
                 const v = canon.cells[r][c];
                 const suspicious = v < 1 || v > maxSide;
+                const isSel = selected && selected.r === r && selected.c === c;
                 return (
                   <rect
                     key={`bg-${r}-${c}`}
@@ -205,7 +243,7 @@ export default function HitoriEditor({ initialJson, onChange }: HitoriEditorProp
                     y={r * CELL_SIZE}
                     width={CELL_SIZE}
                     height={CELL_SIZE}
-                    fill={suspicious ? "#fde2e2" : "white"}
+                    fill={isSel ? "#ffe9a8" : suspicious ? "#fde2e2" : "white"}
                   />
                 );
               })}
