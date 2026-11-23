@@ -73,8 +73,8 @@ CREATE TABLE IF NOT EXISTS player_attempt_snapshot (
 
 -- Seed puzzle types
 INSERT INTO puzzle_types (id, name, jp_label, rule) VALUES
-  (1, 'sudoku', '数独', ''),
-  (2, 'combo-sudoku', '合体数独', ''),
+  (1, 'sudoku', '数独', 'Fill every empty cell with a number so that each row, each column and each room (the boxes outlined by thick lines) contains every number from 1 to N exactly once, where N is the width of the board. On the standard 9x9 board that is the digits 1 to 9 in rows, columns and 3x3 boxes.'),
+  (2, 'combo-sudoku', '合体数独', 'The board is made of several overlapping 9x9 sudoku grids. Fill every empty cell with a digit from 1 to 9 so that, in every grid, each row, each column and each 3x3 box contains every digit exactly once. A cell where grids overlap belongs to each of them and must satisfy all of their rules.'),
   (3, 'nurimaze', 'ぬりめいず', 'Paint rooms black or mark them to create a maze. The shortest path from S to G must pass all circles and no triangles. No 2x2 blocks of same color allowed.'),
   (4, 'double-choco', 'ダブルチョコ', 'Divide the grid into rooms. Each room contains equal numbers of white and gray cells with the same shape (one is a translation of the other). Numbers indicate how many cells of that color are in the room.'),
   (5, 'slitherlink', 'スリザーリンク', 'Draw a single closed loop along the grid edges. Each number indicates how many of its four surrounding edges are part of the loop.'),

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, useRef, useCallback, useImperativeHandle, forwardRef } from "react";
 import { useParams, useLocation, useSearchParams, Link } from "react-router-dom";
-import { getPuzzle, saveSnapshot, listSnapshots, getSnapshotById, SnapshotSummary, AchievementUnlock } from "../api/client";
+import { getPuzzle, listPuzzleTypes, saveSnapshot, listSnapshots, getSnapshotById, SnapshotSummary, AchievementUnlock } from "../api/client";
 import { PuzzleDefinition } from "../types/puzzle";
 import PuzzleBoard from "../components/PuzzleBoard";
+import RuleInfo from "../components/RuleInfo";
 import { DIFFICULTY_LABELS } from "../constants";
 import { extractAnswer } from "../extractors";
 import { computeProgress } from "../progress";
@@ -71,6 +72,8 @@ export default function Play() {
 
   const [puzzle, setPuzzle] = useState<PuzzleDefinition | null>(null);
   const [loading, setLoading] = useState(true);
+  // The type's rule text, for the info popup beside the type badge.
+  const [typeRule, setTypeRule] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -270,6 +273,19 @@ export default function Play() {
       .finally(() => setLoading(false));
   }, [id]);
 
+  const puzzleType = puzzle?.puzzleType;
+  useEffect(() => {
+    if (puzzleType == null) return;
+    let cancelled = false;
+    listPuzzleTypes()
+      .then((res) => {
+        if (!cancelled) setTypeRule(res.puzzleTypes.find((t) => t.id === puzzleType)?.rule ?? null);
+      })
+      // No rule, no info button; the puzzle still plays.
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [puzzleType]);
+
   useEffect(() => {
     if (!toast) return;
     const timeout = setTimeout(() => setToast(null), 5000);
@@ -342,9 +358,12 @@ export default function Play() {
       <div style={infoCardStyle}>
         {/* Left content */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          {/* Puzzle type badge */}
-          <div style={puzzleTypeBadgeStyle}>
-            {puzzle.puzzleTypeJpLabel}
+          {/* Puzzle type badge, with the rule popup's info button */}
+          <div style={{ position: "relative", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            <div style={puzzleTypeBadgeStyle}>
+              {puzzle.puzzleTypeJpLabel}
+            </div>
+            <RuleInfo typeLabel={puzzle.puzzleTypeJpLabel} rule={typeRule} />
           </div>
 
           {/* Title */}

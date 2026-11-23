@@ -29,6 +29,9 @@ data class PlayUiState(
     val loading: Boolean = true,
     val error: String? = null,
     val puzzle: Puzzle? = null,
+    // The puzzle type's rule text, for the info popup beside the type label. Null or
+    // blank until loaded, or when the type has none: the info button is then hidden.
+    val typeRule: String? = null,
     val userValues: Map<String, Int> = emptyMap(),
     val selectedCell: String? = null,
     val noteMode: Boolean = false,
@@ -146,9 +149,25 @@ class PlayViewModel(
                     )
                 }
                 startTimer()
+                loadTypeRule(puzzle.puzzleType)
             } catch (e: Exception) {
                 _state.update { it.copy(loading = false, error = e.message ?: "Failed to load puzzle") }
             }
+        }
+    }
+
+    /**
+     * The type's rule from the Room cache first (works offline), then refreshed from the
+     * server, so an edited rule shows without waiting for Home to resync the types.
+     */
+    private fun loadTypeRule(puzzleType: Int) {
+        viewModelScope.launch {
+            runCatching { repo.getCachedPuzzleTypes() }.getOrNull()
+                ?.find { it.id == puzzleType }?.rule
+                ?.let { rule -> _state.update { it.copy(typeRule = rule) } }
+            runCatching { repo.listPuzzleTypes() }.getOrNull()
+                ?.find { it.id == puzzleType }?.rule
+                ?.let { rule -> _state.update { it.copy(typeRule = rule) } }
         }
     }
 

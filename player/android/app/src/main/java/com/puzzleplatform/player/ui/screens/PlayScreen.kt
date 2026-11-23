@@ -258,11 +258,15 @@ fun PlayScreen(
                             puzzle.srcCollectionName?.let {
                                 Text(it, style = MaterialTheme.typography.bodyMedium)
                             }
-                            Text(
-                                "${puzzle.puzzleTypeJpLabel} · $diff" + (puzzle.author?.let { " · by $it" } ?: ""),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    "${puzzle.puzzleTypeJpLabel} · $diff" + (puzzle.author?.let { " · by $it" } ?: ""),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.weight(1f, fill = false),
+                                )
+                                RuleInfoButton(puzzle.puzzleTypeJpLabel, state.typeRule)
+                            }
                         }
                     }
 
