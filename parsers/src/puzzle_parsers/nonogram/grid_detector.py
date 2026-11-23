@@ -338,10 +338,24 @@ def _detect(
     )
 
 
+# Nonogram boards come in whole 5-cell blocks (a bold line every 5 cells).
+_BLOCK = 5
+
+
 def _count_cells(playable_gray: NDArray) -> tuple[int, int]:
-    """Count (rows, cols) of the playable grid with the shared grid finder."""
+    """Count (rows, cols) of the playable grid with the shared grid finder.
+
+    The count is snapped to the nearest multiple of 5. On a wavy page a thin
+    line bends across neighbouring rows and the whole-width projection gains
+    or loses one (a 40x35 board read 39x35); the bold every-5 lines keep the
+    count within a line or two of the truth.
+    """
     h_lines, v_lines = find_grid_lines(playable_gray)
-    return max(2, len(h_lines) - 1), max(2, len(v_lines) - 1)
+    return _snap(len(h_lines) - 1), _snap(len(v_lines) - 1)
+
+
+def _snap(count: int) -> int:
+    return max(_BLOCK, _BLOCK * round(count / _BLOCK))
 
 
 def _find_line_positions(projection: NDArray, threshold: float) -> list[int]:

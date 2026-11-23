@@ -36,6 +36,8 @@ def _android(img):
         ("board-nonogram-big.jpg", 35, 35),
         # Keystoned photo: no separator line survives until the page is sheared level.
         ("board-nonogram-keystoned.jpg", 30, 30),
+        # Wavy page: the whole-width count reads 39 rows; snapped to 5-cell blocks.
+        ("board-nonogram-wavy.jpg", 40, 35),
     ],
 )
 def test_grid_size(name, rows, cols, android):
