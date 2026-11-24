@@ -1,5 +1,7 @@
 *.iml
 .gradle/
+# Kotlin compiler daemon state (Kotlin 2.x)
+.kotlin/
 /local.properties
 /.idea/
 .DS_Store
