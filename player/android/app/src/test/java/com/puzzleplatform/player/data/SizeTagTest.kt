@@ -53,6 +53,15 @@ class SizeTagTest {
     }
 
     @Test
+    fun picturesqueMazeByCells() {
+        assertNull(p(44, 50, 50).sizeTag())
+        assertNull(p(44, 80, 119).sizeTag())
+        assertEquals(SizeTag.BIG, p(44, 80, 120).sizeTag())
+        assertEquals(SizeTag.BIG, p(44, 240, 119).sizeTag())
+        assertEquals(SizeTag.GIANT, p(44, 240, 120).sizeTag())
+    }
+
+    @Test
     fun nonogramByCells() {
         assertNull(p(6, 50, 59).sizeTag())
         assertEquals(SizeTag.BIG, p(6, 50, 60).sizeTag())

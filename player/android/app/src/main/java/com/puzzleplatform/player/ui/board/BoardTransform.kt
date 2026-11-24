@@ -9,7 +9,9 @@ package com.puzzleplatform.player.ui.board
  *
  * Zoom model:
  *  - [minCell] fits the whole board in the viewport (may be below [entryFloorPx]
- *    for large grids — viewing/panning still work, entry is disabled);
+ *    for large grids — viewing/panning still work, taps are disabled; a drag is
+ *    still accepted down to the lower [dragFloorPx], since a stroke doesn't need
+ *    a fingertip-sized target the way a tap does);
  *  - [maxCell] is the largest cell (zoom-in stop);
  *  - the initial cell auto-zooms to at least [autoCellPx], anchored top-left.
  *
@@ -25,6 +27,7 @@ class BoardTransform(
     autoCellPx: Float,
     private val entryFloorPx: Float,
     val padCells: Float = 0f,
+    private val dragFloorPx: Float = entryFloorPx,
 ) {
     val minCell: Float
     val maxCell: Float
@@ -52,6 +55,9 @@ class BoardTransform(
     /** True when cells are big enough to reliably tap-to-enter. */
     val entryEnabled: Boolean get() = cellPx >= entryFloorPx
 
+    /** True when cells are big enough to draw on with a one-finger drag. */
+    val dragEnabled: Boolean get() = cellPx >= minOf(dragFloorPx, entryFloorPx)
+
     /**
      * Apply a pinch/drag: scale toward [zoomChange] about [centroidX]/[centroidY]
      * (keeping the point under the fingers fixed), then translate by the drag.
@@ -74,10 +80,11 @@ class BoardTransform(
 
     /**
      * Map a tap at viewport coordinates to a (col, row), or null if it falls
-     * outside the grid or entry is disabled (cells too small).
+     * outside the grid or entry is disabled (cells too small). [drag] maps a drag
+     * position, gated by the lower drag floor instead.
      */
-    fun cellAt(x: Float, y: Float): Pair<Int, Int>? {
-        if (!entryEnabled) return null
+    fun cellAt(x: Float, y: Float, drag: Boolean = false): Pair<Int, Int>? {
+        if (!(if (drag) dragEnabled else entryEnabled)) return null
         val col = ((x - panX) / cellPx).toInt()
         val row = ((y - panY) / cellPx).toInt()
         return if (col in 0 until cols && row in 0 until rows) col to row else null
@@ -89,10 +96,10 @@ class BoardTransform(
      * is disabled. Lets a board decide a sub-cell target (which grid line a tap is
      * nearest) that the integer [cellAt] can't express; the whole closed range
      * [0, cols] x [0, rows] is in-bounds so taps on the far border still map, widened
-     * by [padCells] on every side so taps in the margin map too.
+     * by [padCells] on every side so taps in the margin map too. [drag] as in [cellAt].
      */
-    fun fractionalCellAt(x: Float, y: Float): Pair<Float, Float>? {
-        if (!entryEnabled) return null
+    fun fractionalCellAt(x: Float, y: Float, drag: Boolean = false): Pair<Float, Float>? {
+        if (!(if (drag) dragEnabled else entryEnabled)) return null
         val col = (x - panX) / cellPx
         val row = (y - panY) / cellPx
         return if (col in -padCells..cols + padCells && row in -padCells..rows + padCells) col to row else null
