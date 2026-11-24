@@ -46,6 +46,7 @@ import { ominoTreeRenderer } from "./renderers/ominoTree";
 import { minusRoomRenderer } from "./renderers/minusRoom";
 import { tilePaintRenderer } from "./renderers/tilePaint";
 import { countryRoadRenderer } from "./renderers/countryRoad";
+import { picturesqueMazeRenderer } from "./renderers/picturesqueMaze";
 
 registerRenderer(comboSudokuRenderer);
 registerRenderer(sudokuRenderer);
@@ -90,6 +91,7 @@ registerRenderer(ominoTreeRenderer);
 registerRenderer(minusRoomRenderer);
 registerRenderer(tilePaintRenderer);
 registerRenderer(countryRoadRenderer);
+registerRenderer(picturesqueMazeRenderer);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

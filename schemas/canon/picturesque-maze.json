@@ -1,0 +1,46 @@
+{
+  "title": "Picturesque Maze Canonical Representation",
+  "description": "A width x height maze whose walls lie on cell edges; no grid lines are printed. The outer border is a wall everywhere except the entrance and exit openings. The shortest route from entrance to exit, shaded, forms a picture.",
+  "type": "object",
+  "required": ["width", "height", "walls", "entrance", "exit"],
+  "additionalProperties": false,
+  "definitions": {
+    "wallRow": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 0, "maximum": 1 }
+    },
+    "opening": {
+      "description": "An opening in the outer border: side of the board and the column (top/bottom) or row (left/right) of the border cell it opens.",
+      "type": "object",
+      "required": ["side", "index"],
+      "additionalProperties": false,
+      "properties": {
+        "side": { "type": "string", "enum": ["top", "bottom", "left", "right"] },
+        "index": { "type": "integer", "minimum": 0 }
+      }
+    }
+  },
+  "properties": {
+    "width": { "description": "Number of columns.", "type": "integer", "minimum": 2 },
+    "height": { "description": "Number of rows.", "type": "integer", "minimum": 2 },
+    "walls": {
+      "type": "object",
+      "required": ["h", "v"],
+      "additionalProperties": false,
+      "properties": {
+        "h": {
+          "description": "(height - 1) x width. 1 = a wall between cell (r, c) and (r+1, c).",
+          "type": "array",
+          "items": { "$ref": "#/definitions/wallRow" }
+        },
+        "v": {
+          "description": "height x (width - 1). 1 = a wall between cell (r, c) and (r, c+1).",
+          "type": "array",
+          "items": { "$ref": "#/definitions/wallRow" }
+        }
+      }
+    },
+    "entrance": { "$ref": "#/definitions/opening" },
+    "exit": { "$ref": "#/definitions/opening" }
+  }
+}

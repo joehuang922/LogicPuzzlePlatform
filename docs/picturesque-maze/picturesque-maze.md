@@ -27,13 +27,13 @@ entrance to exit, and its shortest route is unique.
   "height": 3,
   "walls": {
     "h": [
-      [0, 1, 1, 0],
-      [1, 0, 1, 0]
+      [0, 1, 0, 0],
+      [0, 1, 1, 0]
     ],
     "v": [
       [0, 1, 0],
       [0, 0, 1],
-      [0, 1, 0]
+      [0, 0, 1]
     ]
   },
   "entrance": { "side": "top", "index": 0 },
@@ -68,11 +68,14 @@ entrance cell; the exit is reached when the path's far end is the exit cell.
 ```json
 {
   "edges": {
-    "h": [[1, 0, 0], [0, 0, 0], [0, 0, 0]],
-    "v": [[1, 0, 0, 0], [0, 0, 0, 0]]
+    "h": [[0, 0, 1], [1, 1, 0], [0, 0, 0]],
+    "v": [[1, 0, 1, 1], [0, 0, 0, 1]]
   }
 }
 ```
+
+This is the solution of the question example: (0,0) → (1,0) → (1,1) → (1,2) →
+(0,2) → (0,3) → (1,3) → (2,3), out through the bottom of column 3.
 
 - `edges.h`: `height × (width − 1)`. `1` = segment between `(r, c)` and `(r, c+1)`.
 - `edges.v`: `(height − 1) × width`. `1` = segment between `(r, c)` and `(r+1, c)`.
@@ -110,16 +113,22 @@ cell that crosses no wall, and its cell sequence equals the maze's shortest rout
   cell with no open side other than the one the path came in by), the end cell is
   outlined red. Reveals nothing about the route that the walls don't already show.
 - On Android the same drag (one finger) extends/retracts, a tap cuts.
+- **Trial interaction.** On a phone a finger covers several cells of a dense maze, so
+  the walls it is steering around are hidden. Mitigations built in: a drag step goes
+  to the open neighbour nearest the finger's direction (a wall never makes the path
+  jump sideways), and the board can be zoomed. If it still feels clumsy we'll swap the
+  interaction (e.g. tap a cell to extend the path to it along the corridor); the
+  stored answer (path edges) doesn't depend on how it was drawn.
 
 ### Appearance
 
 - White cells, no grid lines. Walls are dark (`#222`) lines about 0.12 cell thick
   with square caps, so adjacent wall segments meet cleanly; the outer border is the
   same weight. Small ▼ markers sit outside the entrance and exit openings.
-- Path cells are shaded mid-dark gray (`#6b6b6b`) so the picture builds on the
-  board as the player goes, while walls (`#222`) stay readable across a shaded run.
-  A thin light line through cell centres shows the path's order and its end. (The
-  board has walls but no rooms, so the CLAUDE.md room-shade rule doesn't apply.)
+- Path cells are shaded with the shared `ROOM_SHADE` (`BoardColors.ROOM_SHADE` on
+  Android) so the picture builds on the board as the player goes, while the walls
+  (`#222`) stay readable across a shaded run. A thin white line through cell centres
+  shows the path's order and its end.
 - **Preview panel** (not readonly): the picture so far, path cells black on
   `#d9d9d9`, cells 3–8 px, ~160 px max, like Picto Link.
 - **Solved thumbnail (Android):** `renderThumbnail` draws the solution route's cells
@@ -145,6 +154,8 @@ until the route is right. It never says whether the path is on the right track.
   entrance and exit coincide; no route from entrance to exit; the shortest route is
   not unique. The first shows on the border; the others list the problem (for a tie,
   the cells where the shortest routes part are marked).
+- **Misread warning** (overridable): "Not a perfect maze": open passages form loops;
+  each loop's cells are marked orange.
 - **Show route** toggle: overlays the computed shortest route, the quickest way to
   eyeball the picture (and spot a misread wall) after parsing.
 - The modal's JSON textarea is the source of truth; the editor emits on every edit.
@@ -155,35 +166,38 @@ until the route is right. It never says whether the path is on the right track.
 
 ## Puzzle Parser
 
-`parsers/src/puzzle_parsers/picturesque_maze/`. No OCR. One parser for both
-publishers.
+`parsers/src/puzzle_parsers/picturesque_maze/` (design notes and measurements in
+`grid_detector.py`). No OCR. One parser for both publishers.
 
-- **Board:** the outer border is a heavy, clean rectangle, so the shared
-  `rectify_board` (which flattens) finds it. The interior lines are sparse, so the
-  flatten trace may fall back to the four-corner warp; that is expected.
-- **Ink:** blue (publisher 1) or black (publisher 2): work on the channel with the
-  most ink contrast (the minimum of R, G, B), not plain gray.
-- **Lattice:** there are no grid lines to find. The pitch comes from the wall ink:
-  every wall endpoint lies on a lattice point, so the projection profiles of the
-  binarised walls (and their autocorrelation) have a strong period. The cell count
-  per side is board size / period, snapped to a whole number and checked against
-  both axes. Sample 1 is roughly 46 × 46 cells, sample 2 about 40 × 40, sample 3
-  roughly 50 × 80.
-- **Walls:** each interior edge is sampled along a thin strip (excluding the
-  lattice-point ends, where perpendicular walls meet): ink coverage near 1 is a
-  wall, near 0 is open. This is present / absent, not thick / thin, so it doesn't
-  go through `classify_border_thickness` (that expects every edge to carry a line).
-- **Openings:** the two border edges with no ink are the entrance and exit. Which is
-  which: the one labelled IN, else the top/left one is the entrance. Direction does
-  not change the route, only where the player starts.
-- **Check:** BFS from entrance to exit must reach the exit with a unique shortest
-  route. When the maze has no loops (open edges = W·H − 1 and connected), it is a
-  perfect maze and any misread edge shows up as a cycle or a cut-off region; the
-  parser reports it and the review fixes it.
-- **Risks:** the dense lattice (sample 3) at Android upload size (2000 px long side)
-  leaves about 20 px per cell, still enough for wall strips. A curved phone photo
-  shifts edges by fractions of a cell across ~50 cells; the flattened warp has to
-  keep the lattice within ~0.25 cell.
+- **Board:** the border's entrance/exit gaps keep its contour open, so the shared
+  border finder alone picks the page or a title block. The maze is found as the
+  largest block of ink with one-cell gaps closed; its bounding box, grown by a small
+  margin, goes to `rectify_board` as the `border_image` (as Picto Link does), so a
+  border bowed by a curled page stays inside the warp. `flatten_board` can't trace a
+  maze's lines (they break every cell), so it returns the four-corner warp and the
+  lattice fit below follows the curl.
+- **Ink:** channel minimum (`ink_intensity`), so blue and black ink read alike.
+- **Lattice:** no grid lines are printed. The pitch is the period of the wall strokes.
+  Per window of 8 cells, the outer border lines are found at the edge of the maze's
+  ink footprint (page rules and ▼ markers outside it can't pass for the border), and
+  the lines between are placed by dynamic programming: each step within 20% of a
+  cell, landing on the most wall ink; the cell count is the one that fits best.
+  Cells aren't evenly spaced on a curled page (evenly spaced lines read 56 columns
+  instead of 57).
+- **Walls:** each edge's ink contrast against the local paper (glare dims both).
+  Walls and openings sit an order of magnitude apart; the uncertain edges between are
+  settled by the structure: these publishers print perfect mazes, so an uncertain edge
+  opens only if it joins two parts not yet connected.
+- **Openings:** the two weakest border edges; the entrance is the top-most, then
+  left-most.
+- **"Not a perfect maze" warning, everywhere:** loops and sealed cells are legal but on
+  these publishers mean a misread wall. The parser logs them, and the web editor and
+  the Android review show an overridable warning with the cells marked.
+- **Accuracy:** the three scans read as perfect mazes (unique route, no loops, every
+  cell reachable) at full size and at 2000 px: 57x57, 50x50 and 120x80. Their routes
+  draw a panda, two dice and a samurai; the canons are pinned in
+  `board-picturesque-maze-{1,2,3}.canon.json`. The phone photo of sample 1 reads the
+  same maze to within one wall (glare), leaving one loop for the review to flag.
 
 # Misc
 

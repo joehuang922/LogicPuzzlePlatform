@@ -66,7 +66,7 @@ function computeDimensions(typeId: number, canon: Record<string, unknown>): { w?
   if (typeId === 20 && typeof canon.width === "number" && typeof canon.height === "number") {
     return { w: canon.width as number, h: canon.height as number };
   }
-  if ((typeId === 21 || typeId === 28 || typeId === 36) && typeof canon.width === "number" && typeof canon.height === "number") {
+  if ((typeId === 21 || typeId === 28 || typeId === 36 || typeId === 44) && typeof canon.width === "number" && typeof canon.height === "number") {
     return { w: canon.width as number, h: canon.height as number };
   }
   // Whimsical Knight (dot lattice), Omino Tree, Minus Room and Mannequin Gate 2 (cells): sized by rows / cols.

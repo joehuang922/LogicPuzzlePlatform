@@ -42,6 +42,7 @@ import { ominoTreeExtractor } from "./ominoTree";
 import { minusRoomExtractor } from "./minusRoom";
 import { tilePaintExtractor } from "./tilePaint";
 import { countryRoadExtractor } from "./countryRoad";
+import { picturesqueMazeExtractor } from "./picturesqueMaze";
 
 const extractorRegistry = new Map<number, AnswerExtractor>();
 
@@ -92,6 +93,7 @@ registerExtractor(ominoTreeExtractor);
 registerExtractor(minusRoomExtractor);
 registerExtractor(tilePaintExtractor);
 registerExtractor(countryRoadExtractor);
+registerExtractor(picturesqueMazeExtractor);
 
 export function getExtractor(puzzleType: number): AnswerExtractor | undefined {
   return extractorRegistry.get(puzzleType);

@@ -42,6 +42,7 @@ import ominoTreeSchema from "../../../../schemas/canon/omino-tree.json";
 import minusRoomSchema from "../../../../schemas/canon/minus-room.json";
 import tilePaintSchema from "../../../../schemas/canon/tile-paint.json";
 import countryRoadSchema from "../../../../schemas/canon/country-road.json";
+import picturesqueMazeSchema from "../../../../schemas/canon/picturesque-maze.json";
 
 const ajv = new Ajv();
 
@@ -89,6 +90,7 @@ const validators: Record<number, ValidateFunction> = {
   41: ajv.compile(countryRoadSchema),
   42: ajv.compile(perfectLRingSchema),
   43: ajv.compile(mannequinGate2Schema),
+  44: ajv.compile(picturesqueMazeSchema),
 };
 
 export function validateCanon(puzzleType: number, data: unknown): void {
@@ -421,6 +423,10 @@ const semanticChecks: Record<number, (data: any) => void> = {
       seen.add(key);
     }
   },
+  // Picturesque Maze: wall arrays fit the grid, the openings are two different border
+  // cells, a route joins them, and the shortest route is unique. Mirrors
+  // picturesqueMazeFormatProblems in frontend/src/components/picturesqueMazeRules.ts.
+  44: (data: MazeCanonData) => checkPicturesqueMaze(data),
   // Mannequin Gate 2: every line's cells are on the board, consecutive cells are
   // 8-neighbours, no line visits a cell twice, and no two lines share a step (a photo
   // can't tell them apart). Mirrors formatProblems in mannequinGate2Rules.ts.
@@ -627,4 +633,68 @@ function roomIds(rows: number, cols: number, h: number[][], v: number[][]): numb
     }
   }
   return room;
+}
+
+interface MazeOpening { side: "top" | "bottom" | "left" | "right"; index: number }
+interface MazeCanonData {
+  width: number;
+  height: number;
+  walls: { h: number[][]; v: number[][] };
+  entrance: MazeOpening;
+  exit: MazeOpening;
+}
+
+function mazeOpeningCell(o: MazeOpening, width: number, height: number): [number, number] | null {
+  const limit = o.side === "top" || o.side === "bottom" ? width : height;
+  if (o.index >= limit) return null;
+  switch (o.side) {
+    case "top": return [0, o.index];
+    case "bottom": return [height - 1, o.index];
+    case "left": return [o.index, 0];
+    case "right": return [o.index, width - 1];
+  }
+}
+
+function checkPicturesqueMaze(data: MazeCanonData): void {
+  const { width, height, walls, entrance, exit } = data;
+  const fail = (msg: string) => { throw new Error(`Invalid picturesque maze: ${msg}`); };
+  if (walls.h.length !== height - 1 || walls.h.some((row) => row.length !== width)) {
+    fail(`walls.h must be ${height - 1} x ${width}`);
+  }
+  if (walls.v.length !== height || walls.v.some((row) => row.length !== width - 1)) {
+    fail(`walls.v must be ${height} x ${width - 1}`);
+  }
+  const start = mazeOpeningCell(entrance, width, height);
+  const goal = mazeOpeningCell(exit, width, height);
+  if (!start) fail(`entrance ${entrance.side} ${entrance.index} is off the board`);
+  if (!goal) fail(`exit ${exit.side} ${exit.index} is off the board`);
+  if (entrance.side === exit.side && entrance.index === exit.index) fail("entrance and exit are the same opening");
+  // BFS from the entrance, counting shortest routes (capped at 2).
+  const n = width * height;
+  const dist = new Array<number>(n).fill(-1);
+  const ways = new Array<number>(n).fill(0);
+  const s = start![0] * width + start![1];
+  dist[s] = 0;
+  ways[s] = 1;
+  const queue = [s];
+  for (let qi = 0; qi < queue.length; qi++) {
+    const cur = queue[qi];
+    const r = Math.floor(cur / width);
+    const c = cur % width;
+    const next: number[] = [];
+    if (r > 0 && !walls.h[r - 1][c]) next.push(cur - width);
+    if (r < height - 1 && !walls.h[r][c]) next.push(cur + width);
+    if (c > 0 && !walls.v[r][c - 1]) next.push(cur - 1);
+    if (c < width - 1 && !walls.v[r][c]) next.push(cur + 1);
+    for (const nb of next) {
+      if (dist[nb] < 0) {
+        dist[nb] = dist[cur] + 1;
+        queue.push(nb);
+      }
+      if (dist[nb] === dist[cur] + 1) ways[nb] = Math.min(2, ways[nb] + ways[cur]);
+    }
+  }
+  const g = goal![0] * width + goal![1];
+  if (dist[g] < 0) fail("no route from the entrance to the exit");
+  if (ways[g] > 1) fail("the shortest route is not unique");
 }

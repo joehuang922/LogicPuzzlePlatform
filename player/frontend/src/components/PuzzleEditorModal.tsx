@@ -45,6 +45,7 @@ import OminoTreeEditor from "./OminoTreeEditor";
 import MinusRoomEditor from "./MinusRoomEditor";
 import TilePaintEditor from "./TilePaintEditor";
 import CountryRoadEditor from "./CountryRoadEditor";
+import PicturesqueMazeEditor from "./PicturesqueMazeEditor";
 
 // Puzzle types that have a visual board editor.
 export const EDITOR_TYPE_NAMES = [
@@ -54,6 +55,7 @@ export const EDITOR_TYPE_NAMES = [
   "tentaishow", "heyawake", "shikaku", "norinori", "nurikabe", "ripple-effect",
   "hitori", "picto-link", "kuralin", "unequal-sudoku", "corner-chain", "sinkamino", "balance-link", "l-ring", "hashi", "skeleton-puzzle",
   "zebra-rope", "whimsical-knight", "omino-tree", "minus-room", "tile-paint", "country-road", "perfect-l-ring", "mannequin-gate-2",
+  "picturesque-maze",
 ];
 
 export function hasVisualEditor(typeName: string | undefined): boolean {
@@ -117,6 +119,7 @@ function CanonEditor({
     case "minus-room": return <MinusRoomEditor initialJson={canonRepr} onChange={onChange} />;
     case "tile-paint": return <TilePaintEditor initialJson={canonRepr} onChange={onChange} />;
     case "country-road": return <CountryRoadEditor initialJson={canonRepr} onChange={onChange} />;
+    case "picturesque-maze": return <PicturesqueMazeEditor initialJson={canonRepr} onChange={onChange} />;
     default: return null;
   }
 }

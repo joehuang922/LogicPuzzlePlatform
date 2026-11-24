@@ -656,3 +656,35 @@ export interface CountryRoadAnswer {
   // rows x cols; 0 none, 1 = × (unused), 2 = • (used); solving aids only
   marks: number[][];
 }
+
+// Picturesque Maze (type 44). Walls lie on cell edges; the outer border is a wall
+// except at the entrance and exit openings.
+export type MazeSide = "top" | "bottom" | "left" | "right";
+
+export interface MazeOpening {
+  side: MazeSide;
+  // column for top/bottom, row for left/right
+  index: number;
+}
+
+export interface PicturesqueMazeCanon {
+  width: number;
+  height: number;
+  walls: {
+    // (height - 1) x width; 1 = wall between (r, c) and (r + 1, c)
+    h: number[][];
+    // height x (width - 1); 1 = wall between (r, c) and (r, c + 1)
+    v: number[][];
+  };
+  entrance: MazeOpening;
+  exit: MazeOpening;
+}
+
+export interface PicturesqueMazeAnswer {
+  edges: {
+    // height x (width - 1); 1 = path segment between (r, c) and (r, c + 1)
+    h: number[][];
+    // (height - 1) x width; 1 = path segment between (r, c) and (r + 1, c)
+    v: number[][];
+  };
+}

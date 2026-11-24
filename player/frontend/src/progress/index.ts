@@ -42,6 +42,7 @@ import { computeOminoTreeProgress } from "./ominoTree";
 import { computeMinusRoomProgress } from "./minusRoom";
 import { computeTilePaintProgress } from "./tilePaint";
 import { computeCountryRoadProgress } from "./countryRoad";
+import { computePicturesqueMazeProgress } from "./picturesqueMaze";
 
 export interface ProgressCalculator {
   puzzleType: number;
@@ -97,6 +98,7 @@ register(computeOminoTreeProgress);
 register(computeMinusRoomProgress);
 register(computeTilePaintProgress);
 register(computeCountryRoadProgress);
+register(computePicturesqueMazeProgress);
 
 export function computeProgress(
   puzzle: PuzzleDefinition,
