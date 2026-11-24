@@ -19,6 +19,7 @@ import { akariPlugin } from "./plugins/akari";
 import { fillominoPlugin } from "./plugins/fillomino";
 import { pencilsPlugin } from "./plugins/pencils";
 import { shikakuPlugin } from "./plugins/shikaku";
+import { picturesqueMazePlugin } from "./plugins/picturesque-maze";
 import { irregularNonogramPlugin } from "./plugins/irregular-nonogram";
 
 // A registered plugin with its type parameters erased. The registry is the boundary where
@@ -55,6 +56,7 @@ register(akariPlugin);
 register(fillominoPlugin);
 register(pencilsPlugin);
 register(shikakuPlugin);
+register(picturesqueMazePlugin);
 register(irregularNonogramPlugin);
 
 export function getPlugin(puzzleType: number): AnyPlugin | undefined {
