@@ -18,6 +18,14 @@ describe("sizeTag", () => {
     expect(sizeTag(combo(10))).toBe("BIG");
     expect(sizeTag(combo(20))).toBe("GIANT");
   });
+  it("picturesque maze by cells", () => {
+    expect(sizeTag(p(44, 50, 50))).toBeNull();
+    expect(sizeTag(p(44, 80, 119))).toBeNull();
+    expect(sizeTag(p(44, 80, 120))).toBe("BIG");
+    expect(sizeTag(p(44, 240, 119))).toBe("BIG");
+    expect(sizeTag(p(44, 240, 120))).toBe("GIANT");
+  });
+
   it("nonogram by cells", () => {
     expect(sizeTag(p(6, 50, 59))).toBeNull();
     expect(sizeTag(p(6, 50, 60))).toBe("BIG");

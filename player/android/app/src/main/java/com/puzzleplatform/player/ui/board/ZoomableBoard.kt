@@ -32,6 +32,9 @@ private val MAX_CELL = 40.dp
 private val AUTO_CELL = 28.dp
 /** Below this, cells are too small to tap/draw reliably, so input is off. */
 private val ENTRY_FLOOR = 24.dp
+/** Below this, a one-finger drag is off too. Lower than [ENTRY_FLOOR]: a stroke's start
+ *  point is the fingertip's centre, precise enough for smaller cells than a tap target. */
+private val DRAG_FLOOR = 12.dp
 
 /**
  * The cell the player is typing into while an entry pad (DigitBar / NumberPad) covers
@@ -117,9 +120,10 @@ fun ZoomableBoard(
         val maxCellPx = with(density) { MAX_CELL.toPx() }
         val autoCellPx = with(density) { AUTO_CELL.toPx() }
         val entryFloorPx = with(density) { ENTRY_FLOOR.toPx() }
+        val dragFloorPx = with(density) { DRAG_FLOOR.toPx() }
 
         val transform = remember(cols, rows, resetKey, vpx, padCells) {
-            BoardTransform(cols, rows, vpx, maxCellPx, autoCellPx, entryFloorPx, padCells)
+            BoardTransform(cols, rows, vpx, maxCellPx, autoCellPx, entryFloorPx, padCells, dragFloorPx)
         }
         // A version counter so gesture-driven mutations to `transform` recompose.
         var version by remember(transform) { mutableStateOf(0) }
@@ -151,15 +155,15 @@ fun ZoomableBoard(
                     }
                 },
                     onDragStart = { off ->
-                        onDrawStart?.invoke(transform.cellAt(off.x, off.y))
+                        onDrawStart?.invoke(transform.cellAt(off.x, off.y, drag = true))
                         onDrawStartPrecise?.let { cb ->
-                            transform.fractionalCellAt(off.x, off.y)?.let { (col, row) -> cb(col, row) }
+                            transform.fractionalCellAt(off.x, off.y, drag = true)?.let { (col, row) -> cb(col, row) }
                         }
                     },
                     onDrag = { off ->
-                        onDrawTo?.invoke(transform.cellAt(off.x, off.y))
+                        onDrawTo?.invoke(transform.cellAt(off.x, off.y, drag = true))
                         onDrawToPrecise?.let { cb ->
-                            transform.fractionalCellAt(off.x, off.y)?.let { (col, row) -> cb(col, row) }
+                            transform.fractionalCellAt(off.x, off.y, drag = true)?.let { (col, row) -> cb(col, row) }
                         }
                     },
                     onDragEnd = { onDrawEnd?.invoke() },

@@ -74,6 +74,31 @@ class BoardTransformTest {
         assertNull(t.cellAt(10f, 10f)) // taps ignored while too small
     }
 
+    @Test
+    fun dragAcceptedDownToTheLowerDragFloor() {
+        // 90x90: min cell 12px. Drag floor 12px, tap floor 24px.
+        val t = BoardTransform(90, 90, VP, MAX, AUTO, FLOOR, dragFloorPx = 12f)
+        t.transform(0f, 0f, 0f, 0f, 0.01f)
+        assertEquals(12f, t.cellPx, 0.01f)
+        assertFalse(t.entryEnabled)
+        assertTrue(t.dragEnabled)
+        assertNull(t.cellAt(10f, 10f))
+        assertNull(t.fractionalCellAt(10f, 10f))
+        assertEquals(0 to 0, t.cellAt(10f, 10f, drag = true))
+        assertEquals(2 to 1, t.cellAt(30f, 20f, drag = true))
+        val (col, row) = t.fractionalCellAt(18f, 6f, drag = true)!!
+        assertEquals(1.5f, col, 0.01f)
+        assertEquals(0.5f, row, 0.01f)
+    }
+
+    @Test
+    fun dragFloorDefaultsToTheTapFloor() {
+        val t = make(60, 60)
+        t.transform(0f, 0f, 0f, 0f, 0.01f)
+        assertFalse(t.dragEnabled)
+        assertNull(t.cellAt(10f, 10f, drag = true))
+    }
+
     // -- zoom clamps --------------------------------------------------------
 
     @Test

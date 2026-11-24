@@ -1,5 +1,6 @@
 package com.puzzleplatform.player.ui.board
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
@@ -80,6 +81,9 @@ fun PicturesqueMazeBoard(
     val path = remember(board, userValues) { PicturesqueMazeEngine.path(board, userValues) }
     val drawn = path.size > 1
     val route = remember(board, showRoute) { if (showRoute) PicturesqueMazeEngine.solve(board).route else null }
+    // The opening triangles sit outside the paper, on the screen background: white on a
+    // dark theme so they stay visible.
+    val markerColor = if (isSystemInDarkTheme()) Color.White else WALL
 
     Column(
         modifier = modifier,
@@ -125,7 +129,7 @@ fun PicturesqueMazeBoard(
                 null
             },
         ) { cell ->
-            drawMaze(board, cell, path, drawn, route, marks, liveValidate && playing, playing)
+            drawMaze(board, cell, path, drawn, route, marks, liveValidate && playing, playing, markerColor)
         }
     }
 }
@@ -186,6 +190,7 @@ private fun DrawScope.drawMaze(
     marks: MazeCellMarks,
     showDeadEnd: Boolean,
     playing: Boolean,
+    markerColor: Color,
 ) {
     val rows = board.rows
     val cols = board.cols
@@ -243,8 +248,8 @@ private fun DrawScope.drawMaze(
     }
     drawPath(walls, WALL, style = Stroke(maxOf(1.5f, cell * 0.12f), cap = StrokeCap.Square))
 
-    drawOpeningMarker(board, board.entrance, cell, inward = true, color = if (playing) WALL else ENTRANCE_MARK)
-    drawOpeningMarker(board, board.exit, cell, inward = false, color = if (playing) WALL else EXIT_MARK)
+    drawOpeningMarker(board, board.entrance, cell, inward = true, color = if (playing) markerColor else ENTRANCE_MARK)
+    drawOpeningMarker(board, board.exit, cell, inward = false, color = if (playing) markerColor else EXIT_MARK)
 }
 
 /** A ▼-style triangle just outside an opening, pointing in (entrance) or out (exit). */
