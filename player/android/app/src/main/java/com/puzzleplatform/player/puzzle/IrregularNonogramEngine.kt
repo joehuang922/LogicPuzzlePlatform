@@ -19,8 +19,8 @@ import kotlinx.serialization.json.intOrNull
  *   (maximal run of board cells along a row or column, named by its first cell) has at
  *   most one clue, printed at its "start" (left / above) or "end" (right / below).
  *
- * answer: { cells } — height x width, 1 = filled. User values are Nonogram's: "col,row" ->
- * 1 filled / 2 crossed.
+ * answer: { cells } — height x width, 0 unset, 1 filled, 2 crossed (Nonogram's Android
+ * format; crosses survive a reload). User values are Nonogram's: "col,row" -> 1 / 2.
  */
 object IrregularNonogramEngine : PuzzleEngine {
     override val puzzleType: Int = 45
@@ -310,7 +310,7 @@ object IrregularNonogramEngine : PuzzleEngine {
         val board = parseBoard(puzzle)
         val cells = JsonArray(List(board.rows) { r ->
             JsonArray(List(board.cols) { c ->
-                JsonPrimitive(if (board.cells[r][c] && state(userValues, r, c) == FILLED) 1 else 0)
+                JsonPrimitive(if (board.cells[r][c]) state(userValues, r, c) else UNSET)
             })
         })
         return JsonObject(mapOf("cells" to cells))
@@ -321,7 +321,10 @@ object IrregularNonogramEngine : PuzzleEngine {
         val out = mutableMapOf<String, Int>()
         cells.forEachIndexed { r, rowEl ->
             (rowEl as? JsonArray)?.forEachIndexed { c, v ->
-                if ((v as? JsonPrimitive)?.intOrNull == 1) out["$c,$r"] = FILLED
+                when ((v as? JsonPrimitive)?.intOrNull) {
+                    FILLED -> out["$c,$r"] = FILLED
+                    CROSSED -> out["$c,$r"] = CROSSED
+                }
             }
         }
         return out

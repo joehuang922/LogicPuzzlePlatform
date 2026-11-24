@@ -318,13 +318,23 @@ export function irregularNonogramProgress(canon: IrregularNonogramCanon, values:
   return total === 0 ? 0 : Math.min(100, (decided / total) * 100);
 }
 
-/** The answer { cells }: height x width, 1 = filled board cell. */
+/**
+ * The answer { cells }: height x width, 0 unset, 1 filled, 2 crossed (Android Nonogram's
+ * format): crosses are kept so a reload restores them. Off-board cells are 0.
+ */
 export function irregularNonogramAnswer(canon: IrregularNonogramCanon, values: Record<string, number>): { cells: number[][] } {
   return {
     cells: Array.from({ length: canon.height }, (_, r) =>
-      Array.from({ length: canon.width }, (_, c) => (canon.cells[r]?.[c] === 1 && cellState(values, r, c) === 1 ? 1 : 0))
+      Array.from({ length: canon.width }, (_, c) => (canon.cells[r]?.[c] === 1 ? cellState(values, r, c) : 0))
     ),
   };
+}
+
+/** "col,row" values back from a saved answer: 1 filled, 2 crossed. */
+export function irregularNonogramValues(answer: { cells?: number[][] } | null | undefined): Record<string, number> {
+  const values: Record<string, number> = {};
+  answer?.cells?.forEach((row, r) => row.forEach((v, c) => { if (v === 1 || v === 2) values[`${c},${r}`] = v; }));
+  return values;
 }
 
 export function parseIrregularNonogramCanon(canonRepr: unknown): IrregularNonogramCanon {

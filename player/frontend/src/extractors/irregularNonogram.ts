@@ -4,7 +4,7 @@ import { irregularNonogramAnswer, parseIrregularNonogramCanon } from "../compone
 export const irregularNonogramExtractor: AnswerExtractor = {
   puzzleType: 45,
 
-  // { cells }: height x width, 1 = filled board cell (crosses aren't stored).
+  // { cells }: height x width, 0 unset, 1 filled, 2 crossed.
   extract(puzzle: PuzzleDefinition, userValues: Record<string, number>) {
     return irregularNonogramAnswer(parseIrregularNonogramCanon(puzzle.canonRepr), userValues);
   },

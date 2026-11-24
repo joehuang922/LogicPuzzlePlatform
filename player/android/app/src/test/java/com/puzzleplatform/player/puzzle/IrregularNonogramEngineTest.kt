@@ -47,9 +47,10 @@ class IrregularNonogramEngineTest {
 
     @Test
     fun extractAndRestore_roundTrip() {
+        // Crosses are saved (2), so a reload restores them.
         val answer = IrregularNonogramEngine.extractAnswer(small, solved + ("0,0" to 2))
-        assertEquals(Json.parseToJsonElement("""{"cells":[[0,1,0,0],[0,0,0,1],[1,1,1,1]]}"""), answer)
-        assertEquals(solved, IrregularNonogramEngine.restoreUserValues(small, answer))
+        assertEquals(Json.parseToJsonElement("""{"cells":[[2,1,0,0],[0,0,0,1],[1,1,1,1]]}"""), answer)
+        assertEquals(solved + ("0,0" to 2), IrregularNonogramEngine.restoreUserValues(small, answer))
     }
 
     @Test
