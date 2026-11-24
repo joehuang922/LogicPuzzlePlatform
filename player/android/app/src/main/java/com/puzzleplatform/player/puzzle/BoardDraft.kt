@@ -59,6 +59,9 @@ data class BoardDraft(
         MinusRoomEngine.Board(0, 0, 4, emptyList(), emptyList(), emptyList(), emptyList()),
     val tilePaint: TilePaintEngine.Board = TilePaintEngine.Board(emptyList(), emptyList(), emptyList()),
     val countryRoad: CountryRoadEngine.Board = CountryRoadEngine.Board(emptyList(), emptyList(), emptyList()),
+    val picturesqueMaze: PicturesqueMazeEngine.Board = PicturesqueMazeEngine.Board(
+        0, 0, emptyList(), emptyList(), PicturesqueMazeEngine.Opening("top", 0), PicturesqueMazeEngine.Opening("bottom", 0),
+    ),
 ) {
     /**
      * What the type's misread check finds wrong with this board — the list that turns
@@ -108,6 +111,7 @@ data class BoardDraft(
         AuthoringType.MINUS_ROOM -> MinusRoomAuthoring.problems(minusRoom)
         AuthoringType.TILE_PAINT -> TilePaintAuthoring.problems(tilePaint)
         AuthoringType.COUNTRY_ROAD -> CountryRoadAuthoring.problems(countryRoad)
+        AuthoringType.PICTURESQUE_MAZE -> PicturesqueMazeAuthoring.problems(picturesqueMaze)
     }
 
     /**
@@ -139,6 +143,7 @@ data class BoardDraft(
         AuthoringType.MINUS_ROOM -> MinusRoomAuthoring.formatProblems(minusRoom)
         AuthoringType.TILE_PAINT -> TilePaintAuthoring.formatProblems(tilePaint)
         AuthoringType.COUNTRY_ROAD -> CountryRoadAuthoring.formatProblems(countryRoad)
+        AuthoringType.PICTURESQUE_MAZE -> PicturesqueMazeAuthoring.formatProblems(picturesqueMaze)
         AuthoringType.MANNEQUIN_GATE_2 -> MannequinGate2Authoring.formatProblems(mannequinGate2)
         else -> emptyList()
     }
@@ -241,6 +246,11 @@ data class BoardDraft(
             CanonBoard(TilePaintAuthoring.canonFromDraft(tilePaint), tilePaint.cols, tilePaint.rows)
         AuthoringType.COUNTRY_ROAD ->
             CanonBoard(CountryRoadAuthoring.canonFromDraft(countryRoad), countryRoad.cols, countryRoad.rows)
+        AuthoringType.PICTURESQUE_MAZE -> CanonBoard(
+            PicturesqueMazeAuthoring.canonFromDraft(picturesqueMaze),
+            picturesqueMaze.cols,
+            picturesqueMaze.rows,
+        )
     }
 
     companion object {
@@ -293,6 +303,8 @@ data class BoardDraft(
             AuthoringType.MINUS_ROOM -> BoardDraft(minusRoom = MinusRoomAuthoring.draftFromCanon(canon))
             AuthoringType.TILE_PAINT -> BoardDraft(tilePaint = TilePaintAuthoring.draftFromCanon(canon))
             AuthoringType.COUNTRY_ROAD -> BoardDraft(countryRoad = CountryRoadAuthoring.draftFromCanon(canon))
+            AuthoringType.PICTURESQUE_MAZE ->
+                BoardDraft(picturesqueMaze = PicturesqueMazeAuthoring.draftFromCanon(canon))
         }
     }
 }

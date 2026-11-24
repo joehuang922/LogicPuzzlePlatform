@@ -393,6 +393,10 @@ fun AdminQuestionScreen(
                                     "Tap a tile to review its photo and grid side by side, fix mis-read " +
                                         "walls or numbers, and set its title. A red tile has a wall that ends " +
                                         "inside a room, two numbers in one room or a number too big for its room."
+                                AuthoringType.PICTURESQUE_MAZE ->
+                                    "Tap a tile to review its photo and maze side by side, fix mis-read " +
+                                        "walls or openings, and set its title. A red tile has no route, a tied " +
+                                        "shortest route, or loops or sealed cells (usually a misread wall)."
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -701,6 +705,11 @@ private fun ReviewScreen(
                         "Compare the photo with the grid — pinch to zoom the photo. In Walls, tap a line " +
                             "between two cells to toggle its wall; in Numbers, tap a cell and type its number. " +
                             "Add or remove a row or column at the edge."
+                    AuthoringType.PICTURESQUE_MAZE ->
+                        "Compare the photo with the maze — pinch to zoom the photo. Route shows the shortest " +
+                            "route (its picture should look right); tap a line between two cells to toggle its " +
+                            "wall, or the border to move the entrance (or exit, in Exit mode). Add or remove a " +
+                            "row or column at the edge."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

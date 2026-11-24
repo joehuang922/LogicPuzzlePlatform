@@ -106,6 +106,7 @@ import com.puzzleplatform.player.ui.board.KuralinBoard
 import com.puzzleplatform.player.ui.board.CountryRoadBoard
 import com.puzzleplatform.player.ui.board.TilePaintBoard
 import com.puzzleplatform.player.ui.board.ZebraRopeBoard
+import com.puzzleplatform.player.ui.board.PicturesqueMazeBoard
 import com.puzzleplatform.player.ui.board.WhimsicalKnightBoard
 import com.puzzleplatform.player.ui.board.OminoTreeBoard
 import com.puzzleplatform.player.ui.board.MinusRoomBoard
@@ -653,6 +654,15 @@ fun PlayScreen(
                                     puzzle = puzzle,
                                     userValues = state.userValues,
                                     onTapCell = vm::tapShadeCell,
+                                    liveValidate = state.liveValidate,
+                                )
+                                // Picturesque Maze: one path from the entrance, dragged through
+                                // open passages ("h:r,c"/"v:r,c" segments, as Picto Link); a tap
+                                // on a path cell cuts the path after it.
+                                44 -> PicturesqueMazeBoard(
+                                    puzzle = puzzle,
+                                    userValues = state.userValues,
+                                    onApplyChanges = vm::putUserValues,
                                     liveValidate = state.liveValidate,
                                 )
                                 // Whimsical Knight: drag dot to dot (orthogonal or knight's move) to

@@ -135,6 +135,7 @@ enum class AuthoringType(
     ZEBRA_ROPE("Zebra Rope", "シマシマロープ", ZebraRopeAuthoring.PUZZLE_TYPE),
     TILE_PAINT("Tile Paint", "タイルペイント", TilePaintAuthoring.PUZZLE_TYPE),
     COUNTRY_ROAD("Country Road", "カントリーロード", CountryRoadAuthoring.PUZZLE_TYPE),
+    PICTURESQUE_MAZE("Picturesque Maze", "浮き出しメイロ", PicturesqueMazeAuthoring.PUZZLE_TYPE),
     WHIMSICAL_KNIGHT("Whimsical Knight", "気まぐれナイト", WhimsicalKnightAuthoring.PUZZLE_TYPE, incubating = true),
     OMINO_TREE("Omino Tree", "オミノツリー", OminoTreeAuthoring.PUZZLE_TYPE, incubating = true),
     MINUS_ROOM("Minus Room", "マイナルーム", MinusRoomAuthoring.PUZZLE_TYPE, incubating = true),
