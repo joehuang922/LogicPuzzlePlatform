@@ -1,0 +1,57 @@
+{
+  "title": "Irregular Nonogram Canonical Representation",
+  "description": "A nonogram on an irregular board: a mask of board cells inside a width x height bounding box. Each maximal run of board cells along a row or column (a segment) has at most one clue, printed at one end of it on the same lattice line.",
+  "type": "object",
+  "required": ["width", "height", "cells", "rowClues", "colClues"],
+  "additionalProperties": false,
+  "definitions": {
+    "clues": {
+      "description": "Run lengths in reading order (left to right, top to bottom).",
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "integer", "minimum": 1 }
+    },
+    "side": {
+      "description": "start = left of a row segment / above a column segment; end = right / below.",
+      "type": "string",
+      "enum": ["start", "end"]
+    }
+  },
+  "properties": {
+    "width": { "type": "integer", "minimum": 1 },
+    "height": { "type": "integer", "minimum": 1 },
+    "cells": {
+      "description": "height x width; 1 = board cell, 0 = not part of the board.",
+      "type": "array",
+      "items": { "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 1 } }
+    },
+    "rowClues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["row", "start", "side", "clues"],
+        "additionalProperties": false,
+        "properties": {
+          "row": { "type": "integer", "minimum": 0 },
+          "start": { "description": "Column of the segment's first cell.", "type": "integer", "minimum": 0 },
+          "side": { "$ref": "#/definitions/side" },
+          "clues": { "$ref": "#/definitions/clues" }
+        }
+      }
+    },
+    "colClues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["col", "start", "side", "clues"],
+        "additionalProperties": false,
+        "properties": {
+          "col": { "type": "integer", "minimum": 0 },
+          "start": { "description": "Row of the segment's first cell.", "type": "integer", "minimum": 0 },
+          "side": { "$ref": "#/definitions/side" },
+          "clues": { "$ref": "#/definitions/clues" }
+        }
+      }
+    }
+  }
+}

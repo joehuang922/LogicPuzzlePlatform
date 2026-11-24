@@ -20,7 +20,10 @@ sport), so this is a picture puzzle. Not incubating.
   bounded by non-board cells or the bounding box. A row or column of the lattice can hold
   any number of segments (sample 1's notch splits rows into a left piece with clues on the
   left and a right piece with clues on the right).
-- **Clues.** Every segment has one clue: a list of positive run lengths, in the usual
+- **Clues.** Every board cell belongs to at most one row clue and at most one column
+  clue: a segment has at most one clue (never one at each end). The printed puzzles give
+  every segment one, but a segment without a clue is allowed (it constrains nothing). A
+  clue is a list of positive run lengths, in the usual
   reading order (left to right for a row piece, top to bottom for a column piece),
   printed in a block of dotted clue cells on the same line just outside one end of the
   segment: `side: "start"` (left / above) or `"end"` (right / below). A row clue on the
@@ -62,7 +65,7 @@ sport), so this is a picture puzzle. Not incubating.
 - `colClues`: the same per column segment: `col`, `start` (the row of its first cell),
   `side` (`"start"` = above, `"end"` = below), `clues` (top to bottom).
 - **Format rules** (the editor and the API's `semanticChecks` both enforce them):
-  every segment has exactly one clue entry and every entry names a segment; a clue fits
+  every entry names a segment and no segment has two entries; a clue fits
   its segment (sum + gaps ≤ length); and no two clue blocks, or a clue block and a board
   cell, share a lattice cell (the board couldn't be drawn).
 
@@ -154,7 +157,9 @@ As Nonogram: `(board cells filled or crossed / board cells) × 100`.
 - **Clues mode:** click a board cell to select its row segment and its column segment.
   Two text fields take the row clue and the column clue (`2 5 1`, space separated), each
   with a side toggle (Left/Right, Top/Bottom). The selected segments are highlighted.
-- Format problems (block saving, as the API): a segment without a clue, a clue too long
+- Misread warning (overridable): a segment without a clue (allowed, but in a parsed
+  board usually a missed clue block).
+- Format problems (block saving, as the API): two clues for one segment, a clue too long
   for its segment, overlapping clue blocks or a clue block over the board. Each is
   marked on the board.
 - Misread warning (overridable): the line solver finds no solution, or more than one.
@@ -175,27 +180,28 @@ left for later.
 
 ## Puzzle Parser
 
-`parsers/src/puzzle_parsers/irregular_nonogram/`. Clue digits read with the shared
-EasyOCR path (`cell_ocr.read_cells`, `allow_multi_digits=True`; two-digit clues such as
-10, 12, 13, 15, 19, 21 are squeezed into one cell). Type 45 goes in `_OCR_TYPES`.
+`parsers/src/puzzle_parsers/irregular_nonogram/` (design notes in `grid_detector.py`).
+Clue digits are read with the shared EasyOCR path (`cell_ocr.read_cells`,
+`allow_multi_digits=True`; two-digit clues are squeezed into one cell). Type 45 is in
+`_OCR_TYPES`.
 
-- **Board:** no rectangular border encloses the figure, so, as for Picturesque Maze, the
-  figure (board plus clue blocks: the largest block of ink) is located first and its
-  bounding box, grown by a margin, goes to `rectify_board` as `border_image`.
-- **Lattice:** board and clue cells share one lattice of solid (board, clue-block
-  outlines) and dotted (inside clue blocks) lines. Pitch from the line projections; line
-  positions fitted per window so a curled page doesn't drift.
-- **Cell kinds:** each lattice cell is *board* (all four edges solid, no ink inside),
-  *clue* (a dotted edge, or ink inside) or *outside* (no lines). Edge solidity: the
-  fraction of the edge's length that is ink (solid ≈ 1, dotted ≈ 0.5, none ≈ 0).
-- **Clues:** for each segment, the clue cells continuing its line beyond either end form
-  its block; the end whose block holds digits gives `side`. The block's cells are read
-  in order (blank padding cells skipped).
-- **Orientation:** digits are read upright as photographed; a photo taken sideways is
-  tried in each of the four orientations and the one whose clue cells OCR best wins.
-- **Check:** every segment found a clue, clues fit their segments, and the solver finds
-  exactly one solution: a misread digit almost always leaves none or several. The
-  solved picture (the instrument / the sport) is the final hand check.
+- **Board:** as Picturesque Maze, the figure is located as the largest block of ink and
+  a frame around it goes to `rectify_board` (`lattice_fit.figure_frame_image`). The
+  board is processed at the shared normalised cell size.
+- **Lattice:** fitted by `lattice_fit` (pitch from the line period, lines by dynamic
+  programming), then bent with the page by a smooth 2D polynomial of measured offsets.
+- **Board cells:** rooms enclosed by thick lines (`classify_border_thickness`), empty,
+  lined on every edge, solidly (clue padding is dotted). Both samples' boards are whole
+  5x5 blocks (41 and 39).
+- **Clues:** each piece's clue block is the run of inked cells beyond one end; a clue
+  cell belongs to one block. Crops are cell-sized squares following the digits, read at
+  source resolution.
+- **Check:** both scans parse to their canons at full size and at 2000 px, every piece
+  has its clue, and each canon has exactly one solution: a drum kit (Q79, answer ②
+  ドラム) and a hurdler (Q80, ② ハードル走).
+- **Not yet:** a hand-held photo of a curled page (`board-irregular-nonogram-1-photo.jpg`)
+  parses wrongly: the lattice fit can't follow the curl. Scans and flat photos work; a
+  curved one needs re-shooting flatter, or fixing in the editor.
 
 # Misc
 

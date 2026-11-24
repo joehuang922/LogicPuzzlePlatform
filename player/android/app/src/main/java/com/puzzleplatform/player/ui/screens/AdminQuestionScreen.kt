@@ -397,6 +397,10 @@ fun AdminQuestionScreen(
                                     "Tap a tile to review its photo and maze side by side, fix mis-read " +
                                         "walls or openings, and set its title. A red tile has no route, a tied " +
                                         "shortest route, or loops or sealed cells (usually a misread wall)."
+                                AuthoringType.IRREGULAR_NONOGRAM ->
+                                    "Tap a tile to review its photo and board side by side, fix mis-read " +
+                                        "clues or cells of the shape, and set its title. A red tile has a clue " +
+                                        "that doesn't fit its piece, overlapping clues, or a piece with no clue."
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -692,6 +696,10 @@ private fun ReviewScreen(
                         "Compare the photo with the grid — pinch to zoom the photo. In Numbers, tap a cell " +
                             "to type its number; in Arrows, tap an edge to cycle its arrow. Add or remove a " +
                             "row or column at the edge."
+                    AuthoringType.IRREGULAR_NONOGRAM ->
+                        "Compare the photo with the board — pinch to zoom the photo. In Clues, tap a board " +
+                            "cell and fix its row and column clues or flip their sides; in Shape, tap a cell to " +
+                            "add it to the board or take it out."
                     AuthoringType.MINUS_ROOM ->
                         "Compare the photo with the grid — pinch to zoom the photo, check the range (Max). " +
                             "In Numbers, tap a cell to type its given; in Walls, tap a line to toggle a wall; " +

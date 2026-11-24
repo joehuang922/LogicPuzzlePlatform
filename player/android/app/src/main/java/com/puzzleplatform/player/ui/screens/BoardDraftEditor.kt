@@ -28,6 +28,7 @@ import com.puzzleplatform.player.ui.board.MinusRoomMiniBoard
 import com.puzzleplatform.player.ui.board.MannequinGate2MiniBoard
 import com.puzzleplatform.player.ui.board.CountryRoadMiniBoard
 import com.puzzleplatform.player.ui.board.PicturesqueMazeMiniBoard
+import com.puzzleplatform.player.ui.board.IrregularNonogramMiniBoard
 import com.puzzleplatform.player.ui.board.TilePaintMiniBoard
 import com.puzzleplatform.player.ui.board.DigitBar
 import com.puzzleplatform.player.ui.board.DoubleChocoMiniBoard
@@ -404,6 +405,10 @@ fun BoardDraftEditor(
             draft = board.picturesqueMaze,
             onChange = { t -> onChange { it.copy(picturesqueMaze = t(it.picturesqueMaze)) } },
         )
+        AuthoringType.IRREGULAR_NONOGRAM -> IrregularNonogramEditor(
+            draft = board.irregularNonogram,
+            onChange = { t -> onChange { it.copy(irregularNonogram = t(it.irregularNonogram)) } },
+        )
         AuthoringType.CHOCO_BANANA -> ClueGridEditor(
             authoring = ChocoBananaAuthoring,
             draft = board.chocoBanana,
@@ -489,6 +494,8 @@ fun BoardDraftMiniBoard(type: AuthoringType, board: BoardDraft, size: Dp) {
         AuthoringType.COUNTRY_ROAD -> CountryRoadMiniBoard(draft = board.countryRoad, hasProblems = hasProblems, size = size)
         AuthoringType.PICTURESQUE_MAZE ->
             PicturesqueMazeMiniBoard(draft = board.picturesqueMaze, hasProblems = hasProblems, size = size)
+        AuthoringType.IRREGULAR_NONOGRAM ->
+            IrregularNonogramMiniBoard(draft = board.irregularNonogram, hasProblems = hasProblems, size = size)
         AuthoringType.HEYAWAKE -> HeyawakeMiniBoard(draft = board.heyawake, hasProblems = hasProblems, size = size)
         AuthoringType.PICTO_LINK ->
             PictoLinkMiniBoard(draft = board.pictoLink, hasProblems = hasProblems, size = size)

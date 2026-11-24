@@ -107,6 +107,7 @@ import com.puzzleplatform.player.ui.board.CountryRoadBoard
 import com.puzzleplatform.player.ui.board.TilePaintBoard
 import com.puzzleplatform.player.ui.board.ZebraRopeBoard
 import com.puzzleplatform.player.ui.board.PicturesqueMazeBoard
+import com.puzzleplatform.player.ui.board.IrregularNonogramBoard
 import com.puzzleplatform.player.ui.board.WhimsicalKnightBoard
 import com.puzzleplatform.player.ui.board.OminoTreeBoard
 import com.puzzleplatform.player.ui.board.MinusRoomBoard
@@ -659,6 +660,30 @@ fun PlayScreen(
                                 // Picturesque Maze: one path from the entrance, dragged through
                                 // open passages ("h:r,c"/"v:r,c" segments, as Picto Link); a tap
                                 // on a path cell cuts the path after it.
+                                // Irregular Nonogram: Nonogram's fill / cross painting on an
+                                // irregular board ("col,row" -> 1 / 2), no hints yet.
+                                45 -> {
+                                    var irregularMode by remember(puzzle.id) { mutableStateOf(NonogramMode.FILL) }
+                                    IrregularNonogramBoard(
+                                        puzzle = puzzle,
+                                        userValues = state.userValues,
+                                        mode = irregularMode,
+                                        onSetCell = vm::setCellState,
+                                        liveValidate = state.liveValidate,
+                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        FilterChip(
+                                            selected = irregularMode == NonogramMode.FILL,
+                                            onClick = { irregularMode = NonogramMode.FILL },
+                                            label = { Text("■ Fill") },
+                                        )
+                                        FilterChip(
+                                            selected = irregularMode == NonogramMode.CROSS,
+                                            onClick = { irregularMode = NonogramMode.CROSS },
+                                            label = { Text("✕ Cross") },
+                                        )
+                                    }
+                                }
                                 44 -> PicturesqueMazeBoard(
                                     puzzle = puzzle,
                                     userValues = state.userValues,

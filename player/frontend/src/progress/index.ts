@@ -43,6 +43,7 @@ import { computeMinusRoomProgress } from "./minusRoom";
 import { computeTilePaintProgress } from "./tilePaint";
 import { computeCountryRoadProgress } from "./countryRoad";
 import { computePicturesqueMazeProgress } from "./picturesqueMaze";
+import { computeIrregularNonogramProgress } from "./irregularNonogram";
 
 export interface ProgressCalculator {
   puzzleType: number;
@@ -99,6 +100,7 @@ register(computeMinusRoomProgress);
 register(computeTilePaintProgress);
 register(computeCountryRoadProgress);
 register(computePicturesqueMazeProgress);
+register(computeIrregularNonogramProgress);
 
 export function computeProgress(
   puzzle: PuzzleDefinition,

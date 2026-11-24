@@ -47,6 +47,7 @@ import { minusRoomRenderer } from "./renderers/minusRoom";
 import { tilePaintRenderer } from "./renderers/tilePaint";
 import { countryRoadRenderer } from "./renderers/countryRoad";
 import { picturesqueMazeRenderer } from "./renderers/picturesqueMaze";
+import { irregularNonogramRenderer } from "./renderers/irregularNonogram";
 
 registerRenderer(comboSudokuRenderer);
 registerRenderer(sudokuRenderer);
@@ -92,6 +93,7 @@ registerRenderer(minusRoomRenderer);
 registerRenderer(tilePaintRenderer);
 registerRenderer(countryRoadRenderer);
 registerRenderer(picturesqueMazeRenderer);
+registerRenderer(irregularNonogramRenderer);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

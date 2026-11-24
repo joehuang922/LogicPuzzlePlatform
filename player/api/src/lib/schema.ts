@@ -43,6 +43,7 @@ import minusRoomSchema from "../../../../schemas/canon/minus-room.json";
 import tilePaintSchema from "../../../../schemas/canon/tile-paint.json";
 import countryRoadSchema from "../../../../schemas/canon/country-road.json";
 import picturesqueMazeSchema from "../../../../schemas/canon/picturesque-maze.json";
+import irregularNonogramSchema from "../../../../schemas/canon/irregular-nonogram.json";
 
 const ajv = new Ajv();
 
@@ -91,6 +92,7 @@ const validators: Record<number, ValidateFunction> = {
   42: ajv.compile(perfectLRingSchema),
   43: ajv.compile(mannequinGate2Schema),
   44: ajv.compile(picturesqueMazeSchema),
+  45: ajv.compile(irregularNonogramSchema),
 };
 
 export function validateCanon(puzzleType: number, data: unknown): void {
@@ -427,6 +429,11 @@ const semanticChecks: Record<number, (data: any) => void> = {
   // cells, a route joins them, and the shortest route is unique. Mirrors
   // picturesqueMazeFormatProblems in frontend/src/components/picturesqueMazeRules.ts.
   44: (data: MazeCanonData) => checkPicturesqueMaze(data),
+  // Irregular Nonogram: the mask fits the bounding box, every clue names a piece (segment)
+  // of the board, no piece has two clues, a clue fits its piece, and no clue block overlaps
+  // the board or another block. Mirrors irregularNonogramFormatProblems in
+  // frontend/src/components/irregularNonogramRules.ts.
+  45: (data: IrregularNonogramData) => checkIrregularNonogram(data),
   // Mannequin Gate 2: every line's cells are on the board, consecutive cells are
   // 8-neighbours, no line visits a cell twice, and no two lines share a step (a photo
   // can't tell them apart). Mirrors formatProblems in mannequinGate2Rules.ts.
@@ -697,4 +704,45 @@ function checkPicturesqueMaze(data: MazeCanonData): void {
   const g = goal![0] * width + goal![1];
   if (dist[g] < 0) fail("no route from the entrance to the exit");
   if (ways[g] > 1) fail("the shortest route is not unique");
+}
+
+interface IrregularNonogramData {
+  width: number;
+  height: number;
+  cells: number[][];
+  rowClues: { row: number; start: number; side: "start" | "end"; clues: number[] }[];
+  colClues: { col: number; start: number; side: "start" | "end"; clues: number[] }[];
+}
+
+function checkIrregularNonogram(data: IrregularNonogramData): void {
+  const { width, height, cells } = data;
+  const fail = (msg: string) => { throw new Error(`Invalid irregular nonogram: ${msg}`); };
+  if (cells.length !== height || cells.some((row) => row.length !== width)) fail(`cells must be ${height} x ${width}`);
+  const isBoard = (r: number, c: number) => r >= 0 && c >= 0 && r < height && c < width && cells[r][c] === 1;
+  if (!cells.some((row) => row.includes(1))) fail("the board has no cells");
+  const taken = new Set<string>();
+  for (let r = 0; r < height; r++) for (let c = 0; c < width; c++) if (cells[r][c] === 1) taken.add(`${r},${c}`);
+  const seen = new Set<string>();
+  const entries = [
+    ...data.rowClues.map((e) => ({ axis: "row" as const, line: e.row, ...e })),
+    ...data.colClues.map((e) => ({ axis: "col" as const, line: e.col, ...e })),
+  ];
+  for (const e of entries) {
+    const at = (i: number): [number, number] => (e.axis === "row" ? [e.line, i] : [i, e.line]);
+    const name = `${e.axis} ${e.line + 1} clue at ${e.start + 1}`;
+    if (!isBoard(...at(e.start)) || isBoard(...at(e.start - 1))) fail(`${name} doesn't start a piece of the board`);
+    const key = `${e.axis}:${e.line}:${e.start}`;
+    if (seen.has(key)) fail(`${name}: the piece has two clues`);
+    seen.add(key);
+    let length = 0;
+    while (isBoard(...at(e.start + length))) length++;
+    const need = e.clues.reduce((a, b) => a + b, 0) + e.clues.length - 1;
+    if (need > length) fail(`${name} doesn't fit its ${length} cells`);
+    const k = e.clues.length;
+    for (let i = 0; i < k; i++) {
+      const [r, c] = at(e.side === "start" ? e.start - 1 - i : e.start + length + i);
+      if (taken.has(`${r},${c}`)) fail(`${name} overlaps the board or another clue at R${r + 1}C${c + 1}`);
+      taken.add(`${r},${c}`);
+    }
+  }
 }

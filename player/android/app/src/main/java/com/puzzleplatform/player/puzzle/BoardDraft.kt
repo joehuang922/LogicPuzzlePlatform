@@ -62,6 +62,7 @@ data class BoardDraft(
     val picturesqueMaze: PicturesqueMazeEngine.Board = PicturesqueMazeEngine.Board(
         0, 0, emptyList(), emptyList(), PicturesqueMazeEngine.Opening("top", 0), PicturesqueMazeEngine.Opening("bottom", 0),
     ),
+    val irregularNonogram: IrregularNonogramEngine.Board = IrregularNonogramEngine.Board(0, 0, emptyList(), emptyList()),
 ) {
     /**
      * What the type's misread check finds wrong with this board — the list that turns
@@ -112,6 +113,7 @@ data class BoardDraft(
         AuthoringType.TILE_PAINT -> TilePaintAuthoring.problems(tilePaint)
         AuthoringType.COUNTRY_ROAD -> CountryRoadAuthoring.problems(countryRoad)
         AuthoringType.PICTURESQUE_MAZE -> PicturesqueMazeAuthoring.problems(picturesqueMaze)
+        AuthoringType.IRREGULAR_NONOGRAM -> IrregularNonogramAuthoring.problems(irregularNonogram)
     }
 
     /**
@@ -144,6 +146,7 @@ data class BoardDraft(
         AuthoringType.TILE_PAINT -> TilePaintAuthoring.formatProblems(tilePaint)
         AuthoringType.COUNTRY_ROAD -> CountryRoadAuthoring.formatProblems(countryRoad)
         AuthoringType.PICTURESQUE_MAZE -> PicturesqueMazeAuthoring.formatProblems(picturesqueMaze)
+        AuthoringType.IRREGULAR_NONOGRAM -> IrregularNonogramAuthoring.formatProblems(irregularNonogram)
         AuthoringType.MANNEQUIN_GATE_2 -> MannequinGate2Authoring.formatProblems(mannequinGate2)
         else -> emptyList()
     }
@@ -251,6 +254,11 @@ data class BoardDraft(
             picturesqueMaze.cols,
             picturesqueMaze.rows,
         )
+        AuthoringType.IRREGULAR_NONOGRAM -> CanonBoard(
+            IrregularNonogramAuthoring.canonFromDraft(irregularNonogram),
+            irregularNonogram.cols,
+            irregularNonogram.rows,
+        )
     }
 
     companion object {
@@ -305,6 +313,8 @@ data class BoardDraft(
             AuthoringType.COUNTRY_ROAD -> BoardDraft(countryRoad = CountryRoadAuthoring.draftFromCanon(canon))
             AuthoringType.PICTURESQUE_MAZE ->
                 BoardDraft(picturesqueMaze = PicturesqueMazeAuthoring.draftFromCanon(canon))
+            AuthoringType.IRREGULAR_NONOGRAM ->
+                BoardDraft(irregularNonogram = IrregularNonogramAuthoring.draftFromCanon(canon))
         }
     }
 }

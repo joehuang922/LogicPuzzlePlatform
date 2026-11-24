@@ -688,3 +688,28 @@ export interface PicturesqueMazeAnswer {
     v: number[][];
   };
 }
+
+// Irregular Nonogram (type 45). Board cells are a mask over a bounding box; each segment
+// (maximal run of board cells along a row or column) has at most one clue, printed at one
+// end of it ("start" = left / above, "end" = right / below).
+export interface IrregularNonogramClue {
+  // A column for a row segment, a row for a column segment: the segment's first cell.
+  start: number;
+  side: "start" | "end";
+  // Run lengths in reading order (left to right, top to bottom)
+  clues: number[];
+}
+
+export interface IrregularNonogramCanon {
+  width: number;
+  height: number;
+  // height x width; 1 = board cell
+  cells: number[][];
+  rowClues: (IrregularNonogramClue & { row: number })[];
+  colClues: (IrregularNonogramClue & { col: number })[];
+}
+
+export interface IrregularNonogramAnswer {
+  // height x width; 1 = filled
+  cells: number[][];
+}

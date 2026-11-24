@@ -31,6 +31,7 @@ from puzzle_parsers.hashi.models import HashiBoard
 from puzzle_parsers.skeleton_puzzle.models import SkeletonPuzzleBoard
 from puzzle_parsers.zebra_rope.models import ZebraRopeBoard
 from puzzle_parsers.picturesque_maze.models import PicturesqueMazeBoard
+from puzzle_parsers.irregular_nonogram.models import IrregularNonogramBoard
 from puzzle_parsers.whimsical_knight.models import WhimsicalKnightBoard
 from puzzle_parsers.omino_tree.models import OminoTreeBoard
 from puzzle_parsers.minus_room.models import MinusRoomBoard
@@ -65,6 +66,7 @@ MODELS = {
     "skeleton-puzzle": SkeletonPuzzleBoard,
     "zebra-rope": ZebraRopeBoard,
     "picturesque-maze": PicturesqueMazeBoard,
+    "irregular-nonogram": IrregularNonogramBoard,
     "whimsical-knight": WhimsicalKnightBoard,
     "omino-tree": OminoTreeBoard,
     "minus-room": MinusRoomBoard,
