@@ -29,6 +29,9 @@ object IrregularNonogramEngine : PuzzleEngine {
     const val FILLED = 1
     const val CROSSED = 2
 
+    /** A number of a fully matched piece. */
+    val SATISFIED_NUMBER = NonogramEngine.ClueStatus.SATISFIED
+
     data class Clue(val axis: String, val line: Int, val start: Int, val side: String, val clues: List<Int>)
 
     data class Board(
@@ -239,6 +242,45 @@ object IrregularNonogramEngine : PuzzleEngine {
             if (!lineFits(states, clue.clues)) broken += s.key
         }
         return satisfied to broken
+    }
+
+    /**
+     * Per number of each segment's clue (reading order), Nonogram's per-number status
+     * ([NonogramEngine.analyzeLineStatus]): a number greys out once its run is settled
+     * from either end, not only when the whole piece is done. Port of clueStatus().numbers.
+     */
+    fun numberStatus(board: Board, values: Map<String, Int>): Map<String, List<NonogramEngine.ClueStatus>> {
+        val clued = cluesBySegment(board)
+        return segments(board).mapNotNull { s ->
+            val clue = clued[s.key] ?: return@mapNotNull null
+            s.key to NonogramEngine.analyzeLineStatus(clue.clues, s.cells().map { (r, c) -> state(values, r, c) }).perClue
+        }.toMap()
+    }
+
+    /** The stored solution (auto-solve `solutionRepr`: { cells }), height x width, or null. */
+    fun parseSolution(puzzle: Puzzle): Array<IntArray>? {
+        val board = parseBoard(puzzle)
+        val cells = puzzle.solutionRepr?.get("cells") as? JsonArray ?: return null
+        if (cells.size != board.rows) return null
+        return Array(board.rows) { r ->
+            val row = cells[r] as? JsonArray ?: return null
+            if (row.size != board.cols) return null
+            IntArray(board.cols) { c -> (row[c] as? JsonPrimitive)?.intOrNull ?: return null }
+        }
+    }
+
+    /** The on-track check: a fill must be filled in the solution, a cross empty (Nonogram's). */
+    override fun matchesSolution(puzzle: Puzzle, userValues: Map<String, Int>): Boolean? {
+        val solution = parseSolution(puzzle) ?: return null
+        for ((r, row) in solution.withIndex()) {
+            for ((c, want) in row.withIndex()) {
+                when (userValues["$c,$r"]) {
+                    FILLED -> if (want != 1) return false
+                    CROSSED -> if (want != 0) return false
+                }
+            }
+        }
+        return true
     }
 
     override fun isComplete(puzzle: Puzzle, userValues: Map<String, Int>): Boolean {

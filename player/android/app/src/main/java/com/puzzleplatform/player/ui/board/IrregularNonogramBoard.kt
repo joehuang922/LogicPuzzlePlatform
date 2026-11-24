@@ -77,6 +77,7 @@ fun IrregularNonogramBoard(
     val playing = onEditTap == null
 
     val status = remember(board, userValues) { IrregularNonogramEngine.clueStatus(board, userValues) }
+    val numbers = remember(board, userValues) { IrregularNonogramEngine.numberStatus(board, userValues) }
     val segments = remember(board) { IrregularNonogramEngine.segments(board) }
     val clued = remember(board) { IrregularNonogramEngine.cluesBySegment(board) }
 
@@ -139,10 +140,19 @@ fun IrregularNonogramBoard(
                 val clue = clued[s.key] ?: continue
                 val done = s.key in status.first
                 val bad = liveValidate && s.key in status.second
-                for ((r, c, v) in IrregularNonogramEngine.clueLayout(clue, s.length)) {
+                val perNumber = numbers[s.key]
+                IrregularNonogramEngine.clueLayout(clue, s.length).forEachIndexed { i, (r, c, v) ->
                     drawRect(CLUE_BG, Offset(x(c), y(r)), Size(cell, cell))
                     drawRect(if (bad) ERROR else CLUE_LINE, Offset(x(c), y(r)), Size(cell, cell), style = Stroke(if (bad) cell * 0.08f else 1f))
-                    drawNumber(v, x(c) + cell / 2, y(r) + cell / 2, cell, if (done) CLUE_DONE else CLUE_TEXT)
+                    // Nonogram's colours: a settled number grey (always), a contradicted
+                    // one red (errors on only).
+                    val st = if (done) IrregularNonogramEngine.SATISFIED_NUMBER else perNumber?.getOrNull(i)
+                    val colour = when {
+                        st == com.puzzleplatform.player.puzzle.NonogramEngine.ClueStatus.SATISFIED -> CLUE_DONE
+                        st == com.puzzleplatform.player.puzzle.NonogramEngine.ClueStatus.ERROR && liveValidate -> ERROR
+                        else -> CLUE_TEXT
+                    }
+                    drawNumber(v, x(c) + cell / 2, y(r) + cell / 2, cell, colour)
                 }
             }
             // Board cells, fills and crosses.

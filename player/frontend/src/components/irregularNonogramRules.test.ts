@@ -147,3 +147,12 @@ describe("docs samples", () => {
     });
   }
 });
+
+describe("per-number greying", () => {
+  it("greys a number once its run is settled from an end, like Nonogram", () => {
+    // Column 1 [1, 1]: its first run sealed at the top (filled, then crossed).
+    const s = clueStatus(canon, { "1,0": 1, "1,1": 2 });
+    expect(s.numbers.get("col:1:0")).toEqual(["satisfied", "normal"]);
+    expect(s.satisfied.has("col:1:0")).toBe(false);
+  });
+});

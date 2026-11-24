@@ -2,6 +2,7 @@
 // the progress calculator. The Android engine and authoring port these functions; the
 // API's semanticChecks mirror irregularNonogramFormatProblems.
 import { IrregularNonogramCanon, IrregularNonogramClue } from "../types/canon";
+import { analyzeLineStatus, CellState, ClueStatus as NumberStatus } from "../liveValidators/nonogram";
 
 export type Axis = "row" | "col";
 
@@ -263,11 +264,18 @@ export interface ClueStatus {
   satisfied: Set<string>;
   /** Segments whose decided cells can no longer fit the clue. */
   broken: Set<string>;
+  /**
+   * Per number of each segment's clue (in reading order), Nonogram's per-number status
+   * (liveValidators/nonogram analyzeLineStatus): a number greys out as soon as its run is
+   * settled from either end, not only when the whole piece is done.
+   */
+  numbers: Map<string, NumberStatus[]>;
 }
 
 export function clueStatus(canon: IrregularNonogramCanon, values: Record<string, number>): ClueStatus {
   const satisfied = new Set<string>();
   const broken = new Set<string>();
+  const numbers = new Map<string, NumberStatus[]>();
   const clued = cluesBySegment(canon);
   for (const s of segments(canon)) {
     const key = segmentKey(s.axis, s.line, s.start);
@@ -278,8 +286,9 @@ export function clueStatus(canon: IrregularNonogramCanon, values: Record<string,
     const got = runs(filled);
     if (got.length === ref.entry.clues.length && got.every((n, i) => n === ref.entry.clues[i])) satisfied.add(key);
     if (!lineFits(states, ref.entry.clues)) broken.add(key);
+    numbers.set(key, analyzeLineStatus(ref.entry.clues, states as CellState[]).perClue);
   }
-  return { satisfied, broken };
+  return { satisfied, broken, numbers };
 }
 
 /** Solved: every clued segment's filled runs equal its clue (crosses count as empty). */
