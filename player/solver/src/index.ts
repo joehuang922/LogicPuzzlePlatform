@@ -45,3 +45,5 @@ export { pencilsPlugin, PencilsModel } from "./plugins/pencils";
 export type { PencilsCanon, PencilsSolution } from "./plugins/pencils";
 export { shikakuPlugin, ShikakuModel } from "./plugins/shikaku";
 export type { ShikakuCanon, ShikakuSolution, ShikakuRect } from "./plugins/shikaku";
+export { picturesqueMazePlugin, PicturesqueMazeModel } from "./plugins/picturesque-maze";
+export type { PicturesqueMazeCanon, PicturesqueMazeEdges } from "./plugins/picturesque-maze";
