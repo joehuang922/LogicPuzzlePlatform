@@ -420,6 +420,20 @@ export function getProfile(player: number) {
   return request<ProfileResponse>(`/profile?player=${player}`);
 }
 
+export interface HistoryResponse {
+  from: string;
+  to: string;
+  tz: string;
+  metric: string;
+  /** date (YYYY-MM-DD in tz) -> puzzle type id -> solves; idle days absent. */
+  days: Record<string, Record<string, number>>;
+}
+
+export function getHistory(player: number, from: string, to: string, tz: string) {
+  const q = new URLSearchParams({ player: String(player), from, to, tz, metric: "solved" });
+  return request<HistoryResponse>(`/history?${q}`);
+}
+
 const PARSER_URL = import.meta.env.VITE_PARSER_URL ?? `${API_BASE}/parse`;
 
 // The deployed parser Lambda gives up after 2 minutes, so waiting longer is

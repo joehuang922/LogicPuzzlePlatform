@@ -453,3 +453,13 @@ object StringifiedJsonObjectSerializer : KSerializer<JsonObject> {
         jsonEncoder.encodeJsonElement(value)
     }
 }
+
+/** GET /history: solves per day (YYYY-MM-DD in [tz]) per puzzle type id; idle days absent. */
+@Serializable
+data class HistoryResponse(
+    val from: String,
+    val to: String,
+    val tz: String,
+    val metric: String,
+    val days: Map<String, Map<String, Int>> = emptyMap(),
+)

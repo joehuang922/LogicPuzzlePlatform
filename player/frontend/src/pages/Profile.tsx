@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getProfile, ProfileQuestionStat, ProfileCollectionRow, ProfileAchievement } from "../api/client";
+import ActivityHeatmap from "../components/ActivityHeatmap";
 
 const HARDCODED_PLAYER_ID = 1;
 
@@ -60,6 +61,12 @@ export default function Profile() {
   return (
     <div>
       <h1>{playerName}</h1>
+
+      <h2>Activity</h2>
+      <ActivityHeatmap
+        player={HARDCODED_PLAYER_ID}
+        typeLabels={Object.fromEntries(questionStats.map((s) => [s.typeId, s.typeJpLabel]))}
+      />
 
       <h2>Achievements ({unlockedCount} / {achievements.length})</h2>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "0.75rem", marginBottom: "2rem" }}>

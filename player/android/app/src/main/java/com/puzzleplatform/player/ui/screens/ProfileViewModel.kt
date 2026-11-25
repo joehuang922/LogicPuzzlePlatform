@@ -14,6 +14,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.ZoneId
 
 data class CollectionGroup(
     val collectionId: Int,
@@ -33,6 +35,10 @@ data class ProfileUiState(
     val collectionGroups: List<CollectionGroup> = emptyList(),
     val achievements: List<ProfileAchievement> = emptyList(),
     val syncState: SyncState = SyncState(),
+    /** Activity heat map: date -> puzzle type id -> solves; null until loaded. */
+    val historyDays: Map<LocalDate, Map<Int, Int>>? = null,
+    val historyError: String? = null,
+    val today: LocalDate = LocalDate.now(),
 )
 
 class ProfileViewModel(
@@ -58,6 +64,7 @@ class ProfileViewModel(
 
     fun load() {
         _state.update { it.copy(loading = true, error = null) }
+        loadHistory()
         viewModelScope.launch {
             try {
                 val profile = repo.getProfile()
@@ -72,6 +79,22 @@ class ProfileViewModel(
                 }
             } catch (e: Exception) {
                 _state.update { it.copy(loading = false, error = e.message ?: "Failed to load profile") }
+            }
+        }
+    }
+
+    /** The heat map's year of solves, fetched alongside the profile, in the device's time zone. */
+    private fun loadHistory() {
+        val tz = ZoneId.systemDefault()
+        val today = LocalDate.now(tz)
+        _state.update { it.copy(today = today, historyError = null) }
+        viewModelScope.launch {
+            try {
+                val from = ActivityCalendar.rangeStart(today)
+                val res = repo.getHistory(from.toString(), today.toString(), tz.id)
+                _state.update { it.copy(historyDays = ActivityCalendar.parseDays(res.days)) }
+            } catch (e: Exception) {
+                _state.update { it.copy(historyError = e.message ?: "Failed to load activity") }
             }
         }
     }

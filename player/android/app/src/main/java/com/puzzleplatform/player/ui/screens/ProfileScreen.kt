@@ -66,7 +66,24 @@ fun ProfileScreen(
                     Modifier.fillMaxSize().padding(padding).padding(horizontal = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                        item { SyncStatusRow(state.syncState) }
+                    item { SyncStatusRow(state.syncState) }
+                    item { Header("Activity") }
+                    item {
+                        val days = state.historyDays
+                        when {
+                            days != null -> ActivityHeatmap(
+                                days = days,
+                                today = state.today,
+                                typeLabels = state.questionStats.associate { it.typeId to it.typeJpLabel },
+                            )
+                            state.historyError != null -> Text(
+                                "Activity: ${state.historyError}",
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            else -> Text("Loading activity…", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
                     item { Header("Achievements ($unlocked / ${state.achievements.size})") }
                     items(state.achievements, key = { it.id }) { a ->
                         Card(Modifier.fillMaxWidth()) {
