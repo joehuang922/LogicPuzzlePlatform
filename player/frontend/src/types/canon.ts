@@ -740,3 +740,17 @@ export interface YajilixAnswer {
   // rows x cols; 0 none, 1 = × (unused), 2 = • (used); solving aids only
   marks: number[][];
 }
+
+// Majority Yajilix (type 47). Yajilix's clue without a number: the letter is the class
+// with strictly the most non-clue cells from the clue to the edge in `dir`.
+export interface MajorityYajilixClue {
+  kind: YajilixKind;
+  dir: YajilixDir;
+}
+
+export interface MajorityYajilixCanon {
+  // rows x cols; null = empty cell
+  cells: (MajorityYajilixClue | null)[][];
+}
+
+export type MajorityYajilixAnswer = YajilixAnswer;

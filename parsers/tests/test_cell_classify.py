@@ -16,6 +16,8 @@ from puzzle_parsers.cell_classify import (
     IntegerTarget,
     LetteredDirectedInteger,
     LetteredDirectedIntegerTarget,
+    LetteredDirection,
+    LetteredDirectionTarget,
     PencilHead,
     PencilHeadTarget,
     classify_cells,
@@ -38,6 +40,14 @@ def test_lettered_directed_integer_parse_keeps_known_letters():
     assert t.parse(raw) == LetteredDirectedInteger("L", 2, "up")
     assert t.parse({"letter": "Q", "value": 1, "direction": "left"}) == LetteredDirectedInteger("", 1, "left")
     assert "capital X" in t.prompt_fragment
+
+
+def test_lettered_direction_parse_keeps_known_letters():
+    t = LetteredDirectionTarget({"L": "capital L", "I": "capital I", "X": "capital X"})
+    raw = {"type": "lettered_direction", "letter": "x", "direction": "left"}
+    assert t.parse(raw) == LetteredDirection("X", "left")
+    assert t.parse({"letter": "7", "direction": "up"}) == LetteredDirection("", "up")
+    assert "no number" in t.prompt_fragment
 
 
 class _FakeModel:

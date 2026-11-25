@@ -84,6 +84,13 @@ class LetteredDirectedInteger:
 
 
 @dataclass(frozen=True)
+class LetteredDirection:
+    """Cell contains a letter and a directional arrow, no number (e.g. Majority Yajilix "L↑")."""
+    letter: str
+    direction: str  # "up" | "down" | "left" | "right"
+
+
+@dataclass(frozen=True)
 class DualInteger:
     """Cell split by a diagonal with two numbers."""
     top_right: int
@@ -108,7 +115,7 @@ class Symbol:
     code: int
 
 
-CellClassification = Empty | Integer | CircledInteger | DirectedInteger | LetteredDirectedInteger | DualInteger | PencilHead | DashedGate | Symbol
+CellClassification = Empty | Integer | CircledInteger | DirectedInteger | LetteredDirectedInteger | LetteredDirection | DualInteger | PencilHead | DashedGate | Symbol
 
 
 # ─── Target specs ───
@@ -227,6 +234,46 @@ class LetteredDirectedIntegerTarget(TargetSpec[LetteredDirectedInteger]):
         return LetteredDirectedInteger(
             letter=letter if letter in self._letters else "",
             value=_nonneg_int(raw.get("value")),
+            direction=str(raw.get("direction", "")),
+        )
+
+
+class LetteredDirectionTarget(TargetSpec[LetteredDirection]):
+    """A letter + arrow clue with no number.
+
+    Args:
+        letters: Mapping of letter -> how it is printed, as for LetteredDirectedIntegerTarget.
+            A read letter outside the mapping comes back as "".
+    """
+
+    def __init__(self, letters: dict[str, str]) -> None:
+        self._letters = letters
+
+    @property
+    def name(self) -> str:
+        return "lettered_direction"
+
+    @property
+    def prompt_fragment(self) -> str:
+        lines = [
+            "A clue made of a single letter and an arrow (↑↓←→), with no number. A left/right "
+            "arrow is usually drawn above the letter, an up/down arrow to its right. "
+            "The direction is the way the arrowhead POINTS, never where the arrow sits: an "
+            "arrow drawn above the letter and pointing right is \"right\", not \"up\". "
+            "The letter is one of:"
+        ]
+        for letter, desc in self._letters.items():
+            lines.append(f"  {letter}: {desc}")
+        lines.append(
+            'Report as {"type":"lettered_direction","letter":"<letter>",'
+            '"direction":"up"|"down"|"left"|"right"}.'
+        )
+        return "\n".join(lines)
+
+    def parse(self, raw: dict) -> LetteredDirection:
+        letter = str(raw.get("letter", "")).strip().upper()
+        return LetteredDirection(
+            letter=letter if letter in self._letters else "",
             direction=str(raw.get("direction", "")),
         )
 

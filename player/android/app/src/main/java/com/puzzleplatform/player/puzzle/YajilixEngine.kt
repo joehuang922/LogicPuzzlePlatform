@@ -45,8 +45,9 @@ object YajilixEngine : ShadeMarkEngine {
 
     val KINDS = listOf('L', 'I', 'X')
 
-    data class Clue(val kind: Char, val num: Int, val dir: Dir) {
-        val label: String get() = "$kind$num${dir.arrow}"
+    /** A clue; [num] is null for Majority Yajilix, whose clues have no number. */
+    data class Clue(val kind: Char, val num: Int?, val dir: Dir) {
+        val label: String get() = "$kind${num ?: ""}${dir.arrow}"
     }
 
     data class Board(val cells: List<List<Clue?>>) {
@@ -68,7 +69,8 @@ object YajilixEngine : ShadeMarkEngine {
     private fun clueOf(o: JsonObject?): Clue? {
         o ?: return null
         val kind = (o["kind"] as? JsonPrimitive)?.contentOrNull?.singleOrNull()?.takeIf { it in KINDS } ?: return null
-        val num = (o["num"] as? JsonPrimitive)?.intOrNull?.takeIf { it >= 0 } ?: return null
+        val num = (o["num"] as? JsonPrimitive)?.intOrNull
+        if (num != null && num < 0) return null
         val dir = Dir.fromJson((o["dir"] as? JsonPrimitive)?.contentOrNull) ?: return null
         return Clue(kind, num, dir)
     }
@@ -79,11 +81,11 @@ object YajilixEngine : ShadeMarkEngine {
                 JsonArray(row.map { clue ->
                     if (clue == null) JsonNull
                     else JsonObject(
-                        mapOf(
-                            "kind" to JsonPrimitive(clue.kind.toString()),
-                            "num" to JsonPrimitive(clue.num),
-                            "dir" to JsonPrimitive(clue.dir.json),
-                        )
+                        buildMap {
+                            put("kind", JsonPrimitive(clue.kind.toString()))
+                            clue.num?.let { put("num", JsonPrimitive(it)) }
+                            put("dir", JsonPrimitive(clue.dir.json))
+                        }
                     )
                 })
             })
@@ -112,7 +114,7 @@ object YajilixEngine : ShadeMarkEngine {
         return if (left == right) Shape.STRAIGHT else Shape.TURN
     }
 
-    private fun wanted(kind: Char): Shape = when (kind) {
+    fun wanted(kind: Char): Shape = when (kind) {
         'L' -> Shape.TURN
         'I' -> Shape.STRAIGHT
         else -> Shape.NONE
@@ -134,38 +136,66 @@ object YajilixEngine : ShadeMarkEngine {
         val deg = CountryRoadEngine.degrees(rows, cols, loop)
         for (r in 0 until rows) for (c in 0 until cols) {
             val clue = board.clue(r, c) ?: continue
-            if (deg[r][c] != 0 || clueCount(board, loop, r, c) != clue.num) return false
+            if (deg[r][c] != 0 || clueCount(board, loop, r, c) != (clue.num ?: 0)) return false
         }
         return true
+    }
+
+    /** A class's cells known for certain, and those that could still be it (web: ClassCount). */
+    data class ClassCount(var certain: Int = 0, var possible: Int = 0)
+
+    /**
+     * Each class's certain and possible count among [cells] (web: classCounts): a cell with
+     * 2 segments is a known turn or straight, a × cell with no segment a known X.
+     */
+    fun classCounts(
+        loop: CountryRoadEngine.Loop,
+        marks: Array<IntArray>,
+        deg: Array<IntArray>,
+        cells: List<Pair<Int, Int>>,
+    ): Map<Char, ClassCount> {
+        val out = KINDS.associateWith { ClassCount() }
+        for ((r, c) in cells) {
+            val crossed = marks[r][c] == CROSS
+            when (shape(loop, deg, r, c)) {
+                Shape.TURN -> out.getValue('L').apply { certain++; possible++ }
+                Shape.STRAIGHT -> out.getValue('I').apply { certain++; possible++ }
+                Shape.NONE -> {
+                    out.getValue('X').apply { if (crossed) certain++; possible++ }
+                    if (!crossed) {
+                        out.getValue('L').possible++
+                        out.getValue('I').possible++
+                    }
+                }
+                Shape.OPEN -> if (deg[r][c] == 1) {
+                    out.getValue('L').possible++
+                    out.getValue('I').possible++
+                }
+            }
+        }
+        return out
     }
 
     /** Whether the committed cells already break the clue at (r, c) (web: clueBroken). */
     fun clueBroken(board: Board, loop: CountryRoadEngine.Loop, marks: Array<IntArray>, deg: Array<IntArray>, r: Int, c: Int): Boolean {
         val clue = board.clue(r, c) ?: return false
-        val cells = lineCells(board, r, c, clue.dir)
-        if (clue.kind == 'X') {
-            val crossed = cells.count { (rr, cc) -> marks[rr][cc] == CROSS && deg[rr][cc] == 0 }
-            val free = cells.count { (rr, cc) -> deg[rr][cc] == 0 }
-            return crossed > clue.num || free < clue.num
-        }
-        val want = wanted(clue.kind)
-        var have = 0
-        var possible = 0
-        for ((rr, cc) in cells) {
-            val s = shape(loop, deg, rr, cc)
-            when {
-                s == want -> { have++; possible++ }
-                s == Shape.OPEN && deg[rr][cc] == 1 -> possible++
-                s == Shape.NONE && marks[rr][cc] != CROSS -> possible++
-            }
-        }
-        return have > clue.num || possible < clue.num
+        val num = clue.num ?: 0
+        val n = classCounts(loop, marks, deg, lineCells(board, r, c, clue.dir)).getValue(clue.kind)
+        return n.certain > num || n.possible < num
     }
 
     /** What the player's committed cells already break (web: brokenClues). */
     data class Broken(val clues: Set<Pair<Int, Int>>, val cells: Set<Pair<Int, Int>>)
 
-    fun brokenClues(board: Board, userValues: Map<String, Int>): Broken {
+    fun brokenClues(board: Board, userValues: Map<String, Int>): Broken =
+        brokenLoopClues(board, userValues) { loop, marks, deg, r, c -> clueBroken(board, loop, marks, deg, r, c) }
+
+    /** [Broken] for any loop-clue board, given how to judge one clue (web: brokenLoopClues). */
+    fun brokenLoopClues(
+        board: Board,
+        userValues: Map<String, Int>,
+        isBroken: (CountryRoadEngine.Loop, Array<IntArray>, Array<IntArray>, Int, Int) -> Boolean,
+    ): Broken {
         val rows = board.rows
         val cols = board.cols
         val loop = CountryRoadEngine.loop(rows, cols, userValues)
@@ -176,7 +206,7 @@ object YajilixEngine : ShadeMarkEngine {
         for (r in 0 until rows) for (c in 0 until cols) {
             val isClue = board.isClue(r, c)
             if ((isClue && deg[r][c] > 0) || deg[r][c] > 2) cells.add(r to c)
-            if (isClue && clueBroken(board, loop, marks, deg, r, c)) clues.add(r to c)
+            if (isClue && isBroken(loop, marks, deg, r, c)) clues.add(r to c)
         }
         return Broken(clues, cells)
     }

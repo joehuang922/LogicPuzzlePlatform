@@ -105,6 +105,7 @@ import com.puzzleplatform.player.ui.board.YajilinBoard
 import com.puzzleplatform.player.ui.board.KuralinBoard
 import com.puzzleplatform.player.ui.board.CountryRoadBoard
 import com.puzzleplatform.player.ui.board.YajilixBoard
+import com.puzzleplatform.player.ui.board.MajorityYajilixBoard
 import com.puzzleplatform.player.ui.board.TilePaintBoard
 import com.puzzleplatform.player.ui.board.ZebraRopeBoard
 import com.puzzleplatform.player.ui.board.PicturesqueMazeBoard
@@ -734,6 +735,14 @@ fun PlayScreen(
                                 // Yajilix: drag draws the loop (never through a clue); a tap cycles an
                                 // empty cell's mark (none -> × -> •) through the shared shade/mark cycle.
                                 46 -> YajilixBoard(
+                                    puzzle = puzzle,
+                                    userValues = state.userValues,
+                                    onTapCell = vm::tapShadeCell,
+                                    onApplyChanges = vm::putUserValues,
+                                    liveValidate = state.liveValidate,
+                                )
+                                // Majority Yajilix: Yajilix's board and input.
+                                47 -> MajorityYajilixBoard(
                                     puzzle = puzzle,
                                     userValues = state.userValues,
                                     onTapCell = vm::tapShadeCell,

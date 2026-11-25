@@ -107,7 +107,10 @@ As Yajilix:
   class's possible count is at most another class's certain count. A clue cell the loop
   enters, or a cell with 3+ segments, is tinted red.
 - Rules live in `majorityYajilixRules.ts` with `majorityYajilixRules.test.ts`, reusing
-  Yajilix's `lineCells` / `cellShape` and Country Road's value helpers.
+  Yajilix's `lineCells`, `classCounts`, `finishedCounts` and `brokenLoopClues` and Country
+  Road's value helpers. The board is `MajorityYajilixBoard`, a wrapper of the shared
+  `LoopClueBoard` in `YajilixBoard.tsx` (Yajilix's board, given each type's `validate` and
+  `findBroken`).
 
 ### Appearance
 
@@ -123,7 +126,8 @@ touches it or it carries a mark. Clue cells don't count.
 
 ### Interactions
 
-Yajilix's editor without the number:
+Yajilix's editor without the number (`MajorityYajilixEditor` wraps the shared
+`LoopClueEditor` in `YajilixEditor.tsx` with `withNumbers: false`):
 
 - Click a cell to select it; `L`, `I`, `X` set its kind (an empty cell becomes an `↑`
   clue), arrow keys its direction, Delete / Backspace / Space clears it. Buttons do the same.
@@ -154,14 +158,15 @@ Yajilix's editor without the number:
 
 ## Android port
 
-- **Player:** `MajorityYajilixEngine` (`ShadeMarkEngine`, reusing `YajilixEngine` and
-  `CountryRoadEngine` helpers) and `MajorityYajilixBoard`, which draws through the Yajilix
-  board with letter-only clues: drag for the loop, taps through `vm::tapShadeCell`,
-  `liveValidate`.
-- **Admin review editor** (`MajorityYajilixAuthoring`, `MajorityYajilixEditor`): tap a
-  cell, then kind chips (Empty / L / I / X) and arrow chips; rows and columns added or
-  removed at any edge (`GridEdgeControls`); problems list. `MajorityYajilixMiniBoard` for
-  the batch tile.
+- **Player:** `MajorityYajilixEngine` (`ShadeMarkEngine`; board, values, answer and
+  progress delegate to `YajilixEngine`, whose `Clue.num` is null here) and
+  `MajorityYajilixBoard`, a wrapper of `YajilixBoard` passing the majority `brokenClues`:
+  drag for the loop, taps through `vm::tapShadeCell`, `liveValidate`.
+- **Admin review editor** (`MajorityYajilixAuthoring`, a `LoopClueAuthoring` with
+  `withNumbers = false`): the batch review uses `YajilixEditor` with that authoring — tap a
+  cell, then kind chips (Empty / L / I / X) and arrow chips, no number; rows and columns
+  added or removed at any edge (`GridEdgeControls`); problems list. The batch tile is
+  `YajilixMiniBoard`.
 - Not a picture puzzle.
 
 # Misc

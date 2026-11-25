@@ -49,6 +49,7 @@ import { countryRoadRenderer } from "./renderers/countryRoad";
 import { picturesqueMazeRenderer } from "./renderers/picturesqueMaze";
 import { irregularNonogramRenderer } from "./renderers/irregularNonogram";
 import { yajilixRenderer } from "./renderers/yajilix";
+import { majorityYajilixRenderer } from "./renderers/majorityYajilix";
 
 registerRenderer(comboSudokuRenderer);
 registerRenderer(sudokuRenderer);
@@ -96,6 +97,7 @@ registerRenderer(countryRoadRenderer);
 registerRenderer(picturesqueMazeRenderer);
 registerRenderer(irregularNonogramRenderer);
 registerRenderer(yajilixRenderer);
+registerRenderer(majorityYajilixRenderer);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

@@ -45,6 +45,7 @@ import countryRoadSchema from "../../../../schemas/canon/country-road.json";
 import picturesqueMazeSchema from "../../../../schemas/canon/picturesque-maze.json";
 import irregularNonogramSchema from "../../../../schemas/canon/irregular-nonogram.json";
 import yajilixSchema from "../../../../schemas/canon/yajilix.json";
+import majorityYajilixSchema from "../../../../schemas/canon/majority-yajilix.json";
 
 const ajv = new Ajv();
 
@@ -95,6 +96,7 @@ const validators: Record<number, ValidateFunction> = {
   44: ajv.compile(picturesqueMazeSchema),
   45: ajv.compile(irregularNonogramSchema),
   46: ajv.compile(yajilixSchema),
+  47: ajv.compile(majorityYajilixSchema),
 };
 
 export function validateCanon(puzzleType: number, data: unknown): void {
@@ -416,6 +418,14 @@ const semanticChecks: Record<number, (data: any) => void> = {
     const cols = data.cells[0].length;
     if (data.cells.some((row) => row.length !== cols)) {
       throw new Error("Invalid yajilix: cells must be rectangular");
+    }
+  },
+  // Majority Yajilix: the clue grid is rectangular. Mirrors majorityYajilixFormatProblems in
+  // frontend/src/components/majorityYajilixRules.ts.
+  47: (data: { cells: unknown[][] }) => {
+    const cols = data.cells[0].length;
+    if (data.cells.some((row) => row.length !== cols)) {
+      throw new Error("Invalid majority yajilix: cells must be rectangular");
     }
   },
   // Kuralin: every circle must sit on an interior grid line (edge midpoint or corner,

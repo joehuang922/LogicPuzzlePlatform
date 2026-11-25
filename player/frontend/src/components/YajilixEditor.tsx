@@ -1,12 +1,27 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { YajilixCanon, YajilixClue, YajilixDir, YajilixKind } from "../types/canon";
+import { YajilixDir, YajilixKind } from "../types/canon";
 import { YajilixGrid, YAJILIX_CELL, YAJILIX_PAD } from "./YajilixBoard";
-import { arrowChar, yajilixFormatProblems, yajilixWarnings } from "./yajilixRules";
+import { LoopClue, LoopClueGrid, YajilixProblem, arrowChar, yajilixFormatProblems, yajilixWarnings } from "./yajilixRules";
 
 interface YajilixEditorProps {
   initialJson: string;
   onChange: (json: string) => void;
 }
+
+/** What differs between Yajilix and Majority Yajilix in the shared editor. */
+export interface LoopClueEditorConfig {
+  name: string; // "yajilix", for messages
+  withNumbers: boolean; // Yajilix clues carry a number; Majority Yajilix clues don't
+  formatProblems: (canon: LoopClueGrid) => YajilixProblem[];
+  warnings: (canon: LoopClueGrid) => YajilixProblem[];
+}
+
+const YAJILIX: LoopClueEditorConfig = {
+  name: "yajilix",
+  withNumbers: true,
+  formatProblems: yajilixFormatProblems,
+  warnings: (canon) => yajilixWarnings(canon as Parameters<typeof yajilixWarnings>[0]),
+};
 
 const CELL = YAJILIX_CELL;
 const PAD = YAJILIX_PAD;
@@ -14,40 +29,49 @@ const KINDS: YajilixKind[] = ["L", "I", "X"];
 const DIRS: YajilixDir[] = ["up", "right", "down", "left"];
 const KEY_DIRS: Record<string, YajilixDir> = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" };
 
-function isClue(v: unknown): v is YajilixClue {
+function isClue(v: unknown, withNumbers: boolean): v is LoopClue {
   if (!v || typeof v !== "object") return false;
   const o = v as Record<string, unknown>;
   return (
     KINDS.includes(o.kind as YajilixKind) &&
     DIRS.includes(o.dir as YajilixDir) &&
-    Number.isInteger(o.num) &&
-    (o.num as number) >= 0
+    (withNumbers ? Number.isInteger(o.num) && (o.num as number) >= 0 : o.num === undefined)
   );
 }
 
-function parseCanon(json: string): YajilixCanon | null {
+function parseCanon(json: string, withNumbers: boolean): LoopClueGrid | null {
   try {
     const cells = JSON.parse(json)?.cells;
     if (!Array.isArray(cells) || cells.length === 0 || !Array.isArray(cells[0]) || cells[0].length === 0) return null;
-    if (!cells.every((row: unknown) => Array.isArray(row) && row.every((v) => v === null || isClue(v)))) return null;
+    if (!cells.every((row: unknown) => Array.isArray(row) && row.every((v) => v === null || isClue(v, withNumbers)))) return null;
     return { cells };
   } catch {
     return null;
   }
 }
 
-export function createEmptyYajilix(rows: number, cols: number): YajilixCanon {
+export function createEmptyLoopClueGrid(rows: number, cols: number): LoopClueGrid {
   return { cells: Array.from({ length: rows }, () => Array(cols).fill(null)) };
 }
 
 /** Resize at the bottom / right, keeping the cells that still fit. */
-function resize(canon: YajilixCanon, rows: number, cols: number): YajilixCanon {
+function resize(canon: LoopClueGrid, rows: number, cols: number): LoopClueGrid {
   return {
     cells: Array.from({ length: rows }, (_, r) => Array.from({ length: cols }, (_, c) => canon.cells[r]?.[c] ?? null)),
   };
 }
 
 export default function YajilixEditor({ initialJson, onChange }: YajilixEditorProps) {
+  return <LoopClueEditor initialJson={initialJson} onChange={onChange} config={YAJILIX} />;
+}
+
+/** The clue-grid editor shared by Yajilix and Majority Yajilix. */
+export function LoopClueEditor({
+  initialJson,
+  onChange,
+  config,
+}: YajilixEditorProps & { config: LoopClueEditorConfig }) {
+  const { withNumbers } = config;
   const [jsonText, setJsonText] = useState(initialJson);
   const [newRows, setNewRows] = useState(10);
   const [newCols, setNewCols] = useState(10);
@@ -56,7 +80,7 @@ export default function YajilixEditor({ initialJson, onChange }: YajilixEditorPr
   const typedRef = useRef<string>("");
   const svgRef = useRef<SVGSVGElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const canon = useMemo(() => parseCanon(jsonText), [jsonText]);
+  const canon = useMemo(() => parseCanon(jsonText, withNumbers), [jsonText, withNumbers]);
 
   useEffect(() => {
     onChange(jsonText);
@@ -69,13 +93,13 @@ export default function YajilixEditor({ initialJson, onChange }: YajilixEditorPr
   const sel = selected && selected[0] < rows && selected[1] < cols ? selected : null;
   const selClue = sel && canon ? canon.cells[sel[0]][sel[1]] : null;
 
-  const update = useCallback((next: YajilixCanon) => setJsonText(JSON.stringify(next)), []);
+  const update = useCallback((next: LoopClueGrid) => setJsonText(JSON.stringify(next)), []);
 
   /** Change the selected cell; an empty cell becomes an `L0↑` clue first. */
-  const edit = (fn: (clue: YajilixClue) => YajilixClue | null) => {
+  const edit = (fn: (clue: LoopClue) => LoopClue | null) => {
     if (!canon || !sel) return;
     const cells = canon.cells.map((row) => [...row]);
-    const cur = cells[sel[0]][sel[1]] ?? { kind: "L", num: 0, dir: "up" };
+    const cur: LoopClue = cells[sel[0]][sel[1]] ?? (withNumbers ? { kind: "L", num: 0, dir: "up" } : { kind: "L", dir: "up" });
     cells[sel[0]][sel[1]] = fn(cur);
     update({ cells });
   };
@@ -100,7 +124,7 @@ export default function YajilixEditor({ initialJson, onChange }: YajilixEditorPr
     if (KINDS.includes(upper as YajilixKind)) {
       edit((c) => ({ ...c, kind: upper as YajilixKind }));
       typedRef.current = "";
-    } else if (/^[0-9]$/.test(key)) {
+    } else if (withNumbers && /^[0-9]$/.test(key)) {
       typedRef.current = (typedRef.current + key).slice(-2);
       const num = Number(typedRef.current);
       edit((c) => ({ ...c, num }));
@@ -119,13 +143,13 @@ export default function YajilixEditor({ initialJson, onChange }: YajilixEditorPr
   if (!canon) {
     return (
       <div style={{ padding: "1rem", border: "2px solid #c33", borderRadius: 8, background: "#fff8f8" }}>
-        <p style={{ color: "#c33", margin: "0 0 1rem" }}>Invalid yajilix JSON. Fix the textarea or create a new board.</p>
+        <p style={{ color: "#c33", margin: "0 0 1rem" }}>Invalid {config.name} JSON. Fix the textarea or create a new board.</p>
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "1rem" }}>
           <label style={{ fontSize: "0.85rem" }}>Rows:</label>
           <input type="number" onFocus={(e) => e.currentTarget.select()} value={newRows} onChange={(e) => setNewRows(Number(e.target.value))} style={{ width: 50 }} min={2} />
           <label style={{ fontSize: "0.85rem" }}>Cols:</label>
           <input type="number" onFocus={(e) => e.currentTarget.select()} value={newCols} onChange={(e) => setNewCols(Number(e.target.value))} style={{ width: 50 }} min={2} />
-          <button onClick={() => newRows >= 2 && newCols >= 2 && update(createEmptyYajilix(newRows, newCols))}>
+          <button onClick={() => newRows >= 2 && newCols >= 2 && update(createEmptyLoopClueGrid(newRows, newCols))}>
             Create Empty Board
           </button>
         </div>
@@ -138,8 +162,8 @@ export default function YajilixEditor({ initialJson, onChange }: YajilixEditorPr
     );
   }
 
-  const problems = yajilixFormatProblems(canon);
-  const warnings = yajilixWarnings(canon);
+  const problems = config.formatProblems(canon);
+  const warnings = config.warnings(canon);
   const marked = new Map<string, string>();
   warnings.forEach((p) => marked.set(`${p.r},${p.c}`, "#e69500"));
   problems.forEach((p) => marked.set(`${p.r},${p.c}`, "#c33"));
@@ -199,7 +223,7 @@ export default function YajilixEditor({ initialJson, onChange }: YajilixEditorPr
           {sizeButton("−", "Remove the right column", rows, cols - 1)}
         </div>
         <div style={{ fontSize: "0.75rem", color: "#666", marginLeft: "auto" }}>
-          Click a cell, then type L / I / X, its number and an arrow key; Delete clears it
+          Click a cell, then type L / I / X{withNumbers ? ", its number" : ""} and an arrow key; Delete clears it
         </div>
       </div>
 
@@ -209,10 +233,14 @@ export default function YajilixEditor({ initialJson, onChange }: YajilixEditorPr
         <span style={{ width: 8 }} />
         {DIRS.map((d) => toolButton(arrowChar(d), `Arrow ${d}`, selClue?.dir === d, () => edit((c) => ({ ...c, dir: d }))))}
         <span style={{ width: 8 }} />
-        {toolButton("−", "Number down", false, () => edit((c) => ({ ...c, num: Math.max(0, c.num - 1) })))}
-        <span style={{ fontSize: "0.85rem", minWidth: 18, textAlign: "center" }}>{selClue ? selClue.num : ""}</span>
-        {toolButton("+", "Number up", false, () => edit((c) => ({ ...c, num: c.num + 1 })))}
-        <span style={{ width: 8 }} />
+        {withNumbers && (
+          <>
+            {toolButton("−", "Number down", false, () => edit((c) => ({ ...c, num: Math.max(0, (c.num ?? 0) - 1) })))}
+            <span style={{ fontSize: "0.85rem", minWidth: 18, textAlign: "center" }}>{selClue ? selClue.num : ""}</span>
+            {toolButton("+", "Number up", false, () => edit((c) => ({ ...c, num: (c.num ?? 0) + 1 })))}
+            <span style={{ width: 8 }} />
+          </>
+        )}
         {toolButton("Clear", "Clear the cell", false, () => edit(() => null))}
       </div>
 

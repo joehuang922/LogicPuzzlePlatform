@@ -1,14 +1,29 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { YajilixCanon, YajilixClue } from "../types/canon";
-import { CROSS, DOT, Loop, arrowChar, brokenClues, dims, fromValues, toValues, validateYajilix } from "./yajilixRules";
+import { YajilixCanon } from "../types/canon";
+import {
+  Broken,
+  CROSS,
+  DOT,
+  Loop,
+  LoopClue,
+  LoopClueGrid,
+  arrowChar,
+  brokenClues,
+  dims,
+  fromValues,
+  toValues,
+  validateYajilix,
+} from "./yajilixRules";
 
-interface YajilixBoardProps {
-  canon: YajilixCanon;
+interface LoopClueBoardProps<C extends LoopClueGrid> {
+  canon: C;
   initialUserValues?: Record<string, number>;
   onValuesChange?: (values: Record<string, number>) => void;
   onComplete?: () => void;
   readonly?: boolean;
   liveValidate?: boolean;
+  validate: (canon: C, loop: Loop) => boolean;
+  findBroken: (canon: C, loop: Loop, marks: number[][]) => Broken;
 }
 
 export const YAJILIX_CELL = 40;
@@ -18,8 +33,11 @@ const PAD = YAJILIX_PAD;
 const ERROR = "#d32f2f";
 const MARK = "#888";
 
-/** A clue as printed: letter + number, the arrow above (left/right) or to the right (up/down). */
-export function YajilixClueGlyph({ clue, r, c, color }: { clue: YajilixClue; r: number; c: number; color: string }) {
+/**
+ * A clue as printed: letter (+ number, for Yajilix), the arrow above (left/right) or to the
+ * right (up/down).
+ */
+export function YajilixClueGlyph({ clue, r, c, color }: { clue: LoopClue; r: number; c: number; color: string }) {
   const cx = (c + 0.5) * CELL;
   const cy = (r + 0.5) * CELL;
   const fs = CELL * 0.38;
@@ -37,7 +55,7 @@ export function YajilixClueGlyph({ clue, r, c, color }: { clue: YajilixClue; r: 
         <text x={cx} y={cy + fs * 0.5} textAnchor="middle" dominantBaseline="central" fontSize={fs}
           fontFamily="sans-serif" fontWeight="bold">
           {letter}
-          {clue.num}
+          {clue.num ?? ""}
         </text>
       </g>
     );
@@ -47,7 +65,7 @@ export function YajilixClueGlyph({ clue, r, c, color }: { clue: YajilixClue; r: 
       <text x={cx - fs * 0.35} y={cy} textAnchor="middle" dominantBaseline="central" fontSize={fs}
         fontFamily="sans-serif" fontWeight="bold">
         {letter}
-        {clue.num}
+        {clue.num ?? ""}
       </text>
       <text x={cx + fs * 0.85} y={cy} textAnchor="middle" dominantBaseline="central" fontSize={fs * 1.15}
         fontFamily="sans-serif" fontWeight="bold">
@@ -63,7 +81,7 @@ export function YajilixGrid({
   badClues,
   badCells,
 }: {
-  canon: YajilixCanon;
+  canon: LoopClueGrid;
   badClues?: Set<string>;
   badCells?: Set<string>;
 }) {
@@ -93,14 +111,26 @@ export function YajilixGrid({
   return <>{out}</>;
 }
 
-export default function YajilixBoard({
+type YajilixBoardProps = Omit<LoopClueBoardProps<YajilixCanon>, "validate" | "findBroken">;
+
+export default function YajilixBoard(props: YajilixBoardProps) {
+  return <LoopClueBoard {...props} validate={validateYajilix} findBroken={brokenClues} />;
+}
+
+/**
+ * The board shared by Yajilix and Majority Yajilix: loop drag, × / • marks, clues as
+ * printed. [validate] decides completion and [findBroken] what Errors: On marks.
+ */
+export function LoopClueBoard<C extends LoopClueGrid>({
   canon,
   initialUserValues,
   onValuesChange,
   onComplete,
   readonly,
   liveValidate,
-}: YajilixBoardProps) {
+  validate,
+  findBroken,
+}: LoopClueBoardProps<C>) {
   const { rows, cols } = dims(canon);
   const svgWidth = cols * CELL + PAD * 2;
   const svgHeight = rows * CELL + PAD * 2;
@@ -126,11 +156,11 @@ export default function YajilixBoard({
 
   useEffect(() => {
     if (completedRef.current) return;
-    if (validateYajilix(canon, loop)) {
+    if (validate(canon, loop)) {
       completedRef.current = true;
       onComplete?.();
     }
-  }, [loop, canon, onComplete]);
+  }, [loop, canon, onComplete, validate]);
 
   const isClue = useCallback((r: number, c: number) => canon.cells[r]?.[c] != null, [canon]);
 
@@ -200,8 +230,8 @@ export default function YajilixBoard({
   };
 
   const broken = useMemo(
-    () => (liveValidate ? brokenClues(canon, loop, marks) : null),
-    [liveValidate, canon, loop, marks]
+    () => (liveValidate ? findBroken(canon, loop, marks) : null),
+    [liveValidate, canon, loop, marks, findBroken]
   );
 
   return (

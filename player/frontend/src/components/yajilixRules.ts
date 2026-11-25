@@ -1,4 +1,4 @@
-import { YajilixCanon, YajilixClue, YajilixDir } from "../types/canon";
+import { YajilixCanon, YajilixDir, YajilixKind } from "../types/canon";
 import { Loop, NO_MARK, CROSS, DOT, degrees, emptyLoop, fromValues, isSingleLoop, toValues } from "./countryRoadRules";
 
 // Yajilix (type 46) stores its loop and marks exactly as Country Road does ("h:r,c",
@@ -19,12 +19,23 @@ export const DIR_STEP: Record<YajilixDir, [number, number]> = {
   right: [0, 1],
 };
 
-export function dims(canon: YajilixCanon): { rows: number; cols: number } {
+/** A grid of letter-and-arrow clues: Yajilix's (with a number) or Majority Yajilix's (without). */
+export interface LoopClue {
+  kind: YajilixKind;
+  dir: YajilixDir;
+  num?: number;
+}
+
+export interface LoopClueGrid {
+  cells: (LoopClue | null)[][];
+}
+
+export function dims(canon: LoopClueGrid): { rows: number; cols: number } {
   return { rows: canon.cells.length, cols: canon.cells[0]?.length ?? 0 };
 }
 
 /** The empty (non-clue) cells from (r, c) to the board's edge in `dir`; clues are skipped. */
-export function lineCells(canon: YajilixCanon, r: number, c: number, dir: YajilixDir): [number, number][] {
+export function lineCells(canon: LoopClueGrid, r: number, c: number, dir: YajilixDir): [number, number][] {
   const { rows, cols } = dims(canon);
   const [dr, dc] = DIR_STEP[dir];
   const out: [number, number][] = [];
@@ -71,36 +82,72 @@ export function validateYajilix(canon: YajilixCanon, loop: Loop): boolean {
   return true;
 }
 
+export interface ClassCount {
+  certain: number; // cells already known to be this class
+  possible: number; // certain plus open cells that could still become it
+}
+
+const SHAPE_OF: Record<YajilixKind, CellShape> = { L: "turn", I: "straight", X: "none" };
+
 /**
- * Whether the player's committed cells already break a clue (Errors: On). A cell with two
- * segments is a known turn or straight, a × cell is known unused, anything else is open.
+ * Each class's certain and possible count among `cells`, from what the player committed: a
+ * cell with 2 segments is a known turn or straight, a × cell with no segment a known X.
+ */
+export function classCounts(
+  loop: Loop,
+  marks: number[][],
+  deg: number[][],
+  cells: [number, number][]
+): Record<YajilixKind, ClassCount> {
+  const out: Record<YajilixKind, ClassCount> = {
+    L: { certain: 0, possible: 0 },
+    I: { certain: 0, possible: 0 },
+    X: { certain: 0, possible: 0 },
+  };
+  for (const [r, c] of cells) {
+    const shape = cellShape(loop, deg, r, c);
+    const crossed = marks[r]?.[c] === CROSS;
+    if (shape === "turn" || shape === "straight") {
+      const k: YajilixKind = shape === "turn" ? "L" : "I";
+      out[k].certain++;
+      out[k].possible++;
+    } else if (shape === "none") {
+      if (crossed) out.X.certain++;
+      out.X.possible++;
+      if (!crossed) {
+        out.L.possible++;
+        out.I.possible++;
+      }
+    } else if (deg[r][c] === 1) {
+      // On the loop with one segment: a turn or a straight, never X.
+      out.L.possible++;
+      out.I.possible++;
+    }
+  }
+  return out;
+}
+
+/** The class of every cell on a finished loop, counted. */
+export function finishedCounts(loop: Loop, deg: number[][], cells: [number, number][]): Record<YajilixKind, number> {
+  const out: Record<YajilixKind, number> = { L: 0, I: 0, X: 0 };
+  for (const [r, c] of cells) {
+    const shape = cellShape(loop, deg, r, c);
+    for (const k of ["L", "I", "X"] as YajilixKind[]) if (shape === SHAPE_OF[k]) out[k]++;
+  }
+  return out;
+}
+
+/**
+ * Whether the player's committed cells already break a clue (Errors: On): its class's
+ * certain count is over the number, or its possible count under it.
  */
 export function clueBroken(canon: YajilixCanon, loop: Loop, marks: number[][], r: number, c: number, deg?: number[][]): boolean {
   const clue = canon.cells[r][c];
   if (!clue) return false;
   const { rows, cols } = dims(canon);
   const d = deg ?? degrees(rows, cols, loop);
-  const cells = lineCells(canon, r, c, clue.dir);
-  if (clue.kind === "X") {
-    const crossed = cells.filter(([rr, cc]) => marks[rr]?.[cc] === CROSS && d[rr][cc] === 0).length;
-    const free = cells.filter(([rr, cc]) => d[rr][cc] === 0).length;
-    return crossed > clue.num || free < clue.num;
-  }
-  const want: CellShape = clue.kind === "L" ? "turn" : "straight";
-  let have = 0;
-  let possible = 0;
-  for (const [rr, cc] of cells) {
-    const shape = cellShape(loop, d, rr, cc);
-    if (shape === want) {
-      have++;
-      possible++;
-    } else if (shape === "open" && d[rr][cc] === 1) {
-      possible++;
-    } else if (shape === "none" && marks[rr]?.[cc] !== CROSS) {
-      possible++;
-    }
-  }
-  return have > clue.num || possible < clue.num;
+  const n = classCounts(loop, marks, d, lineCells(canon, r, c, clue.dir))[clue.kind];
+  return n.certain > clue.num || n.possible < clue.num;
 }
 
 export interface Broken {
@@ -109,6 +156,15 @@ export interface Broken {
 }
 
 export function brokenClues(canon: YajilixCanon, loop: Loop, marks: number[][]): Broken {
+  return brokenLoopClues(canon, loop, (r, c, deg) => clueBroken(canon, loop, marks, r, c, deg));
+}
+
+/** [Broken] for any loop-clue grid, given how to judge one clue. */
+export function brokenLoopClues(
+  canon: LoopClueGrid,
+  loop: Loop,
+  isBroken: (r: number, c: number, deg: number[][]) => boolean
+): Broken {
   const { rows, cols } = dims(canon);
   const deg = degrees(rows, cols, loop);
   const clues = new Set<string>();
@@ -117,14 +173,14 @@ export function brokenClues(canon: YajilixCanon, loop: Loop, marks: number[][]):
     for (let c = 0; c < cols; c++) {
       const isClue = canon.cells[r][c] !== null;
       if ((isClue && deg[r][c] > 0) || deg[r][c] > 2) cells.add(`${r},${c}`);
-      if (isClue && clueBroken(canon, loop, marks, r, c, deg)) clues.add(`${r},${c}`);
+      if (isClue && isBroken(r, c, deg)) clues.add(`${r},${c}`);
     }
   }
   return { clues, cells };
 }
 
 /** Empty cells touched by a loop segment or carrying a mark, over all empty cells, 0-100. */
-export function yajilixProgress(canon: YajilixCanon, loop: Loop, marks: number[][]): number {
+export function yajilixProgress(canon: LoopClueGrid, loop: Loop, marks: number[][]): number {
   const { rows, cols } = dims(canon);
   const deg = degrees(rows, cols, loop);
   let total = 0;
@@ -140,7 +196,7 @@ export function yajilixProgress(canon: YajilixCanon, loop: Loop, marks: number[]
 }
 
 /** Format problems: what the API's semanticChecks rejects. A board with any can't be saved. */
-export function yajilixFormatProblems(canon: YajilixCanon): YajilixProblem[] {
+export function yajilixFormatProblems(canon: LoopClueGrid): YajilixProblem[] {
   const { rows, cols } = dims(canon);
   if (rows === 0 || cols === 0 || canon.cells.some((row) => row.length !== cols)) {
     return [{ message: "Rows of cells differ in length", r: 0, c: 0 }];
@@ -174,8 +230,8 @@ export function yajilixWarnings(canon: YajilixCanon): YajilixProblem[] {
 
 const ARROWS: Record<YajilixDir, string> = { up: "↑", down: "↓", left: "←", right: "→" };
 
-export function clueLabel(clue: YajilixClue): string {
-  return `${clue.kind}${clue.num}${ARROWS[clue.dir]}`;
+export function clueLabel(clue: LoopClue): string {
+  return `${clue.kind}${clue.num ?? ""}${ARROWS[clue.dir]}`;
 }
 
 export function arrowChar(dir: YajilixDir): string {

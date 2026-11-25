@@ -1,0 +1,32 @@
+{
+  "title": "Majority Yajilix Canonical Representation",
+  "description": "Rectangle grid where some cells hold a clue: a letter (L = turning cells, I = straight cells, X = cells off the loop) and an arrow. The letter is the class with strictly the most non-clue cells in the arrow's direction. Players draw a single closed loop through cell centres, avoiding clue cells.",
+  "type": "object",
+  "required": ["cells"],
+  "additionalProperties": false,
+  "properties": {
+    "cells": {
+      "description": "rows x cols grid. null = empty cell, object = clue cell.",
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["kind", "dir"],
+              "additionalProperties": false,
+              "properties": {
+                "kind": { "type": "string", "enum": ["L", "I", "X"] },
+                "dir": { "type": "string", "enum": ["up", "down", "left", "right"] }
+              }
+            }
+          ]
+        },
+        "minItems": 1
+      },
+      "minItems": 1
+    }
+  }
+}

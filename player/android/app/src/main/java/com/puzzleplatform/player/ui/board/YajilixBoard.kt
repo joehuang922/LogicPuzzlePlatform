@@ -53,6 +53,8 @@ fun YajilixBoard(
     onEditTap: ((col: Int, row: Int) -> Unit)? = null,
     selectedCell: Pair<Int, Int>? = null,
     problemCells: Set<Pair<Int, Int>> = emptySet(),
+    // What Errors: On marks; Majority Yajilix passes its own rule.
+    findBroken: (YajilixEngine.Board, Map<String, Int>) -> YajilixEngine.Broken = YajilixEngine::brokenClues,
 ) {
     val board = remember(puzzle.id, puzzle.canonRepr) { YajilixEngine.parseBoard(puzzle) }
     val rows = board.rows
@@ -73,7 +75,7 @@ fun YajilixBoard(
         }
     }
     val broken = remember(board, userValues, liveValidate) {
-        if (liveValidate) YajilixEngine.brokenClues(board, userValues) else null
+        if (liveValidate) findBroken(board, userValues) else null
     }
 
     ZoomableBoard(
@@ -163,7 +165,7 @@ internal fun DrawScope.drawClue(clue: YajilixEngine.Clue, r: Int, c: Int, cell: 
     val canvas = drawContext.canvas.nativeCanvas
     val cx = (c + 0.5f) * cell
     val cy = (r + 0.5f) * cell
-    val text = clue.num.toString()
+    val text = clue.num?.toString() ?: ""
     val letterW = letterPaint.measureText(clue.kind.toString())
     val numW = bold.measureText(text)
     val baseline = { centerY: Float -> centerY - (bold.ascent() + bold.descent()) / 2 }

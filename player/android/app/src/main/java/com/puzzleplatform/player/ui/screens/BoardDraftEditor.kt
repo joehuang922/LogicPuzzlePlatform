@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.Dp
 import com.puzzleplatform.player.puzzle.AuthoringType
+import com.puzzleplatform.player.puzzle.MajorityYajilixAuthoring
 import com.puzzleplatform.player.puzzle.AkariAuthoring
 import com.puzzleplatform.player.puzzle.BoardDraft
 import com.puzzleplatform.player.puzzle.CornerChainAuthoring
@@ -406,6 +407,12 @@ fun BoardDraftEditor(
             draft = board.yajilix,
             onChange = { t -> onChange { it.copy(yajilix = t(it.yajilix)) } },
         )
+        // Yajilix's editor without numbers.
+        AuthoringType.MAJORITY_YAJILIX -> YajilixEditor(
+            draft = board.majorityYajilix,
+            onChange = { t -> onChange { it.copy(majorityYajilix = t(it.majorityYajilix)) } },
+            authoring = MajorityYajilixAuthoring,
+        )
         AuthoringType.PICTURESQUE_MAZE -> PicturesqueMazeEditor(
             draft = board.picturesqueMaze,
             onChange = { t -> onChange { it.copy(picturesqueMaze = t(it.picturesqueMaze)) } },
@@ -498,6 +505,8 @@ fun BoardDraftMiniBoard(type: AuthoringType, board: BoardDraft, size: Dp) {
         AuthoringType.TILE_PAINT -> TilePaintMiniBoard(draft = board.tilePaint, hasProblems = hasProblems, size = size)
         AuthoringType.COUNTRY_ROAD -> CountryRoadMiniBoard(draft = board.countryRoad, hasProblems = hasProblems, size = size)
         AuthoringType.YAJILIX -> YajilixMiniBoard(draft = board.yajilix, hasProblems = hasProblems, size = size)
+        AuthoringType.MAJORITY_YAJILIX ->
+            YajilixMiniBoard(draft = board.majorityYajilix, hasProblems = hasProblems, size = size)
         AuthoringType.PICTURESQUE_MAZE ->
             PicturesqueMazeMiniBoard(draft = board.picturesqueMaze, hasProblems = hasProblems, size = size)
         AuthoringType.IRREGULAR_NONOGRAM ->

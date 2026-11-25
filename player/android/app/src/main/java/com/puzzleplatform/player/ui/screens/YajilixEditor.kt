@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.puzzleplatform.player.puzzle.LoopClueAuthoring
 import com.puzzleplatform.player.puzzle.YajilixAuthoring
 import com.puzzleplatform.player.puzzle.YajilixEngine
 import com.puzzleplatform.player.ui.board.YajilixBoard
@@ -36,11 +37,12 @@ import com.puzzleplatform.player.ui.board.YajilixBoard
 fun YajilixEditor(
     draft: YajilixEngine.Board,
     onChange: ((YajilixEngine.Board) -> YajilixEngine.Board) -> Unit,
+    authoring: LoopClueAuthoring = YajilixAuthoring,
 ) {
     var selected by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     val sel = selected?.takeIf { (r, c) -> r in 0 until draft.rows && c in 0 until draft.cols }
-    val format = YajilixAuthoring.formatProblemCells(draft)
-    val warnings = if (format.isEmpty()) YajilixAuthoring.warningCells(draft) else emptyList()
+    val format = authoring.formatProblemCells(draft)
+    val warnings = if (format.isEmpty()) authoring.warningCells(draft) else emptyList()
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
@@ -48,13 +50,13 @@ fun YajilixEditor(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        for (p in YajilixAuthoring.problems(draft)) {
+        for (p in authoring.problems(draft)) {
             Text(p, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         }
 
         if (draft.rows >= 2 && draft.cols >= 2) {
             YajilixBoard(
-                puzzle = YajilixAuthoring.previewPuzzle(draft),
+                puzzle = authoring.previewPuzzle(draft),
                 userValues = emptyMap(),
                 onTapCell = { _, _ -> },
                 onApplyChanges = {},
@@ -75,24 +77,24 @@ fun YajilixEditor(
             val clue = draft.clue(r, c)
             Text("Row ${r + 1}, column ${c + 1}: ${clue?.label ?: "empty"}", fontWeight = FontWeight.Medium)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                FilterChip(selected = clue == null, onClick = { onChange { YajilixAuthoring.setKind(it, r, c, null) } },
+                FilterChip(selected = clue == null, onClick = { onChange { authoring.setKind(it, r, c, null) } },
                     label = { Text("Empty") })
                 for (k in YajilixEngine.KINDS) {
-                    FilterChip(selected = clue?.kind == k, onClick = { onChange { YajilixAuthoring.setKind(it, r, c, k) } },
+                    FilterChip(selected = clue?.kind == k, onClick = { onChange { authoring.setKind(it, r, c, k) } },
                         label = { Text(k.toString()) })
                 }
             }
             if (clue != null) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     for (d in YajilixEngine.Dir.entries) {
-                        FilterChip(selected = clue.dir == d, onClick = { onChange { YajilixAuthoring.setDir(it, r, c, d) } },
+                        FilterChip(selected = clue.dir == d, onClick = { onChange { authoring.setDir(it, r, c, d) } },
                             label = { Text(d.arrow) })
                     }
-                    TextButton(onClick = { onChange { YajilixAuthoring.stepNum(it, r, c, -1) } }, enabled = clue.num > 0) {
+                    if (authoring.withNumbers) TextButton(onClick = { onChange { YajilixAuthoring.stepNum(it, r, c, -1) } }, enabled = (clue.num ?: 0) > 0) {
                         Icon(Icons.Filled.Remove, contentDescription = "Number down")
                     }
-                    Text(clue.num.toString(), modifier = Modifier.align(Alignment.CenterVertically))
-                    TextButton(onClick = { onChange { YajilixAuthoring.stepNum(it, r, c, 1) } }) {
+                    if (authoring.withNumbers) Text((clue.num ?: 0).toString(), modifier = Modifier.align(Alignment.CenterVertically))
+                    if (authoring.withNumbers) TextButton(onClick = { onChange { YajilixAuthoring.stepNum(it, r, c, 1) } }) {
                         Icon(Icons.Filled.Add, contentDescription = "Number up")
                     }
                 }
