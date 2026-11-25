@@ -27,8 +27,8 @@ import com.puzzleplatform.player.ui.board.HeyawakeDraftBoard
  * Review body for a parsed heyawake, the Android analog of the web HeyawakeEditor: the
  * draft's walls on [HeyawakeDraftBoard] (tap a cell to select it), any problems, and a
  * panel for the selected cell — type its room's clue (blank for none), toggle the wall
- * on each side, or delete its row/column (a parser's phantom line). Add row/column
- * append a one-room line for one the parser missed. Every edit goes straight to
+ * on each side, or delete its row/column (a parser's phantom line). The edge controls
+ * add a one-room line for one the parser missed. Every edit goes straight to
  * [onChange]; [selectedCell] is "col,row".
  *
  * Walls toggle one cell side at a time with no checks, so a room can be L-shaped or
@@ -91,16 +91,10 @@ fun HeyawakeRoomEditor(
             }
         }
 
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            TextButton(onClick = { onChange(HeyawakeAuthoring::addRow) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add row")
-            }
-            TextButton(onClick = { onChange(HeyawakeAuthoring::addCol) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add column")
-            }
-        }
+        GridEdgeControls(
+            onAddRow = { top -> onChange { HeyawakeAuthoring.addRow(it, top) } },
+            onAddCol = { left -> onChange { HeyawakeAuthoring.addCol(it, left) } },
+        )
     }
 }
 

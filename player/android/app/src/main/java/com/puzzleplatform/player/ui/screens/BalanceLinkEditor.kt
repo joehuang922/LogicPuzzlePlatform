@@ -33,7 +33,7 @@ import com.puzzleplatform.player.ui.board.drawBalanceSymbol
  * Review body for a parsed balance link, the Android analog of the web BalanceLinkEditor:
  * the board (tap a cell to select it), any warnings, and a panel for the selected cell —
  * make it empty or black, or pick a symbol's shape and colour; or delete its row/column
- * (a parser's phantom line). Add row/column append an empty line for one the parser
+ * (a parser's phantom line). The edge controls add an empty line for one the parser
  * missed. Every edit goes straight to [onChange]; [selectedCell] is "col,row".
  */
 @OptIn(ExperimentalLayoutApi::class)
@@ -144,15 +144,9 @@ fun BalanceLinkEditor(
             }
         }
 
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            TextButton(onClick = { onChange(BalanceLinkAuthoring::addRow) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add row")
-            }
-            TextButton(onClick = { onChange(BalanceLinkAuthoring::addCol) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add column")
-            }
-        }
+        GridEdgeControls(
+            onAddRow = { top -> onChange { BalanceLinkAuthoring.addRow(it, top) } },
+            onAddCol = { left -> onChange { BalanceLinkAuthoring.addCol(it, left) } },
+        )
     }
 }

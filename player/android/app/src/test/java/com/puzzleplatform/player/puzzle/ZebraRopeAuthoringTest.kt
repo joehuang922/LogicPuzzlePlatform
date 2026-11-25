@@ -59,7 +59,7 @@ class ZebraRopeAuthoringTest {
         d = ZebraRopeAuthoring.addRope(d, listOf(0 to 0, 1 to 1, 2 to 2))
         d = ZebraRopeAuthoring.addRope(d, listOf(0 to 1, 0 to 2))
         assertEquals(1, ZebraRopeAuthoring.removeRopeAt(d, 0, 2).ropes.size)
-        val smaller = ZebraRopeAuthoring.removeLastRow(d)
+        val smaller = ZebraRopeAuthoring.removeEdgeRow(d, top = false)
         assertEquals(listOf(listOf(0 to 1, 0 to 2)), smaller.ropes)
         assertTrue(smaller.circles.isEmpty())
     }

@@ -64,6 +64,10 @@ fun NonogramClueEditor(
         }
 
         Text("Row clues (top to bottom)", fontWeight = FontWeight.Medium)
+        TextButton(onClick = { onChange { NonogramAuthoring.addRow(it, top = true) } }) {
+            Icon(Icons.Filled.Add, contentDescription = null)
+            Text("Add row at top")
+        }
         draft.rowClues.forEachIndexed { r, clue ->
             ClueField(
                 label = "Row ${r + 1}",
@@ -74,12 +78,16 @@ fun NonogramClueEditor(
                 onDelete = { onChange { NonogramAuthoring.removeRow(it, r) } },
             )
         }
-        TextButton(onClick = { onChange(NonogramAuthoring::addRow) }) {
+        TextButton(onClick = { onChange { NonogramAuthoring.addRow(it) } }) {
             Icon(Icons.Filled.Add, contentDescription = null)
-            Text("Add row")
+            Text("Add row at bottom")
         }
 
         Text("Column clues (left to right)", fontWeight = FontWeight.Medium)
+        TextButton(onClick = { onChange { NonogramAuthoring.addCol(it, left = true) } }) {
+            Icon(Icons.Filled.Add, contentDescription = null)
+            Text("Add column at left")
+        }
         draft.colClues.forEachIndexed { c, clue ->
             ClueField(
                 label = "Column ${c + 1}",
@@ -90,9 +98,9 @@ fun NonogramClueEditor(
                 onDelete = { onChange { NonogramAuthoring.removeCol(it, c) } },
             )
         }
-        TextButton(onClick = { onChange(NonogramAuthoring::addCol) }) {
+        TextButton(onClick = { onChange { NonogramAuthoring.addCol(it) } }) {
             Icon(Icons.Filled.Add, contentDescription = null)
-            Text("Add column")
+            Text("Add column at right")
         }
     }
 }

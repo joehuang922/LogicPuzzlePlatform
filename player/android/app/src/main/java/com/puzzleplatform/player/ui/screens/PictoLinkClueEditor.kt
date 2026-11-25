@@ -25,7 +25,7 @@ import com.puzzleplatform.player.ui.board.PictoLinkBoard
  * Review body for a parsed picto link, the Android analog of the web PictoLinkEditor: the
  * clue grid on the player board (tap a cell to select it), any problems that can't be
  * right, and a panel for the selected cell — type its clue (blank for none), or delete
- * its row/column (a parser's phantom line). Add row/column append a blank line for one
+ * its row/column (a parser's phantom line). The edge controls add a blank line for one
  * the parser missed. Every edit goes straight to [onChange]; [selectedCell] is "col,row".
  */
 @OptIn(ExperimentalLayoutApi::class)
@@ -100,15 +100,9 @@ fun PictoLinkClueEditor(
             }
         }
 
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            TextButton(onClick = { onChange(PictoLinkAuthoring::addRow) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add row")
-            }
-            TextButton(onClick = { onChange(PictoLinkAuthoring::addCol) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add column")
-            }
-        }
+        GridEdgeControls(
+            onAddRow = { top -> onChange { PictoLinkAuthoring.addRow(it, top) } },
+            onAddCol = { left -> onChange { PictoLinkAuthoring.addCol(it, left) } },
+        )
     }
 }

@@ -114,22 +114,28 @@ object TentaishowAuthoring {
         return draft.copy(dots = sorted(if (next == null) rest else rest + Dot(dr, dc, next)))
     }
 
-    /** Append an empty row at the bottom. */
-    fun addRow(draft: TentaishowDraft): TentaishowDraft = draft.copy(rows = draft.rows + 1)
+    /** Add an empty row at the top or bottom. */
+    fun addRow(draft: TentaishowDraft, top: Boolean = false): TentaishowDraft =
+        resized(draft, draft.rows + 1, draft.cols, edgeShift(top, add = true), 0)
 
-    /** Append an empty column at the right. */
-    fun addCol(draft: TentaishowDraft): TentaishowDraft = draft.copy(cols = draft.cols + 1)
+    /** Add an empty column at the left or right. */
+    fun addCol(draft: TentaishowDraft, left: Boolean = false): TentaishowDraft =
+        resized(draft, draft.rows, draft.cols + 1, 0, edgeShift(left, add = true))
 
-    /** Drop the bottom row and the dots that leave the grid with it. Keeps at least one row. */
-    fun removeLastRow(draft: TentaishowDraft): TentaishowDraft =
-        if (draft.rows <= 1) draft else resized(draft, draft.rows - 1, draft.cols)
+    /** Drop the top or bottom row and the dots that leave the grid with it. Keeps at least one row. */
+    fun removeEdgeRow(draft: TentaishowDraft, top: Boolean): TentaishowDraft =
+        if (draft.rows <= 1) draft else resized(draft, draft.rows - 1, draft.cols, edgeShift(top, add = false), 0)
 
-    /** Drop the rightmost column and the dots that leave the grid with it. Keeps at least one column. */
-    fun removeLastCol(draft: TentaishowDraft): TentaishowDraft =
-        if (draft.cols <= 1) draft else resized(draft, draft.rows, draft.cols - 1)
+    /** Drop the left or right column and the dots that leave the grid with it. Keeps at least one column. */
+    fun removeEdgeCol(draft: TentaishowDraft, left: Boolean): TentaishowDraft =
+        if (draft.cols <= 1) draft else resized(draft, draft.rows, draft.cols - 1, 0, edgeShift(left, add = false))
 
-    private fun resized(draft: TentaishowDraft, rows: Int, cols: Int) =
-        TentaishowDraft(rows, cols, draft.dots.filter { isValidPoint(it.dr, it.dc, rows, cols) })
+    /** Resize, moving the dots by ([dr], [dc]) cells (two lattice steps each). */
+    private fun resized(draft: TentaishowDraft, rows: Int, cols: Int, dr: Int, dc: Int) = TentaishowDraft(
+        rows,
+        cols,
+        draft.dots.map { it.copy(dr = it.dr + 2 * dr, dc = it.dc + 2 * dc) }.filter { isValidPoint(it.dr, it.dc, rows, cols) },
+    )
 
     private fun sorted(dots: List<Dot>) = dots.sortedWith(compareBy({ it.dr }, { it.dc }))
 

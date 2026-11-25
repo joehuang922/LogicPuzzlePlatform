@@ -122,23 +122,13 @@ fun ZebraRopeEditor(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            TextButton(onClick = { onChange(ZebraRopeAuthoring::addRow) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add row")
-            }
-            TextButton(onClick = { onChange(ZebraRopeAuthoring::removeLastRow) }, enabled = draft.rows > 2) {
-                Icon(Icons.Filled.Remove, contentDescription = null)
-                Text("Remove last row")
-            }
-            TextButton(onClick = { onChange(ZebraRopeAuthoring::addCol) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add column")
-            }
-            TextButton(onClick = { onChange(ZebraRopeAuthoring::removeLastCol) }, enabled = draft.cols > 2) {
-                Icon(Icons.Filled.Remove, contentDescription = null)
-                Text("Remove last column")
-            }
-        }
+        GridEdgeControls(
+            onAddRow = { top -> onChange { ZebraRopeAuthoring.addRow(it, top) } },
+            onAddCol = { left -> onChange { ZebraRopeAuthoring.addCol(it, left) } },
+            onRemoveRow = { top -> onChange { ZebraRopeAuthoring.removeEdgeRow(it, top) } },
+            onRemoveCol = { left -> onChange { ZebraRopeAuthoring.removeEdgeCol(it, left) } },
+            canRemoveRow = draft.rows > 2,
+            canRemoveCol = draft.cols > 2,
+        )
     }
 }

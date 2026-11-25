@@ -88,22 +88,27 @@ object ZebraRopeAuthoring {
         return if (i < 0) draft else draft.copy(ropes = draft.ropes.filterIndexed { j, _ -> j != i })
     }
 
-    fun addRow(draft: ZebraRopeEngine.Board): ZebraRopeEngine.Board = draft.copy(rows = draft.rows + 1)
+    fun addRow(draft: ZebraRopeEngine.Board, top: Boolean = false): ZebraRopeEngine.Board =
+        resized(draft, draft.rows + 1, draft.cols, edgeShift(top, add = true), 0)
 
-    fun addCol(draft: ZebraRopeEngine.Board): ZebraRopeEngine.Board = draft.copy(cols = draft.cols + 1)
+    fun addCol(draft: ZebraRopeEngine.Board, left: Boolean = false): ZebraRopeEngine.Board =
+        resized(draft, draft.rows, draft.cols + 1, 0, edgeShift(left, add = true))
 
-    /** Drop the bottom row; ropes reaching it and circles leaving the interior go with it. */
-    fun removeLastRow(draft: ZebraRopeEngine.Board): ZebraRopeEngine.Board =
-        if (draft.rows <= 2) draft else resized(draft, draft.rows - 1, draft.cols)
+    /** Drop the top or bottom row; ropes reaching it and circles leaving the interior go with it. */
+    fun removeEdgeRow(draft: ZebraRopeEngine.Board, top: Boolean): ZebraRopeEngine.Board =
+        if (draft.rows <= 2) draft else resized(draft, draft.rows - 1, draft.cols, edgeShift(top, add = false), 0)
 
-    fun removeLastCol(draft: ZebraRopeEngine.Board): ZebraRopeEngine.Board =
-        if (draft.cols <= 2) draft else resized(draft, draft.rows, draft.cols - 1)
+    fun removeEdgeCol(draft: ZebraRopeEngine.Board, left: Boolean): ZebraRopeEngine.Board =
+        if (draft.cols <= 2) draft else resized(draft, draft.rows, draft.cols - 1, 0, edgeShift(left, add = false))
 
-    private fun resized(draft: ZebraRopeEngine.Board, rows: Int, cols: Int) = ZebraRopeEngine.Board(
+    /** Resize, moving ropes by ([dr], [dc]) cells and circles by twice that on their lattice. */
+    private fun resized(draft: ZebraRopeEngine.Board, rows: Int, cols: Int, dr: Int, dc: Int) = ZebraRopeEngine.Board(
         rows,
         cols,
-        draft.ropes.filter { rope -> rope.all { (r, c) -> r < rows && c < cols } },
-        draft.circles.filter { KuralinEngine.isValidPoint(it.dr, it.dc, rows, cols) },
+        draft.ropes.map { rope -> rope.map { (r, c) -> r + dr to c + dc } }
+            .filter { rope -> rope.all { (r, c) -> r in 0 until rows && c in 0 until cols } },
+        draft.circles.map { it.copy(dr = it.dr + 2 * dr, dc = it.dc + 2 * dc) }
+            .filter { KuralinEngine.isValidPoint(it.dr, it.dc, rows, cols) },
     )
 
     /** Problems the API rejects too (port of zebraRopeFormatProblems); they block saving. */

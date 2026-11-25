@@ -56,7 +56,7 @@ class WhimsicalKnightAuthoringTest {
         d = WhimsicalKnightAuthoring.cycleClue(d, 4, 4)
         d = WhimsicalKnightAuthoring.addCol(d)
         assertEquals(listOf(listOf(0, 0, 0), listOf(0, 1, 0)), d.gray)
-        d = WhimsicalKnightAuthoring.removeLastRow(d)
+        d = WhimsicalKnightAuthoring.removeEdgeRow(d, top = false)
         assertEquals(listOf(listOf(0, 0, 0)), d.gray)
         assertTrue(d.circles.isEmpty())
     }

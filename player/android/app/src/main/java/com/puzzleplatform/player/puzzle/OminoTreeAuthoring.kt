@@ -83,15 +83,24 @@ object OminoTreeAuthoring {
         return draft.copy(arrows = sorted(if (next != null) others + next else others))
     }
 
-    fun addRow(draft: OminoTreeEngine.Board) = resized(draft, draft.rows + 1, draft.cols)
+    fun addRow(draft: OminoTreeEngine.Board, top: Boolean = false) =
+        resized(shifted(draft, edgeShift(top, add = true), 0), draft.rows + 1, draft.cols)
 
-    fun addCol(draft: OminoTreeEngine.Board) = resized(draft, draft.rows, draft.cols + 1)
+    fun addCol(draft: OminoTreeEngine.Board, left: Boolean = false) =
+        resized(shifted(draft, 0, edgeShift(left, add = true)), draft.rows, draft.cols + 1)
 
-    fun removeLastRow(draft: OminoTreeEngine.Board) =
-        if (draft.rows <= 2) draft else resized(draft, draft.rows - 1, draft.cols)
+    fun removeEdgeRow(draft: OminoTreeEngine.Board, top: Boolean) =
+        if (draft.rows <= 2) draft else resized(shifted(draft, edgeShift(top, add = false), 0), draft.rows - 1, draft.cols)
 
-    fun removeLastCol(draft: OminoTreeEngine.Board) =
-        if (draft.cols <= 2) draft else resized(draft, draft.rows, draft.cols - 1)
+    fun removeEdgeCol(draft: OminoTreeEngine.Board, left: Boolean) =
+        if (draft.cols <= 2) draft else resized(shifted(draft, 0, edgeShift(left, add = false)), draft.rows, draft.cols - 1)
+
+    /** Move the numbers and arrows by ([dr], [dc]) cells; [resized] drops what falls off. */
+    private fun shifted(d: OminoTreeEngine.Board, dr: Int, dc: Int): OminoTreeEngine.Board =
+        if (dr == 0 && dc == 0) d else d.copy(
+            numbers = numberGrid(d, d.rows, d.cols).shifted(dr, dc, d.cols, 0),
+            arrows = d.arrows.map { it.copy(r = it.r + dr, c = it.c + dc) },
+        )
 
     private fun sorted(arrows: List<Arrow>) = arrows.sortedWith(compareBy({ it.r }, { it.c }, { it.dir }))
 

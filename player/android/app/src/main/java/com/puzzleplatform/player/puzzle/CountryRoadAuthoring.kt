@@ -68,24 +68,33 @@ object CountryRoadAuthoring {
         }
     }
 
-    fun addRow(draft: Board) = resized(draft, draft.rows + 1, draft.cols)
+    /** Add a row at the top or bottom: walled off from the old cells, open along itself (web: resize). */
+    fun addRow(draft: Board, top: Boolean = false) = Board(
+        cells = draft.cells.plusEdgeRow(top, draft.cols, 0),
+        h = draft.h.plusEdgeRow(top, draft.cols, 1),
+        v = draft.v.plusEdgeRow(top, maxOf(draft.cols - 1, 0), 0),
+    )
 
-    fun addCol(draft: Board) = resized(draft, draft.rows, draft.cols + 1)
+    /** Add a column at the left or right, walled off the same way. */
+    fun addCol(draft: Board, left: Boolean = false) = Board(
+        cells = draft.cells.plusEdgeCol(left, 0),
+        h = draft.h.plusEdgeCol(left, 0),
+        v = draft.v.plusEdgeCol(left, 1),
+    )
 
-    fun removeLastRow(draft: Board) = if (draft.rows <= 2) draft else resized(draft, draft.rows - 1, draft.cols)
+    /** Drop the top or bottom row with its walls. Keeps at least two rows. */
+    fun removeEdgeRow(draft: Board, top: Boolean) = if (draft.rows <= 2) draft else Board(
+        cells = draft.cells.minusEdgeRow(top),
+        h = draft.h.minusEdgeRow(top),
+        v = draft.v.minusEdgeRow(top),
+    )
 
-    fun removeLastCol(draft: Board) = if (draft.cols <= 2) draft else resized(draft, draft.rows, draft.cols - 1)
-
-    /** New cells are walled off from old ones and open to each other (web: resize). */
-    private fun resized(d: Board, rows: Int, cols: Int): Board {
-        val isNew = { r: Int, c: Int -> r >= d.rows || c >= d.cols }
-        fun edge(old: Int?, aNew: Boolean, bNew: Boolean) = if (aNew || bNew) (if (aNew && bNew) 0 else 1) else old ?: 0
-        return Board(
-            cells = List(rows) { r -> List(cols) { c -> d.cells.getOrNull(r)?.getOrNull(c) ?: 0 } },
-            h = List(maxOf(rows - 1, 0)) { r -> List(cols) { c -> edge(d.h.getOrNull(r)?.getOrNull(c), isNew(r, c), isNew(r + 1, c)) } },
-            v = List(rows) { r -> List(maxOf(cols - 1, 0)) { c -> edge(d.v.getOrNull(r)?.getOrNull(c), isNew(r, c), isNew(r, c + 1)) } },
-        )
-    }
+    /** Drop the left or right column with its walls. Keeps at least two columns. */
+    fun removeEdgeCol(draft: Board, left: Boolean) = if (draft.cols <= 2) draft else Board(
+        cells = draft.cells.minusEdgeCol(left),
+        h = draft.h.minusEdgeCol(left),
+        v = draft.v.minusEdgeCol(left),
+    )
 
     data class Problem(val message: String, val r: Int, val c: Int)
 

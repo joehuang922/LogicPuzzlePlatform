@@ -51,7 +51,7 @@ class MannequinGate2AuthoringTest {
     @Test
     fun resizingDropsLinesThatNoLongerFit() {
         var d = MannequinGate2Rules.Board(3, 3, listOf(listOf(0 to 0, 0 to 1), listOf(2 to 2, 1 to 2)))
-        d = MannequinGate2Authoring.removeLastRow(d)
+        d = MannequinGate2Authoring.removeEdgeRow(d, top = false)
         assertEquals(2 to 3, d.rows to d.cols)
         assertEquals(listOf(listOf(0 to 0, 0 to 1)), d.lines)
         d = MannequinGate2Authoring.addCol(MannequinGate2Authoring.addRow(d))

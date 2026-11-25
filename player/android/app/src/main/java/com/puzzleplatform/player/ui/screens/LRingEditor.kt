@@ -115,15 +115,9 @@ fun LRingEditor(
             }
         }
 
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            TextButton(onClick = { onChange(authoring::addRow) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add row")
-            }
-            TextButton(onClick = { onChange(authoring::addCol) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add column")
-            }
-        }
+        GridEdgeControls(
+            onAddRow = { top -> onChange { authoring.addRow(it, top) } },
+            onAddCol = { left -> onChange { authoring.addCol(it, left) } },
+        )
     }
 }

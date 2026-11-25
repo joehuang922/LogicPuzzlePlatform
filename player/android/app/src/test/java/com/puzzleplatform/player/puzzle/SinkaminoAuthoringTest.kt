@@ -63,7 +63,7 @@ class SinkaminoAuthoringTest {
     @Test
     fun removingTheLastRowDropsTrailsThroughIt() {
         var d = SinkaminoAuthoring.addArrow(SinkaminoAuthoring.draftFromCanon(canon), listOf(1 to 0, 1 to 1))
-        d = SinkaminoAuthoring.removeLastRow(d)
+        d = SinkaminoAuthoring.removeEdgeRow(d, top = false)
         assertEquals(1, d.rows)
         assertEquals(listOf(listOf(0 to 0, 0 to 1, 0 to 2)), d.arrows)
     }

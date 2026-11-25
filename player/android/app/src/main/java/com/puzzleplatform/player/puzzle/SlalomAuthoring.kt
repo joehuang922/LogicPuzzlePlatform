@@ -205,13 +205,20 @@ object SlalomAuthoring {
     /** Parse a typed number: digits only; blank -> null. */
     fun parseNum(text: String): Int? = text.filter { it.isDigit() }.take(2).toIntOrNull()
 
-    /** Append an empty row at the bottom — the fix for a row the parser missed. */
-    fun addRow(draft: SlalomDraft): SlalomDraft =
-        draft.copy(cells = draft.cells + listOf(List(draft.cols) { SlalomCell.EMPTY }))
+    /** Add an empty row at the top or bottom — the fix for a row the parser missed. */
+    fun addRow(draft: SlalomDraft, top: Boolean = false): SlalomDraft =
+        shifted(draft.copy(cells = draft.cells.plusEdgeRow(top, draft.cols, SlalomCell.EMPTY)), if (top) 1 else 0, 0)
 
-    /** Append an empty column at the right. */
-    fun addCol(draft: SlalomDraft): SlalomDraft =
-        draft.copy(cells = draft.cells.map { it + SlalomCell.EMPTY })
+    /** Add an empty column at the left or right. */
+    fun addCol(draft: SlalomDraft, left: Boolean = false): SlalomDraft =
+        shifted(draft.copy(cells = draft.cells.plusEdgeCol(left, SlalomCell.EMPTY)), 0, if (left) 1 else 0)
+
+    /** Move the numbers and the start by ([dr], [dc]) cells, after a line goes in at the top / left. */
+    private fun shifted(draft: SlalomDraft, dr: Int, dc: Int): SlalomDraft =
+        if (dr == 0 && dc == 0) draft else draft.copy(
+            numbers = draft.numbers.mapKeys { (at, _) -> at.first + dr to at.second + dc },
+            start = draft.start?.let { it.first + dr to it.second + dc },
+        )
 
     /** Drop row [row] — the fix for a parser's phantom line. Keeps at least one row; a start on it is lost. */
     fun removeRow(draft: SlalomDraft, row: Int): SlalomDraft {

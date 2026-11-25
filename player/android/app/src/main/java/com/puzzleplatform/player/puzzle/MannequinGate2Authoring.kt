@@ -51,10 +51,21 @@ object MannequinGate2Authoring {
         lines = draft.lines.filter { l -> l.all { (r, c) -> r < rows && c < cols } },
     )
 
-    fun addRow(draft: MannequinGate2Rules.Board) = fit(draft, draft.rows + 1, draft.cols)
-    fun addCol(draft: MannequinGate2Rules.Board) = fit(draft, draft.rows, draft.cols + 1)
-    fun removeLastRow(draft: MannequinGate2Rules.Board) = if (draft.rows <= 1) draft else fit(draft, draft.rows - 1, draft.cols)
-    fun removeLastCol(draft: MannequinGate2Rules.Board) = if (draft.cols <= 1) draft else fit(draft, draft.rows, draft.cols - 1)
+    fun addRow(draft: MannequinGate2Rules.Board, top: Boolean = false) =
+        fit(shifted(draft, edgeShift(top, add = true), 0), draft.rows + 1, draft.cols)
+    fun addCol(draft: MannequinGate2Rules.Board, left: Boolean = false) =
+        fit(shifted(draft, 0, edgeShift(left, add = true)), draft.rows, draft.cols + 1)
+    fun removeEdgeRow(draft: MannequinGate2Rules.Board, top: Boolean) =
+        if (draft.rows <= 1) draft else fit(shifted(draft, edgeShift(top, add = false), 0), draft.rows - 1, draft.cols)
+    fun removeEdgeCol(draft: MannequinGate2Rules.Board, left: Boolean) =
+        if (draft.cols <= 1) draft else fit(shifted(draft, 0, edgeShift(left, add = false)), draft.rows, draft.cols - 1)
+
+    /** Move every line by ([dr], [dc]) cells, dropping lines that leave the top / left. */
+    private fun shifted(draft: MannequinGate2Rules.Board, dr: Int, dc: Int) =
+        if (dr == 0 && dc == 0) draft else draft.copy(
+            lines = draft.lines.map { l -> l.map { (r, c) -> r + dr to c + dc } }
+                .filter { l -> l.all { (r, c) -> r >= 0 && c >= 0 } },
+        )
 
     fun formatProblems(draft: MannequinGate2Rules.Board): List<String> = MannequinGate2Rules.formatProblems(draft)
 

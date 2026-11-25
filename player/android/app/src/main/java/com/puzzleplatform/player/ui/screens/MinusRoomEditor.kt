@@ -160,24 +160,14 @@ fun MinusRoomEditor(
             }
         }
 
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            TextButton(onClick = { onChange(MinusRoomAuthoring::addRow) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add row")
-            }
-            TextButton(onClick = { onChange(MinusRoomAuthoring::removeLastRow) }, enabled = draft.rows > 2) {
-                Icon(Icons.Filled.Remove, contentDescription = null)
-                Text("Remove last row")
-            }
-            TextButton(onClick = { onChange(MinusRoomAuthoring::addCol) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add column")
-            }
-            TextButton(onClick = { onChange(MinusRoomAuthoring::removeLastCol) }, enabled = draft.cols > 2) {
-                Icon(Icons.Filled.Remove, contentDescription = null)
-                Text("Remove last column")
-            }
-        }
+        GridEdgeControls(
+            onAddRow = { top -> onChange { MinusRoomAuthoring.addRow(it, top) } },
+            onAddCol = { left -> onChange { MinusRoomAuthoring.addCol(it, left) } },
+            onRemoveRow = { top -> onChange { MinusRoomAuthoring.removeEdgeRow(it, top) } },
+            onRemoveCol = { left -> onChange { MinusRoomAuthoring.removeEdgeCol(it, left) } },
+            canRemoveRow = draft.rows > 2,
+            canRemoveCol = draft.cols > 2,
+        )
     }
 }
 

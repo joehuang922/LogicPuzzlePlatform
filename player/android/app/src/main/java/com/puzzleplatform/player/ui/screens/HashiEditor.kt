@@ -24,7 +24,7 @@ import com.puzzleplatform.player.ui.board.HashiBoard
  * Review body for a parsed Hashi, the Android analog of the web HashiEditor: the board
  * (tap a lattice point to select it; empty points show as faint dots), any warnings, and
  * chips for the selected point — empty or an island 1-8; or delete its row/column (a
- * parser's phantom line). Add row/column append an empty line for one the parser missed.
+ * parser's phantom line). The edge controls add an empty line for one the parser missed.
  * Every edit goes straight to [onChange]; [selectedCell] is "col,row".
  */
 @OptIn(ExperimentalLayoutApi::class)
@@ -107,15 +107,9 @@ fun HashiEditor(
             }
         }
 
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            TextButton(onClick = { onChange(HashiAuthoring::addRow) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add row")
-            }
-            TextButton(onClick = { onChange(HashiAuthoring::addCol) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add column")
-            }
-        }
+        GridEdgeControls(
+            onAddRow = { top -> onChange { HashiAuthoring.addRow(it, top) } },
+            onAddCol = { left -> onChange { HashiAuthoring.addCol(it, left) } },
+        )
     }
 }

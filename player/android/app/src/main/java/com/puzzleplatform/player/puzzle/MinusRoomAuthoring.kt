@@ -95,15 +95,26 @@ object MinusRoomAuthoring {
     fun setMax(draft: MinusRoomEngine.Board, max: Int?): MinusRoomEngine.Board =
         if (max == null || max !in 1..9) draft else draft.copy(max = max)
 
-    fun addRow(draft: MinusRoomEngine.Board) = resized(draft, draft.rows + 1, draft.cols)
+    fun addRow(draft: MinusRoomEngine.Board, top: Boolean = false) =
+        resized(shifted(draft, edgeShift(top, add = true), 0), draft.rows + 1, draft.cols)
 
-    fun addCol(draft: MinusRoomEngine.Board) = resized(draft, draft.rows, draft.cols + 1)
+    fun addCol(draft: MinusRoomEngine.Board, left: Boolean = false) =
+        resized(shifted(draft, 0, edgeShift(left, add = true)), draft.rows, draft.cols + 1)
 
-    fun removeLastRow(draft: MinusRoomEngine.Board) =
-        if (draft.rows <= 2) draft else resized(draft, draft.rows - 1, draft.cols)
+    fun removeEdgeRow(draft: MinusRoomEngine.Board, top: Boolean) =
+        if (draft.rows <= 2) draft else resized(shifted(draft, edgeShift(top, add = false), 0), draft.rows - 1, draft.cols)
 
-    fun removeLastCol(draft: MinusRoomEngine.Board) =
-        if (draft.cols <= 2) draft else resized(draft, draft.rows, draft.cols - 1)
+    fun removeEdgeCol(draft: MinusRoomEngine.Board, left: Boolean) =
+        if (draft.cols <= 2) draft else resized(shifted(draft, 0, edgeShift(left, add = false)), draft.rows, draft.cols - 1)
+
+    /** Move the board by ([dr], [dc]) cells: a line in or out at the top / left; [resized] trims. */
+    private fun shifted(d: MinusRoomEngine.Board, dr: Int, dc: Int): MinusRoomEngine.Board =
+        if (dr == 0 && dc == 0) d else d.copy(
+            cells = d.cells.shifted(dr, dc, d.cols, 0),
+            h = d.h.shifted(dr, dc, d.cols, 0),
+            v = d.v.shifted(dr, dc, d.cols - 1, 0),
+            circles = d.circles.map { it.copy(dr = it.dr + 2 * dr, dc = it.dc + 2 * dc) }.filter { it.dr >= 0 && it.dc >= 0 },
+        )
 
     private fun parseKey(key: String): Triple<String, Int, Int>? {
         val m = Regex("""([hv]):(\d+),(\d+)""").matchEntire(key) ?: return null

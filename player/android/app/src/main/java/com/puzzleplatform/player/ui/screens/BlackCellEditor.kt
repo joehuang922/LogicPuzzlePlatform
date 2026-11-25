@@ -28,7 +28,7 @@ import com.puzzleplatform.player.puzzle.BlackCellDraft
  * player [board] (tap a cell to select it; the board gets the preview puzzle, the tap
  * callback and the "col,row" selection), any problems that can't be right, and a panel
  * for the selected cell — make it white or black, type a black cell's number (blank for
- * none), or delete its row/column (a parser's phantom line). Add row/column append a
+ * none), or delete its row/column (a parser's phantom line). The edge controls add a
  * white line for one the parser missed. Every edit goes straight to [onChange].
  */
 @OptIn(ExperimentalLayoutApi::class)
@@ -123,15 +123,9 @@ fun BlackCellEditor(
             }
         }
 
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            TextButton(onClick = { onChange(authoring::addRow) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add row")
-            }
-            TextButton(onClick = { onChange(authoring::addCol) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add column")
-            }
-        }
+        GridEdgeControls(
+            onAddRow = { top -> onChange { authoring.addRow(it, top) } },
+            onAddCol = { left -> onChange { authoring.addCol(it, left) } },
+        )
     }
 }

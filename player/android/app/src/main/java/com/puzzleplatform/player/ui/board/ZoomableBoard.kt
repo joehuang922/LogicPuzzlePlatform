@@ -108,6 +108,14 @@ fun ZoomableBoard(
     // targets aren't cells (Whimsical Knight's dots). Fires alongside the cell callbacks.
     onDrawStartPrecise: ((col: Float, row: Float) -> Unit)? = null,
     onDrawToPrecise: ((col: Float, row: Float) -> Unit)? = null,
+    // Drawn over the board in viewport pixels (not panned), for content that stays on
+    // screen while the board moves: Irregular Nonogram's sticky clues. Gets the cell
+    // size and the pan, so board cell (col, row) sits at (panX + col * cellPx, ...).
+    overlay: (DrawScope.(cellPx: Float, panX: Float, panY: Float) -> Unit)? = null,
+    // True where a viewport point (px) is covered by [overlay] and takes no input: a
+    // tap there is dropped and a drag sees no cell. Read on every touch, so it may
+    // return what the last [overlay] draw recorded.
+    inputBlocked: ((x: Float, y: Float) -> Boolean)? = null,
     draw: DrawScope.(cellPx: Float) -> Unit,
 ) {
     if (cols <= 0 || rows <= 0) return
@@ -149,21 +157,25 @@ fun ZoomableBoard(
                     transformEnabled = transform.zoomable,
                     drawEnabled = drawable,
                     onTap = { off ->
-                    transform.cellAt(off.x, off.y)?.let { (col, row) -> onTapCell(col, row) }
-                    onTapPrecise?.let { cb ->
-                        transform.fractionalCellAt(off.x, off.y)?.let { (col, row) -> cb(col, row) }
+                    if (inputBlocked?.invoke(off.x, off.y) != true) {
+                        transform.cellAt(off.x, off.y)?.let { (col, row) -> onTapCell(col, row) }
+                        onTapPrecise?.let { cb ->
+                            transform.fractionalCellAt(off.x, off.y)?.let { (col, row) -> cb(col, row) }
+                        }
                     }
                 },
                     onDragStart = { off ->
-                        onDrawStart?.invoke(transform.cellAt(off.x, off.y, drag = true))
+                        val open = inputBlocked?.invoke(off.x, off.y) != true
+                        onDrawStart?.invoke(if (open) transform.cellAt(off.x, off.y, drag = true) else null)
                         onDrawStartPrecise?.let { cb ->
-                            transform.fractionalCellAt(off.x, off.y, drag = true)?.let { (col, row) -> cb(col, row) }
+                            if (open) transform.fractionalCellAt(off.x, off.y, drag = true)?.let { (col, row) -> cb(col, row) }
                         }
                     },
                     onDrag = { off ->
-                        onDrawTo?.invoke(transform.cellAt(off.x, off.y, drag = true))
+                        val open = inputBlocked?.invoke(off.x, off.y) != true
+                        onDrawTo?.invoke(if (open) transform.cellAt(off.x, off.y, drag = true) else null)
                         onDrawToPrecise?.let { cb ->
-                            transform.fractionalCellAt(off.x, off.y, drag = true)?.let { (col, row) -> cb(col, row) }
+                            if (open) transform.fractionalCellAt(off.x, off.y, drag = true)?.let { (col, row) -> cb(col, row) }
                         }
                     },
                     onDragEnd = { onDrawEnd?.invoke() },
@@ -180,6 +192,7 @@ fun ZoomableBoard(
                 translate(transform.panX, transform.panY) {
                     draw(transform.cellPx)
                 }
+                overlay?.invoke(this, transform.cellPx, transform.panX, transform.panY)
             }
         }
     }

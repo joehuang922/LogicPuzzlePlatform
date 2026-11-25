@@ -98,13 +98,13 @@ open class BlackCellAuthoring(
         listOf(col - 1 to row, col + 1 to row, col to row - 1, col to row + 1)
             .count { (c, r) -> draft.inGrid(c, r) && !draft.isBlack(c, r) }
 
-    /** Append a white row at the bottom — the fix for a row the parser missed. */
-    fun addRow(draft: BlackCellDraft): BlackCellDraft =
-        draft.copy(cells = draft.cells + listOf(List(draft.cols) { BlackCell.WHITE }))
+    /** Add a white row at the top or bottom — the fix for a row the parser missed. */
+    fun addRow(draft: BlackCellDraft, top: Boolean = false): BlackCellDraft =
+        draft.copy(cells = draft.cells.plusEdgeRow(top, draft.cols, BlackCell.WHITE))
 
-    /** Append a white column at the right. */
-    fun addCol(draft: BlackCellDraft): BlackCellDraft =
-        draft.copy(cells = draft.cells.map { it + BlackCell.WHITE })
+    /** Add a white column at the left or right. */
+    fun addCol(draft: BlackCellDraft, left: Boolean = false): BlackCellDraft =
+        draft.copy(cells = draft.cells.plusEdgeCol(left, BlackCell.WHITE))
 
     /** Drop row [row] — the fix for a parser's phantom line. Keeps at least one row. */
     fun removeRow(draft: BlackCellDraft, row: Int): BlackCellDraft =

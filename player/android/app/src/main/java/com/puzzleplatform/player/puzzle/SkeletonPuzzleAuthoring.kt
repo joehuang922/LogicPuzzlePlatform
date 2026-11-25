@@ -65,12 +65,17 @@ object SkeletonPuzzleAuthoring {
     fun setWords(draft: SkeletonRules.Board, text: String): SkeletonRules.Board =
         draft.copy(words = SkeletonRules.parseWordLines(text))
 
-    /** Append a non-cell row at the bottom. */
-    fun addRow(draft: SkeletonRules.Board): SkeletonRules.Board =
-        draft.copy(cells = draft.cells + listOf(List(draft.cols) { 0 }))
+    /** Add a non-cell row at the top or bottom; marks move down with a top one. */
+    fun addRow(draft: SkeletonRules.Board, top: Boolean = false): SkeletonRules.Board = draft.copy(
+        cells = draft.cells.plusEdgeRow(top, draft.cols, 0),
+        marks = if (top) draft.marks.map { it.copy(r = it.r + 1) } else draft.marks,
+    )
 
-    /** Append a non-cell column at the right. */
-    fun addCol(draft: SkeletonRules.Board): SkeletonRules.Board = draft.copy(cells = draft.cells.map { it + 0 })
+    /** Add a non-cell column at the left or right; marks move right with a left one. */
+    fun addCol(draft: SkeletonRules.Board, left: Boolean = false): SkeletonRules.Board = draft.copy(
+        cells = draft.cells.plusEdgeCol(left, 0),
+        marks = if (left) draft.marks.map { it.copy(c = it.c + 1) } else draft.marks,
+    )
 
     /** Drop row [row] (a parser's phantom line), with its marks; later marks move up. Keeps one row. */
     fun removeRow(draft: SkeletonRules.Board, row: Int): SkeletonRules.Board {

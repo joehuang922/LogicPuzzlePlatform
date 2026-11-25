@@ -72,26 +72,38 @@ object SinkaminoAuthoring {
         return if (i < 0) draft else draft.copy(arrows = draft.arrows.filterIndexed { j, _ -> j != i })
     }
 
-    /** Append a white row at the bottom — the fix for a row the parser missed. */
-    fun addRow(draft: SinkaminoGrid): SinkaminoGrid =
-        draft.copy(cells = draft.cells + listOf(List(draft.cols) { SinkaminoRules.WHITE }))
+    /** Add a white row at the top or bottom — the fix for a row the parser missed. */
+    fun addRow(draft: SinkaminoGrid, top: Boolean = false): SinkaminoGrid = SinkaminoGrid(
+        draft.cells.plusEdgeRow(top, draft.cols, SinkaminoRules.WHITE),
+        if (top) draft.arrows.map { t -> t.map { (r, c) -> r + 1 to c } } else draft.arrows,
+    )
 
-    /** Append a white column at the right. */
-    fun addCol(draft: SinkaminoGrid): SinkaminoGrid =
-        draft.copy(cells = draft.cells.map { it + SinkaminoRules.WHITE })
+    /** Add a white column at the left or right. */
+    fun addCol(draft: SinkaminoGrid, left: Boolean = false): SinkaminoGrid = SinkaminoGrid(
+        draft.cells.plusEdgeCol(left, SinkaminoRules.WHITE),
+        if (left) draft.arrows.map { t -> t.map { (r, c) -> r to c + 1 } } else draft.arrows,
+    )
 
-    /** Drop the last row; trails reaching it go with it. Keeps at least one row. */
-    fun removeLastRow(draft: SinkaminoGrid): SinkaminoGrid {
+    /** Drop the top or bottom row; trails reaching it go with it. Keeps at least one row. */
+    fun removeEdgeRow(draft: SinkaminoGrid, top: Boolean): SinkaminoGrid {
         if (draft.rows <= 1) return draft
-        val last = draft.rows - 1
-        return SinkaminoGrid(draft.cells.dropLast(1), draft.arrows.filter { t -> t.none { it.first == last } })
+        val gone = if (top) 0 else draft.rows - 1
+        val kept = draft.arrows.filter { t -> t.none { it.first == gone } }
+        return SinkaminoGrid(
+            draft.cells.minusEdgeRow(top),
+            if (top) kept.map { t -> t.map { (r, c) -> r - 1 to c } } else kept,
+        )
     }
 
-    /** Drop the last column; trails reaching it go with it. */
-    fun removeLastCol(draft: SinkaminoGrid): SinkaminoGrid {
+    /** Drop the left or right column; trails reaching it go with it. Keeps at least one column. */
+    fun removeEdgeCol(draft: SinkaminoGrid, left: Boolean): SinkaminoGrid {
         if (draft.cols <= 1) return draft
-        val last = draft.cols - 1
-        return SinkaminoGrid(draft.cells.map { it.dropLast(1) }, draft.arrows.filter { t -> t.none { it.second == last } })
+        val gone = if (left) 0 else draft.cols - 1
+        val kept = draft.arrows.filter { t -> t.none { it.second == gone } }
+        return SinkaminoGrid(
+            draft.cells.minusEdgeCol(left),
+            if (left) kept.map { t -> t.map { (r, c) -> r to c - 1 } } else kept,
+        )
     }
 
     /** Problems that block creating or saving; see [SinkaminoRules.formatProblems]. */

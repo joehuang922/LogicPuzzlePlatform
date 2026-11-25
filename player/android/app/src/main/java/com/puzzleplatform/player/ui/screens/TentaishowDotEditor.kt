@@ -64,23 +64,13 @@ fun TentaishowDotEditor(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            TextButton(onClick = { onChange(TentaishowAuthoring::addRow) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add row")
-            }
-            TextButton(onClick = { onChange(TentaishowAuthoring::removeLastRow) }, enabled = draft.rows > 1) {
-                Icon(Icons.Filled.Remove, contentDescription = null)
-                Text("Remove last row")
-            }
-            TextButton(onClick = { onChange(TentaishowAuthoring::addCol) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add column")
-            }
-            TextButton(onClick = { onChange(TentaishowAuthoring::removeLastCol) }, enabled = draft.cols > 1) {
-                Icon(Icons.Filled.Remove, contentDescription = null)
-                Text("Remove last column")
-            }
-        }
+        GridEdgeControls(
+            onAddRow = { top -> onChange { TentaishowAuthoring.addRow(it, top) } },
+            onAddCol = { left -> onChange { TentaishowAuthoring.addCol(it, left) } },
+            onRemoveRow = { top -> onChange { TentaishowAuthoring.removeEdgeRow(it, top) } },
+            onRemoveCol = { left -> onChange { TentaishowAuthoring.removeEdgeCol(it, left) } },
+            canRemoveRow = draft.rows > 1,
+            canRemoveCol = draft.cols > 1,
+        )
     }
 }

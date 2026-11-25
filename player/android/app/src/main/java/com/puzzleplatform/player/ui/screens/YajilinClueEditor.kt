@@ -28,7 +28,7 @@ import com.puzzleplatform.player.ui.board.YajilinBoard
  * grid on the player board (tap a cell to select it), any problems that can't be right,
  * and a panel for the selected cell — make it empty or point its arrow (an empty cell
  * becomes a 0 clue), type its count, or delete its row/column (a parser's phantom line).
- * Add row/column append an empty line for one the parser missed. Every edit goes
+ * The edge controls add an empty line for one the parser missed. Every edit goes
  * straight to [onChange]; [selectedCell] is "col,row".
  */
 @OptIn(ExperimentalLayoutApi::class)
@@ -123,15 +123,9 @@ fun YajilinClueEditor(
             }
         }
 
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            TextButton(onClick = { onChange(YajilinAuthoring::addRow) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add row")
-            }
-            TextButton(onClick = { onChange(YajilinAuthoring::addCol) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add column")
-            }
-        }
+        GridEdgeControls(
+            onAddRow = { top -> onChange { YajilinAuthoring.addRow(it, top) } },
+            onAddCol = { left -> onChange { YajilinAuthoring.addCol(it, left) } },
+        )
     }
 }

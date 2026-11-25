@@ -87,13 +87,13 @@ object YajilinAuthoring {
     /** Parse a typed count: digits only; blank -> null. */
     fun parseNum(text: String): Int? = text.filter { it.isDigit() }.take(2).toIntOrNull()
 
-    /** Append an empty row at the bottom — the fix for a row the parser missed. */
-    fun addRow(draft: YajilinDraft): YajilinDraft =
-        draft.copy(cells = draft.cells + listOf(List(draft.cols) { null }))
+    /** Add an empty row at the top or bottom — the fix for a row the parser missed. */
+    fun addRow(draft: YajilinDraft, top: Boolean = false): YajilinDraft =
+        draft.copy(cells = draft.cells.plusEdgeRow(top, draft.cols, null))
 
-    /** Append an empty column at the right. */
-    fun addCol(draft: YajilinDraft): YajilinDraft =
-        draft.copy(cells = draft.cells.map { it + null })
+    /** Add an empty column at the left or right. */
+    fun addCol(draft: YajilinDraft, left: Boolean = false): YajilinDraft =
+        draft.copy(cells = draft.cells.plusEdgeCol(left, null))
 
     /** Drop row [row] — the fix for a parser's phantom line. Keeps at least one row. */
     fun removeRow(draft: YajilinDraft, row: Int): YajilinDraft =

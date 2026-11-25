@@ -59,14 +59,14 @@ class OminoTreeAuthoringTest {
     @Test
     fun resize_dropsArrowsThatNoLongerFit() {
         val d = OminoTreeAuthoring.cycleArrow(OminoTreeAuthoring.cycleArrow(empty3, "h:1,0"), "v:0,0")
-        val smaller = OminoTreeAuthoring.removeLastRow(d)
+        val smaller = OminoTreeAuthoring.removeEdgeRow(d, top = false)
         assertEquals(2, smaller.rows)
         assertEquals(listOf(Arrow(0, 0, "right")), smaller.arrows)
         assertEquals(2, smaller.numbers.size)
         val bigger = OminoTreeAuthoring.addCol(d)
         assertEquals(4, bigger.cols)
         assertTrue(bigger.numbers.all { it.size == 4 })
-        assertEquals(OminoTreeAuthoring.removeLastRow(OminoTreeAuthoring.removeLastRow(d)).rows, 2)
+        assertEquals(OminoTreeAuthoring.removeEdgeRow(OminoTreeAuthoring.removeEdgeRow(d, top = false), top = false).rows, 2)
     }
 
     @Test

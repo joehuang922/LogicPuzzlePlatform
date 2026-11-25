@@ -54,12 +54,12 @@ class KuralinAuthoringTest {
     fun removeLastRowAndCol_dropCirclesLeavingTheInterior() {
         val draft = KuralinAuthoring.draftFromCanon(parsed)
         // 2 x 3 -> 2 x 2: the corner at dc=4 is now on the border, dc=5 is outside.
-        val narrower = KuralinAuthoring.removeLastCol(draft)
+        val narrower = KuralinAuthoring.removeEdgeCol(draft, left = false)
         assertEquals(2, narrower.cols)
         assertEquals(listOf(KuralinEngine.Circle(1, 2, 0)), narrower.circles)
         // Never below two rows/columns.
-        assertEquals(narrower, KuralinAuthoring.removeLastCol(narrower))
-        assertEquals(draft, KuralinAuthoring.removeLastRow(draft))
+        assertEquals(narrower, KuralinAuthoring.removeEdgeCol(narrower, left = false))
+        assertEquals(draft, KuralinAuthoring.removeEdgeRow(draft, top = false))
         assertEquals(3, KuralinAuthoring.addRow(draft).rows)
     }
 

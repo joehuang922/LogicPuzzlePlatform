@@ -75,13 +75,13 @@ object SlitherlinkAuthoring {
         })
     }
 
-    /** Append a blank row at the bottom — the fix for a row the parser missed. */
-    fun addRow(draft: SlitherlinkDraft): SlitherlinkDraft =
-        draft.copy(cells = draft.cells + listOf(List(draft.cols) { BLANK }))
+    /** Add a blank row at the top or bottom — the fix for a row the parser missed. */
+    fun addRow(draft: SlitherlinkDraft, top: Boolean = false): SlitherlinkDraft =
+        draft.copy(cells = draft.cells.plusEdgeRow(top, draft.cols, BLANK))
 
-    /** Append a blank column at the right. */
-    fun addCol(draft: SlitherlinkDraft): SlitherlinkDraft =
-        draft.copy(cells = draft.cells.map { it + BLANK })
+    /** Add a blank column at the left or right. */
+    fun addCol(draft: SlitherlinkDraft, left: Boolean = false): SlitherlinkDraft =
+        draft.copy(cells = draft.cells.plusEdgeCol(left, BLANK))
 
     /** Drop row [row] — the fix for a parser's phantom line. Keeps at least one row. */
     fun removeRow(draft: SlitherlinkDraft, row: Int): SlitherlinkDraft =
