@@ -779,3 +779,26 @@ export interface HalfFullPaintAnswer {
   // height x width; 0 unset, 1 shaded, 2 dot (marked unshaded)
   states: number[][];
 }
+
+// Melon Pie (type 49). Circles on grid points (r 0..height, c 0..width); lines run along
+// the grid lines joining same-coloured circles in pairs, crossing straight at points.
+export interface MelonPieCircle {
+  r: number;
+  c: number;
+  color: 0 | 1 | 2; // 0 = white, 1 = black, 2 = gray
+}
+
+export interface MelonPieCanon {
+  width: number;
+  height: number;
+  circles: MelonPieCircle[];
+}
+
+export interface MelonPieAnswer {
+  edges: {
+    // (height + 1) x width; 1 = segment (r, c)-(r, c+1), 2 = × mark
+    h: number[][];
+    // height x (width + 1); 1 = segment (r, c)-(r+1, c), 2 = × mark
+    v: number[][];
+  };
+}

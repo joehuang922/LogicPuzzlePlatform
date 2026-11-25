@@ -145,6 +145,7 @@ enum class AuthoringType(
     MANNEQUIN_GATE_2("Mannequin Gate 2", "マネキンゲート2", MannequinGate2Authoring.PUZZLE_TYPE, incubating = true),
     YAJILIX("Yajilix", "ヤジリックス", YajilixAuthoring.PUZZLE_TYPE, incubating = true),
     MAJORITY_YAJILIX("Majority Yajilix", "多数派ヤジリックス", MajorityYajilixAuthoring.PUZZLE_TYPE, incubating = true),
+    MELON_PIE("Melon Pie", "メロンパイ", MelonPieAuthoring.PUZZLE_TYPE, incubating = true),
     ;
 
     companion object {

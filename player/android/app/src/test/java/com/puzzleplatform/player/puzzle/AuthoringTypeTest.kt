@@ -39,9 +39,9 @@ class AuthoringTypeTest {
             listOf(
                 AuthoringType.WHIMSICAL_KNIGHT, AuthoringType.OMINO_TREE, AuthoringType.MINUS_ROOM,
                 AuthoringType.PERFECT_L_RING, AuthoringType.MANNEQUIN_GATE_2, AuthoringType.YAJILIX,
-                AuthoringType.MAJORITY_YAJILIX,
+                AuthoringType.MAJORITY_YAJILIX, AuthoringType.MELON_PIE,
             ),
-            ordered.takeLast(7),
+            ordered.takeLast(8),
         )
     }
 }

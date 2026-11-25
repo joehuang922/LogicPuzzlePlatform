@@ -51,6 +51,7 @@ import { irregularNonogramRenderer } from "./renderers/irregularNonogram";
 import { yajilixRenderer } from "./renderers/yajilix";
 import { majorityYajilixRenderer } from "./renderers/majorityYajilix";
 import { halfFullPaintRenderer } from "./renderers/halfFullPaint";
+import { melonPieRenderer } from "./renderers/melonPie";
 
 registerRenderer(comboSudokuRenderer);
 registerRenderer(sudokuRenderer);
@@ -100,6 +101,7 @@ registerRenderer(irregularNonogramRenderer);
 registerRenderer(yajilixRenderer);
 registerRenderer(majorityYajilixRenderer);
 registerRenderer(halfFullPaintRenderer);
+registerRenderer(melonPieRenderer);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

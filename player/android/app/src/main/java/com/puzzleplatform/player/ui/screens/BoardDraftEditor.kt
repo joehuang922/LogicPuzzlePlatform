@@ -30,6 +30,7 @@ import com.puzzleplatform.player.ui.board.MannequinGate2MiniBoard
 import com.puzzleplatform.player.ui.board.CountryRoadMiniBoard
 import com.puzzleplatform.player.ui.board.YajilixMiniBoard
 import com.puzzleplatform.player.ui.board.HalfFullPaintMiniBoard
+import com.puzzleplatform.player.ui.board.MelonPieMiniBoard
 import com.puzzleplatform.player.ui.board.PicturesqueMazeMiniBoard
 import com.puzzleplatform.player.ui.board.IrregularNonogramMiniBoard
 import com.puzzleplatform.player.ui.board.TilePaintMiniBoard
@@ -408,6 +409,10 @@ fun BoardDraftEditor(
             draft = board.yajilix,
             onChange = { t -> onChange { it.copy(yajilix = t(it.yajilix)) } },
         )
+        AuthoringType.MELON_PIE -> MelonPieEditor(
+            draft = board.melonPie,
+            onChange = { t -> onChange { it.copy(melonPie = t(it.melonPie)) } },
+        )
         AuthoringType.HALF_FULL_PAINT -> HalfFullPaintEditor(
             draft = board.halfFullPaint,
             onChange = { t -> onChange { it.copy(halfFullPaint = t(it.halfFullPaint)) } },
@@ -510,6 +515,7 @@ fun BoardDraftMiniBoard(type: AuthoringType, board: BoardDraft, size: Dp) {
         AuthoringType.TILE_PAINT -> TilePaintMiniBoard(draft = board.tilePaint, hasProblems = hasProblems, size = size)
         AuthoringType.COUNTRY_ROAD -> CountryRoadMiniBoard(draft = board.countryRoad, hasProblems = hasProblems, size = size)
         AuthoringType.YAJILIX -> YajilixMiniBoard(draft = board.yajilix, hasProblems = hasProblems, size = size)
+        AuthoringType.MELON_PIE -> MelonPieMiniBoard(draft = board.melonPie, hasProblems = hasProblems, size = size)
         AuthoringType.HALF_FULL_PAINT ->
             HalfFullPaintMiniBoard(draft = board.halfFullPaint, hasProblems = hasProblems, size = size)
         AuthoringType.MAJORITY_YAJILIX ->

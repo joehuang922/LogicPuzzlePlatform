@@ -47,6 +47,7 @@ import irregularNonogramSchema from "../../../../schemas/canon/irregular-nonogra
 import yajilixSchema from "../../../../schemas/canon/yajilix.json";
 import majorityYajilixSchema from "../../../../schemas/canon/majority-yajilix.json";
 import halfFullPaintSchema from "../../../../schemas/canon/half-full-paint.json";
+import melonPieSchema from "../../../../schemas/canon/melon-pie.json";
 
 const ajv = new Ajv();
 
@@ -99,6 +100,7 @@ const validators: Record<number, ValidateFunction> = {
   46: ajv.compile(yajilixSchema),
   47: ajv.compile(majorityYajilixSchema),
   48: ajv.compile(halfFullPaintSchema),
+  49: ajv.compile(melonPieSchema),
 };
 
 export function validateCanon(puzzleType: number, data: unknown): void {
@@ -468,6 +470,20 @@ const semanticChecks: Record<number, (data: any) => void> = {
       }
       const key = `${dr},${dc}`;
       if (seen.has(key)) throw new Error(`Invalid half-full paint: two circles at (${dr},${dc})`);
+      seen.add(key);
+    }
+  },
+  // Melon Pie: circles sit on the lattice's points, one per point. Mirrors
+  // melonPieFormatProblems in frontend/src/components/melonPieRules.ts.
+  49: (data: { width: number; height: number; circles: { r: number; c: number }[] }) => {
+    const { width, height, circles } = data;
+    const seen = new Set<string>();
+    for (const { r, c } of circles) {
+      if (r > height || c > width) {
+        throw new Error(`Invalid melon pie: circle at (${r},${c}) is off the ${width}x${height} lattice`);
+      }
+      const key = `${r},${c}`;
+      if (seen.has(key)) throw new Error(`Invalid melon pie: two circles at (${r},${c})`);
       seen.add(key);
     }
   },

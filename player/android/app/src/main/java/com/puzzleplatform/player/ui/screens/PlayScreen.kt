@@ -107,6 +107,7 @@ import com.puzzleplatform.player.ui.board.CountryRoadBoard
 import com.puzzleplatform.player.ui.board.YajilixBoard
 import com.puzzleplatform.player.ui.board.MajorityYajilixBoard
 import com.puzzleplatform.player.ui.board.HalfFullPaintBoard
+import com.puzzleplatform.player.ui.board.MelonPieBoard
 import com.puzzleplatform.player.ui.board.TilePaintBoard
 import com.puzzleplatform.player.ui.board.ZebraRopeBoard
 import com.puzzleplatform.player.ui.board.PicturesqueMazeBoard
@@ -739,6 +740,13 @@ fun PlayScreen(
                                     puzzle = puzzle,
                                     userValues = state.userValues,
                                     onTapCell = vm::tapShadeCell,
+                                    onApplyChanges = vm::putUserValues,
+                                    liveValidate = state.liveValidate,
+                                )
+                                // Melon Pie: drag point to point draws lines; a tap marks a segment ×.
+                                49 -> MelonPieBoard(
+                                    puzzle = puzzle,
+                                    userValues = state.userValues,
                                     onApplyChanges = vm::putUserValues,
                                     liveValidate = state.liveValidate,
                                 )

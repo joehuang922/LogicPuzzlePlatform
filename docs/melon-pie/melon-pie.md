@@ -153,21 +153,30 @@ problem points are ringed red.
 
 `parsers/src/puzzle_parsers/melon_pie/`. No OCR or Gemini.
 
-- **Board:** there is no solid border, and the photos are busy: fingers over parts of
-  neighbouring boards, those boards' dashed lattices, text. Neither `find_quadrilateral_border`
-  nor the shared `lattice_fit.figure_frame_image` (largest ink block) finds it — the faint
-  dashes never form one block. Melon Pie gets its own locator: close the dashes along
-  each direction into line strokes, find the rectangle where long horizontal and vertical
-  strokes meet as a lattice (the circles on its points confirm it), and hand
-  `rectify_board` a frame around it through `border_image`, as Picturesque Maze does — so
-  the board is still flattened, per CLAUDE.md.
-- **Points:** `find_grid_lines` on the warp gives the lattice; the outer lines are
-  dashed, so the outermost lattice lines are found as lines like any other (not as a
-  border).
-- **Circles:** the shared ring probe and colour thresholds (`lattice_circles`, from
-  Kuralin and Half-Full Paint), probing every lattice point, corners and border included.
-- **Accuracy bar:** size and circles exactly right on all three samples at full, 2000 and
-  1080px, pinned against the hand transcriptions; each pinned canon has a unique solution.
+- **Board** (`board_frame_image`): there is no solid border, and the photos are busy:
+  fingers, neighbouring boards' lattices, text. Neither `find_quadrilateral_border` nor
+  the shared `lattice_fit.figure_frame_image` (largest ink block) finds it — the faint
+  dashes never form one block. Instead the dashes are closed along each axis into
+  strokes, long strokes kept, and touching strokes grouped; the board is the largest
+  group holding both directions that doesn't touch the photo's edge (sample 1's puzzle 2,
+  cut off below, would otherwise win). A frame half a cell around it goes to
+  `rectify_board` as `border_image`, as for Picturesque Maze, so the board is still
+  flattened (CLAUDE.md).
+- **Lattice** (`lattice_lines`): read on the warp at source resolution (`native`): the
+  cell-size normalisation can lock onto the dash period of a dashed board, and
+  `find_grid_lines` then sees dozens of lines. The same strokes' projections give
+  candidate lines; the lattice is the longest run of consecutive candidates whose gaps
+  strokes in the other direction span. That drops sample 3's puzzle 2, whose last line
+  is one cell above puzzle 3's first with no lines crossing the gap. Line positions are
+  kept as found (a curled page widens the cells near the spine; forcing an even pitch
+  missed circles there).
+- **Points** (`refine_point`): lines tilt by a few pixels on a curled page, so each point
+  moves to where its two strokes cross nearby before probing.
+- **Circles:** the shared ring probe and colour thresholds (`ring_probe`,
+  `lattice_circles.circle_color`) at every point, corners and border included.
+- **Result:** all three samples read exactly (size and every circle) at full, 2000, 1080
+  and 800px, pinned in `tests/test_melon_pie_parser.py`; each pinned canon has a unique
+  solution.
 - Found while prototyping: `flatten._trace_lines` crashed when it traced no lines at all;
   guarded to return "can't trace" (the plain warp), as it does for too few lines.
 

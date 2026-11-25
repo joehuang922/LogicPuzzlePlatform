@@ -1,0 +1,25 @@
+{
+  "title": "Melon Pie Canonical Representation",
+  "description": "A lattice of width x height cells drawn in dashed lines (the outer boundary dashed too). White, gray and black circles sit on grid points (r 0..height, c 0..width). The solver draws lines along the grid lines joining same-coloured circles in pairs; lines may cross straight at points and together form one connected whole.",
+  "type": "object",
+  "required": ["width", "height", "circles"],
+  "additionalProperties": false,
+  "properties": {
+    "width": { "description": "Cells across; points run 0..width.", "type": "integer", "minimum": 1 },
+    "height": { "description": "Cells down; points run 0..height.", "type": "integer", "minimum": 1 },
+    "circles": {
+      "description": "Circle clues on grid points.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["r", "c", "color"],
+        "additionalProperties": false,
+        "properties": {
+          "r": { "description": "Point row, 0..height.", "type": "integer", "minimum": 0 },
+          "c": { "description": "Point column, 0..width.", "type": "integer", "minimum": 0 },
+          "color": { "description": "0 = white, 1 = black, 2 = gray.", "type": "integer", "enum": [0, 1, 2] }
+        }
+      }
+    }
+  }
+}

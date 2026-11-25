@@ -154,6 +154,9 @@ def _build_parser(puzzle_type: int):
     if puzzle_type == 48:
         from puzzle_parsers.half_full_paint.parser import HalfFullPaintParser
         return HalfFullPaintParser()
+    if puzzle_type == 49:
+        from puzzle_parsers.melon_pie.parser import MelonPieParser
+        return MelonPieParser()
     if puzzle_type == 42:
         from puzzle_parsers.perfect_l_ring.parser import PerfectLRingParser
         return PerfectLRingParser()

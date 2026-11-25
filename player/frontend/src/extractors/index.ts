@@ -47,6 +47,7 @@ import { irregularNonogramExtractor } from "./irregularNonogram";
 import { yajilixExtractor } from "./yajilix";
 import { majorityYajilixExtractor } from "./majorityYajilix";
 import { halfFullPaintExtractor } from "./halfFullPaint";
+import { melonPieExtractor } from "./melonPie";
 
 const extractorRegistry = new Map<number, AnswerExtractor>();
 
@@ -102,6 +103,7 @@ registerExtractor(irregularNonogramExtractor);
 registerExtractor(yajilixExtractor);
 registerExtractor(majorityYajilixExtractor);
 registerExtractor(halfFullPaintExtractor);
+registerExtractor(melonPieExtractor);
 
 export function getExtractor(puzzleType: number): AnswerExtractor | undefined {
   return extractorRegistry.get(puzzleType);

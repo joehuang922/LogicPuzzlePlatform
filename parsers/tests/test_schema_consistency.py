@@ -28,6 +28,7 @@ from puzzle_parsers.l_ring.models import LRingBoard
 from puzzle_parsers.yajilix.models import YajilixBoard
 from puzzle_parsers.majority_yajilix.models import MajorityYajilixBoard
 from puzzle_parsers.half_full_paint.models import HalfFullPaintBoard
+from puzzle_parsers.melon_pie.models import MelonPieBoard
 from puzzle_parsers.perfect_l_ring.models import PerfectLRingBoard
 from puzzle_parsers.mannequin_gate_2.models import MannequinGate2Board
 from puzzle_parsers.hashi.models import HashiBoard
@@ -66,6 +67,7 @@ MODELS = {
     "yajilix": YajilixBoard,
     "majority-yajilix": MajorityYajilixBoard,
     "half-full-paint": HalfFullPaintBoard,
+    "melon-pie": MelonPieBoard,
     "perfect-l-ring": PerfectLRingBoard,
     "mannequin-gate-2": MannequinGate2Board,
     "hashi": HashiBoard,
