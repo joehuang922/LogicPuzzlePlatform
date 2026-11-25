@@ -19,8 +19,8 @@ import kotlinx.serialization.json.intOrNull
  *   (maximal run of board cells along a row or column, named by its first cell) has at
  *   most one clue, printed at its "start" (left / above) or "end" (right / below).
  *
- * answer: { cells } — height x width, 1 = filled. User values are Nonogram's: "col,row" ->
- * 1 filled / 2 crossed.
+ * answer: { cells } — height x width, 0 unset, 1 filled, 2 crossed (Nonogram's Android
+ * format; crosses survive a reload). User values are Nonogram's: "col,row" -> 1 / 2.
  */
 object IrregularNonogramEngine : PuzzleEngine {
     override val puzzleType: Int = 45
@@ -28,6 +28,9 @@ object IrregularNonogramEngine : PuzzleEngine {
     const val UNSET = 0
     const val FILLED = 1
     const val CROSSED = 2
+
+    /** A number of a fully matched piece. */
+    val SATISFIED_NUMBER = NonogramEngine.ClueStatus.SATISFIED
 
     data class Clue(val axis: String, val line: Int, val start: Int, val side: String, val clues: List<Int>)
 
@@ -241,6 +244,45 @@ object IrregularNonogramEngine : PuzzleEngine {
         return satisfied to broken
     }
 
+    /**
+     * Per number of each segment's clue (reading order), Nonogram's per-number status
+     * ([NonogramEngine.analyzeLineStatus]): a number greys out once its run is settled
+     * from either end, not only when the whole piece is done. Port of clueStatus().numbers.
+     */
+    fun numberStatus(board: Board, values: Map<String, Int>): Map<String, List<NonogramEngine.ClueStatus>> {
+        val clued = cluesBySegment(board)
+        return segments(board).mapNotNull { s ->
+            val clue = clued[s.key] ?: return@mapNotNull null
+            s.key to NonogramEngine.analyzeLineStatus(clue.clues, s.cells().map { (r, c) -> state(values, r, c) }).perClue
+        }.toMap()
+    }
+
+    /** The stored solution (auto-solve `solutionRepr`: { cells }), height x width, or null. */
+    fun parseSolution(puzzle: Puzzle): Array<IntArray>? {
+        val board = parseBoard(puzzle)
+        val cells = puzzle.solutionRepr?.get("cells") as? JsonArray ?: return null
+        if (cells.size != board.rows) return null
+        return Array(board.rows) { r ->
+            val row = cells[r] as? JsonArray ?: return null
+            if (row.size != board.cols) return null
+            IntArray(board.cols) { c -> (row[c] as? JsonPrimitive)?.intOrNull ?: return null }
+        }
+    }
+
+    /** The on-track check: a fill must be filled in the solution, a cross empty (Nonogram's). */
+    override fun matchesSolution(puzzle: Puzzle, userValues: Map<String, Int>): Boolean? {
+        val solution = parseSolution(puzzle) ?: return null
+        for ((r, row) in solution.withIndex()) {
+            for ((c, want) in row.withIndex()) {
+                when (userValues["$c,$r"]) {
+                    FILLED -> if (want != 1) return false
+                    CROSSED -> if (want != 0) return false
+                }
+            }
+        }
+        return true
+    }
+
     override fun isComplete(puzzle: Puzzle, userValues: Map<String, Int>): Boolean {
         val board = parseBoard(puzzle)
         val clued = cluesBySegment(board)
@@ -268,7 +310,7 @@ object IrregularNonogramEngine : PuzzleEngine {
         val board = parseBoard(puzzle)
         val cells = JsonArray(List(board.rows) { r ->
             JsonArray(List(board.cols) { c ->
-                JsonPrimitive(if (board.cells[r][c] && state(userValues, r, c) == FILLED) 1 else 0)
+                JsonPrimitive(if (board.cells[r][c]) state(userValues, r, c) else UNSET)
             })
         })
         return JsonObject(mapOf("cells" to cells))
@@ -279,7 +321,10 @@ object IrregularNonogramEngine : PuzzleEngine {
         val out = mutableMapOf<String, Int>()
         cells.forEachIndexed { r, rowEl ->
             (rowEl as? JsonArray)?.forEachIndexed { c, v ->
-                if ((v as? JsonPrimitive)?.intOrNull == 1) out["$c,$r"] = FILLED
+                when ((v as? JsonPrimitive)?.intOrNull) {
+                    FILLED -> out["$c,$r"] = FILLED
+                    CROSSED -> out["$c,$r"] = CROSSED
+                }
             }
         }
         return out

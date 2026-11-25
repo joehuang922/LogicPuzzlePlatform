@@ -6,6 +6,7 @@ import {
   clueStatus,
   cluesBySegment,
   irregularNonogramAnswer,
+  irregularNonogramValues,
   irregularNonogramFormatProblems,
   irregularNonogramProgress,
   irregularNonogramWarnings,
@@ -133,7 +134,10 @@ describe("solving", () => {
   it("progress and answer", () => {
     expect(irregularNonogramProgress(canon, {})).toBe(0);
     expect(irregularNonogramProgress(canon, { "0,0": 2 })).toBeCloseTo(10);
-    expect(irregularNonogramAnswer(canon, { ...values, "0,0": 2 })).toEqual({ cells: solution });
+    // Crosses are kept, so a reload restores them.
+    const withCross = irregularNonogramAnswer(canon, { ...values, "0,0": 2 });
+    expect(withCross).toEqual({ cells: [[2, 1, 0, 0], [0, 0, 0, 1], [1, 1, 1, 1]] });
+    expect(irregularNonogramValues(withCross)).toEqual({ ...values, "0,0": 2 });
   });
 });
 
@@ -146,4 +150,13 @@ describe("docs samples", () => {
       expect(irregularNonogramWarnings(sample)).toEqual([]);
     });
   }
+});
+
+describe("per-number greying", () => {
+  it("greys a number once its run is settled from an end, like Nonogram", () => {
+    // Column 1 [1, 1]: its first run sealed at the top (filled, then crossed).
+    const s = clueStatus(canon, { "1,0": 1, "1,1": 2 });
+    expect(s.numbers.get("col:1:0")).toEqual(["satisfied", "normal"]);
+    expect(s.satisfied.has("col:1:0")).toBe(false);
+  });
 });

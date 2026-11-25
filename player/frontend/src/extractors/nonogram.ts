@@ -19,7 +19,9 @@ export const nonogramExtractor: AnswerExtractor = {
       const c = parseInt(colStr, 10);
       const r = parseInt(rowStr, 10);
       if (r >= 0 && r < rows && c >= 0 && c < cols) {
-        cells[r][c] = val === 1 ? 1 : 0;
+        // Keep crosses (2) as well as fills (1), as Android does, so a reload restores
+        // the player's marks.
+        cells[r][c] = val === 1 || val === 2 ? val : 0;
       }
     }
 

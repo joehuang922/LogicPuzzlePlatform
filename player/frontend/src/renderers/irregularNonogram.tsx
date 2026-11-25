@@ -1,14 +1,7 @@
 import { PuzzleDefinition, PuzzleRenderer, PuzzleState, PlayerAction } from "../types/puzzle";
 import { IrregularNonogramAnswer } from "../types/canon";
 import IrregularNonogramBoard from "../components/IrregularNonogramBoard";
-import { parseIrregularNonogramCanon } from "../components/irregularNonogramRules";
-
-/** "col,row" -> 1 values from a saved answer (crosses aren't saved, as in Nonogram). */
-function valuesFromAnswer(answer: IrregularNonogramAnswer | undefined): Record<string, number> {
-  const values: Record<string, number> = {};
-  answer?.cells?.forEach((row, r) => row.forEach((v, c) => { if (v === 1) values[`${c},${r}`] = 1; }));
-  return values;
-}
+import { irregularNonogramValues, parseIrregularNonogramCanon } from "../components/irregularNonogramRules";
 
 export const irregularNonogramRenderer: PuzzleRenderer = {
   puzzleType: 45,
@@ -19,7 +12,7 @@ export const irregularNonogramRenderer: PuzzleRenderer = {
     return (
       <IrregularNonogramBoard
         canon={canon}
-        initialUserValues={state.restoreValues ?? valuesFromAnswer(saved)}
+        initialUserValues={state.restoreValues ?? irregularNonogramValues(saved)}
         onValuesChange={onValuesChange}
         onComplete={onComplete}
         liveValidate={liveValidate}

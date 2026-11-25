@@ -83,26 +83,24 @@ sport), so this is a picture puzzle. Not incubating.
 
 ## Answer structure description
 
-As Nonogram: which cells are filled.
+Each board cell's state, crosses included so that a saved game reloads with its marks
+(the format Nonogram's Android engine saves).
 
 ### Canonical JSON structure
 
 ```json
 {
   "cells": [
-    [0, 1, 0, 0],
+    [2, 1, 0, 0],
     [0, 0, 0, 1],
     [1, 1, 1, 1]
   ]
 }
 ```
 
-This is the unique solution of the question example. Its row 1 clue sits on the right
-(`"end"`); columns 2 and 3 start at row 1, so their clues sit above in row 0, beside the
-board.
-
-- `cells`: `height` × `width`; `1` = filled, `0` = empty. Non-board cells are always `0`.
-  The crossed state is a solving aid and isn't stored, as in Nonogram.
+- `cells`: `height` × `width`; `0` = unset, `1` = filled, `2` = crossed (a solving aid).
+  Non-board cells are always `0`. Only filled cells count for the rules: the example is
+  the question example's solution with one cross.
 
 ## Rules
 

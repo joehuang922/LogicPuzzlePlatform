@@ -16,7 +16,7 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
-from puzzle_parsers.grid_utils import find_grid_lines, ink_intensity
+from puzzle_parsers.grid_utils import estimate_cell_pitch, find_grid_lines, ink_intensity
 
 
 @dataclass
@@ -356,9 +356,30 @@ def _count_cells(playable_gray: NDArray) -> tuple[int, int]:
     line bends across neighbouring rows and the whole-width projection gains
     or loses one (a 40x35 board read 39x35); the bold every-5 lines keep the
     count within a line or two of the truth.
+
+    A count far from ``span / cell pitch`` is replaced by that estimate (also
+    snapped): on a small board at Android size the finder upscales the grid
+    and its faint thin lines fail the lattice test, so only the bold every-5
+    lines pass and a 15x15 board read 5x5.
     """
     h_lines, v_lines = find_grid_lines(playable_gray)
-    return _snap(len(h_lines) - 1), _snap(len(v_lines) - 1)
+    pitch = estimate_cell_pitch(playable_gray)
+    h, w = playable_gray.shape[:2]
+    return (
+        _snap(_check_pitch(len(h_lines) - 1, h, pitch)),
+        _snap(_check_pitch(len(v_lines) - 1, w, pitch)),
+    )
+
+
+# A line count further than this many cells from span / pitch is not trusted.
+_PITCH_TOLERANCE_CELLS = 2.5
+
+
+def _check_pitch(count: int, span: int, pitch: float | None) -> float:
+    if not pitch:
+        return count
+    expected = span / pitch
+    return expected if abs(count - expected) > _PITCH_TOLERANCE_CELLS else count
 
 
 def _snap(count: int) -> int:

@@ -42,6 +42,8 @@ export function IrregularNonogramDrawing({
   values = {},
   satisfied,
   broken,
+  numbers,
+  liveValidate,
   marks,
   selected,
   showLattice,
@@ -51,6 +53,10 @@ export function IrregularNonogramDrawing({
   values?: Record<string, number>;
   satisfied?: Set<string>;
   broken?: Set<string>;
+  /** Per-number status of each segment's clue (Nonogram's greying). */
+  numbers?: Map<string, ("normal" | "satisfied" | "error")[]>;
+  /** Errors on: red numbers and broken blocks. */
+  liveValidate?: boolean;
   /** Cell outlines by "r,c" (problems, warnings). */
   marks?: Map<string, string>;
   /** Highlighted cells by "r,c" (the editor's selected segments). */
@@ -104,10 +110,19 @@ export function IrregularNonogramDrawing({
         )}
       {blocks.map(([key, cells]) => {
         const done = satisfied?.has(key);
-        const bad = broken?.has(key);
+        const bad = liveValidate && broken?.has(key);
+        const perNumber = numbers?.get(key);
+        // Nonogram's colours: a settled number grey (always), a contradicted one red
+        // (errors on only).
+        const colour = (i: number) => {
+          const st = done ? "satisfied" : perNumber?.[i];
+          if (st === "satisfied") return CLUE_DONE;
+          if (st === "error" && liveValidate) return ERROR;
+          return CLUE_TEXT;
+        };
         return (
           <g key={`b${key}`}>
-            {cells.map(([r, c, v]) => (
+            {cells.map(([r, c, v], i) => (
               <g key={`${r},${c}`}>
                 <rect x={x(c)} y={y(r)} width={IN_CELL} height={IN_CELL} fill={CLUE_BG} stroke={bad ? ERROR : "#ccc"} strokeWidth={bad ? 2 : 1} strokeDasharray={bad ? undefined : "2 2"} />
                 <text
@@ -117,7 +132,7 @@ export function IrregularNonogramDrawing({
                   dominantBaseline="central"
                   fontSize={v >= 10 ? 10 : 13}
                   fontWeight={600}
-                  fill={done ? CLUE_DONE : CLUE_TEXT}
+                  fill={colour(i)}
                   pointerEvents="none"
                 >
                   {v}
@@ -277,7 +292,9 @@ export default function IrregularNonogramBoard({
               bounds={bounds}
               values={values}
               satisfied={status.satisfied}
-              broken={liveValidate ? status.broken : undefined}
+              broken={status.broken}
+              numbers={status.numbers}
+              liveValidate={liveValidate}
             />
           </g>
         </svg>

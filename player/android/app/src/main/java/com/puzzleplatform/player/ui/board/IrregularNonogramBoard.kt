@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.puzzleplatform.player.data.model.Puzzle
 import com.puzzleplatform.player.puzzle.IrregularNonogramEngine
+import com.puzzleplatform.player.puzzle.NonogramEngine
 
 private val PAPER = Color.White
 private val CLUE_BG = Color(0xFFF1F1F1)
@@ -96,11 +97,25 @@ fun IrregularNonogramBoard(
     val playing = onEditTap == null
 
     val status = remember(board, userValues) { IrregularNonogramEngine.clueStatus(board, userValues) }
-    // A clue's text and frame: grey once its piece matches, red frame once it can't fit.
-    fun clueColors(key: String) = ClueColors(
-        text = if (key in status.first) CLUE_DONE else CLUE_TEXT,
-        bad = liveValidate && key in status.second,
-    )
+    val numbers = remember(board, userValues) { IrregularNonogramEngine.numberStatus(board, userValues) }
+    // A clue's colours. Its frame turns red once the clue can't fit (errors on); each
+    // number takes Nonogram's colours: grey once settled (always, and all of them once the
+    // piece matches), red once contradicted (errors on only).
+    fun clueColors(key: String, count: Int): ClueColors {
+        val done = key in status.first
+        val perNumber = numbers[key]
+        return ClueColors(
+            text = List(count) { i ->
+                val st = if (done) IrregularNonogramEngine.SATISFIED_NUMBER else perNumber?.getOrNull(i)
+                when {
+                    st == NonogramEngine.ClueStatus.SATISFIED -> CLUE_DONE
+                    st == NonogramEngine.ClueStatus.ERROR && liveValidate -> ERROR
+                    else -> CLUE_TEXT
+                }
+            },
+            bad = liveValidate && key in status.second,
+        )
+    }
     val segments = remember(board) { IrregularNonogramEngine.segments(board) }
     val clued = remember(board) { IrregularNonogramEngine.cluesBySegment(board) }
     val cluePlan = remember(board) {
@@ -172,7 +187,7 @@ fun IrregularNonogramBoard(
                         val viewEnd = if (row) size.width else size.height
                         val slot = minOf(cell, cap / k)
                         val pin = StickyClue.pin(clue.side == "start", k * cell, k * slot, segStart, segEnd, 0f, viewEnd)
-                        val color = clueColors(s.key)
+                        val color = clueColors(s.key, k)
                         if (pin == null) {
                             val at = if (clue.side == "start") segStart - k * cell else segEnd
                             drawClueBlock(row, at, across, cell, cell, clue.clues, color, pinned = false)
@@ -206,9 +221,9 @@ fun IrregularNonogramBoard(
             if (!playing) {
                 for (s in segments) {
                     val clue = clued[s.key] ?: continue
-                    val color = clueColors(s.key)
-                    for ((r, c, v) in IrregularNonogramEngine.clueLayout(clue, s.length)) {
-                        drawClueCell(v, x(c), y(r), cell, cell, color)
+                    val color = clueColors(s.key, clue.clues.size)
+                    IrregularNonogramEngine.clueLayout(clue, s.length).forEachIndexed { i, (r, c, v) ->
+                        drawClueCell(v, x(c), y(r), cell, cell, color.bad, color.text[i])
                     }
                 }
             }
@@ -250,7 +265,8 @@ fun IrregularNonogramBoard(
     }
 }
 
-private data class ClueColors(val text: Color, val bad: Boolean)
+/** A clue's per-number text colours (reading order) and whether its frame is red. */
+private data class ClueColors(val text: List<Color>, val bad: Boolean)
 
 /** Viewport rects of the pinned clue blocks, as last drawn. */
 private class PinnedRects {
@@ -309,7 +325,8 @@ private fun DrawScope.drawClueBlock(
 ) {
     nums.forEachIndexed { i, v ->
         val a = along + i * slot
-        if (row) drawClueCell(v, a, across, slot, cell, color) else drawClueCell(v, across, a, cell, slot, color)
+        val text = color.text[i]
+        if (row) drawClueCell(v, a, across, slot, cell, color.bad, text) else drawClueCell(v, across, a, cell, slot, color.bad, text)
     }
     if (pinned && !color.bad) {
         val edge = if (startSide) along + nums.size * slot else along
@@ -323,11 +340,11 @@ private fun DrawScope.drawClueBlock(
 }
 
 /** One clue number in a [w] x [h] box at ([x], [y]). */
-private fun DrawScope.drawClueCell(v: Int, x: Float, y: Float, w: Float, h: Float, color: ClueColors) {
+private fun DrawScope.drawClueCell(v: Int, x: Float, y: Float, w: Float, h: Float, bad: Boolean, text: Color) {
     drawRect(CLUE_BG, Offset(x, y), Size(w, h))
-    val stroke = if (color.bad) minOf(w, h) * 0.08f else 1f
-    drawRect(if (color.bad) ERROR else CLUE_LINE, Offset(x, y), Size(w, h), style = Stroke(stroke))
-    drawNumber(v, x + w / 2, y + h / 2, w, h, color.text)
+    val stroke = if (bad) minOf(w, h) * 0.08f else 1f
+    drawRect(if (bad) ERROR else CLUE_LINE, Offset(x, y), Size(w, h), style = Stroke(stroke))
+    drawNumber(v, x + w / 2, y + h / 2, w, h, text)
 }
 
 /** [v] centred at ([cx], [cy]), sized to its [w] x [h] box (a two-digit number by width). */

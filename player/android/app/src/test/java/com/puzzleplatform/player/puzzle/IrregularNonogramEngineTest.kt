@@ -47,9 +47,10 @@ class IrregularNonogramEngineTest {
 
     @Test
     fun extractAndRestore_roundTrip() {
+        // Crosses are saved (2), so a reload restores them.
         val answer = IrregularNonogramEngine.extractAnswer(small, solved + ("0,0" to 2))
-        assertEquals(Json.parseToJsonElement("""{"cells":[[0,1,0,0],[0,0,0,1],[1,1,1,1]]}"""), answer)
-        assertEquals(solved, IrregularNonogramEngine.restoreUserValues(small, answer))
+        assertEquals(Json.parseToJsonElement("""{"cells":[[2,1,0,0],[0,0,0,1],[1,1,1,1]]}"""), answer)
+        assertEquals(solved + ("0,0" to 2), IrregularNonogramEngine.restoreUserValues(small, answer))
     }
 
     @Test
@@ -83,6 +84,25 @@ class IrregularNonogramEngineTest {
         val w = IrregularNonogramEngine.PAPER_ARGB
         val g = IrregularNonogramEngine.GROUND_ARGB
         assertArrayEquals(intArrayOf(w, b, g, g, w, w, w, b, b, b, b, b), thumb.cells)
+    }
+
+    @Test
+    fun numbersGreyOnceSettledFromAnEnd() {
+        val board = IrregularNonogramEngine.parseBoard(small)
+        // Column 1 [1, 1]: its first run sealed at the top (filled, then crossed).
+        val st = IrregularNonogramEngine.numberStatus(board, mapOf("1,0" to 1, "1,1" to 2))
+        assertEquals(listOf(NonogramEngine.ClueStatus.SATISFIED, NonogramEngine.ClueStatus.NORMAL), st["col:1:0"])
+    }
+
+    @Test
+    fun onTrack_againstTheStoredSolution() {
+        val withSolution = small.copy(
+            solutionRepr = Json.parseToJsonElement("""{"cells":[[0,1,0,0],[0,0,0,1],[1,1,1,1]]}""") as JsonObject,
+        )
+        assertEquals(null, IrregularNonogramEngine.matchesSolution(small, emptyMap()))
+        assertEquals(true, IrregularNonogramEngine.matchesSolution(withSolution, mapOf("1,0" to 1, "0,0" to 2)))
+        assertEquals(false, IrregularNonogramEngine.matchesSolution(withSolution, mapOf("0,0" to 1)))
+        assertEquals(false, IrregularNonogramEngine.matchesSolution(withSolution, mapOf("3,1" to 2)))
     }
 
     @Test

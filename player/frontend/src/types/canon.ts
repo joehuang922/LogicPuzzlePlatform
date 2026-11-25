@@ -710,6 +710,6 @@ export interface IrregularNonogramCanon {
 }
 
 export interface IrregularNonogramAnswer {
-  // height x width; 1 = filled
+  // height x width; 0 = unset, 1 = filled, 2 = crossed
   cells: number[][];
 }

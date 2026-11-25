@@ -45,6 +45,9 @@ def _android(img):
         # Landscape photo: at Android size a line-tracking pass ran off the
         # board and find_grid_lines raised IndexError.
         ("board-nonogram-landscape.jpg", 35, 40),
+        # Small board: at Android size only the bold lines pass the lattice
+        # test (5x5); the count is checked against span / cell pitch.
+        ("board-nonogram-small.jpg", 15, 15),
     ],
 )
 def test_grid_size(name, rows, cols, android):

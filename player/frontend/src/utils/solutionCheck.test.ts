@@ -76,6 +76,16 @@ describe("matchesSolution", () => {
     expect(matchesSolution(p, { "1,1": 8 })).toBe(false);
   });
 
+  it("irregular nonogram: Nonogram's check on the board's bounding box", () => {
+    const canon = { width: 4, height: 3, cells: [[1, 1, 0, 0], [1, 1, 1, 1], [1, 1, 1, 1]], rowClues: [], colClues: [] };
+    const p = puzzle(45, canon, { cells: [[0, 1, 0, 0], [0, 0, 0, 1], [1, 1, 1, 1]] });
+    expect(matchesSolution(p, {})).toBe(true);
+    expect(matchesSolution(p, { "1,0": 1, "0,0": 2 })).toBe(true);
+    expect(matchesSolution(p, { "0,0": 1 })).toBe(false);
+    expect(matchesSolution(p, { "3,1": 2 })).toBe(false);
+    expect(matchesSolution(puzzle(45, canon, { cells: [[0]] }), {})).toBeNull();
+  });
+
   it("nonogram: a fill must be filled there, a cross must be empty", () => {
     const p = puzzle(6, { rowClues: [[1], [1]], colClues: [[1], [1]] }, { cells: [[1, 0], [0, 1]] });
     expect(matchesSolution(p, { "0,0": 1, "1,0": 2 })).toBe(true);
