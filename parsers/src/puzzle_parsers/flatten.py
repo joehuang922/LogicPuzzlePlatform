@@ -404,6 +404,8 @@ def _trace_lines(binary: NDArray, axis: int, pitch: float) -> tuple[NDArray, NDA
                     last.append(np.nan)
 
     # Keep lines seen in enough strips; fill their gaps along the line.
+    if not tracks:
+        return None
     arr = np.array(tracks, dtype=float)
     support = (~np.isnan(arr)).sum(axis=1)
     arr = arr[support >= max(2, int(np.ceil(_MIN_LINE_SUPPORT * n)))]
