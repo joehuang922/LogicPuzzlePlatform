@@ -144,11 +144,18 @@ async function push(
   }
 
   for (const attemptId of finishedAttemptIds) {
-    // finished_at is set-once and monotonic; only stamp it if still null so a
-    // replay never moves the completion time.
+    // finished_at is when the puzzle was solved, not when the push arrived: an
+    // offline solve syncs later. Take the earliest finished snapshot's
+    // created_at (the client's solve time), clamped to [attempt created_at,
+    // server now] against a wrong device clock. Set-once: only stamp it if
+    // still null so a replay never moves the completion time.
     await executeStatement(
-      `UPDATE player_attempt SET finished_at = CURRENT_TIMESTAMP
-       WHERE id = :id AND finished_at IS NULL`,
+      `UPDATE player_attempt pa
+       SET pa.finished_at = LEAST(CURRENT_TIMESTAMP, GREATEST(pa.created_at, COALESCE(
+         (SELECT MIN(s.created_at) FROM player_attempt_snapshot s
+          WHERE s.attempt = pa.id AND s.finished = TRUE),
+         CURRENT_TIMESTAMP)))
+       WHERE pa.id = :id AND pa.finished_at IS NULL`,
       [{ name: "id", value: { stringValue: attemptId } }]
     );
   }
