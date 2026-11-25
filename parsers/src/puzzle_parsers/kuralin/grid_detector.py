@@ -10,14 +10,9 @@ set of places a circle can be is a small, known lattice once the grid is found.
    ``find_quadrilateral_border``; on a page with a small worked example above
    the puzzle it picks the main board, the largest quadrilateral).
 2. Find the grid lines with the shared ``find_grid_lines``.
-3. Probe every lattice point with at least one even doubled coordinate for a
-   printed ring (shared ``ring_probe``). Probing replaces Hough: HoughCircles (as used by Tentai Show)
-   missed a gray circle whose halftone fill and touching dashes defeated both
-   the gradient vote and the contour fallback, while a ring test at a known
-   center finds it. A dashed crossing has ink on only ~4 perimeter samples, so
-   it never passes the ring test.
-4. Classify each circle by its inner-disk brightness relative to the paper:
-   white ~1.0, gray halftone ~0.6-0.8, black <0.3.
+3. Probe every edge midpoint and interior corner for a circle and classify its
+   colour: the shared ``lattice_circles.probe_lattice_circles`` (also used by
+   Half-Full Paint).
 """
 from __future__ import annotations
 
@@ -29,18 +24,7 @@ from numpy.typing import NDArray
 
 from puzzle_parsers.board_grid import BoardGrid
 from puzzle_parsers.grid_utils import find_grid_lines, rectify_board
-from puzzle_parsers.ring_probe import RING_SUPPORT, fill_ratio, probe_ring
-
-# Inner-disk brightness / paper brightness thresholds for color.
-BLACK_MAX = 0.40
-WHITE_MIN = 0.90
-
-
-@dataclass
-class DetectedCircle:
-    dr: int
-    dc: int
-    color: int  # 0 = white, 1 = black, 2 = gray
+from puzzle_parsers.lattice_circles import DetectedCircle, probe_lattice_circles
 
 
 @dataclass
@@ -81,7 +65,7 @@ def detect_kuralin_grid(
 
     h_lines, v_lines = find_grid_lines(warped_gray)
     grid = BoardGrid(warped=warped, h_lines=h_lines, v_lines=v_lines, quad=border_pts)
-    circles = _probe_circles(warped_gray, grid)
+    circles = probe_lattice_circles(warped_gray, grid)
 
     if debug_path:
         vis = warped.copy()
@@ -96,29 +80,3 @@ def detect_kuralin_grid(
         cv2.imwrite(str(debug_path / "03_grid_circles.png"), vis)
 
     return KuralinGeometry(grid=grid, circles=circles)
-
-
-def _probe_circles(gray: NDArray, grid: BoardGrid) -> list[DetectedCircle]:
-    """Test every valid lattice point (edge midpoint or interior corner) for a circle."""
-    pitch = min(grid.cell_w, grid.cell_h)
-    circles: list[DetectedCircle] = []
-    for dr in range(1, 2 * grid.rows):
-        for dc in range(1, 2 * grid.cols):
-            if dr % 2 == 1 and dc % 2 == 1:
-                continue
-            x0, y0 = grid.point(dr, dc)
-            ring = probe_ring(gray, x0, y0, pitch)
-            if ring.support < RING_SUPPORT:
-                continue
-            ratio = fill_ratio(gray, ring.cx, ring.cy, pitch)
-            circles.append(DetectedCircle(dr=dr, dc=dc, color=_color(ratio)))
-    return circles
-
-
-def _color(ratio: float) -> int:
-    """0 = white, 1 = black, 2 = gray, from the inner disk's brightness ratio."""
-    if ratio < BLACK_MAX:
-        return 1
-    if ratio > WHITE_MIN:
-        return 0
-    return 2

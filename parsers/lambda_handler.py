@@ -151,6 +151,9 @@ def _build_parser(puzzle_type: int):
     if puzzle_type == 47:
         from puzzle_parsers.majority_yajilix.parser import MajorityYajilixParser
         return MajorityYajilixParser()
+    if puzzle_type == 48:
+        from puzzle_parsers.half_full_paint.parser import HalfFullPaintParser
+        return HalfFullPaintParser()
     if puzzle_type == 42:
         from puzzle_parsers.perfect_l_ring.parser import PerfectLRingParser
         return PerfectLRingParser()

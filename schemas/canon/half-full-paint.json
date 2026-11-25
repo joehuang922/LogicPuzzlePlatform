@@ -1,0 +1,42 @@
+{
+  "title": "Half-Full Paint Canonical Representation",
+  "description": "A width x height grid divided into rooms by thick walls. White, gray and black circle clues sit on grid lines (edge midpoints or interior corners), in doubled coordinates where cell (r, c) has its centre at (2r+1, 2c+1). The solver shades cells: every room is all shaded, all unshaded or half shaded with each colour connected, and each circle shows the majority of the cells it touches.",
+  "type": "object",
+  "required": ["width", "height", "grids", "circles"],
+  "additionalProperties": false,
+  "properties": {
+    "width": { "description": "Number of columns.", "type": "integer", "minimum": 1 },
+    "height": { "description": "Number of rows.", "type": "integer", "minimum": 1 },
+    "grids": {
+      "type": "object",
+      "required": ["h", "v"],
+      "additionalProperties": false,
+      "properties": {
+        "h": {
+          "description": "(height-1) x width: h[r][c] = 1 for a wall between (r, c) and (r+1, c).",
+          "type": "array",
+          "items": { "type": "array", "items": { "type": "integer", "enum": [0, 1] } }
+        },
+        "v": {
+          "description": "height x (width-1): v[r][c] = 1 for a wall between (r, c) and (r, c+1).",
+          "type": "array",
+          "items": { "type": "array", "items": { "type": "integer", "enum": [0, 1] } }
+        }
+      }
+    },
+    "circles": {
+      "description": "Circle clues.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["dr", "dc", "color"],
+        "additionalProperties": false,
+        "properties": {
+          "dr": { "description": "Doubled row coordinate, 1..2*height-1.", "type": "integer", "minimum": 1 },
+          "dc": { "description": "Doubled column coordinate, 1..2*width-1; at least one of dr, dc is even.", "type": "integer", "minimum": 1 },
+          "color": { "description": "0 = white (unshaded majority), 1 = black (shaded majority), 2 = gray (equal).", "type": "integer", "enum": [0, 1, 2] }
+        }
+      }
+    }
+  }
+}

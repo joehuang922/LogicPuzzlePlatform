@@ -754,3 +754,28 @@ export interface MajorityYajilixCanon {
 }
 
 export type MajorityYajilixAnswer = YajilixAnswer;
+
+// Half-Full Paint (type 48). Rooms by thick walls; circles on grid lines (Kuralin's doubled
+// coordinates and colours) show the majority of the cells they touch.
+export interface HalfFullPaintCircle {
+  dr: number;
+  dc: number;
+  color: 0 | 1 | 2; // 0 = white, 1 = black, 2 = gray
+}
+
+export interface HalfFullPaintCanon {
+  width: number;
+  height: number;
+  grids: {
+    // (height - 1) x width; 1 = wall between (r, c) and (r + 1, c)
+    h: number[][];
+    // height x (width - 1); 1 = wall between (r, c) and (r, c + 1)
+    v: number[][];
+  };
+  circles: HalfFullPaintCircle[];
+}
+
+export interface HalfFullPaintAnswer {
+  // height x width; 0 unset, 1 shaded, 2 dot (marked unshaded)
+  states: number[][];
+}

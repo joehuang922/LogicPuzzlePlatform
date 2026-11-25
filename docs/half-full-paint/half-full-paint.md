@@ -2,6 +2,9 @@
 
 **Puzzle Type ID:** 48
 
+A **picture puzzle**: the shaded cells of the solution draw a picture, so the player shows
+a live preview above the board and the Android collection shows a solved thumbnail.
+
 ## Question structure description
 
 A rectangular grid of thin solid lines, divided into rooms by thick walls (the outer border
@@ -123,6 +126,9 @@ group.
 
 ### Appearance
 
+- **Picture preview** above the board (not when `readonly`), as Zebra Rope / Tile Paint:
+  shaded cells black, dotted cells white, unset cells left `#d9d9d9`, 3-8px cells, about
+  160px at most.
 - Thin solid grid lines, thick walls and border, as in the print.
 - Circles drawn on top of the walls at their lattice points, about a third of a cell
   across: white with a black outline, gray (`#9a9a9a`) with a black outline, solid black.
@@ -169,8 +175,8 @@ Same as the player view without shading; the hovered edge (Walls) or lattice poi
   complete); the border finder picks the puzzle.
 - **Walls:** `grid_utils.classify_border_thickness`.
 - **Circles:** Kuralin's ring probe at every edge midpoint and interior corner
-  (`ring_probe.probe_ring` / `fill_ratio`) and its colour thresholds. That code moves from
-  `kuralin/grid_detector.py` to a shared helper both parsers call. No OCR or Gemini: no
+  and its colour thresholds, now the shared `lattice_circles.probe_lattice_circles` that
+  both parsers call (Zebra Rope still has its own copy of the probe). No OCR or Gemini: no
   `_OCR_TYPES` entry and no recognizer.
 - Prototyped on the samples: all three read the right size, walls and circles (puzzle 1
   matches a hand transcription exactly; 2 and 3 checked against overlays), and each read
@@ -186,8 +192,11 @@ Same as the player view without shading; the hovered edge (Walls) or lattice poi
   **Walls** (tap a line to toggle its wall) and **Circles** (tap near a lattice point to
   cycle none → white → gray → black), rows and columns added or removed at any edge
   (`GridEdgeControls`; circles shift with the board), and the problems list.
-  `HalfFullPaintMiniBoard` for the batch tile, framed red on problems.
-- Not a picture puzzle.
+  `HalfFullPaintMiniBoard` for the batch tile, framed red on problems. In edit mode the
+  picture preview is hidden.
+- **Picture:** `PicturePreview` above the board from the same cells as the web preview,
+  and `renderThumbnail` returns a `PuzzleThumbnail` of the solved answer's shaded cells for
+  the collection.
 
 # Misc
 

@@ -106,6 +106,7 @@ import com.puzzleplatform.player.ui.board.KuralinBoard
 import com.puzzleplatform.player.ui.board.CountryRoadBoard
 import com.puzzleplatform.player.ui.board.YajilixBoard
 import com.puzzleplatform.player.ui.board.MajorityYajilixBoard
+import com.puzzleplatform.player.ui.board.HalfFullPaintBoard
 import com.puzzleplatform.player.ui.board.TilePaintBoard
 import com.puzzleplatform.player.ui.board.ZebraRopeBoard
 import com.puzzleplatform.player.ui.board.PicturesqueMazeBoard
@@ -739,6 +740,14 @@ fun PlayScreen(
                                     userValues = state.userValues,
                                     onTapCell = vm::tapShadeCell,
                                     onApplyChanges = vm::putUserValues,
+                                    liveValidate = state.liveValidate,
+                                )
+                                // Half-Full Paint: a tap cycles unset -> shaded -> dot through the
+                                // shared shade/mark cycle; picture preview above the board.
+                                48 -> HalfFullPaintBoard(
+                                    puzzle = puzzle,
+                                    userValues = state.userValues,
+                                    onTapCell = vm::tapShadeCell,
                                     liveValidate = state.liveValidate,
                                 )
                                 // Majority Yajilix: Yajilix's board and input.

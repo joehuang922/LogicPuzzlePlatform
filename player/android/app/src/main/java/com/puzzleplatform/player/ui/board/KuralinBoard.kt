@@ -168,7 +168,7 @@ fun KuralinBoard(
 }
 
 /** One circle at its doubled coordinates, with a white halo so it reads over black cells. */
-private fun DrawScope.drawKuralinCircle(circle: KuralinEngine.Circle, cell: Float, error: Boolean) {
+internal fun DrawScope.drawKuralinCircle(circle: KuralinEngine.Circle, cell: Float, error: Boolean) {
     val center = Offset(circle.dc / 2f * cell, circle.dr / 2f * cell)
     val radius = cell * 0.24f
     drawCircle(Color.White, radius + 1.5.dp.toPx(), center)

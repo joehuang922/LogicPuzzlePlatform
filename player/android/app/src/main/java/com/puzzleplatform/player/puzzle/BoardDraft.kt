@@ -65,6 +65,7 @@ data class BoardDraft(
     val irregularNonogram: IrregularNonogramEngine.Board = IrregularNonogramEngine.Board(0, 0, emptyList(), emptyList()),
     val yajilix: YajilixEngine.Board = YajilixEngine.Board(emptyList()),
     val majorityYajilix: YajilixEngine.Board = YajilixEngine.Board(emptyList()),
+    val halfFullPaint: HalfFullPaintEngine.Board = HalfFullPaintEngine.Board(0, 0, emptyList(), emptyList(), emptyList()),
 ) {
     /**
      * What the type's misread check finds wrong with this board — the list that turns
@@ -116,6 +117,7 @@ data class BoardDraft(
         AuthoringType.COUNTRY_ROAD -> CountryRoadAuthoring.problems(countryRoad)
         AuthoringType.YAJILIX -> YajilixAuthoring.problems(yajilix)
         AuthoringType.MAJORITY_YAJILIX -> MajorityYajilixAuthoring.problems(majorityYajilix)
+        AuthoringType.HALF_FULL_PAINT -> HalfFullPaintAuthoring.problems(halfFullPaint)
         AuthoringType.PICTURESQUE_MAZE -> PicturesqueMazeAuthoring.problems(picturesqueMaze)
         AuthoringType.IRREGULAR_NONOGRAM -> IrregularNonogramAuthoring.problems(irregularNonogram)
     }
@@ -151,6 +153,7 @@ data class BoardDraft(
         AuthoringType.COUNTRY_ROAD -> CountryRoadAuthoring.formatProblems(countryRoad)
         AuthoringType.YAJILIX -> YajilixAuthoring.formatProblems(yajilix)
         AuthoringType.MAJORITY_YAJILIX -> MajorityYajilixAuthoring.formatProblems(majorityYajilix)
+        AuthoringType.HALF_FULL_PAINT -> HalfFullPaintAuthoring.formatProblems(halfFullPaint)
         AuthoringType.PICTURESQUE_MAZE -> PicturesqueMazeAuthoring.formatProblems(picturesqueMaze)
         AuthoringType.IRREGULAR_NONOGRAM -> IrregularNonogramAuthoring.formatProblems(irregularNonogram)
         AuthoringType.MANNEQUIN_GATE_2 -> MannequinGate2Authoring.formatProblems(mannequinGate2)
@@ -256,6 +259,8 @@ data class BoardDraft(
         AuthoringType.COUNTRY_ROAD ->
             CanonBoard(CountryRoadAuthoring.canonFromDraft(countryRoad), countryRoad.cols, countryRoad.rows)
         AuthoringType.YAJILIX -> CanonBoard(YajilixAuthoring.canonFromDraft(yajilix), yajilix.cols, yajilix.rows)
+        AuthoringType.HALF_FULL_PAINT ->
+            CanonBoard(HalfFullPaintAuthoring.canonFromDraft(halfFullPaint), halfFullPaint.cols, halfFullPaint.rows)
         AuthoringType.MAJORITY_YAJILIX -> CanonBoard(
             MajorityYajilixAuthoring.canonFromDraft(majorityYajilix),
             majorityYajilix.cols,
@@ -326,6 +331,7 @@ data class BoardDraft(
             AuthoringType.YAJILIX -> BoardDraft(yajilix = YajilixAuthoring.draftFromCanon(canon))
             AuthoringType.MAJORITY_YAJILIX ->
                 BoardDraft(majorityYajilix = MajorityYajilixAuthoring.draftFromCanon(canon))
+            AuthoringType.HALF_FULL_PAINT -> BoardDraft(halfFullPaint = HalfFullPaintAuthoring.draftFromCanon(canon))
             AuthoringType.PICTURESQUE_MAZE ->
                 BoardDraft(picturesqueMaze = PicturesqueMazeAuthoring.draftFromCanon(canon))
             AuthoringType.IRREGULAR_NONOGRAM ->

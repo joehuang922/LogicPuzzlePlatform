@@ -50,6 +50,7 @@ import { picturesqueMazeRenderer } from "./renderers/picturesqueMaze";
 import { irregularNonogramRenderer } from "./renderers/irregularNonogram";
 import { yajilixRenderer } from "./renderers/yajilix";
 import { majorityYajilixRenderer } from "./renderers/majorityYajilix";
+import { halfFullPaintRenderer } from "./renderers/halfFullPaint";
 
 registerRenderer(comboSudokuRenderer);
 registerRenderer(sudokuRenderer);
@@ -98,6 +99,7 @@ registerRenderer(picturesqueMazeRenderer);
 registerRenderer(irregularNonogramRenderer);
 registerRenderer(yajilixRenderer);
 registerRenderer(majorityYajilixRenderer);
+registerRenderer(halfFullPaintRenderer);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

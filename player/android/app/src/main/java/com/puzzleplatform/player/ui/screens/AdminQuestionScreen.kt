@@ -389,6 +389,10 @@ fun AdminQuestionScreen(
                                     "Tap a tile to review its photo and grid side by side, fix mis-read " +
                                         "walls, clue cells or clue numbers, and set its title. A red tile has a " +
                                         "wall that ends inside a tile, a clue with no cells or one too big for them."
+                                AuthoringType.HALF_FULL_PAINT ->
+                                    "Tap a tile to review its photo and grid side by side, fix mis-read " +
+                                        "walls or circles, and set its title. A red tile has a wall that ends " +
+                                        "inside a room, a misplaced circle, no circles or only one room."
                                 AuthoringType.MAJORITY_YAJILIX ->
                                     "Tap a tile to review its photo and grid side by side, fix mis-read " +
                                         "clues (letter or arrow), and set its title. A red tile has no clues " +
@@ -717,6 +721,11 @@ private fun ReviewScreen(
                             "between two tile cells to toggle its wall; in Clues, tap a cell to select it, toggle " +
                             "it between tile and clue cell, and type its right and down numbers. Add or remove " +
                             "a row or column at the edge."
+                    AuthoringType.HALF_FULL_PAINT ->
+                        "Compare the photo with the grid — pinch to zoom the photo. In Walls, tap a line " +
+                            "between two cells to toggle its wall; in Circles, tap an edge midpoint or corner " +
+                            "to cycle its circle (none, white, gray, black). Add or remove a row or column at " +
+                            "the edge."
                     AuthoringType.MAJORITY_YAJILIX ->
                         "Compare the photo with the grid — pinch to zoom the photo. Tap a cell to select it, " +
                             "then pick its letter (or Empty) and its arrow. Add or remove a row or column at " +

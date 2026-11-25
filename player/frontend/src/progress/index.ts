@@ -46,6 +46,7 @@ import { computePicturesqueMazeProgress } from "./picturesqueMaze";
 import { computeIrregularNonogramProgress } from "./irregularNonogram";
 import { computeYajilixProgress } from "./yajilix";
 import { computeMajorityYajilixProgress } from "./majorityYajilix";
+import { computeHalfFullPaintProgress } from "./halfFullPaint";
 
 export interface ProgressCalculator {
   puzzleType: number;
@@ -105,6 +106,7 @@ register(computePicturesqueMazeProgress);
 register(computeIrregularNonogramProgress);
 register(computeYajilixProgress);
 register(computeMajorityYajilixProgress);
+register(computeHalfFullPaintProgress);
 
 export function computeProgress(
   puzzle: PuzzleDefinition,
