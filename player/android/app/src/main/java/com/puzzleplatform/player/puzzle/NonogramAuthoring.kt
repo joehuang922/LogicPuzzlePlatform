@@ -112,10 +112,13 @@ object NonogramAuthoring {
     fun removeCol(draft: NonogramDraft, c: Int): NonogramDraft =
         if (draft.cols <= 1) draft else draft.copy(colClues = draft.colClues.filterIndexed { i, _ -> i != c })
 
-    /** Append a blank row — the fix for a line the parser missed. */
-    fun addRow(draft: NonogramDraft): NonogramDraft = draft.copy(rowClues = draft.rowClues + listOf(listOf(0)))
+    /** Add a blank row at the top or bottom — the fix for a line the parser missed. */
+    fun addRow(draft: NonogramDraft, top: Boolean = false): NonogramDraft =
+        draft.copy(rowClues = if (top) listOf(listOf(0)) + draft.rowClues else draft.rowClues + listOf(listOf(0)))
 
-    fun addCol(draft: NonogramDraft): NonogramDraft = draft.copy(colClues = draft.colClues + listOf(listOf(0)))
+    /** Add a blank column at the left or right. */
+    fun addCol(draft: NonogramDraft, left: Boolean = false): NonogramDraft =
+        draft.copy(colClues = if (left) listOf(listOf(0)) + draft.colClues else draft.colClues + listOf(listOf(0)))
 
     /** Zeros only mean "blank line": drop them among real blocks, and empty/all-zero -> [0]. */
     private fun normalize(clue: List<Int>): List<Int> =

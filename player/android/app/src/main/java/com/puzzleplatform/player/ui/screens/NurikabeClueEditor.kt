@@ -26,7 +26,7 @@ import com.puzzleplatform.player.ui.board.NurikabeBoard
  * Review body for a parsed nurikabe, the Android analog of the web NurikabeEditor: the
  * clue grid on the player board (tap a cell to select it), any problems that can't be
  * right, and a panel for the selected cell — type its island clue (blank for none), or
- * delete its row/column (a parser's phantom line). Add row/column append a blank line
+ * delete its row/column (a parser's phantom line). The edge controls add a blank line
  * for one the parser missed. Every edit goes straight to [onChange]; [selectedCell] is
  * "col,row".
  *
@@ -106,15 +106,9 @@ fun NurikabeClueEditor(
             }
         }
 
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            TextButton(onClick = { onChange(NurikabeAuthoring::addRow) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add row")
-            }
-            TextButton(onClick = { onChange(NurikabeAuthoring::addCol) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add column")
-            }
-        }
+        GridEdgeControls(
+            onAddRow = { top -> onChange { NurikabeAuthoring.addRow(it, top) } },
+            onAddCol = { left -> onChange { NurikabeAuthoring.addCol(it, left) } },
+        )
     }
 }

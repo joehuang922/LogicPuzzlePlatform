@@ -24,7 +24,7 @@ import com.puzzleplatform.player.ui.board.MasyuBoard
  * Review body for a parsed masyu, the Android analog of the web MasyuEditor: the circle
  * grid on the player board (tap a cell to select it), any problems that can't be right,
  * and a panel for the selected cell — make it empty, a white or a black circle, or delete
- * its row/column (a parser's phantom line). Add row/column append an empty line for one
+ * its row/column (a parser's phantom line). The edge controls add an empty line for one
  * the parser missed. Every edit goes straight to [onChange]; [selectedCell] is "col,row".
  */
 @OptIn(ExperimentalLayoutApi::class)
@@ -101,16 +101,10 @@ fun MasyuCircleEditor(
             }
         }
 
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            TextButton(onClick = { onChange(MasyuAuthoring::addRow) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add row")
-            }
-            TextButton(onClick = { onChange(MasyuAuthoring::addCol) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add column")
-            }
-        }
+        GridEdgeControls(
+            onAddRow = { top -> onChange { MasyuAuthoring.addRow(it, top) } },
+            onAddCol = { left -> onChange { MasyuAuthoring.addCol(it, left) } },
+        )
     }
 }
 

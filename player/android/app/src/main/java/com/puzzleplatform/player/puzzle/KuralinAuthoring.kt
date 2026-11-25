@@ -94,24 +94,28 @@ object KuralinAuthoring {
         return draft.copy(circles = sorted(circles))
     }
 
-    /** Append an empty row at the bottom. */
-    fun addRow(draft: KuralinDraft): KuralinDraft = draft.copy(rows = draft.rows + 1)
+    /** Add an empty row at the top or bottom. */
+    fun addRow(draft: KuralinDraft, top: Boolean = false): KuralinDraft =
+        resized(draft, draft.rows + 1, draft.cols, edgeShift(top, add = true), 0)
 
-    /** Append an empty column at the right. */
-    fun addCol(draft: KuralinDraft): KuralinDraft = draft.copy(cols = draft.cols + 1)
+    /** Add an empty column at the left or right. */
+    fun addCol(draft: KuralinDraft, left: Boolean = false): KuralinDraft =
+        resized(draft, draft.rows, draft.cols + 1, 0, edgeShift(left, add = true))
 
-    /** Drop the bottom row and the circles that leave the interior with it. Keeps at least two rows. */
-    fun removeLastRow(draft: KuralinDraft): KuralinDraft =
-        if (draft.rows <= 2) draft else resized(draft, draft.rows - 1, draft.cols)
+    /** Drop the top or bottom row and the circles that leave the interior with it. Keeps at least two rows. */
+    fun removeEdgeRow(draft: KuralinDraft, top: Boolean): KuralinDraft =
+        if (draft.rows <= 2) draft else resized(draft, draft.rows - 1, draft.cols, edgeShift(top, add = false), 0)
 
-    /** Drop the rightmost column and the circles that leave the interior with it. Keeps at least two columns. */
-    fun removeLastCol(draft: KuralinDraft): KuralinDraft =
-        if (draft.cols <= 2) draft else resized(draft, draft.rows, draft.cols - 1)
+    /** Drop the left or right column and the circles that leave the interior with it. Keeps at least two columns. */
+    fun removeEdgeCol(draft: KuralinDraft, left: Boolean): KuralinDraft =
+        if (draft.cols <= 2) draft else resized(draft, draft.rows, draft.cols - 1, 0, edgeShift(left, add = false))
 
-    private fun resized(draft: KuralinDraft, rows: Int, cols: Int) = KuralinDraft(
+    /** Resize, moving the circles by ([dr], [dc]) cells (two lattice steps each). */
+    private fun resized(draft: KuralinDraft, rows: Int, cols: Int, dr: Int, dc: Int) = KuralinDraft(
         rows,
         cols,
-        draft.circles.filter { KuralinEngine.isValidPoint(it.dr, it.dc, rows, cols) },
+        draft.circles.map { it.copy(dr = it.dr + 2 * dr, dc = it.dc + 2 * dc) }
+            .filter { KuralinEngine.isValidPoint(it.dr, it.dc, rows, cols) },
     )
 
     private fun sorted(circles: List<KuralinEngine.Circle>) = circles.sortedWith(compareBy({ it.dr }, { it.dc }))

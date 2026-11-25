@@ -29,7 +29,7 @@ import com.puzzleplatform.player.ui.board.SlalomBoard
  * a panel for the selected cell — make it empty, a wall, or part of a horizontal or
  * vertical gate (neighbouring gate cells along the line join into one gate), set its
  * gate's order number (blank for none), move the start circle there, or delete its
- * row/column (a parser's phantom line). Add row/column append an empty line for one the
+ * row/column (a parser's phantom line). The edge controls add an empty line for one the
  * parser missed. Every edit goes straight to [onChange]; [selectedCell] is "col,row".
  *
  * A gate carrying two different numbers (two numbered gates joined) is a format problem:
@@ -149,16 +149,10 @@ fun SlalomGateEditor(
             }
         }
 
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            TextButton(onClick = { onChange(SlalomAuthoring::addRow) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add row")
-            }
-            TextButton(onClick = { onChange(SlalomAuthoring::addCol) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add column")
-            }
-        }
+        GridEdgeControls(
+            onAddRow = { top -> onChange { SlalomAuthoring.addRow(it, top) } },
+            onAddCol = { left -> onChange { SlalomAuthoring.addCol(it, left) } },
+        )
     }
 }
 

@@ -179,18 +179,19 @@ object RippleEffectAuthoring {
     private fun List<List<Boolean>>.flip(r: Int, c: Int) =
         mapIndexed { i, line -> if (i == r) line.mapIndexed { j, v -> if (j == c) !v else v } else line }
 
-    /** Append a row at the bottom as one empty room — the fix for a row the parser missed. */
-    fun addRow(draft: RippleEffectDraft): RippleEffectDraft {
+    /** Add a row at the top or bottom as one empty room — the fix for a row the parser missed. */
+    fun addRow(draft: RippleEffectDraft, top: Boolean = false): RippleEffectDraft {
         if (draft.width <= 0 || draft.height <= 0) return draft
         return draft.copy(
             height = draft.height + 1,
-            hWalls = draft.hWalls + listOf(List(draft.width) { true }),
-            vWalls = draft.vWalls + listOf(List(draft.width - 1) { false }),
+            hWalls = draft.hWalls.plusEdgeRow(top, draft.width, true),
+            vWalls = draft.vWalls.plusEdgeRow(top, draft.width - 1, false),
+            clues = if (top) draft.clues.mapKeys { (cell, _) -> cell.first + 1 to cell.second } else draft.clues,
         )
     }
 
-    /** Append a column at the right as one empty room. */
-    fun addCol(draft: RippleEffectDraft): RippleEffectDraft = transpose(addRow(transpose(draft)))
+    /** Add a column at the left or right as one empty room. */
+    fun addCol(draft: RippleEffectDraft, left: Boolean = false): RippleEffectDraft = transpose(addRow(transpose(draft), left))
 
     /**
      * Drop row [row] — the fix for a parser's phantom line — and the numbers in it. The

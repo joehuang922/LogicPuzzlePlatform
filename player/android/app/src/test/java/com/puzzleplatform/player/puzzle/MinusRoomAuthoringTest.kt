@@ -58,7 +58,7 @@ class MinusRoomAuthoringTest {
     @Test
     fun resize_keepsWhatFits() {
         val d = MinusRoomAuthoring.setCircle(MinusRoomAuthoring.setCircle(empty3, 3, 4, 1), 0, 1, 2)
-        val smaller = MinusRoomAuthoring.removeLastRow(d)
+        val smaller = MinusRoomAuthoring.removeEdgeRow(d, top = false)
         assertEquals(2, smaller.rows)
         assertEquals(listOf(Circle(0, 1, 2)), smaller.circles)
         assertEquals(1, smaller.h.size)

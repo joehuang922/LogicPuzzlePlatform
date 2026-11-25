@@ -91,13 +91,13 @@ object DoubleChocoAuthoring {
     /** Parse a typed number: digits only; blank or 0 -> null (no number, as in the canon). */
     fun parseNumber(text: String): Int? = text.filter { it.isDigit() }.take(3).toIntOrNull()?.takeIf { it > 0 }
 
-    /** Append a white row at the bottom — the fix for a row the parser missed. */
-    fun addRow(draft: DoubleChocoDraft): DoubleChocoDraft =
-        draft.copy(cells = draft.cells + listOf(List(draft.cols) { DoubleChocoDraft.WHITE }))
+    /** Add a white row at the top or bottom — the fix for a row the parser missed. */
+    fun addRow(draft: DoubleChocoDraft, top: Boolean = false): DoubleChocoDraft =
+        draft.copy(cells = draft.cells.plusEdgeRow(top, draft.cols, DoubleChocoDraft.WHITE))
 
-    /** Append a white column at the right. */
-    fun addCol(draft: DoubleChocoDraft): DoubleChocoDraft =
-        draft.copy(cells = draft.cells.map { it + DoubleChocoDraft.WHITE })
+    /** Add a white column at the left or right. */
+    fun addCol(draft: DoubleChocoDraft, left: Boolean = false): DoubleChocoDraft =
+        draft.copy(cells = draft.cells.plusEdgeCol(left, DoubleChocoDraft.WHITE))
 
     /** Drop row [row] — the fix for a parser's phantom line. Keeps at least one row. */
     fun removeRow(draft: DoubleChocoDraft, row: Int): DoubleChocoDraft =

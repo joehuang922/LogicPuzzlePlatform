@@ -123,16 +123,10 @@ fun SkeletonPuzzleEditor(
             }
         }
 
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            TextButton(onClick = { onChange(SkeletonPuzzleAuthoring::addRow) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add row")
-            }
-            TextButton(onClick = { onChange(SkeletonPuzzleAuthoring::addCol) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add column")
-            }
-        }
+        GridEdgeControls(
+            onAddRow = { top -> onChange { SkeletonPuzzleAuthoring.addRow(it, top) } },
+            onAddCol = { left -> onChange { SkeletonPuzzleAuthoring.addCol(it, left) } },
+        )
 
         OutlinedTextField(
             value = wordText,

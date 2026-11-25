@@ -79,23 +79,13 @@ fun MannequinGate2Editor(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            TextButton(onClick = { onChange(MannequinGate2Authoring::addRow) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add row")
-            }
-            TextButton(onClick = { onChange(MannequinGate2Authoring::removeLastRow) }, enabled = draft.rows > 1) {
-                Icon(Icons.Filled.Remove, contentDescription = null)
-                Text("Remove last row")
-            }
-            TextButton(onClick = { onChange(MannequinGate2Authoring::addCol) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add column")
-            }
-            TextButton(onClick = { onChange(MannequinGate2Authoring::removeLastCol) }, enabled = draft.cols > 1) {
-                Icon(Icons.Filled.Remove, contentDescription = null)
-                Text("Remove last column")
-            }
-        }
+        GridEdgeControls(
+            onAddRow = { top -> onChange { MannequinGate2Authoring.addRow(it, top) } },
+            onAddCol = { left -> onChange { MannequinGate2Authoring.addCol(it, left) } },
+            onRemoveRow = { top -> onChange { MannequinGate2Authoring.removeEdgeRow(it, top) } },
+            onRemoveCol = { left -> onChange { MannequinGate2Authoring.removeEdgeCol(it, left) } },
+            canRemoveRow = draft.rows > 1,
+            canRemoveCol = draft.cols > 1,
+        )
     }
 }

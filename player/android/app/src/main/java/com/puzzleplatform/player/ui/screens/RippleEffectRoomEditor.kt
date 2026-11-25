@@ -28,7 +28,7 @@ import com.puzzleplatform.player.ui.board.RippleEffectDraftBoard
  * RippleEffectEditor: the draft's walls on [RippleEffectDraftBoard] (tap a cell to select
  * it), any problems, and a panel for the selected cell — type its given number (blank for
  * none), toggle the wall on each side, or delete its row/column (a parser's phantom
- * line). Add row/column append a one-room line for one the parser missed. Every edit
+ * line). The edge controls add a one-room line for one the parser missed. Every edit
  * goes straight to [onChange]; [selectedCell] is "col,row".
  *
  * Walls toggle one cell side at a time with no checks. A wall left ending inside a room
@@ -103,16 +103,10 @@ fun RippleEffectRoomEditor(
             }
         }
 
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            TextButton(onClick = { onChange(RippleEffectAuthoring::addRow) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add row")
-            }
-            TextButton(onClick = { onChange(RippleEffectAuthoring::addCol) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add column")
-            }
-        }
+        GridEdgeControls(
+            onAddRow = { top -> onChange { RippleEffectAuthoring.addRow(it, top) } },
+            onAddCol = { left -> onChange { RippleEffectAuthoring.addCol(it, left) } },
+        )
     }
 }
 

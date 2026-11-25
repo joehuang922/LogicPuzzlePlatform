@@ -87,15 +87,28 @@ object WhimsicalKnightAuthoring {
         }
     }
 
-    fun addRow(draft: WhimsicalKnightEngine.Board) = resized(draft, draft.rows + 1, draft.cols)
+    fun addRow(draft: WhimsicalKnightEngine.Board, top: Boolean = false) =
+        resized(shifted(draft, edgeShift(top, add = true), 0), draft.rows + 1, draft.cols)
 
-    fun addCol(draft: WhimsicalKnightEngine.Board) = resized(draft, draft.rows, draft.cols + 1)
+    fun addCol(draft: WhimsicalKnightEngine.Board, left: Boolean = false) =
+        resized(shifted(draft, 0, edgeShift(left, add = true)), draft.rows, draft.cols + 1)
 
-    fun removeLastRow(draft: WhimsicalKnightEngine.Board) =
-        if (draft.rows <= 2) draft else resized(draft, draft.rows - 1, draft.cols)
+    fun removeEdgeRow(draft: WhimsicalKnightEngine.Board, top: Boolean) =
+        if (draft.rows <= 2) draft else resized(shifted(draft, edgeShift(top, add = false), 0), draft.rows - 1, draft.cols)
 
-    fun removeLastCol(draft: WhimsicalKnightEngine.Board) =
-        if (draft.cols <= 2) draft else resized(draft, draft.rows, draft.cols - 1)
+    fun removeEdgeCol(draft: WhimsicalKnightEngine.Board, left: Boolean) =
+        if (draft.cols <= 2) draft else resized(shifted(draft, 0, edgeShift(left, add = false)), draft.rows, draft.cols - 1)
+
+    /** Move the grey cells and the marks by ([dr], [dc]) dots; [resized] trims the far side. */
+    private fun shifted(d: WhimsicalKnightEngine.Board, dr: Int, dc: Int): WhimsicalKnightEngine.Board {
+        if (dr == 0 && dc == 0) return d
+        fun move(ps: List<Point>) = ps.map { Point(it.dr + 2 * dr, it.dc + 2 * dc) }.filter { it.dr >= 0 && it.dc >= 0 }
+        return d.copy(
+            gray = grayGrid(d, d.rows, d.cols).shifted(dr, dc, d.cols - 1, 0),
+            circles = move(d.circles),
+            squares = move(d.squares),
+        )
+    }
 
     private fun grayGrid(draft: WhimsicalKnightEngine.Board, rows: Int, cols: Int) =
         List(rows - 1) { r -> List(cols - 1) { c -> if (draft.isGray(r, c)) 1 else 0 } }

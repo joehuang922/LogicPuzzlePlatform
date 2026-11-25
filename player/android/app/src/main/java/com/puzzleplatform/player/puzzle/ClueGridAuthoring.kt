@@ -80,13 +80,13 @@ abstract class ClueGridAuthoring(
     /** Parse a typed clue: digits only; blank -> null (no clue). */
     fun parseClue(text: String): Int? = text.filter { it.isDigit() }.take(3).toIntOrNull()
 
-    /** Append a blank row at the bottom — the fix for a row the parser missed. */
-    fun addRow(draft: ClueGridDraft): ClueGridDraft =
-        draft.copy(cells = draft.cells + listOf(List(draft.cols) { 0 }))
+    /** Add a blank row at the top or bottom — the fix for a row the parser missed. */
+    fun addRow(draft: ClueGridDraft, top: Boolean = false): ClueGridDraft =
+        draft.copy(cells = draft.cells.plusEdgeRow(top, draft.cols, 0))
 
-    /** Append a blank column at the right. */
-    fun addCol(draft: ClueGridDraft): ClueGridDraft =
-        draft.copy(cells = draft.cells.map { it + 0 })
+    /** Add a blank column at the left or right. */
+    fun addCol(draft: ClueGridDraft, left: Boolean = false): ClueGridDraft =
+        draft.copy(cells = draft.cells.plusEdgeCol(left, 0))
 
     /** Drop row [row] — the fix for a parser's phantom line. Keeps at least one row. */
     fun removeRow(draft: ClueGridDraft, row: Int): ClueGridDraft =

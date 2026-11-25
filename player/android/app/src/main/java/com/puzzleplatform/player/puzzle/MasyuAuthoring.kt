@@ -72,13 +72,13 @@ object MasyuAuthoring {
         })
     }
 
-    /** Append an empty row at the bottom — the fix for a row the parser missed. */
-    fun addRow(draft: MasyuDraft): MasyuDraft =
-        draft.copy(cells = draft.cells + listOf(List(draft.cols) { MasyuEngine.EMPTY }))
+    /** Add an empty row at the top or bottom — the fix for a row the parser missed. */
+    fun addRow(draft: MasyuDraft, top: Boolean = false): MasyuDraft =
+        draft.copy(cells = draft.cells.plusEdgeRow(top, draft.cols, MasyuEngine.EMPTY))
 
-    /** Append an empty column at the right. */
-    fun addCol(draft: MasyuDraft): MasyuDraft =
-        draft.copy(cells = draft.cells.map { it + MasyuEngine.EMPTY })
+    /** Add an empty column at the left or right. */
+    fun addCol(draft: MasyuDraft, left: Boolean = false): MasyuDraft =
+        draft.copy(cells = draft.cells.plusEdgeCol(left, MasyuEngine.EMPTY))
 
     /** Drop row [row] — the fix for a parser's phantom line. Keeps at least one row. */
     fun removeRow(draft: MasyuDraft, row: Int): MasyuDraft =

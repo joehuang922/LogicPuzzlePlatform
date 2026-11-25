@@ -123,24 +123,14 @@ fun CountryRoadEditor(
             }
         }
 
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            TextButton(onClick = { onChange(CountryRoadAuthoring::addRow) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add row")
-            }
-            TextButton(onClick = { onChange(CountryRoadAuthoring::removeLastRow) }, enabled = draft.rows > 2) {
-                Icon(Icons.Filled.Remove, contentDescription = null)
-                Text("Remove last row")
-            }
-            TextButton(onClick = { onChange(CountryRoadAuthoring::addCol) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add column")
-            }
-            TextButton(onClick = { onChange(CountryRoadAuthoring::removeLastCol) }, enabled = draft.cols > 2) {
-                Icon(Icons.Filled.Remove, contentDescription = null)
-                Text("Remove last column")
-            }
-        }
+        GridEdgeControls(
+            onAddRow = { top -> onChange { CountryRoadAuthoring.addRow(it, top) } },
+            onAddCol = { left -> onChange { CountryRoadAuthoring.addCol(it, left) } },
+            onRemoveRow = { top -> onChange { CountryRoadAuthoring.removeEdgeRow(it, top) } },
+            onRemoveCol = { left -> onChange { CountryRoadAuthoring.removeEdgeCol(it, left) } },
+            canRemoveRow = draft.rows > 2,
+            canRemoveCol = draft.cols > 2,
+        )
     }
 }
 

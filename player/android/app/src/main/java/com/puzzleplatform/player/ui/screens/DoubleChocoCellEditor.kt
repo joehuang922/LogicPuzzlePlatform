@@ -27,7 +27,7 @@ import com.puzzleplatform.player.ui.board.DoubleChocoBoard
  * DoubleChocoEditor: the grid on the player [DoubleChocoBoard] (tap a cell to select it),
  * any problems that can't be right, and a panel for the selected cell — make it white or
  * gray, type its number (blank for none), or delete its row/column (a parser's phantom
- * line). Add row/column append a white line for one the parser missed. Every edit goes
+ * line). The edge controls add a white line for one the parser missed. Every edit goes
  * straight to [onChange]; [selectedCell] is "col,row".
  */
 @OptIn(ExperimentalLayoutApi::class)
@@ -116,15 +116,9 @@ fun DoubleChocoCellEditor(
             }
         }
 
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            TextButton(onClick = { onChange(DoubleChocoAuthoring::addRow) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add row")
-            }
-            TextButton(onClick = { onChange(DoubleChocoAuthoring::addCol) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add column")
-            }
-        }
+        GridEdgeControls(
+            onAddRow = { top -> onChange { DoubleChocoAuthoring.addRow(it, top) } },
+            onAddCol = { left -> onChange { DoubleChocoAuthoring.addCol(it, left) } },
+        )
     }
 }

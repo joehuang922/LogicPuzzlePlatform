@@ -66,23 +66,13 @@ fun WhimsicalKnightEditor(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            TextButton(onClick = { onChange(WhimsicalKnightAuthoring::addRow) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add row")
-            }
-            TextButton(onClick = { onChange(WhimsicalKnightAuthoring::removeLastRow) }, enabled = draft.rows > 2) {
-                Icon(Icons.Filled.Remove, contentDescription = null)
-                Text("Remove last row")
-            }
-            TextButton(onClick = { onChange(WhimsicalKnightAuthoring::addCol) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add column")
-            }
-            TextButton(onClick = { onChange(WhimsicalKnightAuthoring::removeLastCol) }, enabled = draft.cols > 2) {
-                Icon(Icons.Filled.Remove, contentDescription = null)
-                Text("Remove last column")
-            }
-        }
+        GridEdgeControls(
+            onAddRow = { top -> onChange { WhimsicalKnightAuthoring.addRow(it, top) } },
+            onAddCol = { left -> onChange { WhimsicalKnightAuthoring.addCol(it, left) } },
+            onRemoveRow = { top -> onChange { WhimsicalKnightAuthoring.removeEdgeRow(it, top) } },
+            onRemoveCol = { left -> onChange { WhimsicalKnightAuthoring.removeEdgeCol(it, left) } },
+            canRemoveRow = draft.rows > 2,
+            canRemoveCol = draft.cols > 2,
+        )
     }
 }

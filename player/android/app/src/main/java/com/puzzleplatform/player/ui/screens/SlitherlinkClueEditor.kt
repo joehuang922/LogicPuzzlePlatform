@@ -23,7 +23,7 @@ import com.puzzleplatform.player.ui.board.SlitherlinkBoard
  * Review body for a parsed slitherlink, the Android analog of the web SlitherlinkEditor:
  * the clue grid on the player board (tap a cell to select it), any problems that can't
  * be right, and a panel for the selected cell — set its clue (blank or 0-3), or delete
- * its row/column (a parser's phantom line). Add row/column append a blank line for one
+ * its row/column (a parser's phantom line). The edge controls add a blank line for one
  * the parser missed. Every edit goes straight to [onChange]; [selectedCell] is "col,row".
  */
 @OptIn(ExperimentalLayoutApi::class)
@@ -99,15 +99,9 @@ fun SlitherlinkClueEditor(
             }
         }
 
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            TextButton(onClick = { onChange(SlitherlinkAuthoring::addRow) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add row")
-            }
-            TextButton(onClick = { onChange(SlitherlinkAuthoring::addCol) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add column")
-            }
-        }
+        GridEdgeControls(
+            onAddRow = { top -> onChange { SlitherlinkAuthoring.addRow(it, top) } },
+            onAddCol = { left -> onChange { SlitherlinkAuthoring.addCol(it, left) } },
+        )
     }
 }

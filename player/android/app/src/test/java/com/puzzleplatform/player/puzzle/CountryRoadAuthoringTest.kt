@@ -48,9 +48,9 @@ class CountryRoadAuthoringTest {
         assertEquals(4, wider.cols)
         assertTrue(wider.wallRight(0, 2) && wider.wallRight(2, 2)) // the new column is walled off
         assertEquals(0, wider.h[0][3]) // and its cells join each other
-        assertEquals(example, CountryRoadAuthoring.removeLastCol(wider))
+        assertEquals(example, CountryRoadAuthoring.removeEdgeCol(wider, left = false))
         val taller = CountryRoadAuthoring.addRow(example)
-        assertEquals(example, CountryRoadAuthoring.removeLastRow(taller))
+        assertEquals(example, CountryRoadAuthoring.removeEdgeRow(taller, top = false))
     }
 
     @Test

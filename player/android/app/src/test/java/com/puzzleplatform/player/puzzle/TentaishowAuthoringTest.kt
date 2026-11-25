@@ -72,7 +72,7 @@ class TentaishowAuthoringTest {
 
     @Test
     fun removingTheLastColumnDropsItsDots() {
-        val draft = TentaishowAuthoring.removeLastCol(TentaishowAuthoring.draftFromCanon(canon))
+        val draft = TentaishowAuthoring.removeEdgeCol(TentaishowAuthoring.draftFromCanon(canon), left = false)
         assertEquals(2, draft.cols)
         assertEquals(listOf(Dot(1, 1, 0)), draft.dots)
     }
