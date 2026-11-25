@@ -29,7 +29,7 @@ import com.puzzleplatform.player.ui.board.YajilixBoard
  * Review body for a parsed Yajilix board, the Android analog of the web YajilixEditor:
  * the draft on the player board, its problems (also marked on the board), and the
  * selected cell's controls — kind chips (Empty / L / I / X), arrow chips and −/+ for its
- * number. Rows and columns are added or removed at the bottom/right edge.
+ * number. Rows and columns are added or removed at any edge.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -99,23 +99,13 @@ fun YajilixEditor(
             }
         }
 
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            TextButton(onClick = { onChange(YajilixAuthoring::addRow) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add row")
-            }
-            TextButton(onClick = { onChange(YajilixAuthoring::removeLastRow) }, enabled = draft.rows > 2) {
-                Icon(Icons.Filled.Remove, contentDescription = null)
-                Text("Remove last row")
-            }
-            TextButton(onClick = { onChange(YajilixAuthoring::addCol) }) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Text("Add column")
-            }
-            TextButton(onClick = { onChange(YajilixAuthoring::removeLastCol) }, enabled = draft.cols > 2) {
-                Icon(Icons.Filled.Remove, contentDescription = null)
-                Text("Remove last column")
-            }
-        }
+        GridEdgeControls(
+            onAddRow = { top -> onChange { YajilixAuthoring.addRow(it, top) } },
+            onAddCol = { left -> onChange { YajilixAuthoring.addCol(it, left) } },
+            onRemoveRow = { top -> onChange { YajilixAuthoring.removeEdgeRow(it, top) } },
+            onRemoveCol = { left -> onChange { YajilixAuthoring.removeEdgeCol(it, left) } },
+            canRemoveRow = draft.rows > 2,
+            canRemoveCol = draft.cols > 2,
+        )
     }
 }

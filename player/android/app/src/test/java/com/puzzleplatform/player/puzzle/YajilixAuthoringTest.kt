@@ -49,12 +49,17 @@ class YajilixAuthoringTest {
         val wider = YajilixAuthoring.addCol(example)
         assertEquals(7, wider.cols)
         assertNull(wider.clue(0, 6))
-        assertEquals(example, YajilixAuthoring.removeLastCol(wider))
+        assertEquals(example, YajilixAuthoring.removeEdgeCol(wider, left = false))
         val taller = YajilixAuthoring.addRow(example)
         assertEquals(7, taller.rows)
-        assertEquals(example, YajilixAuthoring.removeLastRow(taller))
+        assertEquals(example, YajilixAuthoring.removeEdgeRow(taller, top = false))
+        // At the top / left, clues shift with the board.
+        val shifted = YajilixAuthoring.addCol(YajilixAuthoring.addRow(example, top = true), left = true)
+        assertEquals(example.clue(2, 0), shifted.clue(3, 1))
+        assertNull(shifted.clue(0, 0))
+        assertEquals(example, YajilixAuthoring.removeEdgeCol(YajilixAuthoring.removeEdgeRow(shifted, top = true), left = true))
         val tiny = YajilixEngine.Board(List(2) { List(2) { null } })
-        assertEquals(tiny, YajilixAuthoring.removeLastRow(tiny))
+        assertEquals(tiny, YajilixAuthoring.removeEdgeRow(tiny, top = true))
     }
 
     @Test

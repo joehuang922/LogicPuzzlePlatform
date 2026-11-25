@@ -212,7 +212,7 @@ cell is highlighted, and cells with warnings are outlined red.
   with Masyu's drag for the loop, taps through `vm::tapShadeCell`, and `liveValidate`.
 - **Admin review editor** (`YajilixAuthoring`, `YajilixEditor`): tap a cell to select it;
   chips under the board set the kind (Empty / L / I / X) and the direction (↑ → ↓ ←), and
-  −/+ step the number. Add / remove row and column at the bottom / right, and the problems
+  −/+ step the number. Add / remove rows and columns at any edge (`GridEdgeControls`), and the problems
   list. `YajilixMiniBoard` for the batch tile, framed red on problems.
 - Not a picture puzzle: no thumbnail or preview.
 

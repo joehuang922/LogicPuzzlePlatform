@@ -12,7 +12,7 @@ import kotlinx.serialization.json.JsonObject
  *
  * A cell is set to a kind (L / I / X; an empty cell becomes that kind's `0 ↑` clue) or
  * cleared, its arrow pointed and its number stepped. Rows and columns are added or removed
- * at the bottom/right edge. [formatProblems] mirrors yajilixFormatProblems (and the API)
+ * at any edge. [formatProblems] mirrors yajilixFormatProblems (and the API)
  * and blocks saving; [problems] adds the misread warnings an admin may override.
  *
  * Kept free of Android/Compose types so it's unit-testable.
@@ -60,16 +60,17 @@ object YajilixAuthoring {
     fun stepNum(draft: Board, r: Int, c: Int, delta: Int): Board =
         edit(draft, r, c) { it.copy(num = (it.num + delta).coerceAtLeast(0)) }
 
-    fun addRow(draft: Board) = resized(draft, draft.rows + 1, draft.cols)
+    /** Add an empty row at the top or bottom. */
+    fun addRow(draft: Board, top: Boolean = false) = Board(draft.cells.plusEdgeRow(top, draft.cols, null))
 
-    fun addCol(draft: Board) = resized(draft, draft.rows, draft.cols + 1)
+    /** Add an empty column at the left or right. */
+    fun addCol(draft: Board, left: Boolean = false) = Board(draft.cells.plusEdgeCol(left, null))
 
-    fun removeLastRow(draft: Board) = if (draft.rows <= 2) draft else resized(draft, draft.rows - 1, draft.cols)
+    /** Drop the top or bottom row. Keeps at least two rows. */
+    fun removeEdgeRow(draft: Board, top: Boolean) = if (draft.rows <= 2) draft else Board(draft.cells.minusEdgeRow(top))
 
-    fun removeLastCol(draft: Board) = if (draft.cols <= 2) draft else resized(draft, draft.rows, draft.cols - 1)
-
-    private fun resized(d: Board, rows: Int, cols: Int): Board =
-        Board(List(rows) { r -> List(cols) { c -> d.clue(r, c) } })
+    /** Drop the left or right column. Keeps at least two columns. */
+    fun removeEdgeCol(draft: Board, left: Boolean) = if (draft.cols <= 2) draft else Board(draft.cells.minusEdgeCol(left))
 
     data class Problem(val message: String, val r: Int, val c: Int)
 
