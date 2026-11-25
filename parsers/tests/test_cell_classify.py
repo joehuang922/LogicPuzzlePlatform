@@ -14,6 +14,8 @@ from puzzle_parsers.cell_classify import (
     Empty,
     Integer,
     IntegerTarget,
+    LetteredDirectedInteger,
+    LetteredDirectedIntegerTarget,
     PencilHead,
     PencilHeadTarget,
     classify_cells,
@@ -28,6 +30,14 @@ def test_dual_integer_parse_is_forgiving():
     assert t.parse({"type": "dual_integer", "top_right": 7}) == DualInteger(7, 0)
     assert t.parse({"type": "dual_integer", "top_right": "12", "bottom_left": None}) == DualInteger(12, 0)
     assert t.parse({"type": "dual_integer", "top_right": -1, "bottom_left": "x"}) == DualInteger(0, 0)
+
+
+def test_lettered_directed_integer_parse_keeps_known_letters():
+    t = LetteredDirectedIntegerTarget({"L": "capital L", "I": "capital I", "X": "capital X"})
+    raw = {"type": "lettered_directed_integer", "letter": "l", "value": "2", "direction": "up"}
+    assert t.parse(raw) == LetteredDirectedInteger("L", 2, "up")
+    assert t.parse({"letter": "Q", "value": 1, "direction": "left"}) == LetteredDirectedInteger("", 1, "left")
+    assert "capital X" in t.prompt_fragment
 
 
 class _FakeModel:

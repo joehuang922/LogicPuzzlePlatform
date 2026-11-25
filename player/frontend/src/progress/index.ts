@@ -44,6 +44,7 @@ import { computeTilePaintProgress } from "./tilePaint";
 import { computeCountryRoadProgress } from "./countryRoad";
 import { computePicturesqueMazeProgress } from "./picturesqueMaze";
 import { computeIrregularNonogramProgress } from "./irregularNonogram";
+import { computeYajilixProgress } from "./yajilix";
 
 export interface ProgressCalculator {
   puzzleType: number;
@@ -101,6 +102,7 @@ register(computeTilePaintProgress);
 register(computeCountryRoadProgress);
 register(computePicturesqueMazeProgress);
 register(computeIrregularNonogramProgress);
+register(computeYajilixProgress);
 
 export function computeProgress(
   puzzle: PuzzleDefinition,

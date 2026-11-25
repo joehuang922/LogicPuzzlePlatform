@@ -27,6 +27,7 @@ import com.puzzleplatform.player.ui.board.OminoTreeMiniBoard
 import com.puzzleplatform.player.ui.board.MinusRoomMiniBoard
 import com.puzzleplatform.player.ui.board.MannequinGate2MiniBoard
 import com.puzzleplatform.player.ui.board.CountryRoadMiniBoard
+import com.puzzleplatform.player.ui.board.YajilixMiniBoard
 import com.puzzleplatform.player.ui.board.PicturesqueMazeMiniBoard
 import com.puzzleplatform.player.ui.board.IrregularNonogramMiniBoard
 import com.puzzleplatform.player.ui.board.TilePaintMiniBoard
@@ -401,6 +402,10 @@ fun BoardDraftEditor(
             draft = board.countryRoad,
             onChange = { t -> onChange { it.copy(countryRoad = t(it.countryRoad)) } },
         )
+        AuthoringType.YAJILIX -> YajilixEditor(
+            draft = board.yajilix,
+            onChange = { t -> onChange { it.copy(yajilix = t(it.yajilix)) } },
+        )
         AuthoringType.PICTURESQUE_MAZE -> PicturesqueMazeEditor(
             draft = board.picturesqueMaze,
             onChange = { t -> onChange { it.copy(picturesqueMaze = t(it.picturesqueMaze)) } },
@@ -492,6 +497,7 @@ fun BoardDraftMiniBoard(type: AuthoringType, board: BoardDraft, size: Dp) {
         AuthoringType.MINUS_ROOM -> MinusRoomMiniBoard(draft = board.minusRoom, hasProblems = hasProblems, size = size)
         AuthoringType.TILE_PAINT -> TilePaintMiniBoard(draft = board.tilePaint, hasProblems = hasProblems, size = size)
         AuthoringType.COUNTRY_ROAD -> CountryRoadMiniBoard(draft = board.countryRoad, hasProblems = hasProblems, size = size)
+        AuthoringType.YAJILIX -> YajilixMiniBoard(draft = board.yajilix, hasProblems = hasProblems, size = size)
         AuthoringType.PICTURESQUE_MAZE ->
             PicturesqueMazeMiniBoard(draft = board.picturesqueMaze, hasProblems = hasProblems, size = size)
         AuthoringType.IRREGULAR_NONOGRAM ->

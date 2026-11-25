@@ -57,7 +57,8 @@ below, has exactly one solution. The example's solution matches the printed answ
 
 ## Answer structure description
 
-The loop's segments between neighbouring cell centres, as in Masyu / L-Ring.
+The loop's segments between neighbouring cell centres, plus the player's cell marks so they
+restore, exactly as Country Road.
 
 ### Canonical JSON structure
 
@@ -81,12 +82,14 @@ Answer to the example above:
       [0, 0, 1, 0, 1, 0],
       [0, 1, 0, 0, 1, 0]
     ]
-  }
+  },
+  "marks": [[0, 0, 0, 0, 0, 0], ...]
 }
 ```
 
 - `edges.h`: `rows x (cols-1)`. `1` = a segment between (row, col) and (row, col+1).
 - `edges.v`: `(rows-1) x cols`. `1` = a segment between (row, col) and (row+1, col).
+- `marks`: `rows x cols`. `0` none, `1` ×, `2` •; solving aids only, never validated.
 
 ## Rules
 
@@ -152,7 +155,8 @@ touches it or it carries a mark (× or •). Clue cells don't count.
   - Delete / Backspace / Space clears the cell.
 - A small toolbar under the board does the same by mouse: L / I / X / ↑ → ↓ ← / − / + /
   Clear buttons.
-- Add / remove a row at the bottom and a column at the right; Rows/Cols inputs too.
+- Add / remove a row at the bottom and a column at the right (+/− buttons). An invalid JSON
+  shows a "Create Empty Board" form with Rows/Cols inputs.
 - The modal's JSON textarea is the source of truth, synced both ways.
 
 ### Format problems (hard block, also in the API's `semanticChecks`)
@@ -192,8 +196,13 @@ cell is highlighted, and cells with warnings are outlined red.
   should be right on the samples — the editor fixes misreads. The likely confusions are
   `I` vs `1` / `l` and a left/right arrow over the text vs a digit.
 - Each sample's parse is hand-checked against the photo, pinned as
-  `docs/yajilix/<sample>.canon.json` at full and Android size (2000px long side) with the
-  Gemini reads stubbed, and solved with CP-SAT to confirm a unique solution.
+  `docs/yajilix/<sample>.canon.json` in `tests/test_yajilix_parser.py` at full, Android
+  (2000px long side) and 1080px size with the Gemini reads stubbed, and solved with CP-SAT
+  to confirm a unique solution (`<sample>.solution.json`; the example's matches the printed
+  answer). The grid size is right on every sample at full, 2000, 1080 and 800px.
+- Not yet checked: live Gemini reads of the clues (no key in the session that wrote the
+  parser). Expect `I`/`1` and arrow-direction misreads to show up first; the review editor
+  fixes them.
 
 ## Android port
 
@@ -216,5 +225,6 @@ cell is highlighted, and cells with warnings are outlined red.
   - `"h:row,col"`: loop segment between `(row, col)` and `(row, col+1)`; `1` = drawn.
   - `"v:row,col"`: loop segment between `(row, col)` and `(row+1, col)`; `1` = drawn.
   - `"m:row,col"`: cell mark; `1` = ×, `2` = •.
-- The persisted answer is `{edges: {h, v}}` as above; marks are kept in the saved user
-  values only.
+- The persisted answer is `{edges: {h, v}, marks}` as above. The web shares
+  `fromValues` / `toValues` / `degrees` / `isSingleLoop` with `countryRoadRules.ts`, and
+  `YajilixEngine` reuses `CountryRoadEngine`'s loop helpers.

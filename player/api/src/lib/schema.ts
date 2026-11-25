@@ -44,6 +44,7 @@ import tilePaintSchema from "../../../../schemas/canon/tile-paint.json";
 import countryRoadSchema from "../../../../schemas/canon/country-road.json";
 import picturesqueMazeSchema from "../../../../schemas/canon/picturesque-maze.json";
 import irregularNonogramSchema from "../../../../schemas/canon/irregular-nonogram.json";
+import yajilixSchema from "../../../../schemas/canon/yajilix.json";
 
 const ajv = new Ajv();
 
@@ -93,6 +94,7 @@ const validators: Record<number, ValidateFunction> = {
   43: ajv.compile(mannequinGate2Schema),
   44: ajv.compile(picturesqueMazeSchema),
   45: ajv.compile(irregularNonogramSchema),
+  46: ajv.compile(yajilixSchema),
 };
 
 export function validateCanon(puzzleType: number, data: unknown): void {
@@ -406,6 +408,14 @@ const semanticChecks: Record<number, (data: any) => void> = {
         if (prev) throw new Error(`Invalid country road: two numbers in one room (${prev} and R${r + 1}C${c + 1})`);
         numbered.set(room[r][c], `R${r + 1}C${c + 1}`);
       }
+    }
+  },
+  // Yajilix: the clue grid is rectangular. Mirrors yajilixFormatProblems in
+  // frontend/src/components/yajilixRules.ts.
+  46: (data: { cells: unknown[][] }) => {
+    const cols = data.cells[0].length;
+    if (data.cells.some((row) => row.length !== cols)) {
+      throw new Error("Invalid yajilix: cells must be rectangular");
     }
   },
   // Kuralin: every circle must sit on an interior grid line (edge midpoint or corner,

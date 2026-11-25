@@ -100,6 +100,7 @@ object PuzzleEngines {
         CountryRoadEngine,
         PicturesqueMazeEngine,
         IrregularNonogramEngine,
+        YajilixEngine,
     ).associateBy { it.puzzleType }
 
     fun forType(puzzleType: Int): PuzzleEngine? = engines[puzzleType]

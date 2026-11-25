@@ -104,6 +104,7 @@ import com.puzzleplatform.player.ui.board.TentaishowBoard
 import com.puzzleplatform.player.ui.board.YajilinBoard
 import com.puzzleplatform.player.ui.board.KuralinBoard
 import com.puzzleplatform.player.ui.board.CountryRoadBoard
+import com.puzzleplatform.player.ui.board.YajilixBoard
 import com.puzzleplatform.player.ui.board.TilePaintBoard
 import com.puzzleplatform.player.ui.board.ZebraRopeBoard
 import com.puzzleplatform.player.ui.board.PicturesqueMazeBoard
@@ -724,6 +725,15 @@ fun PlayScreen(
                                 // Country Road: drag draws the loop; a tap cycles the cell's mark
                                 // (none -> × -> •) through the shared shade/mark cycle.
                                 41 -> CountryRoadBoard(
+                                    puzzle = puzzle,
+                                    userValues = state.userValues,
+                                    onTapCell = vm::tapShadeCell,
+                                    onApplyChanges = vm::putUserValues,
+                                    liveValidate = state.liveValidate,
+                                )
+                                // Yajilix: drag draws the loop (never through a clue); a tap cycles an
+                                // empty cell's mark (none -> × -> •) through the shared shade/mark cycle.
+                                46 -> YajilixBoard(
                                     puzzle = puzzle,
                                     userValues = state.userValues,
                                     onTapCell = vm::tapShadeCell,

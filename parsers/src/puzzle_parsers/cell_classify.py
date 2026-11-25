@@ -76,6 +76,14 @@ class DirectedInteger:
 
 
 @dataclass(frozen=True)
+class LetteredDirectedInteger:
+    """Cell contains a letter, a number and a directional arrow (e.g. Yajilix "L2↑")."""
+    letter: str
+    value: int
+    direction: str  # "up" | "down" | "left" | "right"
+
+
+@dataclass(frozen=True)
 class DualInteger:
     """Cell split by a diagonal with two numbers."""
     top_right: int
@@ -100,7 +108,7 @@ class Symbol:
     code: int
 
 
-CellClassification = Empty | Integer | CircledInteger | DirectedInteger | DualInteger | PencilHead | DashedGate | Symbol
+CellClassification = Empty | Integer | CircledInteger | DirectedInteger | LetteredDirectedInteger | DualInteger | PencilHead | DashedGate | Symbol
 
 
 # ─── Target specs ───
@@ -179,6 +187,48 @@ class DirectedIntegerTarget(TargetSpec[DirectedInteger]):
 
     def parse(self, raw: dict) -> DirectedInteger:
         return DirectedInteger(value=_nonneg_int(raw.get("value")), direction=str(raw.get("direction", "")))
+
+
+class LetteredDirectedIntegerTarget(TargetSpec[LetteredDirectedInteger]):
+    """A letter + number + arrow clue.
+
+    Args:
+        letters: Mapping of letter -> how it is printed, e.g.
+            {"L": "capital L", "I": "capital I, printed as a plain vertical bar like l or |"}.
+            A read letter outside the mapping comes back as "".
+    """
+
+    def __init__(self, letters: dict[str, str]) -> None:
+        self._letters = letters
+
+    @property
+    def name(self) -> str:
+        return "lettered_directed_integer"
+
+    @property
+    def prompt_fragment(self) -> str:
+        lines = [
+            "A clue made of a letter, a number and an arrow (↑↓←→). A left/right arrow is "
+            "usually drawn above the letter and number, an up/down arrow to their right. "
+            "The direction is the way the arrowhead POINTS, never where the arrow sits: an "
+            "arrow drawn above the text and pointing right is \"right\", not \"up\". "
+            "The letter comes first, then the number. The letter is one of:"
+        ]
+        for letter, desc in self._letters.items():
+            lines.append(f"  {letter}: {desc}")
+        lines.append(
+            'Report as {"type":"lettered_directed_integer","letter":"<letter>","value":N,'
+            '"direction":"up"|"down"|"left"|"right"}.'
+        )
+        return "\n".join(lines)
+
+    def parse(self, raw: dict) -> LetteredDirectedInteger:
+        letter = str(raw.get("letter", "")).strip().upper()
+        return LetteredDirectedInteger(
+            letter=letter if letter in self._letters else "",
+            value=_nonneg_int(raw.get("value")),
+            direction=str(raw.get("direction", "")),
+        )
 
 
 class DualIntegerTarget(TargetSpec[DualInteger]):

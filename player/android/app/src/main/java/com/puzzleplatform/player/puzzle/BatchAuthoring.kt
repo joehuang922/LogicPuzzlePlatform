@@ -142,6 +142,7 @@ enum class AuthoringType(
     MINUS_ROOM("Minus Room", "マイナルーム", MinusRoomAuthoring.PUZZLE_TYPE, incubating = true),
     PERFECT_L_RING("Perfect L-Ring", "完全えるりんぐ", PerfectLRingAuthoring.PUZZLE_TYPE, incubating = true),
     MANNEQUIN_GATE_2("Mannequin Gate 2", "マネキンゲート2", MannequinGate2Authoring.PUZZLE_TYPE, incubating = true),
+    YAJILIX("Yajilix", "ヤジリックス", YajilixAuthoring.PUZZLE_TYPE, incubating = true),
     ;
 
     companion object {

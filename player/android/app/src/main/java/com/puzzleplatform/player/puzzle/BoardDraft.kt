@@ -63,6 +63,7 @@ data class BoardDraft(
         0, 0, emptyList(), emptyList(), PicturesqueMazeEngine.Opening("top", 0), PicturesqueMazeEngine.Opening("bottom", 0),
     ),
     val irregularNonogram: IrregularNonogramEngine.Board = IrregularNonogramEngine.Board(0, 0, emptyList(), emptyList()),
+    val yajilix: YajilixEngine.Board = YajilixEngine.Board(emptyList()),
 ) {
     /**
      * What the type's misread check finds wrong with this board — the list that turns
@@ -112,6 +113,7 @@ data class BoardDraft(
         AuthoringType.MINUS_ROOM -> MinusRoomAuthoring.problems(minusRoom)
         AuthoringType.TILE_PAINT -> TilePaintAuthoring.problems(tilePaint)
         AuthoringType.COUNTRY_ROAD -> CountryRoadAuthoring.problems(countryRoad)
+        AuthoringType.YAJILIX -> YajilixAuthoring.problems(yajilix)
         AuthoringType.PICTURESQUE_MAZE -> PicturesqueMazeAuthoring.problems(picturesqueMaze)
         AuthoringType.IRREGULAR_NONOGRAM -> IrregularNonogramAuthoring.problems(irregularNonogram)
     }
@@ -145,6 +147,7 @@ data class BoardDraft(
         AuthoringType.MINUS_ROOM -> MinusRoomAuthoring.formatProblems(minusRoom)
         AuthoringType.TILE_PAINT -> TilePaintAuthoring.formatProblems(tilePaint)
         AuthoringType.COUNTRY_ROAD -> CountryRoadAuthoring.formatProblems(countryRoad)
+        AuthoringType.YAJILIX -> YajilixAuthoring.formatProblems(yajilix)
         AuthoringType.PICTURESQUE_MAZE -> PicturesqueMazeAuthoring.formatProblems(picturesqueMaze)
         AuthoringType.IRREGULAR_NONOGRAM -> IrregularNonogramAuthoring.formatProblems(irregularNonogram)
         AuthoringType.MANNEQUIN_GATE_2 -> MannequinGate2Authoring.formatProblems(mannequinGate2)
@@ -249,6 +252,7 @@ data class BoardDraft(
             CanonBoard(TilePaintAuthoring.canonFromDraft(tilePaint), tilePaint.cols, tilePaint.rows)
         AuthoringType.COUNTRY_ROAD ->
             CanonBoard(CountryRoadAuthoring.canonFromDraft(countryRoad), countryRoad.cols, countryRoad.rows)
+        AuthoringType.YAJILIX -> CanonBoard(YajilixAuthoring.canonFromDraft(yajilix), yajilix.cols, yajilix.rows)
         AuthoringType.PICTURESQUE_MAZE -> CanonBoard(
             PicturesqueMazeAuthoring.canonFromDraft(picturesqueMaze),
             picturesqueMaze.cols,
@@ -311,6 +315,7 @@ data class BoardDraft(
             AuthoringType.MINUS_ROOM -> BoardDraft(minusRoom = MinusRoomAuthoring.draftFromCanon(canon))
             AuthoringType.TILE_PAINT -> BoardDraft(tilePaint = TilePaintAuthoring.draftFromCanon(canon))
             AuthoringType.COUNTRY_ROAD -> BoardDraft(countryRoad = CountryRoadAuthoring.draftFromCanon(canon))
+            AuthoringType.YAJILIX -> BoardDraft(yajilix = YajilixAuthoring.draftFromCanon(canon))
             AuthoringType.PICTURESQUE_MAZE ->
                 BoardDraft(picturesqueMaze = PicturesqueMazeAuthoring.draftFromCanon(canon))
             AuthoringType.IRREGULAR_NONOGRAM ->

@@ -25,6 +25,7 @@ from puzzle_parsers.corner_chain.models import CornerChainBoard
 from puzzle_parsers.sinkamino.models import SinkaminoBoard
 from puzzle_parsers.balance_link.models import BalanceLinkBoard
 from puzzle_parsers.l_ring.models import LRingBoard
+from puzzle_parsers.yajilix.models import YajilixBoard
 from puzzle_parsers.perfect_l_ring.models import PerfectLRingBoard
 from puzzle_parsers.mannequin_gate_2.models import MannequinGate2Board
 from puzzle_parsers.hashi.models import HashiBoard
@@ -60,6 +61,7 @@ MODELS = {
     "sinkamino": SinkaminoBoard,
     "balance-link": BalanceLinkBoard,
     "l-ring": LRingBoard,
+    "yajilix": YajilixBoard,
     "perfect-l-ring": PerfectLRingBoard,
     "mannequin-gate-2": MannequinGate2Board,
     "hashi": HashiBoard,

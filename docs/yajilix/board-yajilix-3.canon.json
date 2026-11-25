@@ -1,0 +1,14 @@
+{
+  "cells": [
+    [null, null, null, null, {"kind": "I", "num": 1, "dir": "left"}, null, null, null, null, {"kind": "X", "num": 1, "dir": "left"}],
+    [null, null, null, null, null, null, {"kind": "L", "num": 4, "dir": "down"}, null, null, null],
+    [null, {"kind": "L", "num": 2, "dir": "up"}, null, {"kind": "I", "num": 2, "dir": "left"}, {"kind": "X", "num": 0, "dir": "down"}, null, null, null, {"kind": "I", "num": 1, "dir": "right"}, null],
+    [null, null, null, null, null, null, null, null, null, null],
+    [null, null, null, null, null, null, null, null, {"kind": "X", "num": 2, "dir": "left"}, null],
+    [null, {"kind": "X", "num": 1, "dir": "left"}, null, null, null, {"kind": "I", "num": 1, "dir": "down"}, null, null, {"kind": "I", "num": 0, "dir": "right"}, null],
+    [null, null, null, null, null, null, null, null, null, null],
+    [{"kind": "L", "num": 2, "dir": "down"}, null, {"kind": "L", "num": 2, "dir": "right"}, null, null, null, null, null, null, null],
+    [null, null, {"kind": "I", "num": 4, "dir": "right"}, null, null, null, null, {"kind": "I", "num": 2, "dir": "right"}, null, null],
+    [null, null, null, null, {"kind": "X", "num": 1, "dir": "right"}, null, null, null, null, null]
+  ]
+}

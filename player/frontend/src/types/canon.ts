@@ -713,3 +713,30 @@ export interface IrregularNonogramAnswer {
   // height x width; 0 = unset, 1 = filled, 2 = crossed
   cells: number[][];
 }
+
+// Yajilix (type 46). A clue counts the non-clue cells from it to the board's edge in
+// `dir` that the loop turns in (L), goes straight through (I) or skips (X).
+export type YajilixKind = "L" | "I" | "X";
+export type YajilixDir = "up" | "down" | "left" | "right";
+
+export interface YajilixClue {
+  kind: YajilixKind;
+  num: number;
+  dir: YajilixDir;
+}
+
+export interface YajilixCanon {
+  // rows x cols; null = empty cell
+  cells: (YajilixClue | null)[][];
+}
+
+export interface YajilixAnswer {
+  edges: {
+    // rows x (cols - 1); 1 = loop segment between (r, c) and (r, c + 1)
+    h: number[][];
+    // (rows - 1) x cols; 1 = loop segment between (r, c) and (r + 1, c)
+    v: number[][];
+  };
+  // rows x cols; 0 none, 1 = × (unused), 2 = • (used); solving aids only
+  marks: number[][];
+}

@@ -44,6 +44,7 @@ import { tilePaintExtractor } from "./tilePaint";
 import { countryRoadExtractor } from "./countryRoad";
 import { picturesqueMazeExtractor } from "./picturesqueMaze";
 import { irregularNonogramExtractor } from "./irregularNonogram";
+import { yajilixExtractor } from "./yajilix";
 
 const extractorRegistry = new Map<number, AnswerExtractor>();
 
@@ -96,6 +97,7 @@ registerExtractor(tilePaintExtractor);
 registerExtractor(countryRoadExtractor);
 registerExtractor(picturesqueMazeExtractor);
 registerExtractor(irregularNonogramExtractor);
+registerExtractor(yajilixExtractor);
 
 export function getExtractor(puzzleType: number): AnswerExtractor | undefined {
   return extractorRegistry.get(puzzleType);
