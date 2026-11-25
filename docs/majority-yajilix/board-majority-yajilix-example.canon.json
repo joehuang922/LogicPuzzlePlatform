@@ -1,0 +1,9 @@
+{
+  "cells": [
+    [null, null, null, null, null],
+    [null, {"kind": "X", "dir": "right"}, null, null, null],
+    [null, null, null, null, {"kind": "L", "dir": "down"}],
+    [null, null, null, null, null],
+    [{"kind": "L", "dir": "up"}, {"kind": "I", "dir": "up"}, null, null, null]
+  ]
+}

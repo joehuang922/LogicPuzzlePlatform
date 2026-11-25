@@ -1,0 +1,12 @@
+{
+  "cells": [
+    [null, null, null, null, null, null, null, null],
+    [null, null, null, null, {"kind": "L", "dir": "left"}, null, null, null],
+    [null, {"kind": "I", "dir": "up"}, null, null, null, {"kind": "L", "dir": "up"}, null, null],
+    [null, {"kind": "I", "dir": "down"}, {"kind": "L", "dir": "down"}, null, null, null, {"kind": "X", "dir": "up"}, null],
+    [null, null, null, null, {"kind": "X", "dir": "up"}, null, null, null],
+    [null, {"kind": "X", "dir": "right"}, null, null, null, null, null, null],
+    [null, null, null, {"kind": "L", "dir": "right"}, null, null, {"kind": "I", "dir": "up"}, null],
+    [null, null, null, null, null, null, null, null]
+  ]
+}
