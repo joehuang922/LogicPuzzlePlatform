@@ -26,6 +26,11 @@ describe("sizeTag", () => {
     expect(sizeTag(p(44, 240, 120))).toBe("GIANT");
   });
 
+  it("kakuro by cells", () => {
+    expect(sizeTag(p(12, 16, 16))).toBeNull();
+    expect(sizeTag(p(12, 22, 32))).toBe("BIG");
+    expect(sizeTag(p(12, 42, 32))).toBe("GIANT");
+  });
   it("nonogram by cells", () => {
     expect(sizeTag(p(6, 50, 59))).toBeNull();
     expect(sizeTag(p(6, 50, 60))).toBe("BIG");

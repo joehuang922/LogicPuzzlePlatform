@@ -53,6 +53,13 @@ class SizeTagTest {
     }
 
     @Test
+    fun kakuroByCells() {
+        assertNull(p(12, 16, 16).sizeTag())
+        assertEquals(SizeTag.BIG, p(12, 22, 32).sizeTag())
+        assertEquals(SizeTag.GIANT, p(12, 42, 32).sizeTag())
+    }
+
+    @Test
     fun picturesqueMazeByCells() {
         assertNull(p(44, 50, 50).sizeTag())
         assertNull(p(44, 80, 119).sizeTag())
