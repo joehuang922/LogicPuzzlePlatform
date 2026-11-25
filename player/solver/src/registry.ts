@@ -21,6 +21,7 @@ import { pencilsPlugin } from "./plugins/pencils";
 import { shikakuPlugin } from "./plugins/shikaku";
 import { picturesqueMazePlugin } from "./plugins/picturesque-maze";
 import { irregularNonogramPlugin } from "./plugins/irregular-nonogram";
+import { zebraRopePlugin } from "./plugins/zebra-rope";
 
 // A registered plugin with its type parameters erased. The registry is the boundary where
 // per-type Canon/Board/Solution shapes meet the generic drivers, so `any` here is
@@ -58,6 +59,7 @@ register(pencilsPlugin);
 register(shikakuPlugin);
 register(picturesqueMazePlugin);
 register(irregularNonogramPlugin);
+register(zebraRopePlugin);
 
 export function getPlugin(puzzleType: number): AnyPlugin | undefined {
   return registry.get(puzzleType);

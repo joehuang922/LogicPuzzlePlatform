@@ -134,6 +134,18 @@ class ZebraRopeEngineTest {
     }
 
     @Test
+    fun matchesSolution_readsStoredStates() {
+        val withSolution = small.copy(
+            solutionRepr = Json.parseToJsonElement("""{"states":[[1,1,1],[1,0,1],[0,0,1]]}""") as JsonObject,
+        )
+        assertEquals(null, ZebraRopeEngine.matchesSolution(small, emptyMap()))
+        assertEquals(true, ZebraRopeEngine.matchesSolution(withSolution, solved))
+        assertEquals(true, ZebraRopeEngine.matchesSolution(withSolution, mapOf("1,1" to ZebraRopeEngine.MARKED)))
+        assertEquals(false, ZebraRopeEngine.matchesSolution(withSolution, mapOf("1,1" to ZebraRopeEngine.SHADED)))
+        assertEquals(false, ZebraRopeEngine.matchesSolution(withSolution, mapOf("0,0" to ZebraRopeEngine.MARKED)))
+    }
+
+    @Test
     fun registeredAsShadeMarkEngine() {
         assertTrue(PuzzleEngines.forType(36) is ShadeMarkEngine)
         val tap = ShadeCycle.tap(ZebraRopeEngine, small, emptyMap(), 1, 2)

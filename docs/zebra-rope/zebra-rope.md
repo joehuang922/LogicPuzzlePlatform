@@ -123,6 +123,10 @@ With every cell read as shaded (`1`) or unshaded (`0`/`2`): every circle's major
 - **Accuracy:** both samples parse exactly (16 ropes and 20 or 21 circles each) at full size, at 2000 / 1500 / 1200 / 1000 / 800 px long side, and after JPEG q70 recompression. The answer keys are `board-zebra-rope-{1,2}.canon.json`. Each has a unique solution under the rules (`board-zebra-rope-{1,2}.solution.json`, found by CP-SAT), which checks the parse and the rules reading together.
 - **Metric:** ropes-off (ropes whose cell list differs) plus circles-off (missing, ghost or wrong-colour circles).
 
+## Solver
+
+`player/solver/src/plugins/zebra-rope/` (type 36, gate only, no hints yet). Each rope gets one unknown *mode* (all the same, or alternating): once two cells an odd distance apart are known the mode is fixed and every cell on the rope follows; two known cells an even distance apart must agree. Each circle bounds its shaded count (white: fewer than half, black: more than half, gray: exactly half) and fills its open cells when a bound is reached. Propagation runs with failed-literal probing, then the shared search. `solution_repr` is `{ states }` (1 shaded, 0 unshaded), which drives the on-track check on web and Android. Both samples prove unique and match their `.solution.json`; a test cross-checks the verdict against brute force on random 3x3 boards.
+
 # Misc
 
 ## Coordinate convention

@@ -208,6 +208,11 @@ const CHECKS: Record<number, (canon: Json, solution: Json) => Expect | null> = {
     const sol = grid(s.cells, (canon.height as number) ?? 0, (canon.width as number) ?? 0);
     return sol && onOff(sol, "", 1, 2, false);
   },
+  // Zebra Rope: { states: height x width of 0/1 }; "col,row" -> 1 shaded, 2 marked unshaded.
+  36: (canon, s) => {
+    const sol = grid(s.states, (canon.height as number) ?? 0, (canon.width as number) ?? 0);
+    return sol && onOff(sol, "", 1, 2, false);
+  },
   // Kakuro: { values: rows x cols, 0 off the white cells }.
   12: (canon, s) => {
     const cells = canon.cells as unknown[][] | undefined;
