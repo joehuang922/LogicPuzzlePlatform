@@ -1,0 +1,13 @@
+{
+  "width": 6,
+  "height": 6,
+  "circles": [
+    {"dr": 2, "dc": 1, "color": 1},
+    {"dr": 2, "dc": 8, "color": 2},
+    {"dr": 4, "dc": 2, "color": 0},
+    {"dr": 4, "dc": 9, "color": 0},
+    {"dr": 8, "dc": 2, "color": 1},
+    {"dr": 8, "dc": 10, "color": 1},
+    {"dr": 10, "dc": 7, "color": 0}
+  ]
+}
