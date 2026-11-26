@@ -393,6 +393,7 @@ export default function NonogramStrips() {
   const isProblem = (axis: Axis, l: LineResult) => {
     if (suspectSet.has(lineId(axis, l.index))) return true;
     if (l.status === "ok" || l.status === "auto") return false; // auto fixes are listed with the result
+    if (l.status === "edited") return !solved; // settled by a person; listed until the board solves
     // A solved board proves its doubtful readings right.
     return !(solved && l.status === "flagged");
   };
@@ -707,7 +708,7 @@ function Coverage({ label, lines }: { label: string; lines: LineResult[] }) {
 
 function Legend() {
   const text: Record<string, string> = {
-    ok: "read", auto: "fixed automatically", edited: "edited", flagged: "doubtful reading", conflict: "strips disagree", missing: "no strip covers it",
+    ok: "read", auto: "fixed automatically", edited: "edited or confirmed", flagged: "doubtful reading", conflict: "strips disagree", missing: "no strip covers it",
   };
   return (
     <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", fontSize: "0.8rem", color: "#555" }}>
@@ -756,18 +757,23 @@ function LineRow({
     const clues = parseClueText(draft);
     setDraft(null);
     if (!clues) return;
-    // Back to what the strips agree on: drop the edit.
-    const readings = new Set(line.readings.map((r) => r.clues.join(" ")));
-    if (readings.size === 1 && readings.has(clues.join(" "))) onEdit(null);
-    else onEdit(clues);
+    // Untouched text changes nothing; anything typed is the person's word,
+    // even when it matches the reading (that confirms it).
+    if (clues.join(" ") === current && line.status !== "flagged" && line.status !== "auto") return;
+    onEdit(clues);
   }
+  // The reading is right as it stands: trust it (the repair then builds on it
+  // instead of setting it aside), which reruns the check.
+  const confirmable = line.clues !== null && (line.status === "flagged" || line.status === "auto" || suspect);
+  const readingsAgree = line.status === "edited" && line.readings.length > 0 &&
+    line.readings.every((r) => r.clues.join(" ") === current);
 
   return (
     <div style={{ borderTop: "1px solid #eee", padding: "0.6rem 0", display: "flex", flexDirection: "column", gap: "0.35rem" }}>
       <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
         <strong style={{ minWidth: 92 }}>{name}</strong>
         <span style={{ fontSize: "0.75rem", padding: "0.05rem 0.4rem", borderRadius: 3, background: STATUS_COLORS[line.status] }}>
-          {line.status}
+          {readingsAgree ? "confirmed" : line.status}
         </span>
         {suspect && (
           <span style={{ fontSize: "0.75rem", padding: "0.05rem 0.4rem", borderRadius: 3, background: "#c62828", color: "#fff" }}>
@@ -783,7 +789,12 @@ function LineRow({
           onBlur={commit}
           onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setDraft(null); }}
         />
-        {line.status === "edited" && <button onClick={() => { setDraft(null); onEdit(null); }}>Undo edit</button>}
+        {confirmable && draft === null && (
+          <button onClick={() => onEdit(line.clues)} title="The scan shows exactly this: trust it">Looks right</button>
+        )}
+        {line.status === "edited" && (
+          <button onClick={() => { setDraft(null); onEdit(null); }}>{readingsAgree ? "Unconfirm" : "Undo edit"}</button>
+        )}
       </div>
       {fix && line.status === "auto" && (
         <div style={{ fontSize: "0.85rem", color: "#6a1b9a" }}>
