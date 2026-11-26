@@ -41,6 +41,13 @@ WIDE = (0.08, 0.0)
 # Measured: real digits <= 0.04, the crease's cells >= 0.08.
 FAINT = 0.06
 
+# No clue is 0, so a cell the OCR reads as "0" holds a number it failed to
+# read: on the 180x70 sample a clean bold 8 read "0" and vanished from the
+# middle of its line. Keep the cell as the digit most often read as 0, and
+# hand the repair the others to try.
+UNREAD_GUESS = 8
+UNREAD_ALTERNATES = [6, 9, 3]
+
 
 def reconcile(trimmed: int, wide: int, max_clue: int | None = None) -> tuple[int, bool]:
     """One value from the two readings, and whether they disagreed.
@@ -181,22 +188,28 @@ def read_strip(
         wide.append(row_w)
         cell_boxes.append(row_boxes)
 
-    # No 0 clues: big-puzzle sources leave no line blank, and reading 0 lets
-    # every smudge in an empty cell through as a clue.
-    read_t = read_cells(ocr, trimmed, allow_multi_digits=True)
+    # Empty cells read -1 and a "0" is kept: no clue is 0, so a 0 is a number
+    # the OCR failed to read (see UNREAD_GUESS), not an empty cell.
+    read_t = read_cells(ocr, trimmed, allow_multi_digits=True, allow_zero=True)
     # An empty trimmed cell is empty: blank it out of the wide pass, where its
     # dashed sides could read as a 1.
     for i in range(n):
         for k, v in enumerate(read_t[i]):
-            if v == 0:
+            if v < 0:
                 wide[i][k] = np.full_like(wide[i][k], 255)
-    read_w = read_cells(ocr, wide, allow_multi_digits=True)
+    read_w = read_cells(ocr, wide, allow_multi_digits=True, allow_zero=True)
     values: list[list[int]] = []
     unsure: list[dict[int, list[int]]] = []
     for rt, rw in zip(read_t, read_w):
         row_v, row_u = [], {}
         for k, (t, w) in enumerate(zip(rt, rw)):
-            v, disagreed = reconcile(t, w, max_clue)
+            if 0 in (t, w) and max(t, w) <= 0:
+                # A crop read "0" and neither read a number: one, guessed.
+                row_v.append(UNREAD_GUESS)
+                row_u[k] = list(UNREAD_ALTERNATES)
+                continue
+            # From here 0 is empty, the way reconcile counts it.
+            v, disagreed = reconcile(max(t, 0), max(w, 0), max_clue)
             row_v.append(v)
             if disagreed:
                 row_u[k] = sorted({x for x in (t, w) if x != v and x > 0 and (max_clue is None or x <= max_clue)})

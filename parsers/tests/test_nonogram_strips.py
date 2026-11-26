@@ -9,7 +9,8 @@ so every clue in it is consistent with a unique picture.
 
 ``lp2604-*`` are a 180x70 board photographed rather than scanned: its thin
 separators fade out among the clues at the top and bottom of the page, and a
-smudge and a crease bend one column line.
+smudge and a crease bend one column line. ``lp2604.canon.json`` is its verified clue
+set (line logic solves all 12,600 cells).
 """
 from __future__ import annotations
 
@@ -203,6 +204,21 @@ def test_photographed_strip_keeps_every_line_where_thin_lines_fade():
     # Every separator reaches across the clue grid (21 rows used to stop short).
     common = float(np.median(g.extents))
     assert all(e <= common + 0.5 * g.cell_pitch for e in g.extents)
+
+
+def test_photographed_row_keeps_a_number_the_ocr_read_as_zero():
+    """Row 66's clean bold 8 reads "0"; no clue is 0, so it stays a number
+    (guessed 8, flagged) instead of vanishing from the middle of the row.
+    (Its 21 reads 1 or 27, both crops blurred: left to the repair.)"""
+    from puzzle_parsers.recognition import EasyOcrBackend
+
+    canon = json.loads((STRIPS / "lp2604.canon.json").read_text())["rowClues"][65]
+    r = read_strip(cv2.imread(str(STRIPS / "lp2604-rows.jpg")), "rows", EasyOcrBackend(), max_clue=180)
+    row = r.lines[65]
+    assert len(row.clues) == len(canon)
+    assert row.clues[10] == 8 and row.alternates[10] == [6, 9, 3]
+    assert [c for k, c in enumerate(row.clues) if k != 20] == [c for k, c in enumerate(canon) if k != 20]
+    assert "gap" not in row.flags
 
 
 def test_photographed_strip_lines_stay_evenly_spaced_past_a_smudge():

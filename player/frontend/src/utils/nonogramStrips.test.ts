@@ -118,6 +118,11 @@ describe("candidates", () => {
     expect(c).toEqual(expect.arrayContaining(["4 6", "12 8", "1 2 6", "126", "6 12", "17 6"]));
   });
 
+  it("a mix-up of the other crop's reading too: a blurred 21 read as 1 and as 27", () => {
+    const c = candidates(ln({ alternates: [[1, 27]] }), [3, 1, 14], null, 200).map((x) => x.join(" "));
+    expect(c).toContain("3 21 14");
+  });
+
   it("drops lists that don't fit the line", () => {
     expect(candidates(ln(), [3, 3], 4, 8).map((x) => x.join(" "))).not.toContain("3 7");
   });

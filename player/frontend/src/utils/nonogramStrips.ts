@@ -374,7 +374,12 @@ export function candidates(line: RepairLine, base: number[], delta: number | nul
   };
   const replaced = (i: number, vs: number[]) => [...base.slice(0, i), ...vs, ...base.slice(i + 1)];
   for (const r of line.readings) add(r);
-  for (const [i, v] of line.alternates) if (i < base.length) add(replaced(i, [v]));
+  for (const [i, v] of line.alternates) {
+    if (i >= base.length) continue;
+    add(replaced(i, [v]));
+    // Both crops can be off: a blurred 21 read as 1 and as 27.
+    if (delta === null) for (const w of confusions(v)) add(replaced(i, [w]));
+  }
   // A blurred line can have several cells the other crop read right.
   if (line.alternates.length > 1) {
     const all = [...base];
