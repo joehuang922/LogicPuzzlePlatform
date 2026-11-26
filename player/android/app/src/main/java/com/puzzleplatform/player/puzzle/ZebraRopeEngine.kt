@@ -131,6 +131,12 @@ object ZebraRopeEngine : ShadeMarkEngine {
         return result
     }
 
+    override fun matchesSolution(puzzle: Puzzle, userValues: Map<String, Int>): Boolean? {
+        val board = parseBoard(puzzle)
+        val states = SolutionCheck.grid(puzzle.solutionRepr?.get("states"), board.rows, board.cols) ?: return null
+        return SolutionCheck.matches(userValues, SolutionCheck.onOff(states, "", SHADED, MARKED, rowFirst = false))
+    }
+
     override fun isComplete(puzzle: Puzzle, userValues: Map<String, Int>): Boolean {
         val board = parseBoard(puzzle)
         if (board.rows == 0 || board.cols == 0) return false

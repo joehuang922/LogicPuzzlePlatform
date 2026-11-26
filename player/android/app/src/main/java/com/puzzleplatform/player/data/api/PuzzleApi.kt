@@ -5,6 +5,7 @@ import com.puzzleplatform.player.data.model.CollectionListResponse
 import com.puzzleplatform.player.data.model.CollectionManifestResponse
 import com.puzzleplatform.player.data.model.CollectionProgressResponse
 import com.puzzleplatform.player.data.model.CreateAttemptRequest
+import com.puzzleplatform.player.data.model.MissionsResponse
 import com.puzzleplatform.player.data.model.CreateAttemptResponse
 import com.puzzleplatform.player.data.model.CreateCollectionRequest
 import com.puzzleplatform.player.data.model.CreateCollectionResponse
@@ -12,6 +13,7 @@ import com.puzzleplatform.player.data.model.UpdateCollectionRequest
 import com.puzzleplatform.player.data.model.UpdateCollectionResponse
 import com.puzzleplatform.player.data.model.CreatePuzzleRequest
 import com.puzzleplatform.player.data.model.CreatePuzzleResponse
+import com.puzzleplatform.player.data.model.HistoryResponse
 import com.puzzleplatform.player.data.model.ProfileResponse
 import com.puzzleplatform.player.data.model.ProgressChangesResponse
 import com.puzzleplatform.player.data.model.PuzzleListResponse
@@ -123,6 +125,19 @@ interface PuzzleApi {
 
     @GET("profile")
     suspend fun getProfile(@Query("player") player: Int): ProfileResponse
+
+    /** Solves per day over [from]..[to] (YYYY-MM-DD, inclusive) in time zone [tz]. */
+    @GET("history")
+    suspend fun getHistory(
+        @Query("player") player: Int,
+        @Query("from") from: String,
+        @Query("to") to: String,
+        @Query("tz") tz: String,
+        @Query("metric") metric: String = "solved",
+    ): HistoryResponse
+
+    @GET("profile/missions")
+    suspend fun getMissions(@Query("player") player: Int, @Query("tz") tz: String): MissionsResponse
 
     @POST("sync")
     suspend fun sync(@Body body: SyncRequest): SyncResponse

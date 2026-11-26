@@ -392,6 +392,32 @@ data class ProfileAchievement(
     val unlockedAt: String? = null,
 )
 
+/** A periodic mission (GET /profile/missions); period is "day", "week" or "month". */
+@Serializable
+data class Mission(
+    val id: Int,
+    val period: String,
+    val slot: Int = 0,
+    val periodStart: String,
+    val startsAt: String,
+    val endsAt: String,
+    val kind: String,
+    val typeId: Int? = null,
+    val description: String,
+    /** Assigned-puzzle missions only: the puzzle to open, its title and size pill ("BIG" / "GIANT"). */
+    val questionId: String? = null,
+    val questionTitle: String? = null,
+    val size: String? = null,
+    val progress: Int,
+    val target: Int,
+    @Serializable(with = FlexibleBooleanSerializer::class)
+    val completed: Boolean = false,
+    val completedAt: String? = null,
+)
+
+@Serializable
+data class MissionsResponse(val missions: List<Mission> = emptyList())
+
 @Serializable
 data class ProfilePlayer(val id: Int, val name: String)
 
@@ -453,3 +479,13 @@ object StringifiedJsonObjectSerializer : KSerializer<JsonObject> {
         jsonEncoder.encodeJsonElement(value)
     }
 }
+
+/** GET /history: solves per day (YYYY-MM-DD in [tz]) per puzzle type id; idle days absent. */
+@Serializable
+data class HistoryResponse(
+    val from: String,
+    val to: String,
+    val tz: String,
+    val metric: String,
+    val days: Map<String, Map<String, Int>> = emptyMap(),
+)

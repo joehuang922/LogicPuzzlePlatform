@@ -1,5 +1,6 @@
 /** BIG / GIANT size pills and the type-first grouping for Home. Mirrors the
- *  Android app's SizeTag.kt and groupTypePuzzlesByCollection. */
+ *  Android app's SizeTag.kt and groupTypePuzzlesByCollection; the API's
+ *  lib/sizeTag.ts (mission assignment) mirrors sizeTag too. */
 
 export type SizeTag = "BIG" | "GIANT";
 
@@ -13,6 +14,7 @@ interface Sized {
 const SUDOKU = 1;
 const COMBO_SUDOKU = 2;
 const NONOGRAM = 6;
+const KAKURO = 12;
 const PICTURESQUE_MAZE = 44;
 
 function tagFor(value: number, big: number, giant: number): SizeTag | null {
@@ -28,7 +30,8 @@ function arrayLength(value: unknown): number {
 /**
  * - sudoku: 16x16 and up is BIG, 25x25 and up GIANT;
  * - combo sudoku: 10+ subboards BIG, 20+ GIANT;
- * - nonogram: 3000+ cells BIG, 10000+ GIANT;
+ * - kakuro: 500+ cells BIG, 1000+ GIANT (every cell is a sum to work out);
+ * - nonogram: 3000+ cells BIG, 5000+ GIANT (60x90 is GIANT);
  * - picturesque maze: 9600+ cells (80x120) BIG, 28800+ (240x120) GIANT;
  * - every other type: 1000+ cells BIG, 2000+ GIANT.
  */
@@ -41,8 +44,10 @@ export function sizeTag(p: Sized): SizeTag | null {
     }
     case COMBO_SUDOKU:
       return tagFor(arrayLength(p.canonRepr?.subboards), 10, 20);
+    case KAKURO:
+      return tagFor(cells, 500, 1000);
     case NONOGRAM:
-      return tagFor(cells, 3000, 10000);
+      return tagFor(cells, 3000, 5000);
     case PICTURESQUE_MAZE:
       return tagFor(cells, 9600, 28800);
     default:

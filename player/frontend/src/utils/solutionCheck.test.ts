@@ -86,6 +86,15 @@ describe("matchesSolution", () => {
     expect(matchesSolution(puzzle(45, canon, { cells: [[0]] }), {})).toBeNull();
   });
 
+  it("zebra rope: a shade must be shaded there, a mark must be unshaded", () => {
+    const canon = { width: 3, height: 3, ropes: [], circles: [] };
+    const p = puzzle(36, canon, { states: [[1, 1, 1], [1, 0, 1], [0, 0, 1]] });
+    expect(matchesSolution(p, { "0,0": 1, "1,1": 2 })).toBe(true);
+    expect(matchesSolution(p, { "1,1": 1 })).toBe(false);
+    expect(matchesSolution(p, { "2,2": 2 })).toBe(false);
+    expect(matchesSolution(puzzle(36, canon, { states: [[0]] }), {})).toBeNull();
+  });
+
   it("nonogram: a fill must be filled there, a cross must be empty", () => {
     const p = puzzle(6, { rowClues: [[1], [1]], colClues: [[1], [1]] }, { cells: [[1, 0], [0, 1]] });
     expect(matchesSolution(p, { "0,0": 1, "1,0": 2 })).toBe(true);

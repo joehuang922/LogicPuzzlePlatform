@@ -8,20 +8,24 @@ enum class SizeTag(val label: String) { BIG("BIG"), GIANT("GIANT") }
 private const val SUDOKU = 1
 private const val COMBO_SUDOKU = 2
 private const val NONOGRAM = 6
+private const val KAKURO = 12
 private const val PICTURESQUE_MAZE = 44
 
 /**
- * BIG / GIANT for an oversized puzzle, null otherwise:
+ * BIG / GIANT for an oversized puzzle, null otherwise (mirrored by the web's
+ * puzzleBrowse.ts and the API's lib/sizeTag.ts, which assigns missions):
  * - sudoku: 16x16 and up is BIG, 25x25 and up GIANT;
  * - combo sudoku: 10+ subboards BIG, 20+ GIANT;
- * - nonogram: 3000+ cells BIG, 10000+ GIANT;
+ * - kakuro: 500+ cells BIG, 1000+ GIANT (every cell is a sum to work out);
+ * - nonogram: 3000+ cells BIG, 5000+ GIANT (60x90 is GIANT);
  * - picturesque maze: 9600+ cells (80x120) BIG, 28800+ (240x120) GIANT;
  * - every other type: 1000+ cells BIG, 2000+ GIANT.
  */
 fun Puzzle.sizeTag(): SizeTag? = when (puzzleType) {
     SUDOKU -> tagFor(sudokuSide(), big = 16, giant = 25)
     COMBO_SUDOKU -> tagFor((canonRepr["subboards"] as? JsonArray)?.size ?: 0, big = 10, giant = 20)
-    NONOGRAM -> tagFor(cellCount(), big = 3000, giant = 10000)
+    KAKURO -> tagFor(cellCount(), big = 500, giant = 1000)
+    NONOGRAM -> tagFor(cellCount(), big = 3000, giant = 5000)
     PICTURESQUE_MAZE -> tagFor(cellCount(), big = 9600, giant = 28800)
     else -> tagFor(cellCount(), big = 1000, giant = 2000)
 }

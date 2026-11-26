@@ -176,7 +176,31 @@ export class ApiStack extends cdk.Stack {
     props.cluster.grantDataApiAccess(profileHandler);
 
     const profile = api.root.addResource("profile");
-    profile.addMethod("GET", new apigw.LambdaIntegration(profileHandler));
+    const profileIntegration = new apigw.LambdaIntegration(profileHandler);
+    profile.addMethod("GET", profileIntegration);
+    // Periodic missions (current day/week/month), served by the profile Lambda.
+    profile.addResource("missions").addMethod("GET", profileIntegration);
+
+    // Per-day activity by puzzle type over a date range (heat map, missions).
+    const historyHandler = new lambda.Function(this, "HistoryHandler", {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: "handlers/history.handler",
+      code: lambda.Code.fromAsset(path.join(__dirname, "../../../api/dist")),
+      environment: {
+        CLUSTER_ARN: props.cluster.clusterArn,
+        SECRET_ARN: props.cluster.secret!.secretArn,
+        DATABASE_NAME: props.databaseName,
+      },
+      // 29s = API Gateway's max integration timeout. Gives the DB layer's
+      // resume-retry loop room to outlast an Aurora cold start (~10-25s).
+      timeout: cdk.Duration.seconds(29),
+    });
+
+    props.cluster.secret!.grantRead(historyHandler);
+    props.cluster.grantDataApiAccess(historyHandler);
+
+    const history = api.root.addResource("history");
+    history.addMethod("GET", new apigw.LambdaIntegration(historyHandler));
 
     const attempts = api.root.addResource("attempts");
     const attemptIntegration = new apigw.LambdaIntegration(attemptsHandler);

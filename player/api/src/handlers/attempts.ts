@@ -265,7 +265,9 @@ async function saveSnapshot(
 
   if (body.finished) {
     await executeStatement(
-      `UPDATE player_attempt SET finished_at = CURRENT_TIMESTAMP WHERE id = :id`,
+      // Set-once, as in sync: re-saving a finished attempt never moves its solve date.
+      `UPDATE player_attempt SET finished_at = CURRENT_TIMESTAMP
+       WHERE id = :id AND finished_at IS NULL`,
       [{ name: "id", value: { stringValue: attemptId } }]
     );
 

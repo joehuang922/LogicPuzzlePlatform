@@ -70,7 +70,12 @@ fun PuzzleApp() {
             )
         }
         composable(Routes.PROFILE) {
-            ProfileScreen(onBack = { navController.popBackStack() })
+            ProfileScreen(
+                onBack = { navController.popBackStack() },
+                onOpenAttempt = { puzzleId, attemptId ->
+                    navController.navigate(Routes.play(puzzleId, attemptId))
+                },
+            )
         }
         composable(Routes.ADMIN) {
             AdminScreen(
