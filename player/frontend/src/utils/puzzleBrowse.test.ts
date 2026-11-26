@@ -34,7 +34,9 @@ describe("sizeTag", () => {
   it("nonogram by cells", () => {
     expect(sizeTag(p(6, 50, 59))).toBeNull();
     expect(sizeTag(p(6, 50, 60))).toBe("BIG");
-    expect(sizeTag(p(6, 100, 100))).toBe("GIANT");
+    expect(sizeTag(p(6, 50, 99))).toBe("BIG");
+    expect(sizeTag(p(6, 50, 100))).toBe("GIANT");
+    expect(sizeTag(p(6, 60, 90))).toBe("GIANT");
   });
   it("other types by cells", () => {
     expect(sizeTag(p(5, 30, 33))).toBeNull();

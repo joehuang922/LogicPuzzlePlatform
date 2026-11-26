@@ -17,7 +17,7 @@ private const val PICTURESQUE_MAZE = 44
  * - sudoku: 16x16 and up is BIG, 25x25 and up GIANT;
  * - combo sudoku: 10+ subboards BIG, 20+ GIANT;
  * - kakuro: 500+ cells BIG, 1000+ GIANT (every cell is a sum to work out);
- * - nonogram: 3000+ cells BIG, 10000+ GIANT;
+ * - nonogram: 3000+ cells BIG, 5000+ GIANT (60x90 is GIANT);
  * - picturesque maze: 9600+ cells (80x120) BIG, 28800+ (240x120) GIANT;
  * - every other type: 1000+ cells BIG, 2000+ GIANT.
  */
@@ -25,7 +25,7 @@ fun Puzzle.sizeTag(): SizeTag? = when (puzzleType) {
     SUDOKU -> tagFor(sudokuSide(), big = 16, giant = 25)
     COMBO_SUDOKU -> tagFor((canonRepr["subboards"] as? JsonArray)?.size ?: 0, big = 10, giant = 20)
     KAKURO -> tagFor(cellCount(), big = 500, giant = 1000)
-    NONOGRAM -> tagFor(cellCount(), big = 3000, giant = 10000)
+    NONOGRAM -> tagFor(cellCount(), big = 3000, giant = 5000)
     PICTURESQUE_MAZE -> tagFor(cellCount(), big = 9600, giant = 28800)
     else -> tagFor(cellCount(), big = 1000, giant = 2000)
 }

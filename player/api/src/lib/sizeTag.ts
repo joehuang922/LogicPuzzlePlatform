@@ -35,7 +35,7 @@ export function sizeTag(p: SizedRow): SizeTag | null {
     case KAKURO:
       return tagFor(cells, 500, 1000);
     case NONOGRAM:
-      return tagFor(cells, 3000, 10000);
+      return tagFor(cells, 3000, 5000);
     case PICTURESQUE_MAZE:
       return tagFor(cells, 9600, 28800);
     default:

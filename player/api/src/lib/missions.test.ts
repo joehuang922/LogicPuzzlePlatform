@@ -34,7 +34,8 @@ describe("sizeTag", () => {
     expect(t(2, null, null, 20)).toBe("GIANT");
     expect(t(12, 42, 32)).toBe("GIANT");
     expect(t(6, 60, 50)).toBe("BIG");
-    expect(t(6, 100, 100)).toBe("GIANT");
+    expect(t(6, 50, 99)).toBe("BIG");
+    expect(t(6, 60, 90)).toBe("GIANT");
     expect(t(44, 240, 120)).toBe("GIANT");
     expect(t(5, 40, 30)).toBe("BIG");
     expect(t(5, 50, 40)).toBe("GIANT");

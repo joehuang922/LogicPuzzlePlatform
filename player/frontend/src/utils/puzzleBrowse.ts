@@ -31,7 +31,7 @@ function arrayLength(value: unknown): number {
  * - sudoku: 16x16 and up is BIG, 25x25 and up GIANT;
  * - combo sudoku: 10+ subboards BIG, 20+ GIANT;
  * - kakuro: 500+ cells BIG, 1000+ GIANT (every cell is a sum to work out);
- * - nonogram: 3000+ cells BIG, 10000+ GIANT;
+ * - nonogram: 3000+ cells BIG, 5000+ GIANT (60x90 is GIANT);
  * - picturesque maze: 9600+ cells (80x120) BIG, 28800+ (240x120) GIANT;
  * - every other type: 1000+ cells BIG, 2000+ GIANT.
  */
@@ -47,7 +47,7 @@ export function sizeTag(p: Sized): SizeTag | null {
     case KAKURO:
       return tagFor(cells, 500, 1000);
     case NONOGRAM:
-      return tagFor(cells, 3000, 10000);
+      return tagFor(cells, 3000, 5000);
     case PICTURESQUE_MAZE:
       return tagFor(cells, 9600, 28800);
     default:
