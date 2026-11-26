@@ -409,6 +409,10 @@ fun BoardDraftEditor(
             draft = board.yajilix,
             onChange = { t -> onChange { it.copy(yajilix = t(it.yajilix)) } },
         )
+        AuthoringType.TETRO_CHAIN_K -> TetroChainKEditor(
+            draft = board.tetroChainK,
+            onChange = { t -> onChange { it.copy(tetroChainK = t(it.tetroChainK)) } },
+        )
         AuthoringType.MELON_PIE -> MelonPieEditor(
             draft = board.melonPie,
             onChange = { t -> onChange { it.copy(melonPie = t(it.melonPie)) } },
@@ -515,6 +519,7 @@ fun BoardDraftMiniBoard(type: AuthoringType, board: BoardDraft, size: Dp) {
         AuthoringType.TILE_PAINT -> TilePaintMiniBoard(draft = board.tilePaint, hasProblems = hasProblems, size = size)
         AuthoringType.COUNTRY_ROAD -> CountryRoadMiniBoard(draft = board.countryRoad, hasProblems = hasProblems, size = size)
         AuthoringType.YAJILIX -> YajilixMiniBoard(draft = board.yajilix, hasProblems = hasProblems, size = size)
+        AuthoringType.TETRO_CHAIN_K -> KuralinMiniBoard(draft = board.tetroChainK, hasProblems = hasProblems, size = size)
         AuthoringType.MELON_PIE -> MelonPieMiniBoard(draft = board.melonPie, hasProblems = hasProblems, size = size)
         AuthoringType.HALF_FULL_PAINT ->
             HalfFullPaintMiniBoard(draft = board.halfFullPaint, hasProblems = hasProblems, size = size)

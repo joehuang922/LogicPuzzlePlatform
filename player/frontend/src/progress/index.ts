@@ -48,6 +48,7 @@ import { computeYajilixProgress } from "./yajilix";
 import { computeMajorityYajilixProgress } from "./majorityYajilix";
 import { computeHalfFullPaintProgress } from "./halfFullPaint";
 import { computeMelonPieProgress } from "./melonPie";
+import { computeTetroChainKProgress } from "./tetroChainK";
 
 export interface ProgressCalculator {
   puzzleType: number;
@@ -109,6 +110,7 @@ register(computeYajilixProgress);
 register(computeMajorityYajilixProgress);
 register(computeHalfFullPaintProgress);
 register(computeMelonPieProgress);
+register(computeTetroChainKProgress);
 
 export function computeProgress(
   puzzle: PuzzleDefinition,

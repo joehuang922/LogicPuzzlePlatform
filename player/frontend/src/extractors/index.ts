@@ -48,6 +48,7 @@ import { yajilixExtractor } from "./yajilix";
 import { majorityYajilixExtractor } from "./majorityYajilix";
 import { halfFullPaintExtractor } from "./halfFullPaint";
 import { melonPieExtractor } from "./melonPie";
+import { tetroChainKExtractor } from "./tetroChainK";
 
 const extractorRegistry = new Map<number, AnswerExtractor>();
 
@@ -104,6 +105,7 @@ registerExtractor(yajilixExtractor);
 registerExtractor(majorityYajilixExtractor);
 registerExtractor(halfFullPaintExtractor);
 registerExtractor(melonPieExtractor);
+registerExtractor(tetroChainKExtractor);
 
 export function getExtractor(puzzleType: number): AnswerExtractor | undefined {
   return extractorRegistry.get(puzzleType);

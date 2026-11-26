@@ -48,6 +48,7 @@ import yajilixSchema from "../../../../schemas/canon/yajilix.json";
 import majorityYajilixSchema from "../../../../schemas/canon/majority-yajilix.json";
 import halfFullPaintSchema from "../../../../schemas/canon/half-full-paint.json";
 import melonPieSchema from "../../../../schemas/canon/melon-pie.json";
+import tetroChainKSchema from "../../../../schemas/canon/tetro-chain-k.json";
 
 const ajv = new Ajv();
 
@@ -101,6 +102,7 @@ const validators: Record<number, ValidateFunction> = {
   47: ajv.compile(majorityYajilixSchema),
   48: ajv.compile(halfFullPaintSchema),
   49: ajv.compile(melonPieSchema),
+  50: ajv.compile(tetroChainKSchema),
 };
 
 export function validateCanon(puzzleType: number, data: unknown): void {
@@ -484,6 +486,23 @@ const semanticChecks: Record<number, (data: any) => void> = {
       }
       const key = `${r},${c}`;
       if (seen.has(key)) throw new Error(`Invalid melon pie: two circles at (${r},${c})`);
+      seen.add(key);
+    }
+  },
+  // Tetro Chain K: circles sit on grid lines inside the board, one per spot. Mirrors
+  // tetroChainKFormatProblems in frontend/src/components/tetroChainKRules.ts.
+  50: (data: { width: number; height: number; circles: { dr: number; dc: number }[] }) => {
+    const { width, height, circles } = data;
+    const seen = new Set<string>();
+    for (const { dr, dc } of circles) {
+      if (dr > 2 * height - 1 || dc > 2 * width - 1) {
+        throw new Error(`Invalid tetro chain k: circle at (${dr},${dc}) is outside the ${width}x${height} grid`);
+      }
+      if (dr % 2 === 1 && dc % 2 === 1) {
+        throw new Error(`Invalid tetro chain k: circle at (${dr},${dc}) is at a cell centre; circles sit on grid lines`);
+      }
+      const key = `${dr},${dc}`;
+      if (seen.has(key)) throw new Error(`Invalid tetro chain k: two circles at (${dr},${dc})`);
       seen.add(key);
     }
   },

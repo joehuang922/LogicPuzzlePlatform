@@ -67,6 +67,7 @@ data class BoardDraft(
     val majorityYajilix: YajilixEngine.Board = YajilixEngine.Board(emptyList()),
     val halfFullPaint: HalfFullPaintEngine.Board = HalfFullPaintEngine.Board(0, 0, emptyList(), emptyList(), emptyList()),
     val melonPie: MelonPieEngine.Board = MelonPieEngine.Board(0, 0, emptyList()),
+    val tetroChainK: KuralinDraft = KuralinDraft(),
 ) {
     /**
      * What the type's misread check finds wrong with this board — the list that turns
@@ -120,6 +121,7 @@ data class BoardDraft(
         AuthoringType.MAJORITY_YAJILIX -> MajorityYajilixAuthoring.problems(majorityYajilix)
         AuthoringType.HALF_FULL_PAINT -> HalfFullPaintAuthoring.problems(halfFullPaint)
         AuthoringType.MELON_PIE -> MelonPieAuthoring.problems(melonPie)
+        AuthoringType.TETRO_CHAIN_K -> TetroChainKAuthoring.problems(tetroChainK)
         AuthoringType.PICTURESQUE_MAZE -> PicturesqueMazeAuthoring.problems(picturesqueMaze)
         AuthoringType.IRREGULAR_NONOGRAM -> IrregularNonogramAuthoring.problems(irregularNonogram)
     }
@@ -157,6 +159,7 @@ data class BoardDraft(
         AuthoringType.MAJORITY_YAJILIX -> MajorityYajilixAuthoring.formatProblems(majorityYajilix)
         AuthoringType.HALF_FULL_PAINT -> HalfFullPaintAuthoring.formatProblems(halfFullPaint)
         AuthoringType.MELON_PIE -> MelonPieAuthoring.formatProblems(melonPie)
+        AuthoringType.TETRO_CHAIN_K -> TetroChainKAuthoring.formatProblems(tetroChainK)
         AuthoringType.PICTURESQUE_MAZE -> PicturesqueMazeAuthoring.formatProblems(picturesqueMaze)
         AuthoringType.IRREGULAR_NONOGRAM -> IrregularNonogramAuthoring.formatProblems(irregularNonogram)
         AuthoringType.MANNEQUIN_GATE_2 -> MannequinGate2Authoring.formatProblems(mannequinGate2)
@@ -263,6 +266,8 @@ data class BoardDraft(
             CanonBoard(CountryRoadAuthoring.canonFromDraft(countryRoad), countryRoad.cols, countryRoad.rows)
         AuthoringType.YAJILIX -> CanonBoard(YajilixAuthoring.canonFromDraft(yajilix), yajilix.cols, yajilix.rows)
         AuthoringType.MELON_PIE -> CanonBoard(MelonPieAuthoring.canonFromDraft(melonPie), melonPie.width, melonPie.height)
+        AuthoringType.TETRO_CHAIN_K ->
+            CanonBoard(TetroChainKAuthoring.canonFromDraft(tetroChainK), tetroChainK.cols, tetroChainK.rows)
         AuthoringType.HALF_FULL_PAINT ->
             CanonBoard(HalfFullPaintAuthoring.canonFromDraft(halfFullPaint), halfFullPaint.cols, halfFullPaint.rows)
         AuthoringType.MAJORITY_YAJILIX -> CanonBoard(
@@ -337,6 +342,7 @@ data class BoardDraft(
                 BoardDraft(majorityYajilix = MajorityYajilixAuthoring.draftFromCanon(canon))
             AuthoringType.HALF_FULL_PAINT -> BoardDraft(halfFullPaint = HalfFullPaintAuthoring.draftFromCanon(canon))
             AuthoringType.MELON_PIE -> BoardDraft(melonPie = MelonPieAuthoring.draftFromCanon(canon))
+            AuthoringType.TETRO_CHAIN_K -> BoardDraft(tetroChainK = TetroChainKAuthoring.draftFromCanon(canon))
             AuthoringType.PICTURESQUE_MAZE ->
                 BoardDraft(picturesqueMaze = PicturesqueMazeAuthoring.draftFromCanon(canon))
             AuthoringType.IRREGULAR_NONOGRAM ->

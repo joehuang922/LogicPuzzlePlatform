@@ -802,3 +802,16 @@ export interface MelonPieAnswer {
     v: number[][];
   };
 }
+
+// Tetro Chain K (type 50). Kuralin's canon: circles on grid lines show the majority of
+// the cells they touch; the shaded cells are tetrominoes chained through corners.
+export interface TetroChainKCanon {
+  width: number;
+  height: number;
+  circles: HalfFullPaintCircle[];
+}
+
+export interface TetroChainKAnswer {
+  // height x width; 0 unset, 1 shaded, 2 dot (marked unshaded)
+  states: number[][];
+}

@@ -51,6 +51,7 @@ import YajilixEditor from "./YajilixEditor";
 import MajorityYajilixEditor from "./MajorityYajilixEditor";
 import HalfFullPaintEditor from "./HalfFullPaintEditor";
 import MelonPieEditor from "./MelonPieEditor";
+import TetroChainKEditor from "./TetroChainKEditor";
 
 // Puzzle types that have a visual board editor.
 export const EDITOR_TYPE_NAMES = [
@@ -60,7 +61,7 @@ export const EDITOR_TYPE_NAMES = [
   "tentaishow", "heyawake", "shikaku", "norinori", "nurikabe", "ripple-effect",
   "hitori", "picto-link", "kuralin", "unequal-sudoku", "corner-chain", "sinkamino", "balance-link", "l-ring", "hashi", "skeleton-puzzle",
   "zebra-rope", "whimsical-knight", "omino-tree", "minus-room", "tile-paint", "country-road", "perfect-l-ring", "mannequin-gate-2",
-  "picturesque-maze", "irregular-nonogram", "yajilix", "majority-yajilix", "half-full-paint", "melon-pie",
+  "picturesque-maze", "irregular-nonogram", "yajilix", "majority-yajilix", "half-full-paint", "melon-pie", "tetro-chain-k",
 ];
 
 export function hasVisualEditor(typeName: string | undefined): boolean {
@@ -130,6 +131,7 @@ function CanonEditor({
     case "majority-yajilix": return <MajorityYajilixEditor initialJson={canonRepr} onChange={onChange} />;
     case "half-full-paint": return <HalfFullPaintEditor initialJson={canonRepr} onChange={onChange} />;
     case "melon-pie": return <MelonPieEditor initialJson={canonRepr} onChange={onChange} />;
+    case "tetro-chain-k": return <TetroChainKEditor initialJson={canonRepr} onChange={onChange} />;
     default: return null;
   }
 }

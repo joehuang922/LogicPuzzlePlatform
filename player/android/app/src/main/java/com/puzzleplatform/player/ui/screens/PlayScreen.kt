@@ -108,6 +108,7 @@ import com.puzzleplatform.player.ui.board.YajilixBoard
 import com.puzzleplatform.player.ui.board.MajorityYajilixBoard
 import com.puzzleplatform.player.ui.board.HalfFullPaintBoard
 import com.puzzleplatform.player.ui.board.MelonPieBoard
+import com.puzzleplatform.player.ui.board.TetroChainKBoard
 import com.puzzleplatform.player.ui.board.TilePaintBoard
 import com.puzzleplatform.player.ui.board.ZebraRopeBoard
 import com.puzzleplatform.player.ui.board.PicturesqueMazeBoard
@@ -741,6 +742,13 @@ fun PlayScreen(
                                     userValues = state.userValues,
                                     onTapCell = vm::tapShadeCell,
                                     onApplyChanges = vm::putUserValues,
+                                    liveValidate = state.liveValidate,
+                                )
+                                // Tetro Chain K: a tap cycles unset -> shaded -> dot (shared cycle).
+                                50 -> TetroChainKBoard(
+                                    puzzle = puzzle,
+                                    userValues = state.userValues,
+                                    onTapCell = vm::tapShadeCell,
                                     liveValidate = state.liveValidate,
                                 )
                                 // Melon Pie: drag point to point draws lines; a tap marks a segment ×.

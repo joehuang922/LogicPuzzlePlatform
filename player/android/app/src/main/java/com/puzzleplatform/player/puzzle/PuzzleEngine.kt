@@ -104,6 +104,7 @@ object PuzzleEngines {
         MajorityYajilixEngine,
         HalfFullPaintEngine,
         MelonPieEngine,
+        TetroChainKEngine,
     ).associateBy { it.puzzleType }
 
     fun forType(puzzleType: Int): PuzzleEngine? = engines[puzzleType]

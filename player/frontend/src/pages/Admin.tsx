@@ -528,7 +528,7 @@ function QuestionForm({
       } else if (typeId === 27 && canon.cells) {
         h = canon.cells.length;
         w = canon.cells[0].length;
-      } else if ((typeId === 28 || typeId === 36 || typeId === 44 || typeId === 45 || typeId === 48 || typeId === 49) && canon.width && canon.height) {
+      } else if ((typeId === 28 || typeId === 36 || typeId === 44 || typeId === 45 || typeId === 48 || typeId === 49 || typeId === 50) && canon.width && canon.height) {
         w = canon.width;
         h = canon.height;
       } else if ((typeId === 37 || typeId === 38 || typeId === 39 || typeId === 43) && canon.cols && canon.rows) {

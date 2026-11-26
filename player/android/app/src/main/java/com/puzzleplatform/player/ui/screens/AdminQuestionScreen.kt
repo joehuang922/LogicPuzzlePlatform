@@ -389,6 +389,9 @@ fun AdminQuestionScreen(
                                     "Tap a tile to review its photo and grid side by side, fix mis-read " +
                                         "walls, clue cells or clue numbers, and set its title. A red tile has a " +
                                         "wall that ends inside a tile, a clue with no cells or one too big for them."
+                                AuthoringType.TETRO_CHAIN_K ->
+                                    "Tap a tile to review its photo and grid side by side, fix mis-read " +
+                                        "circles, and set its title. A red tile has no circles or a misplaced circle."
                                 AuthoringType.MELON_PIE ->
                                     "Tap a tile to review its photo and lattice side by side, fix mis-read " +
                                         "circles, and set its title. A red tile has no circles, a colour with an " +
@@ -725,6 +728,10 @@ private fun ReviewScreen(
                             "between two tile cells to toggle its wall; in Clues, tap a cell to select it, toggle " +
                             "it between tile and clue cell, and type its right and down numbers. Add or remove " +
                             "a row or column at the edge."
+                    AuthoringType.TETRO_CHAIN_K ->
+                        "Compare the photo with the grid — pinch to zoom the photo. Tap an edge midpoint or " +
+                            "corner to cycle its circle (none, white, gray, black). Add or remove a row or column " +
+                            "at the edge."
                     AuthoringType.MELON_PIE ->
                         "Compare the photo with the lattice — pinch to zoom the photo. Tap a grid point to " +
                             "cycle its circle (none, white, gray, black). Add or remove a row or column at the edge."

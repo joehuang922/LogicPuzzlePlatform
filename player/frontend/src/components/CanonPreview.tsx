@@ -47,7 +47,8 @@ import YajilixBoard from "./YajilixBoard";
 import MajorityYajilixBoard from "./MajorityYajilixBoard";
 import HalfFullPaintBoard from "./HalfFullPaintBoard";
 import MelonPieBoard from "./MelonPieBoard";
-import { NurimazeCanon, DoubleChocoCanon, SlitherlinkCanon, NonogramCanon, MasyuCanon, PencilsCanon, NuritwinCanon, SlalomCanon, ShakashakaCanon, KakuroCanon, YajilinCanon, FillominoCanon, LitsCanon, ChocoBananaCanon, NumberLinkCanon, AkariCanon, HellGolfCanon, TentaishowCanon, HeyawakeCanon, ShikakuCanon, NorinoriCanon, NurikabeCanon, RippleEffectCanon, HitoriCanon, PictoLinkCanon, KuralinCanon, UnequalSudokuCanon, CornerChainCanon, SinkaminoCanon, BalanceLinkCanon, LRingCanon, PerfectLRingCanon, MannequinGate2Canon, HashiCanon, SkeletonPuzzleCanon, ZebraRopeCanon, WhimsicalKnightCanon, OminoTreeCanon, MinusRoomCanon, TilePaintCanon, CountryRoadCanon, PicturesqueMazeCanon, IrregularNonogramCanon, YajilixCanon, MajorityYajilixCanon, HalfFullPaintCanon, MelonPieCanon } from "../types/canon";
+import TetroChainKBoard from "./TetroChainKBoard";
+import { NurimazeCanon, DoubleChocoCanon, SlitherlinkCanon, NonogramCanon, MasyuCanon, PencilsCanon, NuritwinCanon, SlalomCanon, ShakashakaCanon, KakuroCanon, YajilinCanon, FillominoCanon, LitsCanon, ChocoBananaCanon, NumberLinkCanon, AkariCanon, HellGolfCanon, TentaishowCanon, HeyawakeCanon, ShikakuCanon, NorinoriCanon, NurikabeCanon, RippleEffectCanon, HitoriCanon, PictoLinkCanon, KuralinCanon, UnequalSudokuCanon, CornerChainCanon, SinkaminoCanon, BalanceLinkCanon, LRingCanon, PerfectLRingCanon, MannequinGate2Canon, HashiCanon, SkeletonPuzzleCanon, ZebraRopeCanon, WhimsicalKnightCanon, OminoTreeCanon, MinusRoomCanon, TilePaintCanon, CountryRoadCanon, PicturesqueMazeCanon, IrregularNonogramCanon, YajilixCanon, MajorityYajilixCanon, HalfFullPaintCanon, MelonPieCanon, TetroChainKCanon } from "../types/canon";
 
 export default function CanonPreview({ puzzleType, canonRepr }: { puzzleType: number; canonRepr: string }) {
   let parsed: Record<string, unknown>;
@@ -209,6 +210,9 @@ export default function CanonPreview({ puzzleType, canonRepr }: { puzzleType: nu
   }
   if (puzzleType === 49 && parsed.circles && parsed.width && parsed.height) {
     return <MelonPieBoard canon={parsed as unknown as MelonPieCanon} readonly />;
+  }
+  if (puzzleType === 50 && parsed.circles && parsed.width && parsed.height) {
+    return <TetroChainKBoard canon={parsed as unknown as TetroChainKCanon} readonly />;
   }
   return <p style={{ color: "#666", fontSize: "0.85rem" }}>No preview available for this puzzle type.</p>;
 }

@@ -10,6 +10,12 @@ export const WHITE = 0;
 export const BLACK = 1;
 export const GRAY = 2;
 
+/** Just the board size: what the circle and value helpers need (shared with Tetro Chain K). */
+export interface GridSize {
+  width: number;
+  height: number;
+}
+
 export interface HalfFullPaintProblem {
   message: string;
   r: number;
@@ -49,7 +55,7 @@ export function computeRooms(canon: HalfFullPaintCanon): { ids: number[][]; coun
 }
 
 /** The cells (r, c) a circle at doubled (dr, dc) touches: 2 on an edge, 4 on a corner. */
-export function circleCells(canon: HalfFullPaintCanon, dr: number, dc: number): [number, number][] {
+export function circleCells(canon: GridSize, dr: number, dc: number): [number, number][] {
   const rs = dr % 2 === 1 ? [(dr - 1) / 2] : [dr / 2 - 1, dr / 2];
   const cs = dc % 2 === 1 ? [(dc - 1) / 2] : [dc / 2 - 1, dc / 2];
   const out: [number, number][] = [];
@@ -57,11 +63,11 @@ export function circleCells(canon: HalfFullPaintCanon, dr: number, dc: number): 
   return out;
 }
 
-export function emptyStates(canon: HalfFullPaintCanon): number[][] {
+export function emptyStates(canon: GridSize): number[][] {
   return Array.from({ length: canon.height }, () => Array<number>(canon.width).fill(UNSET));
 }
 
-export function fromValues(canon: HalfFullPaintCanon, values: Record<string, number>): number[][] {
+export function fromValues(canon: GridSize, values: Record<string, number>): number[][] {
   const states = emptyStates(canon);
   for (const [key, v] of Object.entries(values)) {
     const [c, r] = key.split(",").map(Number);

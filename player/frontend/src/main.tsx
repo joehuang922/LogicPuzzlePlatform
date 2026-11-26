@@ -52,6 +52,7 @@ import { yajilixRenderer } from "./renderers/yajilix";
 import { majorityYajilixRenderer } from "./renderers/majorityYajilix";
 import { halfFullPaintRenderer } from "./renderers/halfFullPaint";
 import { melonPieRenderer } from "./renderers/melonPie";
+import { tetroChainKRenderer } from "./renderers/tetroChainK";
 
 registerRenderer(comboSudokuRenderer);
 registerRenderer(sudokuRenderer);
@@ -102,6 +103,7 @@ registerRenderer(yajilixRenderer);
 registerRenderer(majorityYajilixRenderer);
 registerRenderer(halfFullPaintRenderer);
 registerRenderer(melonPieRenderer);
+registerRenderer(tetroChainKRenderer);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
