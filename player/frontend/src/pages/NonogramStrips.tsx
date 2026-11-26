@@ -354,7 +354,9 @@ export default function NonogramStrips() {
 
   const current = repair && repair.key === repairKey ? repair : null;
   const result = current?.result ?? null;
-  const applied = result && result.kind !== "stuck" ? result.fixes : [];
+  // A stuck repair's fixes are what it found so far: shown and used, so a
+  // person only settles what is left.
+  const applied = result ? result.fixes : [];
   const autos = useMemo(() => {
     const m: Record<Axis, Map<number, number[]>> = { rows: new Map(), cols: new Map() };
     for (const f of applied) m[f.id[0] === "r" ? "rows" : "cols"].set(Number(f.id.slice(1)), f.to);
@@ -551,7 +553,9 @@ export default function NonogramStrips() {
 
           {applied.length > 0 && (
             <>
-              <h3 style={{ marginBottom: "0.25rem" }}>Changes to proofcheck ({applied.length})</h3>
+              <h3 style={{ marginBottom: "0.25rem" }}>
+                {result?.kind === "stuck" ? "Changes found so far" : "Changes to proofcheck"} ({applied.length})
+              </h3>
               <p style={{ color: "#555", marginTop: 0, fontSize: "0.85rem" }}>
                 Compare each with the scan cut out above its numbers. If the scan says otherwise, type what it says.
               </p>
@@ -643,7 +647,7 @@ function ResultSummary({
     return box("#2e7d32", <><strong>Solved{changes}.</strong> Line logic fills all {cells.toLocaleString()} cells with no contradiction, so these clues have exactly one picture.</>);
   if (result.kind === "consistent")
     return box("#b26a00", <><strong>No contradiction{changes},</strong> but line logic settles only {result.settled.toLocaleString()} of {result.total.toLocaleString()} cells; the server's solver checks the rest when you create it. Look the picture over.</>);
-  return box("#c62828", <><strong>Needs you:</strong> {result.reason}.{result.suspects.length > 0 && <> Lines: {result.suspects.slice(0, 8).map(lineLabel).join(", ")}{result.suspects.length > 8 ? ", …" : ""}.</>}</>);
+  return box("#c62828", <><strong>Needs you:</strong> {result.reason}.{result.fixes.length > 0 && <> {result.fixes.length} other line{result.fixes.length > 1 ? "s were" : " was"} fixed so far (below).</>}{result.suspects.length > 0 && <> Lines: {result.suspects.slice(0, 8).map(lineLabel).join(", ")}{result.suspects.length > 8 ? ", …" : ""}.</>}</>);
 }
 
 /** The picture the clues draw: what a misread that slipped through would scar. */

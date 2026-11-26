@@ -3,8 +3,13 @@
 The sample is a 175x110 (19,250-cell) nonogram whose clues were scanned as
 four strips: row clues in two (top, bottom) and column clues in two (left,
 right). ``q83.canon.json`` is the verified clue set: the strips' reading with
-one misread fixed (column 146's 18 read as 16), which line logic alone then
-solves completely, so every clue in it is consistent with a unique picture.
+one misread fixed (column 146's 18 read as 16, before the board's edge line
+was painted out of the crops), which line logic alone then solves completely,
+so every clue in it is consistent with a unique picture.
+
+``lp2604-*`` are a 180x70 board photographed rather than scanned: its thin
+separators fade out among the clues at the top and bottom of the page, and a
+smudge and a crease bend one column line.
 """
 from __future__ import annotations
 
@@ -16,7 +21,10 @@ import numpy as np
 import pytest
 
 from puzzle_parsers.nonogram_strips.geometry import (
+    Polyline,
     _classify_thick,
+    _fill_faint,
+    _recentre_strays,
     detect_strip,
     regular_lines,
 )
@@ -104,6 +112,26 @@ def test_thick_lines_are_found_by_their_every_5th_rhythm():
     assert [i for i, t in enumerate(_classify_thick(widths)) if t] == [2, 7, 12]
 
 
+def _flat(y: float, x0: float = 0.0, x1: float = 1000.0) -> Polyline:
+    return Polyline(np.array([x0, x1]), np.array([y, y]))
+
+
+def test_faint_lines_are_carried_across_from_their_neighbours():
+    # lines every 50px; 1-4 died out at x=800, while 0 and 5 reach x=100
+    seps = [_flat(50.0 * i, 800.0 if 0 < i < 5 else 100.0) for i in range(6)]
+    extents = [800.0 if 0 < i < 5 else 100.0 for i in range(6)]
+    filled, ext = _fill_faint(seps, extents, reach=150.0)
+    assert ext == [100.0] * 6
+    assert [round(float(s(120.0))) for s in filled] == [0, 50, 100, 150, 200, 250]
+
+
+def test_a_line_that_strayed_goes_back_between_its_neighbours():
+    seps = [_flat(0.0), _flat(30.0), _flat(116.0), _flat(174.0)]  # 30 should be 58
+    fixed = _recentre_strays(seps, np.linspace(0, 1000, 5), pitch=58.0)
+    assert round(float(fixed[1](500.0))) == 58
+    assert [float(s(500.0)) for s in fixed[2:]] == [116.0, 174.0]
+
+
 # --- merging ----------------------------------------------------------------
 
 
@@ -169,6 +197,22 @@ def test_sample_geometry(name, axis, n, complete, start, end, offset):
     assert thick and all(b - a == 5 for a, b in zip(thick, thick[1:]))
 
 
+def test_photographed_strip_keeps_every_line_where_thin_lines_fade():
+    g = detect_strip(cv2.imread(str(STRIPS / "lp2604-rows.jpg")), "rows")
+    assert len(g.separators) - 1 == 70 and g.start_border and g.end_border
+    # Every separator reaches across the clue grid (21 rows used to stop short).
+    common = float(np.median(g.extents))
+    assert all(e <= common + 0.5 * g.cell_pitch for e in g.extents)
+
+
+def test_photographed_strip_lines_stay_evenly_spaced_past_a_smudge():
+    g = detect_strip(cv2.imread(str(STRIPS / "lp2604-cols-middle.jpg")), "cols")
+    assert len(g.separators) - 1 == 68
+    xs = np.linspace(float(np.median(g.extents)), float(np.median(g.edge.pos)), 12)
+    gaps = np.diff([[float(s(x)) for x in xs] for s in g.separators], axis=0)
+    assert np.abs(gaps - g.row_pitch).max() < 0.2 * g.row_pitch
+
+
 @pytest.fixture(scope="module")
 def sample_reading():
     from puzzle_parsers.recognition import EasyOcrBackend
@@ -187,12 +231,11 @@ def test_sample_reads_the_canon(sample_reading):
     cols = merge_axis("cols", sample_reading["cols"], WIDTH)
     assert [p.offset for p in rows.placements + cols.placements] == [s[-1] for s in SAMPLES]
     assert [ln.clues for ln in rows.lines] == canon["rowClues"]
-    wrong = [ln.index + 1 for ln, want in zip(cols.lines, canon["colClues"]) if ln.clues != want]
-    # Known: column 146's 18, blurred in the lowest-resolution strip, reads
-    # 16 in both crops. The totals check catches it (off by 2).
-    assert wrong == [146]
+    # Column 146's 18, next to the board's thick edge line, once read 16;
+    # with the line painted out of the crops every line reads exactly.
+    assert [ln.clues for ln in cols.lines] == canon["colClues"]
     totals = next(c for c in check_clues(rows, cols) if c.name == "totals")
-    assert not totals.ok and "11030" in totals.detail and "11028" in totals.detail
+    assert totals.ok
 
 
 @pytest.mark.parametrize("name, axis", [("q83-rows-bottom.jpg", "rows"), ("q83-cols-right.jpg", "cols")])

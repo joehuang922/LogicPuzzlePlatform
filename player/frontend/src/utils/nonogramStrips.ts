@@ -333,6 +333,7 @@ export interface Fix {
 export type RepairResult =
   | { kind: "solved"; fixes: Fix[]; grid: Int8Array }
   | { kind: "consistent"; fixes: Fix[]; settled: number; total: number; grid: Int8Array }
+  // stuck: `fixes` are changes found so far, unconfirmed until the board solves.
   | { kind: "stuck"; fixes: Fix[]; reason: string; suspects: LineId[]; options: Fix[]; grid: Int8Array | null };
 
 // Digits a scan or OCR mixes up.
@@ -374,6 +375,12 @@ export function candidates(line: RepairLine, base: number[], delta: number | nul
   const replaced = (i: number, vs: number[]) => [...base.slice(0, i), ...vs, ...base.slice(i + 1)];
   for (const r of line.readings) add(r);
   for (const [i, v] of line.alternates) if (i < base.length) add(replaced(i, [v]));
+  // A blurred line can have several cells the other crop read right.
+  if (line.alternates.length > 1) {
+    const all = [...base];
+    for (const [i, v] of line.alternates) if (i < all.length) all[i] = v;
+    add(all);
+  }
   base.forEach((v, i) => {
     if (delta !== null) add(replaced(i, [v + delta]));
     else for (const w of confusions(v)) add(replaced(i, [w]));
@@ -387,6 +394,34 @@ export function candidates(line: RepairLine, base: number[], delta: number | nul
   });
   if (delta !== null && delta > 0) for (let i = 0; i <= base.length; i++) add([...base.slice(0, i), delta, ...base.slice(i)]);
   return [...out.values()];
+}
+
+/** One line's cells of a row-major grid. */
+function lineCells(grid: Int8Array, id: LineId, R: number, C: number): number[] {
+  const k = Number(id.slice(1));
+  return id[0] === "r"
+    ? Array.from(grid.subarray(k * C, (k + 1) * C))
+    : Array.from({ length: R }, (_, t) => grid[t * C + k]);
+}
+
+/** The clues a fully settled line of the grid shows, or null if any cell is open. */
+function lineRuns(grid: Int8Array, id: LineId, R: number, C: number): number[] | null {
+  const k = Number(id.slice(1));
+  const isRow = id[0] === "r";
+  const n = isRow ? C : R;
+  const runs: number[] = [];
+  let len = 0;
+  for (let t = 0; t < n; t++) {
+    const v = isRow ? grid[k * C + t] : grid[t * C + k];
+    if (v === -1) return null;
+    if (v === 1) len++;
+    else if (len) {
+      runs.push(len);
+      len = 0;
+    }
+  }
+  if (len) runs.push(len);
+  return runs;
 }
 
 const lineIds = (n: number, p: "r" | "c") => Array.from({ length: n }, (_, i) => `${p}${i}` as LineId);
@@ -483,29 +518,7 @@ export async function autoRepair(
     return { kind: "consistent", fixes, settled: base.settled, total: base.total, grid: base.grid };
   }
 
-  // 2. The misread line: the one whose removal clears the contradiction.
   const editable = ids.filter((id) => !get(id).locked);
-  let suspects: LineId[];
-  if (base.contradiction) {
-    suspects = await findSuspects(rc0, cc0, (d, t) => onProgress?.(`looking for the misread line… ${d}/${t}`), editable);
-  } else {
-    suspects = editable.filter((id) => get(id).doubtful); // totals off, but nothing contradicts yet
-  }
-
-  // 3. One line wrong: try its likely readings, with the totals' change.
-  const solved: Fix[] = [];
-  const clean: { fix: Fix; settled: number }[] = [];
-  for (const id of suspects) {
-    const delta = id[0] === "r" ? -totalsGap : totalsGap;
-    const from = cur.get(id)!;
-    for (const c of candidates(get(id), from, delta, maxLen(id))) {
-      const p = run(new Map([[id, c]]));
-      const fix: Fix = { id, from, to: c, why: "" };
-      if (solves(p)) solved.push(fix);
-      else if (!p.contradiction) clean.push({ fix, settled: p.settled });
-      await tick(`trying fixes for ${lineLabel(id)}…`);
-    }
-  }
   const finish = (chosen: Fix[], why: string): RepairResult => {
     for (const f of chosen) {
       cur.set(f.id, f.to);
@@ -519,15 +532,151 @@ export async function autoRepair(
       ? { kind: "solved", fixes, grid: p.grid }
       : { kind: "consistent", fixes, settled: p.settled, total: p.total, grid: p.grid };
   };
+
+  // 2. Set the doubtful lines aside, and while the rest still contradict
+  // each other, also the line whose absence lets line logic settle the most
+  // (a misread the reader didn't notice). Put back every line the picture
+  // agrees with, and read the others off the picture the clean lines draw.
+  // Kept only if the result solves the whole board.
+  let stuckHere: { open: LineId[]; grid: Int8Array; fixes: Fix[] } | null = null;
+  if (base.contradiction || totalsGap !== 0) {
+    const aside = new Set(editable.filter((id) => get(id).doubtful || conflicts.includes(id)));
+    if (aside.size <= 0.3 * ids.length) {
+      onProgress?.(`solving without the ${aside.size} doubtful lines…`);
+      await pause();
+      let p = run(undefined, aside);
+      for (let round = 0; p.contradiction && round < 6; round++) {
+        let best: { id: LineId; settled: number } | null = null;
+        const rest = editable.filter((id) => !aside.has(id));
+        for (let i = 0; i < rest.length; i++) {
+          const q = run(undefined, new Set([...aside, rest[i]]));
+          if (!q.contradiction && (!best || q.settled > best.settled)) best = { id: rest[i], settled: q.settled };
+          if (i % 8 === 7) {
+            onProgress?.(`looking for misread lines (${aside.size} set aside)… ${i + 1}/${rest.length}`);
+            await pause();
+          }
+        }
+        if (!best) break;
+        aside.add(best.id);
+        p = run(undefined, aside);
+      }
+      // The set-aside lines as the picture draws them: all of them, or null.
+      const readOff = (grid: Int8Array, lines: Set<LineId>) => {
+        const derived = new Map<LineId, number[]>();
+        const open: LineId[] = [];
+        for (const id of lines) {
+          const runs = lineRuns(grid, id, R, C);
+          if (!runs) open.push(id);
+          else if (key(runs) !== key(cur.get(id)!)) derived.set(id, runs);
+        }
+        return { derived, open };
+      };
+      const accept = (derived: Map<LineId, number[]>) =>
+        finish(
+          [...derived].map(([id, to]) => ({ id, from: cur.get(id)!, to, why: "" })),
+          "read off the picture the other lines draw; the scan's reading contradicts it",
+        );
+      if (!p.contradiction) {
+        let r = readOff(p.grid, aside);
+        if (!r.open.length && r.derived.size && solves(run(r.derived))) return accept(r.derived);
+        // The clean lines leave some cells open: put back each set-aside
+        // line the picture agrees with, to settle more.
+        onProgress?.("putting back the lines the picture agrees with…");
+        for (const id of [...aside]) {
+          const without = new Set(aside);
+          without.delete(id);
+          const q = run(undefined, without);
+          if (!q.contradiction) {
+            aside.delete(id);
+            p = q;
+          }
+          await tick("putting back the lines the picture agrees with…");
+        }
+        r = readOff(p.grid, aside);
+        if (!r.open.length && r.derived.size && solves(run(r.derived))) return accept(r.derived);
+        // Lines the picture doesn't settle yet: of their likely readings,
+        // the one that fits the cells it does settle. Each one taken settles
+        // more of the picture for the next.
+        const adopted = new Map<LineId, number[]>();
+        for (let pass = 0; pass < 4 && r.open.length; pass++) {
+          let took = false;
+          for (const id of r.open) {
+            const cells = lineCells(p.grid, id, R, C);
+            const from = cur.get(id)!;
+            const fits = [from, ...candidates(get(id), from, null, maxLen(id))].filter(
+              (c) => nonogramSolveLine(cells, c) !== null,
+            );
+            if (fits.length === 1) {
+              adopted.set(id, fits[0]);
+              aside.delete(id);
+              took = true;
+            }
+            await tick("matching doubtful lines to the picture…");
+          }
+          if (!took) break;
+          const q = run(adopted, aside);
+          if (q.contradiction) break;
+          p = q;
+          r = readOff(p.grid, aside);
+        }
+        if (!r.open.length) {
+          const all = new Map([...adopted, ...r.derived]);
+          for (const [id, c] of all) if (key(c) === key(cur.get(id)!)) all.delete(id);
+          if (all.size && solves(run(all))) {
+            return finish(
+              [...all].map(([id, to]) => ({ id, from: cur.get(id)!, to, why: "" })),
+              "the reading that fits the picture the other lines draw",
+            );
+          }
+        }
+        if (r.open.length) {
+          const found = new Map([...adopted, ...r.derived]);
+          stuckHere = {
+            open: r.open,
+            grid: p.grid,
+            fixes: [...found]
+              .filter(([id, c]) => key(c) !== key(cur.get(id)!))
+              .map(([id, to]) => ({
+                id, from: get(id).clues === null ? null : cur.get(id)!, to,
+                why: "fits the picture the other lines draw (confirmed once the board solves)",
+              })),
+          };
+        }
+      }
+    }
+  }
+
+  // 3. The misread line: the one whose removal clears the contradiction.
+  let suspects: LineId[];
+  if (base.contradiction) {
+    suspects = await findSuspects(rc0, cc0, (d, t) => onProgress?.(`looking for the misread line… ${d}/${t}`), editable);
+  } else {
+    suspects = editable.filter((id) => get(id).doubtful); // totals off, but nothing contradicts yet
+  }
+
+  // 4. One line wrong: try its likely readings, with the totals' change.
+  const solved: Fix[] = [];
+  const clean: { fix: Fix; settled: number }[] = [];
+  for (const id of suspects) {
+    const delta = id[0] === "r" ? -totalsGap : totalsGap;
+    const from = cur.get(id)!;
+    for (const c of candidates(get(id), from, delta, maxLen(id))) {
+      const p = run(new Map([[id, c]]));
+      const fix: Fix = { id, from, to: c, why: "" };
+      if (solves(p)) solved.push(fix);
+      else if (!p.contradiction) clean.push({ fix, settled: p.settled });
+      await tick(`trying fixes for ${lineLabel(id)}…`);
+    }
+  }
   if (solved.length === 1) return finish(solved, "the only change to this line that lets the board solve");
   if (solved.length > 1)
-    return { kind: "stuck", fixes, reason: "more than one fix lets the board solve: pick the one the scan shows", suspects, options: solved, grid: base.grid };
+    return { kind: "stuck", fixes: [], reason: "more than one fix lets the board solve: pick the one the scan shows", suspects, options: solved, grid: base.grid };
   if (clean.length === 1)
     return finish([clean[0].fix], "the only change to this line that clears the contradiction (line logic doesn't finish the board: check the picture)");
   if (clean.length > 1)
-    return { kind: "stuck", fixes, reason: "several fixes clear the contradiction: pick the one the scan shows", suspects, options: clean.map((c) => c.fix), grid: base.grid };
+    return { kind: "stuck", fixes: [], reason: "several fixes clear the contradiction: pick the one the scan shows", suspects, options: clean.map((c) => c.fix), grid: base.grid };
 
-  // 4. Two lines wrong: pairs of doubtful lines whose removal clears it.
+  // 5. Two lines wrong: pairs of doubtful lines whose removal clears it.
   const doubtful = editable.filter((id) => get(id).doubtful).slice(0, 40);
   const started = Date.now();
   const pairFixes: Fix[][] = [];
@@ -554,9 +703,18 @@ export async function autoRepair(
     }
   }
   if (pairFixes.length === 1) return finish(pairFixes[0], "the only change to these two lines that lets the board solve");
+  if (stuckHere && !pairFixes.length)
+    return {
+      kind: "stuck",
+      fixes: stuckHere.fixes,
+      reason: `${stuckHere.open.length} line(s) contradict the rest, and the other lines don't settle them: read their clues from the scan`,
+      suspects: stuckHere.open,
+      options: [],
+      grid: stuckHere.grid,
+    };
   return {
     kind: "stuck",
-    fixes,
+    fixes: [],
     reason: pairFixes.length > 1
       ? "more than one pair of fixes lets the board solve: pick what the scan shows"
       : suspects.length

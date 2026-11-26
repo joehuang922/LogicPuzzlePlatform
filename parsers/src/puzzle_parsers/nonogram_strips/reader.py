@@ -13,7 +13,12 @@ import numpy as np
 from numpy.typing import NDArray
 
 from puzzle_parsers.cell_ocr import crop_cell, read_cells
-from puzzle_parsers.nonogram_strips.geometry import Orientation, StripGeometry, detect_strip
+from puzzle_parsers.nonogram_strips.geometry import (
+    Orientation,
+    StripGeometry,
+    detect_strip,
+    without_edge_line,
+)
 
 
 # Each cell is read twice, because a two-digit clue fills its cell nearly
@@ -135,7 +140,7 @@ def read_strip(
     lines come back empty, flagged ``not_read``.
     """
     geom = geometry or detect_strip(image, orientation)
-    img = geom.image
+    img = without_edge_line(geom)
     h, w = img.shape[:2]
     seps, extents = geom.separators, geom.extents
     common = float(np.median(extents))

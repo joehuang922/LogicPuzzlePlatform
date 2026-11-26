@@ -295,6 +295,62 @@ def _trace_separators(
     return polys, extents, row_pitch
 
 
+def _fill_faint(
+    seps: list[Polyline], extents: list[float], reach: float, max_gap: int = 10
+) -> tuple[list[Polyline], list[float]]:
+    """Carry faint separators across the clue grid from their neighbours.
+
+    Some prints keep the thin lines between clue lines so light that they
+    vanish among the numbers, while the thick every-5th lines stay clear.
+    The lines of a printed grid are evenly spaced, so a separator that died
+    out short of the clue grid's far side follows the nearest lines above and
+    below that reach it, in proportion, shifted to meet its own traced part.
+    """
+    reaching = [i for i, e in enumerate(extents) if e <= reach]
+    seps, extents = list(seps), list(extents)
+    for i, e in enumerate(extents):
+        if e <= reach:
+            continue
+        j = max((r for r in reaching if r < i), default=None)
+        k = min((r for r in reaching if r > i), default=None)
+        if j is None or k is None or k - j > max_gap:
+            continue
+        t = (i - j) / (k - j)
+        far = max(extents[j], extents[k])
+        own = seps[i]
+        between = lambda x: (1 - t) * seps[j](x) + t * seps[k](x)  # noqa: E731
+        shift = float(own(e)) - float(between(e))
+        xs = np.linspace(far, e, max(2, int((e - far) / 20)), endpoint=False)
+        kept = own.at >= e
+        seps[i] = Polyline(
+            np.concatenate([xs, own.at[kept]]),
+            np.concatenate([between(xs) + shift, own.pos[kept]]),
+        )
+        extents[i] = far
+    return seps, extents
+
+
+def _recentre_strays(seps: list[Polyline], xs: NDArray, pitch: float, tol: float = 0.3) -> list[Polyline]:
+    """Put a separator that strayed off the grid's rhythm back between its neighbours.
+
+    A smudge, tape or crease on a line can lead its trace off by half a cell
+    somewhere across the clue grid: there the gap above it shrinks as the gap
+    below grows by as much. Printed lines are evenly spaced, so such a line
+    goes midway between its neighbours (when they are a regular two pitches
+    apart). ``xs`` sample the clue grid.
+    """
+    seps = list(seps)
+    for i in range(1, len(seps) - 1):
+        a, m, b = (np.array([float(s(x)) for x in xs]) for s in (seps[i - 1], seps[i], seps[i + 1]))
+        up, down = m - a, b - m
+        stray = (np.abs(up - down) > tol * pitch) & (np.abs(up + down - 2 * pitch) < 0.25 * pitch)
+        if stray.any():
+            lo, hi = seps[i - 1], seps[i + 1]
+            at = np.union1d(lo.at, hi.at)
+            seps[i] = Polyline(at, (lo(at) + hi(at)) / 2)
+    return seps
+
+
 def _thickness(gray: NDArray, line: Polyline, xs: NDArray, pitch: float) -> float:
     """Median dark-run thickness of a line across its own direction."""
     h = gray.shape[0]
@@ -399,6 +455,30 @@ def _number_separators(
     return out, cell_pitch
 
 
+def without_edge_line(geom: StripGeometry) -> NDArray:
+    """The canonical image with the board's edge line painted out.
+
+    The edge line is thick, and the cells next to it hold numbers that often
+    touch it: a crop of such a cell takes in part of the line, which reads
+    as an extra 1 or turns a digit into another. Only the long solid run
+    of the line goes (digits' strokes are far shorter), so a digit touching
+    it keeps its shape.
+    """
+    img = geom.image.copy()
+    h, w = img.shape[:2]
+    line = solid_lines(ink_mask(img), horizontal=False, length=max(40, h // 25))
+    ys = np.arange(h)
+    near = np.zeros((h, w), np.uint8)
+    reach = max(3, int(0.2 * geom.cell_pitch))
+    xs = np.asarray(geom.edge(ys), dtype=float)
+    for y in range(h):
+        x = int(round(xs[y]))
+        near[y, max(0, x - reach):min(w, x + reach + 1)] = 255
+    mask = cv2.dilate(cv2.bitwise_and(line, near), np.ones((3, 3), np.uint8))
+    img[mask > 0] = 255
+    return img
+
+
 def _regularize(xs: list[float], pitch: float) -> list[float]:
     """Separators of one clue line as a smooth sequence.
 
@@ -480,6 +560,8 @@ def detect_strip(image: NDArray, orientation: Orientation) -> StripGeometry:
     # boundary followed a crease or a banner, not the grid.
     common = float(np.median(extents))
     extents = [max(e, common - 0.5 * board_pitch) for e in extents]
+    seps, extents = _fill_faint(seps, extents, common + 0.5 * board_pitch)
+    seps = _recentre_strays(seps, np.linspace(common, float(np.median(edge.pos)), 12), row_pitch)
     board_xs = float(np.median(edge.pos)) + board_pitch * (np.arange(4) + 0.5)
     widths = [_thickness(gray, s, board_xs, row_pitch) for s in seps]
     thick = _classify_thick(widths)

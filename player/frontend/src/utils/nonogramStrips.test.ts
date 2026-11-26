@@ -165,6 +165,20 @@ describe("autoRepair on the 175x110 sample", () => {
     ]);
   }, 300_000);
 
+  it("a blurred scan: several misreads, some unnoticed, read off the picture", async () => {
+    const rows = canon.rowClues.map((c) => [...c]);
+    const cols = canon.colClues.map((c) => [...c]);
+    const longest = (cl: number[][]) => cl.findIndex((c) => c.length >= 6);
+    const r1 = longest(rows), r2 = rows.findIndex((c, i) => i > r1 + 20 && c.length >= 6);
+    rows[r1] = rows[r1].filter((_, k) => k !== 2); // a number missed
+    rows[r2] = [...rows[r2].slice(0, -1), rows[r2].at(-1)! + 10]; // a 1 gained
+    cols[145][cols[145].indexOf(18)] = 16; // unnoticed: no flag
+    const res = await autoRepair(asLines(rows, [r1, r2]), asLines(cols));
+    expect(res.kind).toBe("solved");
+    const fixed = Object.fromEntries(res.fixes.map((f) => [f.id, f.to]));
+    expect(fixed).toEqual({ [`r${r1}`]: canon.rowClues[r1], [`r${r2}`]: canon.rowClues[r2], c145: canon.colClues[145] });
+  }, 300_000);
+
   it("never changes a line a person set, and hands back what it can't settle", async () => {
     const cols = canon.colClues.map((c) => [...c]);
     cols[145][cols[145].indexOf(18)] = 16;
