@@ -329,7 +329,64 @@ def _projection_box_quad(gray: NDArray) -> NDArray:
 
     y0, y1 = _outer(row_frac, h)
     x0, x1 = _outer(col_frac, w)
+    y0, y1 = _skip_blank_gaps(dark, row_frac, y0, y1, x0, x1, rows=True)
+    x0, x1 = _skip_blank_gaps(dark, col_frac, x0, x1, y0, y1, rows=False)
     return np.float32([[x0, y0], [x1, y0], [x1, y1], [x0, y1]])
+
+
+# A strip between two full-width dark rows (or columns) is blank paper when less than
+# this fraction of it is ink, measured away from the box's sides.
+_GAP_INK_MAX = 0.002
+# A gap must be at least this fraction of the box's span to count (a thick border's
+# rows are adjacent, with no gap at all).
+_GAP_MIN = 0.02
+
+
+def _skip_blank_gaps(
+    dark: NDArray, frac: NDArray, lo: int, hi: int, cross_lo: int, cross_hi: int, *, rows: bool
+) -> tuple[int, int]:
+    """Move a box edge past blank paper to the next dark line inward.
+
+    Two boards stacked edge to edge put the previous board's last border line, a
+    full-width dark row, on the same columns as this board's: the projection box
+    then spans both and the blank gap between them. Just inside a real border, grid
+    lines (solid or dashed) meet it; inside the gap there is no ink at all. So while
+    the strip between the outermost dark line and the next one inward is blank, the
+    edge moves to that next line. Boards that start with grid lines are unchanged.
+    """
+    thr = max(0.18, 0.55 * float(frac.max()))
+    idx = np.where(frac > thr)[0]
+    idx = idx[(idx >= lo) & (idx <= hi)]
+    if len(idx) < 2:
+        return lo, hi
+    # Runs of consecutive dark lines (a thick border is several rows).
+    runs: list[tuple[int, int]] = []
+    start = prev = int(idx[0])
+    for i in idx[1:]:
+        i = int(i)
+        if i > prev + 1:
+            runs.append((start, prev))
+            start = i
+        prev = i
+    runs.append((start, prev))
+    span = hi - lo
+    margin = max(2, int(0.03 * (cross_hi - cross_lo)))
+    c0, c1 = cross_lo + margin, cross_hi - margin
+
+    def blank(a: int, b: int) -> bool:
+        if b - a < _GAP_MIN * span or c1 <= c0:
+            return False
+        # The middle of the gap: its ends hold the two lines' blurred fringes.
+        a, b = a + (b - a) // 5, b - (b - a) // 5
+        strip = dark[a:b, c0:c1] if rows else dark[c0:c1, a:b]
+        return strip.size > 0 and float(strip.mean()) < _GAP_INK_MAX
+
+    first, last = 0, len(runs) - 1
+    while first < last and blank(runs[first][1] + 1, runs[first + 1][0]):
+        first += 1
+    while last > first and blank(runs[last - 1][1] + 1, runs[last][0]):
+        last -= 1
+    return runs[first][0], runs[last][1]
 
 
 
