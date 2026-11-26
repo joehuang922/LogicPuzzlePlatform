@@ -11,6 +11,8 @@ import {
   HARD_15X25,
   UNSOLVABLE_15X25,
   GIANT_50X64,
+  GIANT_31X45,
+  MISREAD_31X45,
 } from "./fixtures";
 
 const model = (canon = UNIQUE) => SlitherlinkModel.fromCanon(canon);
@@ -148,6 +150,19 @@ describe("large boards — probing and the loop-closing rule", () => {
     const result = gate(5, GIANT_50X64, { deadline: Date.now() + DEFAULT_GATE_BUDGET_MS });
     expect(result!.verdict).toBe("unique");
     expect(isValidSolution(GIANT_50X64, (result!.solution as { edges: never }).edges)).toBe(true);
+  }, 60_000);
+
+  // Both timed out in the gate before the colour rule and probing at search nodes.
+  it("proves the production 31x45 GIANT_31X45 unique through the gate within its default budget", async () => {
+    const { gate, DEFAULT_GATE_BUDGET_MS } = await import("../../gate");
+    const result = gate(5, GIANT_31X45, { deadline: Date.now() + DEFAULT_GATE_BUDGET_MS });
+    expect(result!.verdict).toBe("unique");
+    expect(isValidSolution(GIANT_31X45, (result!.solution as { edges: never }).edges)).toBe(true);
+  }, 60_000);
+
+  it("reports the misread 31x45 'multiple' through the gate within its default budget", async () => {
+    const { gate, DEFAULT_GATE_BUDGET_MS } = await import("../../gate");
+    expect(gate(5, MISREAD_31X45, { deadline: Date.now() + DEFAULT_GATE_BUDGET_MS })!.verdict).toBe("multiple");
   }, 60_000);
 
   it("forces off an edge that would close a loop that is not the whole answer", () => {

@@ -56,6 +56,13 @@ interface Spec {
   facesOfEdge: [number, number][];
   faceCount: number; // rows*cols + 1 (the outer region)
   outerFace: number; // id of the outer region = rows*cols
+  /** Per clue cell: its face and its 4 neighbours' faces [cell, top, bottom, left, right]. */
+  clueFaces: { clue: number; faces: number[] }[];
+  /**
+   * Per dot with 4 distinct faces around it (an interior dot, or one whose cyclic
+   * neighbours aren't both the outer region): those faces in cyclic order.
+   */
+  dotFaces: number[][];
 }
 
 interface ClueCell {
@@ -126,10 +133,31 @@ function buildSpec(canon: SlitherlinkCanon): Spec {
     }
   }
 
+  // Neighbourhoods for the local colour rule (`applyColourRules`).
+  const clueFaces: { clue: number; faces: number[] }[] = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (cells[r][c] < 0) continue;
+      clueFaces.push({
+        clue: cells[r][c],
+        faces: [faceId(r, c), faceId(r - 1, c), faceId(r + 1, c), faceId(r, c - 1), faceId(r, c + 1)],
+      });
+    }
+  }
+  // Around a dot, cyclically adjacent faces sharing the outer region can never alternate,
+  // so only dots with 4 cyclically distinct faces can break the degree rule in colour terms.
+  const dotFaces: number[][] = [];
+  for (let r = 0; r <= rows; r++) {
+    for (let c = 0; c <= cols; c++) {
+      const f = [faceId(r - 1, c - 1), faceId(r - 1, c), faceId(r, c), faceId(r, c - 1)];
+      if (f[0] !== f[1] && f[1] !== f[2] && f[2] !== f[3] && f[3] !== f[0]) dotFaces.push(f);
+    }
+  }
+
   return {
     rows, cols, hCount, edgeCount, cells,
     edgesOfDot, clueCells, cluesOfEdge, endpoints,
-    facesOfEdge, faceCount, outerFace,
+    facesOfEdge, faceCount, outerFace, clueFaces, dotFaces,
   };
 }
 
@@ -249,11 +277,19 @@ class ParityDSU {
  * A fourth propagator applies the single-loop rule early (`applyLoopRule`): an edge that
  * would close a path into a loop that isn't the whole answer is forced OFF.
  *
- * Even with all four, most edges of a 15x25 stay undecided, and the search used to run
- * past 300k nodes without a verdict. So construction ends with failed-literal probing
- * (`probe`): try each undecided edge both ways and keep the side that survives. That
- * settles every production 15x25 before the search starts, in 5-25ms. Search nodes don't
- * probe (measured slower), and the probe runs before the search budget's first tick.
+ * A fifth, the local colour rule (`applyColourRules`), reads clues and dots in colour
+ * terms: a clue n means exactly n of the cell's 4 neighbours differ from it in colour, and
+ * a dot of degree 4 would mean its 4 faces alternate. Known parities can link faces far
+ * apart, so this sees what edge counting can't (a 3 whose top and bottom neighbours are
+ * known to share a colour has both those edges ON). It enumerates each neighbourhood's
+ * colourings and records every relation that holds in all of them.
+ *
+ * Even with these, most edges of a 15x25 stay undecided, and the search used to run past
+ * 300k nodes without a verdict. So construction ends with failed-literal probing (`probe`):
+ * try each undecided edge both ways and keep the side that survives. Search nodes probe
+ * too: on the 31x45 boards the search otherwise ran 300k+ nodes into dead subtrees whose
+ * contradiction one probe exposes. The colour rule costs a scan of every clue and dot, so
+ * it runs at search nodes and between probe passes, never inside a single probe.
  */
 export class SlitherlinkModel implements ConstraintModel<SlitherlinkEdges> {
   private constructor(
@@ -261,6 +297,8 @@ export class SlitherlinkModel implements ConstraintModel<SlitherlinkEdges> {
     private readonly state: Int8Array, // edge id -> UNDECIDED | OFF | ON
     private readonly dsu: ParityDSU, // face 2-coloring relations
     private readonly dead: boolean,
+    // Whether propagation runs the colour rule (see the class comment for when it doesn't).
+    private readonly colour: boolean,
   ) {}
 
   static fromCanon(canon: SlitherlinkCanon): SlitherlinkModel {
@@ -269,7 +307,7 @@ export class SlitherlinkModel implements ConstraintModel<SlitherlinkEdges> {
     const dsu = ParityDSU.create(spec.faceCount);
     // Propagate from the initial (all-undecided) board: 0-clues force their edges off,
     // and border dangles get resolved, before any branching.
-    const model = new SlitherlinkModel(spec, state, dsu, false);
+    const model = new SlitherlinkModel(spec, state, dsu, false, false);
     return model.propagateAll().probe();
   }
 
@@ -307,13 +345,11 @@ export class SlitherlinkModel implements ConstraintModel<SlitherlinkEdges> {
   }
 
   assign(id: number, value: number): ConstraintModel<SlitherlinkEdges> {
-    // Probing runs once, at construction. Probing every search node too was measured
-    // slower: on a 45x31 the search after root probing is tiny, and re-probing each node
-    // cost ~35x more than it saved.
-    return this.assignRaw(id, value);
+    // probe() starts each pass with the colour rule, so the assignment itself skips it.
+    return this.assignRaw(id, value).probe();
   }
 
-  /** Assign and propagate (no probing); probing is built on it. */
+  /** Assign and propagate without probing or the colour rule; probing is built on it. */
   private assignRaw(id: number, value: number): SlitherlinkModel {
     if (this.state[id] !== UNDECIDED) {
       // Reassigning a settled edge to the same value is a no-op; to a different value is a
@@ -322,7 +358,7 @@ export class SlitherlinkModel implements ConstraintModel<SlitherlinkEdges> {
     }
     const state = Int8Array.from(this.state);
     state[id] = value as -1 | 0 | 1;
-    return new SlitherlinkModel(this.spec, state, this.dsu.clone(), false).propagateFrom([id]);
+    return new SlitherlinkModel(this.spec, state, this.dsu.clone(), false, false).propagateFrom([id]);
   }
 
   solution(): SlitherlinkEdges {
@@ -348,11 +384,19 @@ export class SlitherlinkModel implements ConstraintModel<SlitherlinkEdges> {
    * nothing. This is the "if this edge were a line, X breaks" step a human uses, and it is
    * what lets large boards solve without deep search: the plain rules leave most edges of
    * a 15x25 undecided, and a wrong guess was only exposed many levels further down.
+   *
+   * Each pass starts with the colour rule; the probes themselves propagate without it.
    */
   private probe(): SlitherlinkModel {
     let m: SlitherlinkModel = this;
     for (let changed = true; changed && !m.dead; ) {
       changed = false;
+      const coloured = m.withColourRule();
+      if (coloured.dead) return coloured;
+      for (let e = 0; e < m.spec.edgeCount && !changed; e++) {
+        if (coloured.state[e] !== m.state[e]) changed = true;
+      }
+      m = coloured;
       for (let e = 0; e < m.spec.edgeCount && !m.dead; e++) {
         if (m.state[e] !== UNDECIDED) continue;
         const on = m.assignRaw(e, ON);
@@ -372,7 +416,17 @@ export class SlitherlinkModel implements ConstraintModel<SlitherlinkEdges> {
   }
 
   private toDead(): SlitherlinkModel {
-    return new SlitherlinkModel(this.spec, this.state, this.dsu, true);
+    return new SlitherlinkModel(this.spec, this.state, this.dsu, true, this.colour);
+  }
+
+  /**
+   * This model propagated to a fixpoint with the colour rule, returned as a model whose own
+   * propagation leaves it out (what probing wants). `this` is never mutated.
+   */
+  private withColourRule(): SlitherlinkModel {
+    const m = new SlitherlinkModel(this.spec, Int8Array.from(this.state), this.dsu.clone(), false, true)
+      .propagateFrom([]);
+    return new SlitherlinkModel(m.spec, m.state, m.dsu, m.dead, false);
   }
 
   /** Fixpoint propagation seeded by every edge (used once at construction). */
@@ -441,12 +495,103 @@ export class SlitherlinkModel implements ConstraintModel<SlitherlinkEdges> {
         }
         if (qi < queue.length) continue;
       }
+      // The colour rule runs once the cheaper rules are quiet; a new relation sends the loop
+      // back round through the faces -> edge scan.
+      if (this.colour) {
+        const related = this.applyColourRules();
+        if (related === null) return this.toDead();
+        if (related) {
+          colorDirty = true;
+          continue;
+        }
+      }
       // The single-loop rule runs once the local rules are quiet; any edge it forces sends
       // the loop back round.
       if (!this.applyLoopRule(force)) return this.toDead();
       if (qi < queue.length) continue;
       return this;
     }
+  }
+
+  /**
+   * The local colour rule over every clue cell and dot (see the class comment). Returns
+   * null on a contradiction, otherwise whether any new face relation was recorded.
+   */
+  private applyColourRules(): boolean | null {
+    let related = false;
+    for (const { clue, faces } of this.spec.clueFaces) {
+      const r = this.relateNeighbourhood(
+        faces,
+        (c) => (c[0] ^ c[1]) + (c[0] ^ c[2]) + (c[0] ^ c[3]) + (c[0] ^ c[4]) === clue,
+      );
+      if (r === null) return null;
+      related ||= r;
+    }
+    for (const faces of this.spec.dotFaces) {
+      // Degree 4 is the one colouring of a dot's faces that alternates all the way round.
+      const r = this.relateNeighbourhood(faces, (c) => !(c[0] !== c[1] && c[1] !== c[2] && c[2] !== c[3]));
+      if (r === null) return null;
+      related ||= r;
+    }
+    return related;
+  }
+
+  /**
+   * Enumerate the colourings of `faces` consistent with the known relations, keep those
+   * `valid` accepts, and record each relation between two of the faces that holds in all
+   * of them. Faces already related form one group with fixed offsets, so a neighbourhood
+   * of k unrelated groups has 2^k colourings (k <= 5). Returns null when none is valid,
+   * otherwise whether a new relation was recorded.
+   */
+  private relateNeighbourhood(faces: number[], valid: (colours: number[]) => boolean): boolean | null {
+    const { dsu } = this;
+    const n = faces.length;
+    const group = new Int8Array(n); // which group each face belongs to
+    const offset = new Uint8Array(n); // its colour relative to the group's colour
+    const groupFace = new Int32Array(n); // a face of each group whose offset is 0
+    let groups = 0;
+    for (let i = 0; i < n; i++) {
+      group[i] = -1;
+      for (let j = 0; j < i; j++) {
+        const rel = dsu.related(faces[i], faces[j]);
+        if (rel !== null) {
+          group[i] = group[j];
+          offset[i] = offset[j] ^ rel;
+          break;
+        }
+      }
+      if (group[i] < 0) {
+        groupFace[groups] = faces[i];
+        group[i] = groups++;
+      }
+    }
+    if (groups === 1) return false;
+
+    // seen[a*groups+b]: bit 0 = some valid colouring gives groups a and b the same colour,
+    // bit 1 = some gives them different colours.
+    const seen = new Uint8Array(groups * groups);
+    const colours = new Array<number>(n);
+    let anyValid = false;
+    for (let mask = 0; mask < 1 << groups; mask++) {
+      for (let i = 0; i < n; i++) colours[i] = ((mask >> group[i]) & 1) ^ offset[i];
+      if (!valid(colours)) continue;
+      anyValid = true;
+      for (let a = 0; a < groups; a++) {
+        for (let b = a + 1; b < groups; b++) seen[a * groups + b] |= ((mask >> a) ^ (mask >> b)) & 1 ? 2 : 1;
+      }
+    }
+    if (!anyValid) return null;
+
+    let related = false;
+    for (let a = 0; a < groups; a++) {
+      for (let b = a + 1; b < groups; b++) {
+        const s = seen[a * groups + b];
+        if (s === 3) continue;
+        if (!dsu.relate(groupFace[a], groupFace[b], s === 2 ? 1 : 0)) return null;
+        related = true;
+      }
+    }
+    return related;
   }
 
   /**

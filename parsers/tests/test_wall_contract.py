@@ -20,6 +20,10 @@ from puzzle_parsers.grid_utils import _close_dangling_walls, classify_border_thi
 PKG = Path(__file__).resolve().parent.parent / "src" / "puzzle_parsers"
 ROOM_PACKAGES = {"heyawake", "lits", "norinori", "nurimaze", "nuritwin", "ripple_effect"}
 _OWN_CLASSIFIER = re.compile(r"^def \w*(classify_borders|border_width|wall_width|thickness)\w*\(", re.M)
+# Not a room wall: a big nonogram's clue strip has no rooms and no rectified
+# board to classify. It measures its grid lines only to find the every-5th
+# thick ones, which place the strip on the board (mod 5).
+_OWN_CLASSIFIER_OK = {"nonogram_strips/geometry.py: def _thickness("}
 
 
 def test_room_parsers_use_the_shared_classifier():
@@ -34,6 +38,7 @@ def test_no_parser_defines_its_own_wall_classifier():
         for p in PKG.rglob("*.py")
         if p.name != "grid_utils.py"
         for m in _OWN_CLASSIFIER.finditer(p.read_text())
+        if f"{p.relative_to(PKG)}: {m.group(0)}" not in _OWN_CLASSIFIER_OK
     ]
     assert not offenders, "Use grid_utils.classify_border_thickness:\n" + "\n".join(offenders)
 

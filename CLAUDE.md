@@ -76,6 +76,11 @@ This is a solo project. Do not create pull requests or feature branches.
   lines too sparse for the trace, so it skips `rectify_board` and builds its
   lattice locally from the corners of the regions the grid encloses (see
   `skeleton_puzzle/grid_detector.py`). It warps and remaps nothing.
+- Big-nonogram clue strips (`nonogram_strips`) are the other exception: a strip
+  shows the board's border on one side only, so it skips `rectify_board` and
+  traces its own grid lines band by band from the board side (see
+  `nonogram_strips/geometry.py`). It measures line widths only to find the
+  every-5th thick lines, not walls (exempt in `test_wall_contract.py`).
 
 # Authoring room-based puzzles
 
