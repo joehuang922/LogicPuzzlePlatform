@@ -1,7 +1,8 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { executeStatement } from "../lib/db";
 import { evaluateAndUnlock, getAllDefinitions } from "../lib/achievements";
-import { getCurrentMissions, isValidTimeZone } from "../lib/missions";
+import { isValidTimeZone } from "../lib/history";
+import { getCurrentMissions } from "../lib/missions";
 
 function toCamelCase(str: string): string {
   return str.replace(/_([a-z])/g, (_, c) => c.toUpperCase());

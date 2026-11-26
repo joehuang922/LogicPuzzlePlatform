@@ -66,15 +66,6 @@ const WEEKLY_BIG = 3;
 
 // --- Periods ---------------------------------------------------------------
 
-export function isValidTimeZone(tz: string): boolean {
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: tz });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /** Offset of `tz` from UTC at `instant`, in ms (UTC+8 -> 8h). */
 function tzOffsetMs(instant: number, tz: string): number {
   const parts = new Intl.DateTimeFormat("en-US", {
