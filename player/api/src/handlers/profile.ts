@@ -1,6 +1,7 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { executeStatement } from "../lib/db";
 import { evaluateAndUnlock, getAllDefinitions } from "../lib/achievements";
+import { getCurrentMissions, isValidTimeZone } from "../lib/missions";
 
 function toCamelCase(str: string): string {
   return str.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
@@ -122,9 +123,30 @@ async function getProfile(
   return response(200, { player, questionStats, collectionStats: collectionRows, achievements });
 }
 
+/**
+ * GET /profile/missions?player={id}&tz={IANA zone}: the current day, week and
+ * month missions, generating any the player doesn't have yet. tz falls back
+ * to UTC when missing or unknown.
+ */
+async function getMissions(
+  event: APIGatewayProxyEvent
+): Promise<APIGatewayProxyResult> {
+  const playerId = Number(event.queryStringParameters?.player);
+  if (!Number.isInteger(playerId) || playerId <= 0) {
+    return response(400, { error: "player query param required" });
+  }
+  const tzParam = event.queryStringParameters?.tz ?? "UTC";
+  const tz = isValidTimeZone(tzParam) ? tzParam : "UTC";
+  const missions = await getCurrentMissions(playerId, tz);
+  return response(200, { missions });
+}
+
 export async function handler(
   event: APIGatewayProxyEvent
 ): Promise<APIGatewayProxyResult> {
+  if (event.httpMethod === "GET" && event.resource === "/profile/missions") {
+    return getMissions(event);
+  }
   if (event.httpMethod === "GET") {
     return getProfile(event);
   }

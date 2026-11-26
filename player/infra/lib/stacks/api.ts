@@ -176,7 +176,10 @@ export class ApiStack extends cdk.Stack {
     props.cluster.grantDataApiAccess(profileHandler);
 
     const profile = api.root.addResource("profile");
-    profile.addMethod("GET", new apigw.LambdaIntegration(profileHandler));
+    const profileIntegration = new apigw.LambdaIntegration(profileHandler);
+    profile.addMethod("GET", profileIntegration);
+    // Periodic missions (current day/week/month), served by the profile Lambda.
+    profile.addResource("missions").addMethod("GET", profileIntegration);
 
     // Per-day activity by puzzle type over a date range (heat map, missions).
     const historyHandler = new lambda.Function(this, "HistoryHandler", {

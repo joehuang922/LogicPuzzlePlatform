@@ -392,6 +392,27 @@ data class ProfileAchievement(
     val unlockedAt: String? = null,
 )
 
+/** A periodic mission (GET /profile/missions); period is "day", "week" or "month". */
+@Serializable
+data class Mission(
+    val id: Int,
+    val period: String,
+    val periodStart: String,
+    val startsAt: String,
+    val endsAt: String,
+    val kind: String,
+    val typeId: Int? = null,
+    val description: String,
+    val progress: Int,
+    val target: Int,
+    @Serializable(with = FlexibleBooleanSerializer::class)
+    val completed: Boolean = false,
+    val completedAt: String? = null,
+)
+
+@Serializable
+data class MissionsResponse(val missions: List<Mission> = emptyList())
+
 @Serializable
 data class ProfilePlayer(val id: Int, val name: String)
 

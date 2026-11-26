@@ -15,6 +15,7 @@ import com.puzzleplatform.player.data.model.CreateAttemptResponse
 import com.puzzleplatform.player.data.model.DEFAULT_COLLECTION_ID
 import com.puzzleplatform.player.data.model.defaultCollection
 import com.puzzleplatform.player.data.model.HistoryResponse
+import com.puzzleplatform.player.data.model.Mission
 import com.puzzleplatform.player.data.model.ProfileResponse
 import com.puzzleplatform.player.data.model.Puzzle
 import com.puzzleplatform.player.data.model.PuzzleType
@@ -312,6 +313,10 @@ class PuzzleRepository(
 
     suspend fun getHistory(from: String, to: String, tz: String): HistoryResponse =
         api.getHistory(PLAYER_ID, from, to, tz)
+
+    /** Current day/week/month missions in the device's time zone (online only). */
+    suspend fun getMissions(): List<Mission> =
+        api.getMissions(PLAYER_ID, java.time.ZoneId.systemDefault().id).missions
 
     /** Parse a snapshot's stringified currentAnswer into a JsonObject. */
     fun parseAnswer(currentAnswer: String): JsonObject =

@@ -434,6 +434,31 @@ export function getHistory(player: number, from: string, to: string, tz: string)
   return request<HistoryResponse>(`/history?${q}`);
 }
 
+export type MissionPeriod = "day" | "week" | "month";
+
+export interface Mission {
+  id: number;
+  period: MissionPeriod;
+  periodStart: string;
+  startsAt: string;
+  endsAt: string;
+  kind: string;
+  typeId: number | null;
+  description: string;
+  progress: number;
+  target: number;
+  completed: boolean;
+  completedAt: string | null;
+}
+
+/** Current day/week/month missions; the API generates any missing one. */
+export function getMissions(player: number) {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC";
+  return request<{ missions: Mission[] }>(
+    `/profile/missions?player=${player}&tz=${encodeURIComponent(tz)}`
+  );
+}
+
 const PARSER_URL = import.meta.env.VITE_PARSER_URL ?? `${API_BASE}/parse`;
 
 // The deployed parser Lambda gives up after 2 minutes, so waiting longer is

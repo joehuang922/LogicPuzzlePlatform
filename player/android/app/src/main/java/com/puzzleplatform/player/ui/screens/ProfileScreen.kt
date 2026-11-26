@@ -14,6 +14,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -28,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.puzzleplatform.player.data.model.Mission
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,6 +69,23 @@ fun ProfileScreen(
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     item { SyncStatusRow(state.syncState) }
+                    item { Header("Missions") }
+                    when {
+                        state.missionsError != null -> item {
+                            Text(
+                                "Couldn't load missions: ${state.missionsError}",
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                        state.missions == null -> item {
+                            Text("Loading missions…", style = MaterialTheme.typography.bodySmall)
+                        }
+                        state.missions!!.isEmpty() -> item {
+                            Text("No missions right now.", style = MaterialTheme.typography.bodySmall)
+                        }
+                        else -> items(state.missions!!, key = { "m-${it.id}" }) { m -> MissionCard(m) }
+                    }
                     item { Header("Activity") }
                     item {
                         val days = state.historyDays
@@ -174,6 +193,54 @@ private fun formatRelativeTime(epochMillis: Long): String {
         deltaSec < 3600 -> "${deltaSec / 60} min ago"
         deltaSec < 86400 -> "${deltaSec / 3600} h ago"
         else -> "${deltaSec / 86400} d ago"
+    }
+}
+
+private val PERIOD_LABELS = mapOf("day" to "Today", "week" to "This week", "month" to "This month")
+
+@Composable
+private fun MissionCard(m: Mission) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    (PERIOD_LABELS[m.period] ?: m.period).uppercase(),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    if (m.completed) "✓ Done" else missionTimeLeft(m.endsAt),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (m.completed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(m.description, fontWeight = FontWeight.Bold)
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                LinearProgressIndicator(
+                    progress = { if (m.target > 0) m.progress.toFloat() / m.target else 0f },
+                    modifier = Modifier.weight(1f),
+                )
+                Text("${m.progress} / ${m.target}", style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+/** "3 h left" / "2 d left" until the mission's period ends. */
+private fun missionTimeLeft(endsAt: String): String {
+    val end = runCatching { java.time.Instant.parse(endsAt).toEpochMilli() }.getOrNull() ?: return ""
+    val ms = end - System.currentTimeMillis()
+    if (ms <= 0) return "ended"
+    val h = ms / 3_600_000
+    return when {
+        h < 1 -> "${maxOf(1, ms / 60_000)} min left"
+        h < 48 -> "$h h left"
+        else -> "${h / 24} d left"
     }
 }
 

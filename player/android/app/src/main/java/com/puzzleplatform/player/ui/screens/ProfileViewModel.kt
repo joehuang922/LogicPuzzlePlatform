@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.puzzleplatform.player.data.PuzzleRepository
 import com.puzzleplatform.player.data.ServiceLocator
+import com.puzzleplatform.player.data.model.Mission
 import com.puzzleplatform.player.data.model.ProfileAchievement
 import com.puzzleplatform.player.data.model.ProfileCollectionRow
 import com.puzzleplatform.player.data.model.ProfileQuestionStat
@@ -34,6 +35,9 @@ data class ProfileUiState(
     val questionStats: List<ProfileQuestionStat> = emptyList(),
     val collectionGroups: List<CollectionGroup> = emptyList(),
     val achievements: List<ProfileAchievement> = emptyList(),
+    /** null while loading; missions load on their own so a failure doesn't hide the profile. */
+    val missions: List<Mission>? = null,
+    val missionsError: String? = null,
     val syncState: SyncState = SyncState(),
     /** Activity heat map: date -> puzzle type id -> solves; null until loaded. */
     val historyDays: Map<LocalDate, Map<Int, Int>>? = null,
@@ -63,8 +67,16 @@ class ProfileViewModel(
     }
 
     fun load() {
-        _state.update { it.copy(loading = true, error = null) }
+        _state.update { it.copy(loading = true, error = null, missions = null, missionsError = null) }
         loadHistory()
+        viewModelScope.launch {
+            try {
+                val missions = repo.getMissions()
+                _state.update { it.copy(missions = missions) }
+            } catch (e: Exception) {
+                _state.update { it.copy(missionsError = e.message ?: "Failed to load missions") }
+            }
+        }
         viewModelScope.launch {
             try {
                 val profile = repo.getProfile()

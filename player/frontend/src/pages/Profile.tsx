@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getProfile, ProfileQuestionStat, ProfileCollectionRow, ProfileAchievement } from "../api/client";
+import { getProfile, getMissions, Mission, ProfileQuestionStat, ProfileCollectionRow, ProfileAchievement } from "../api/client";
 import ActivityHeatmap from "../components/ActivityHeatmap";
 
 const HARDCODED_PLAYER_ID = 1;
@@ -40,6 +40,14 @@ export default function Profile() {
   const [achievements, setAchievements] = useState<ProfileAchievement[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [missions, setMissions] = useState<Mission[] | null>(null);
+  const [missionsError, setMissionsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getMissions(HARDCODED_PLAYER_ID)
+      .then((res) => setMissions(res.missions))
+      .catch((err) => setMissionsError(err.message));
+  }, []);
 
   useEffect(() => {
     getProfile(HARDCODED_PLAYER_ID)
@@ -61,6 +69,8 @@ export default function Profile() {
   return (
     <div>
       <h1>{playerName}</h1>
+
+      <MissionsSection missions={missions} error={missionsError} />
 
       <h2>Activity</h2>
       <ActivityHeatmap
@@ -163,6 +173,69 @@ export default function Profile() {
         ))
       )}
     </div>
+  );
+}
+
+const PERIOD_LABELS: Record<string, string> = {
+  day: "Today",
+  week: "This week",
+  month: "This month",
+};
+
+/** "3 h left" / "2 d left" until a mission's period ends. */
+function timeLeft(endsAt: string): string {
+  const ms = Date.parse(endsAt) - Date.now();
+  if (ms <= 0) return "ended";
+  const h = Math.floor(ms / 3_600_000);
+  if (h < 1) return `${Math.max(1, Math.floor(ms / 60_000))} min left`;
+  if (h < 48) return `${h} h left`;
+  return `${Math.floor(h / 24)} d left`;
+}
+
+function MissionsSection({ missions, error }: { missions: Mission[] | null; error: string | null }) {
+  return (
+    <>
+      <h2>Missions</h2>
+      {error ? (
+        <p style={{ color: "red" }}>Couldn't load missions: {error}</p>
+      ) : missions === null ? (
+        <p style={{ color: "#666" }}>Loading missions...</p>
+      ) : missions.length === 0 ? (
+        <p style={{ color: "#666" }}>No missions right now.</p>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "0.75rem", marginBottom: "2rem" }}>
+          {missions.map((m) => (
+            <div key={m.id} style={{
+              padding: "0.75rem",
+              border: "1px solid",
+              borderColor: m.completed ? "#4caf50" : "#ddd",
+              borderRadius: 8,
+              backgroundColor: m.completed ? "#f1f8e9" : "#fff",
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", color: "#888" }}>
+                <span style={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                  {PERIOD_LABELS[m.period] ?? m.period}
+                </span>
+                <span>{m.completed ? "✓ Done" : timeLeft(m.endsAt)}</span>
+              </div>
+              <div style={{ margin: "0.35rem 0 0.5rem", fontWeight: 600 }}>{m.description}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <div style={{ flex: 1, height: 8, borderRadius: 4, backgroundColor: "#eee", overflow: "hidden" }}>
+                  <div style={{
+                    width: `${Math.round((100 * m.progress) / m.target)}%`,
+                    height: "100%",
+                    backgroundColor: m.completed ? "#4caf50" : "#2196f3",
+                  }} />
+                </div>
+                <span style={{ fontSize: "0.85rem", color: "#555", fontVariantNumeric: "tabular-nums" }}>
+                  {m.progress} / {m.target}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
   );
 }
 
