@@ -94,10 +94,11 @@ CREATE TABLE IF NOT EXISTS player_achievement (
   UNIQUE KEY uq_player_achievement (player, achievement_id)
 );
 
--- Periodic missions: one per player per day / week (Monday start) / month, in
--- the player's time zone, generated on first request (see lib/missions.ts).
--- period_start is the local date the period starts on; window_start/end are
--- that period's bounds in UTC, frozen at generation. Progress is counted from
+-- Periodic missions: a fixed set per player per day / week (Monday start) /
+-- month, in the player's time zone, generated on first request (see
+-- lib/missions.ts); slot orders the missions within a period. period_start is
+-- the local date the period starts on; window_start/end are that period's
+-- bounds in UTC, frozen at generation. Progress is counted from
 -- player_attempt.finished_at inside the window; completed_at is the finish
 -- time of the solve that reached the target.
 CREATE TABLE IF NOT EXISTS player_mission (
@@ -105,6 +106,7 @@ CREATE TABLE IF NOT EXISTS player_mission (
   player        INT          NOT NULL,
   period        VARCHAR(8)   NOT NULL,
   period_start  DATE         NOT NULL,
+  slot          TINYINT      NOT NULL,
   window_start  DATETIME     NOT NULL,
   window_end    DATETIME     NOT NULL,
   kind          VARCHAR(32)  NOT NULL,
@@ -113,5 +115,5 @@ CREATE TABLE IF NOT EXISTS player_mission (
   completed_at  DATETIME     NULL,
   created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (player) REFERENCES player_account(id),
-  UNIQUE KEY uq_player_mission_period (player, period, period_start)
+  UNIQUE KEY uq_player_mission_slot (player, period, period_start, slot)
 );

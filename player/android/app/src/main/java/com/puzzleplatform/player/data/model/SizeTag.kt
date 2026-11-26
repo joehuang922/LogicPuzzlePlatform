@@ -12,7 +12,8 @@ private const val KAKURO = 12
 private const val PICTURESQUE_MAZE = 44
 
 /**
- * BIG / GIANT for an oversized puzzle, null otherwise:
+ * BIG / GIANT for an oversized puzzle, null otherwise (mirrored by the web's
+ * puzzleBrowse.ts and the API's lib/sizeTag.ts, which assigns missions):
  * - sudoku: 16x16 and up is BIG, 25x25 and up GIANT;
  * - combo sudoku: 10+ subboards BIG, 20+ GIANT;
  * - kakuro: 500+ cells BIG, 1000+ GIANT (every cell is a sum to work out);

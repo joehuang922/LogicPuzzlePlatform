@@ -397,12 +397,17 @@ data class ProfileAchievement(
 data class Mission(
     val id: Int,
     val period: String,
+    val slot: Int = 0,
     val periodStart: String,
     val startsAt: String,
     val endsAt: String,
     val kind: String,
     val typeId: Int? = null,
     val description: String,
+    /** Assigned-puzzle missions only: the puzzle to open, its title and size pill ("BIG" / "GIANT"). */
+    val questionId: String? = null,
+    val questionTitle: String? = null,
+    val size: String? = null,
     val progress: Int,
     val target: Int,
     @Serializable(with = FlexibleBooleanSerializer::class)

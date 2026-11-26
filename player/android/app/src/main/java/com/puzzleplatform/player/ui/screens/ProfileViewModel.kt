@@ -10,6 +10,7 @@ import com.puzzleplatform.player.data.model.ProfileCollectionRow
 import com.puzzleplatform.player.data.model.ProfileQuestionStat
 import com.puzzleplatform.player.data.sync.SyncManager
 import com.puzzleplatform.player.data.sync.SyncState
+import com.puzzleplatform.player.puzzle.PuzzleEngines
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -38,6 +39,8 @@ data class ProfileUiState(
     /** null while loading; missions load on their own so a failure doesn't hide the profile. */
     val missions: List<Mission>? = null,
     val missionsError: String? = null,
+    /** Set when an assigned mission puzzle couldn't be opened. */
+    val openError: String? = null,
     val syncState: SyncState = SyncState(),
     /** Activity heat map: date -> puzzle type id -> solves; null until loaded. */
     val historyDays: Map<LocalDate, Map<Int, Int>>? = null,
@@ -107,6 +110,32 @@ class ProfileViewModel(
                 _state.update { it.copy(historyDays = ActivityCalendar.parseDays(res.days)) }
             } catch (e: Exception) {
                 _state.update { it.copy(historyError = e.message ?: "Failed to load activity") }
+            }
+        }
+    }
+
+    /**
+     * Open an assigned mission puzzle: resume its newest unfinished attempt,
+     * else start one (fetching the puzzle when it isn't cached).
+     */
+    fun openMissionPuzzle(questionId: String, onReady: (puzzleId: String, attemptId: String) -> Unit) {
+        _state.update { it.copy(openError = null) }
+        viewModelScope.launch {
+            try {
+                repo.listAttempts(questionId, finished = false).firstOrNull()?.let {
+                    onReady(questionId, it.id)
+                    return@launch
+                }
+                val puzzle = repo.getPuzzle(questionId)
+                val engine = PuzzleEngines.forType(puzzle.puzzleType)
+                if (engine == null) {
+                    _state.update { it.copy(openError = "This puzzle type can't be played in the app yet") }
+                    return@launch
+                }
+                val result = repo.createAttempt(puzzle.id, engine.extractAnswer(puzzle, emptyMap()))
+                onReady(puzzle.id, result.attemptId)
+            } catch (e: Exception) {
+                _state.update { it.copy(openError = e.message ?: "Failed to open the puzzle") }
             }
         }
     }

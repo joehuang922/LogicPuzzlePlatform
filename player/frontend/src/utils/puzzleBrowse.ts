@@ -1,5 +1,6 @@
 /** BIG / GIANT size pills and the type-first grouping for Home. Mirrors the
- *  Android app's SizeTag.kt and groupTypePuzzlesByCollection. */
+ *  Android app's SizeTag.kt and groupTypePuzzlesByCollection; the API's
+ *  lib/sizeTag.ts (mission assignment) mirrors sizeTag too. */
 
 export type SizeTag = "BIG" | "GIANT";
 

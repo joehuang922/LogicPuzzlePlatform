@@ -1,5 +1,19 @@
 import { useEffect, useState } from "react";
-import { getProfile, getMissions, Mission, ProfileQuestionStat, ProfileCollectionRow, ProfileAchievement } from "../api/client";
+import { useNavigate } from "react-router-dom";
+import {
+  createAttempt,
+  getAttemptSnapshot,
+  getMissions,
+  getProfile,
+  getPuzzle,
+  listAttempts,
+  Mission,
+  ProfileAchievement,
+  ProfileCollectionRow,
+  ProfileQuestionStat,
+} from "../api/client";
+import { extractAnswer } from "../extractors";
+import { PuzzleDefinition } from "../types/puzzle";
 import ActivityHeatmap from "../components/ActivityHeatmap";
 
 const HARDCODED_PLAYER_ID = 1;
@@ -182,6 +196,8 @@ const PERIOD_LABELS: Record<string, string> = {
   month: "This month",
 };
 
+const SIZE_COLORS: Record<string, string> = { BIG: "#ef6c00", GIANT: "#c62828" };
+
 /** "3 h left" / "2 d left" until a mission's period ends. */
 function timeLeft(endsAt: string): string {
   const ms = Date.parse(endsAt) - Date.now();
@@ -192,49 +208,115 @@ function timeLeft(endsAt: string): string {
   return `${Math.floor(h / 24)} d left`;
 }
 
+/**
+ * Open an assigned mission puzzle: resume its latest attempt, else start one.
+ * Same as Home's New Attempt / Load Attempt.
+ */
+async function openMissionPuzzle(questionId: string, navigate: ReturnType<typeof useNavigate>) {
+  const { attempts } = await listAttempts(HARDCODED_PLAYER_ID, questionId);
+  const latest = [...attempts].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+  if (latest) {
+    const { snapshot } = await getAttemptSnapshot(latest.id);
+    navigate(`/play/${questionId}?attempt=${latest.id}`, {
+      state: {
+        currentAnswer: typeof snapshot.currentAnswer === "string"
+          ? JSON.parse(snapshot.currentAnswer)
+          : snapshot.currentAnswer,
+        elapsedSeconds: snapshot.elapsedSeconds,
+      },
+    });
+    return;
+  }
+  const { puzzle } = await getPuzzle(questionId);
+  const result = await createAttempt({
+    player: HARDCODED_PLAYER_ID,
+    question: questionId,
+    initialAnswer: extractAnswer(puzzle as PuzzleDefinition, {}),
+  });
+  navigate(`/play/${questionId}?attempt=${result.attemptId}`);
+}
+
 function MissionsSection({ missions, error }: { missions: Mission[] | null; error: string | null }) {
+  const navigate = useNavigate();
+  const [openError, setOpenError] = useState<string | null>(null);
+
+  if (error) return (<><h2>Missions</h2><p style={{ color: "red" }}>Couldn't load missions: {error}</p></>);
+  if (missions === null) return (<><h2>Missions</h2><p style={{ color: "#666" }}>Loading missions...</p></>);
+  if (missions.length === 0) return (<><h2>Missions</h2><p style={{ color: "#666" }}>No missions right now.</p></>);
+
+  const periods = ["day", "week", "month"].filter((p) => missions.some((m) => m.period === p));
   return (
     <>
       <h2>Missions</h2>
-      {error ? (
-        <p style={{ color: "red" }}>Couldn't load missions: {error}</p>
-      ) : missions === null ? (
-        <p style={{ color: "#666" }}>Loading missions...</p>
-      ) : missions.length === 0 ? (
-        <p style={{ color: "#666" }}>No missions right now.</p>
-      ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "0.75rem", marginBottom: "2rem" }}>
-          {missions.map((m) => (
-            <div key={m.id} style={{
-              padding: "0.75rem",
-              border: "1px solid",
-              borderColor: m.completed ? "#4caf50" : "#ddd",
-              borderRadius: 8,
-              backgroundColor: m.completed ? "#f1f8e9" : "#fff",
-            }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", color: "#888" }}>
-                <span style={{ fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                  {PERIOD_LABELS[m.period] ?? m.period}
-                </span>
-                <span>{m.completed ? "✓ Done" : timeLeft(m.endsAt)}</span>
-              </div>
-              <div style={{ margin: "0.35rem 0 0.5rem", fontWeight: 600 }}>{m.description}</div>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <div style={{ flex: 1, height: 8, borderRadius: 4, backgroundColor: "#eee", overflow: "hidden" }}>
-                  <div style={{
-                    width: `${Math.round((100 * m.progress) / m.target)}%`,
-                    height: "100%",
-                    backgroundColor: m.completed ? "#4caf50" : "#2196f3",
-                  }} />
+      {openError && <p style={{ color: "red" }}>Couldn't open the puzzle: {openError}</p>}
+      {periods.map((period) => {
+        const group = missions.filter((m) => m.period === period);
+        const done = group.filter((m) => m.completed).length;
+        return (
+          <div key={period} style={{ marginBottom: "1.25rem" }}>
+            <h3 style={{ margin: "0 0 0.5rem", display: "flex", gap: "0.75rem", alignItems: "baseline" }}>
+              {PERIOD_LABELS[period]}
+              <span style={{ fontWeight: "normal", fontSize: "0.85rem", color: "#888" }}>
+                {done} / {group.length} done · {timeLeft(group[0].endsAt)}
+              </span>
+            </h3>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "0.75rem" }}>
+              {group.map((m) => (
+                <div key={m.id} style={{
+                  padding: "0.75rem",
+                  border: "1px solid",
+                  borderColor: m.completed ? "#4caf50" : "#ddd",
+                  borderRadius: 8,
+                  backgroundColor: m.completed ? "#f1f8e9" : "#fff",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.4rem",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontWeight: 600 }}>
+                    {m.size && (
+                      <span style={{
+                        fontSize: "0.7rem",
+                        fontWeight: 700,
+                        color: "#fff",
+                        backgroundColor: SIZE_COLORS[m.size] ?? "#888",
+                        borderRadius: 4,
+                        padding: "0.05rem 0.35rem",
+                      }}>{m.size}</span>
+                    )}
+                    <span>{m.description}</span>
+                    {m.completed && <span style={{ marginLeft: "auto", color: "#4caf50" }}>✓</span>}
+                  </div>
+                  {m.questionTitle && (
+                    <div style={{ fontSize: "0.85rem", color: "#555" }}>{m.questionTitle}</div>
+                  )}
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <div style={{ flex: 1, height: 8, borderRadius: 4, backgroundColor: "#eee", overflow: "hidden" }}>
+                      <div style={{
+                        width: `${Math.round((100 * m.progress) / m.target)}%`,
+                        height: "100%",
+                        backgroundColor: m.completed ? "#4caf50" : "#2196f3",
+                      }} />
+                    </div>
+                    <span style={{ fontSize: "0.85rem", color: "#555", fontVariantNumeric: "tabular-nums" }}>
+                      {m.progress} / {m.target}
+                    </span>
+                    {m.questionId && !m.completed && (
+                      <button
+                        onClick={() => {
+                          setOpenError(null);
+                          openMissionPuzzle(m.questionId!, navigate).catch((e) => setOpenError(e.message));
+                        }}
+                      >
+                        Play
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <span style={{ fontSize: "0.85rem", color: "#555", fontVariantNumeric: "tabular-nums" }}>
-                  {m.progress} / {m.target}
-                </span>
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        );
+      })}
     </>
   );
 }

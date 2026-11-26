@@ -1,5 +1,6 @@
 package com.puzzleplatform.player.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,6 +16,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -24,7 +26,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -35,6 +39,7 @@ import com.puzzleplatform.player.data.model.Mission
 @Composable
 fun ProfileScreen(
     onBack: () -> Unit,
+    onOpenAttempt: (puzzleId: String, attemptId: String) -> Unit,
     vm: ProfileViewModel = viewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -70,6 +75,7 @@ fun ProfileScreen(
                 ) {
                     item { SyncStatusRow(state.syncState) }
                     item { Header("Missions") }
+                    val missions = state.missions
                     when {
                         state.missionsError != null -> item {
                             Text(
@@ -78,13 +84,31 @@ fun ProfileScreen(
                                 style = MaterialTheme.typography.bodySmall,
                             )
                         }
-                        state.missions == null -> item {
+                        missions == null -> item {
                             Text("Loading missions…", style = MaterialTheme.typography.bodySmall)
                         }
-                        state.missions!!.isEmpty() -> item {
+                        missions.isEmpty() -> item {
                             Text("No missions right now.", style = MaterialTheme.typography.bodySmall)
                         }
-                        else -> items(state.missions!!, key = { "m-${it.id}" }) { m -> MissionCard(m) }
+                        else -> {
+                            state.openError?.let { err ->
+                                item {
+                                    Text(
+                                        "Couldn't open the puzzle: $err",
+                                        color = MaterialTheme.colorScheme.error,
+                                        style = MaterialTheme.typography.bodySmall,
+                                    )
+                                }
+                            }
+                            for (period in listOf("day", "week", "month")) {
+                                val group = missions.filter { it.period == period }
+                                if (group.isEmpty()) continue
+                                item(key = "mh-$period") { MissionPeriodHeader(period, group) }
+                                items(group, key = { "m-${it.id}" }) { m ->
+                                    MissionCard(m, onPlay = { qid -> vm.openMissionPuzzle(qid, onOpenAttempt) })
+                                }
+                            }
+                        }
                     }
                     item { Header("Activity") }
                     item {
@@ -199,23 +223,48 @@ private fun formatRelativeTime(epochMillis: Long): String {
 private val PERIOD_LABELS = mapOf("day" to "Today", "week" to "This week", "month" to "This month")
 
 @Composable
-private fun MissionCard(m: Mission) {
+private fun MissionPeriodHeader(period: String, group: List<Mission>) {
+    val done = group.count { it.completed }
+    Row(
+        Modifier.fillMaxWidth().padding(top = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(PERIOD_LABELS[period] ?: period, fontWeight = FontWeight.SemiBold)
+        Text(
+            "$done / ${group.size} done · ${missionTimeLeft(group.first().endsAt)}",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+private val SIZE_PILL_COLORS = mapOf("BIG" to Color(0xFFEF6C00), "GIANT" to Color(0xFFC62828))
+
+@Composable
+private fun MissionCard(m: Mission, onPlay: (questionId: String) -> Unit) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(
-                    (PERIOD_LABELS[m.period] ?: m.period).uppercase(),
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    if (m.completed) "✓ Done" else missionTimeLeft(m.endsAt),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (m.completed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                m.size?.let { size ->
+                    Text(
+                        size,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        modifier = Modifier
+                            .background(SIZE_PILL_COLORS[size] ?: Color.Gray, RoundedCornerShape(4.dp))
+                            .padding(horizontal = 5.dp, vertical = 1.dp),
+                    )
+                }
+                Text(m.description, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                if (m.completed) Text("✓", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
             }
-            Text(m.description, fontWeight = FontWeight.Bold)
+            m.questionTitle?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -226,6 +275,9 @@ private fun MissionCard(m: Mission) {
                     modifier = Modifier.weight(1f),
                 )
                 Text("${m.progress} / ${m.target}", style = MaterialTheme.typography.bodySmall)
+                if (m.questionId != null && !m.completed) {
+                    TextButton(onClick = { onPlay(m.questionId) }) { Text("Play") }
+                }
             }
         }
     }

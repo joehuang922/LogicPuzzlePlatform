@@ -439,12 +439,17 @@ export type MissionPeriod = "day" | "week" | "month";
 export interface Mission {
   id: number;
   period: MissionPeriod;
+  slot: number;
   periodStart: string;
   startsAt: string;
   endsAt: string;
   kind: string;
   typeId: number | null;
   description: string;
+  /** Assigned-puzzle missions only: the puzzle to open, its title and size pill. */
+  questionId: string | null;
+  questionTitle: string | null;
+  size: "BIG" | "GIANT" | null;
   progress: number;
   target: number;
   completed: boolean;
