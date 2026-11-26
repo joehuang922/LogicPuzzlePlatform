@@ -22,17 +22,7 @@ import cv2
 
 from puzzle_parsers.nonogram_strips.geometry import draw
 from puzzle_parsers.nonogram_strips.merge import check_clues, merge_axis
-from puzzle_parsers.nonogram_strips.reader import StripReading, read_strip
-
-
-def _box_to_original(box, reading: StripReading, original_shape) -> list[int]:
-    x1, y1, x2, y2 = box
-    if reading.orientation == "rows":
-        return [x1, y1, x2, y2]
-    # Canonical = original turned a quarter counter-clockwise:
-    # canonical (x, y) is original (W - 1 - y, x).
-    w = original_shape[1]
-    return [w - 1 - y2, x1, w - 1 - y1, x2]
+from puzzle_parsers.nonogram_strips.reader import StripReading, box_to_original, read_strip
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -113,7 +103,7 @@ def main(argv: list[str] | None = None) -> int:
                     "endBorder": r.end_border,
                     "lines": [
                         {"clues": ln.clues, "complete": ln.complete, "flags": ln.flags,
-                         "boxes": [_box_to_original(b, r, shapes[axis][i]) for b in ln.boxes]}
+                         "boxes": [box_to_original(b, r.orientation, shapes[axis][i]) for b in ln.boxes]}
                         for ln in r.lines
                     ],
                 }

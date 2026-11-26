@@ -78,6 +78,17 @@ class StripReading:
     geometry: StripGeometry
 
 
+def box_to_original(box: tuple[int, int, int, int], orientation: Orientation, shape) -> list[int]:
+    """A canonical-image cell box in the coordinates of the image as given."""
+    x1, y1, x2, y2 = box
+    if orientation == "rows":
+        return [x1, y1, x2, y2]
+    # Canonical = original turned a quarter counter-clockwise:
+    # canonical (x, y) is original (W - 1 - y, x).
+    w = shape[1]
+    return [w - 1 - y2, x1, w - 1 - y1, x2]
+
+
 def _lines_from_cells(values: list[int], empty: int) -> tuple[list[int], list[int], list[str]]:
     """Clues (away-from-board order reversed) and their cell indices.
 
@@ -111,15 +122,27 @@ def read_strip(
     *,
     max_clue: int | None = None,
     geometry: StripGeometry | None = None,
+    share: tuple[int, int] | None = None,
 ) -> StripReading:
     """``max_clue``: the length of the lines this strip clues (the board's
-    width for row clues, its height for column clues), when known."""
+    width for row clues, its height for column clues), when known.
+
+    ``share=(k, n)`` reads only the k-th of n equal blocks of clue lines (in
+    board order), so one strip can be read by n requests at once; the other
+    lines come back empty, flagged ``not_read``.
+    """
     geom = geometry or detect_strip(image, orientation)
     img = geom.image
     h, w = img.shape[:2]
     seps, extents = geom.separators, geom.extents
     common = float(np.median(extents))
     n = len(seps) - 1
+    wanted = range(n)
+    if share is not None:
+        k, parts = share
+        board = range(k * n // parts, (k + 1) * n // parts)
+        # Column strips list their columns right to left in the canonical image.
+        wanted = range(n - board.stop, n - board.start) if orientation == "cols" else board
 
     gray = cv2.GaussianBlur(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), (3, 3), 0)
     ink_level, paper_level = np.percentile(gray, 1), np.percentile(gray, 60)
@@ -128,7 +151,7 @@ def read_strip(
     wide: list[list[NDArray]] = []
     cell_boxes: list[list[tuple[int, int, int, int]]] = []
     for i in range(n):
-        xs = geom.number_seps[i]
+        xs = geom.number_seps[i] if i in wanted else [0.0]
         row_t, row_w, row_boxes = [], [], []
         for k in range(len(xs) - 1):
             x2, x1 = xs[k], xs[k + 1]
@@ -174,6 +197,9 @@ def read_strip(
 
     canon_lines: list[ClueLine] = []
     for i in range(n):
+        if i not in wanted:
+            canon_lines.append(ClueLine(clues=[], complete=False, flags=["not_read"]))
+            continue
         clues, ks, flags = _lines_from_cells(values[i], empty=0)
         uncertain = [ks.index(k) for k in sorted(unsure[i]) if k in ks]
         if uncertain:

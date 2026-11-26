@@ -13,7 +13,7 @@ export { litsPlugin, LitsModel } from "./plugins/lits";
 export type { LitsCanon } from "./plugins/lits";
 export { slitherlinkPlugin, SlitherlinkModel } from "./plugins/slitherlink";
 export type { SlitherlinkCanon, SlitherlinkEdges } from "./plugins/slitherlink";
-export { nonogramPlugin, NonogramModel, NonogramBoard, nonogramRevealStep } from "./plugins/nonogram";
+export { nonogramPlugin, NonogramModel, NonogramBoard, nonogramRevealStep, solveLine as nonogramSolveLine } from "./plugins/nonogram";
 export type { NonogramCanon } from "./plugins/nonogram";
 export { comboSudokuPlugin, ComboSudokuModel, comboGeometry } from "./plugins/combo-sudoku";
 export type { ComboSudokuCanon, ComboSudokuSolution } from "./plugins/combo-sudoku";

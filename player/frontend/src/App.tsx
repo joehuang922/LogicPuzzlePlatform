@@ -3,6 +3,7 @@ import Home from "./pages/Home";
 import Play from "./pages/Play";
 import Sandbox from "./pages/Sandbox";
 import Admin from "./pages/Admin";
+import NonogramStrips from "./pages/NonogramStrips";
 import Profile from "./pages/Profile";
 import { useIsMobile } from "./hooks/useIsMobile";
 
@@ -20,6 +21,7 @@ export default function App() {
         <Route path="/sandbox" element={<Sandbox />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/admin" element={<Admin />} />
+        <Route path="/admin/nonogram-strips" element={<NonogramStrips />} />
       </Routes>
     </div>
   );

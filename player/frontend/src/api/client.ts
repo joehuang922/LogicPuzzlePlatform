@@ -508,3 +508,69 @@ export async function parseImage(image: string, puzzleType: number) {
   }
   return res.json() as Promise<ParseImageResponse>;
 }
+
+/** One clue line of a big-nonogram strip, by board-order index within the strip. */
+export interface StripLineReading {
+  index: number;
+  clues: number[];
+  /** Both separators traced across the whole clue grid (a cut line is not). */
+  complete: boolean;
+  /** gap | detached | no_clue | ghost_dropped:N | uncertain:i,j (clue positions) | ... */
+  flags: string[];
+  /** Cell boxes [x1, y1, x2, y2] in the uploaded image, in clue order. */
+  boxes: number[][];
+}
+
+export interface StripReadingResponse {
+  orientation: "rows" | "cols";
+  lineCount: number;
+  /** The strip shows the board's border before its first line / after its last. */
+  startBorder: boolean;
+  endBorder: boolean;
+  /** Per separator (lineCount + 1): thick (every 5th) or not. */
+  thick: boolean[];
+  imageWidth: number;
+  imageHeight: number;
+  lines: StripLineReading[];
+}
+
+/** The parser runs locally (`make author-ui`): no deadline, no need to split work. */
+export const PARSER_IS_LOCAL = Boolean(import.meta.env.VITE_PARSER_URL);
+
+/**
+ * Read share `chunk` of `chunks` of one big-nonogram clue strip. Every share
+ * returns the strip's geometry; `lines` holds only that share's lines.
+ */
+export async function parseNonogramStrip(
+  image: string,
+  orientation: "rows" | "cols",
+  maxClue: number,
+  chunk = 0,
+  chunks = 1,
+): Promise<StripReadingResponse> {
+  let res: Response;
+  try {
+    res = await fetch(PARSER_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "nonogramStrip", image, orientation, maxClue, chunk, chunks }),
+      signal: PARSE_TIMEOUT_MS === null ? undefined : AbortSignal.timeout(PARSE_TIMEOUT_MS),
+    });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "TimeoutError") {
+      throw new Error("Reading timed out (2min).");
+    }
+    throw err;
+  }
+  if (!res.ok) {
+    let detail = res.statusText;
+    try {
+      const body = await res.json();
+      if (body.error) detail = body.error;
+    } catch {}
+    const err = new Error(`Strip error ${res.status}: ${detail}`) as Error & { status?: number };
+    err.status = res.status;
+    throw err;
+  }
+  return res.json() as Promise<StripReadingResponse>;
+}

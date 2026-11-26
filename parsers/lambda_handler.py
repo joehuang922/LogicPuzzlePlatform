@@ -209,6 +209,72 @@ def _get_parser(puzzle_type: int):
     return _parsers[puzzle_type]
 
 
+def _nonogram_strip(body: dict) -> dict:
+    """One clue strip of a big nonogram (the web strip editor).
+
+    Body: ``image`` (base64), ``orientation`` ("rows" | "cols"), optional
+    ``maxClue`` (the clued lines' length) and ``chunk`` / ``chunks``: read only
+    that share of the strip's lines, so a long strip is read by parallel
+    requests well inside the 2-minute limit. Every share returns the strip's
+    geometry; ``lines`` holds only its own lines, by board-order index.
+    """
+    import base64
+
+    import cv2
+    import numpy as np
+
+    from puzzle_parsers.nonogram_strips.reader import box_to_original, read_strip
+
+    orientation = body.get("orientation")
+    image_b64 = body.get("image")
+    if orientation not in ("rows", "cols") or not image_b64:
+        return {
+            "statusCode": 400,
+            "headers": HEADERS,
+            "body": json.dumps({"error": "image (base64) and orientation (rows|cols) are required"}),
+        }
+    chunks = max(1, int(body.get("chunks", 1)))
+    chunk = min(max(0, int(body.get("chunk", 0))), chunks - 1)
+    max_clue = body.get("maxClue")
+    img = cv2.imdecode(np.frombuffer(base64.b64decode(image_b64), np.uint8), cv2.IMREAD_COLOR)
+    if img is None:
+        return {"statusCode": 400, "headers": HEADERS, "body": json.dumps({"error": "Could not decode image"})}
+    print(f"  - nonogram strip {orientation} {img.shape} chunk {chunk + 1}/{chunks}")
+    try:
+        r = read_strip(
+            img, orientation, _get_ocr(),
+            max_clue=int(max_clue) if max_clue else None, share=(chunk, chunks),
+        )
+    except ValueError as e:
+        # Geometry not found: usually the wrong orientation or not a clue strip.
+        return {"statusCode": 422, "headers": HEADERS, "body": json.dumps({"error": str(e)})}
+    lines = [
+        {
+            "index": j,
+            "clues": ln.clues,
+            "complete": ln.complete,
+            "flags": ln.flags,
+            "boxes": [box_to_original(b, orientation, img.shape) for b in ln.boxes],
+        }
+        for j, ln in enumerate(r.lines)
+        if "not_read" not in ln.flags
+    ]
+    return {
+        "statusCode": 200,
+        "headers": HEADERS,
+        "body": json.dumps({
+            "orientation": orientation,
+            "lineCount": len(r.lines),
+            "startBorder": r.start_border,
+            "endBorder": r.end_border,
+            "thick": r.thick,
+            "imageWidth": int(img.shape[1]),
+            "imageHeight": int(img.shape[0]),
+            "lines": lines,
+        }),
+    }
+
+
 def handler(event, context):
     print(f"=== Handler invoked: method={event.get('requestContext', {}).get('http', {}).get('method', event.get('httpMethod', '?'))} ===")
 
@@ -232,6 +298,8 @@ def handler(event, context):
         from PIL import Image
 
         body = json.loads(event["body"])
+        if body.get("mode") == "nonogramStrip":
+            return _nonogram_strip(body)
         image_b64 = body.get("image")
         puzzle_type = body.get("puzzleType")
 

@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, FormEvent } from "react";
+import { Link } from "react-router-dom";
 import {
   listPuzzleTypes,
   sortPuzzleTypes,
@@ -1447,6 +1448,10 @@ export default function Admin() {
   return (
     <div>
       <h1>Admin</h1>
+      <p>
+        <Link to="/admin/nonogram-strips">Big nonogram from clue strips →</Link>{" "}
+        <span style={{ color: "#666" }}>for a board too big for one photo</span>
+      </p>
       <ReviewQueue puzzleTypes={puzzleTypes} collections={collections} />
       <CollectionBrowser collections={collections} puzzleTypes={puzzleTypes} onDataChanged={loadData} />
       <CollectionForm onCreated={loadData} />

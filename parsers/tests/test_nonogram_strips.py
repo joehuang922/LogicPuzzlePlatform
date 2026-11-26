@@ -193,3 +193,25 @@ def test_sample_reads_the_canon(sample_reading):
     assert wrong == [146]
     totals = next(c for c in check_clues(rows, cols) if c.name == "totals")
     assert not totals.ok and "11030" in totals.detail and "11028" in totals.detail
+
+
+@pytest.mark.parametrize("name, axis", [("q83-rows-bottom.jpg", "rows"), ("q83-cols-right.jpg", "cols")])
+def test_shares_split_the_lines_exactly(name, axis):
+    """The web editor reads a strip in parallel shares; together they cover
+    every line once, as contiguous blocks in board order."""
+    img = cv2.imread(str(STRIPS / name))
+    geom = detect_strip(img, axis)
+    seen: list[int] = []
+    for k in range(4):
+        r = read_strip(img, axis, None, geometry=geom, share=(k, 4))
+        mine = [j for j, ln in enumerate(r.lines) if "not_read" not in ln.flags]
+        assert mine == list(range(mine[0], mine[-1] + 1))
+        seen += mine
+    assert seen == list(range(len(geom.separators) - 1))
+
+
+def test_endpoint_rejects_a_request_without_orientation():
+    import lambda_handler
+
+    res = lambda_handler.handler({"body": json.dumps({"mode": "nonogramStrip", "image": "eA=="})}, None)
+    assert res["statusCode"] == 400
