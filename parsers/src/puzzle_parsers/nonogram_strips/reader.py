@@ -66,6 +66,9 @@ class ClueLine:
     # Canonical-image boxes (x1, y1, x2, y2) of the cells holding clues, in
     # clue order: what an editor shows next to the numbers.
     boxes: list[tuple[int, int, int, int]] = field(default_factory=list)
+    # Clue position -> the other value(s) a crop read where the two crops
+    # disagreed: the first candidates when the clue set needs repairing.
+    alternates: dict[int, list[int]] = field(default_factory=dict)
 
 
 @dataclass
@@ -184,14 +187,14 @@ def read_strip(
                 wide[i][k] = np.full_like(wide[i][k], 255)
     read_w = read_cells(ocr, wide, allow_multi_digits=True)
     values: list[list[int]] = []
-    unsure: list[set[int]] = []
+    unsure: list[dict[int, list[int]]] = []
     for rt, rw in zip(read_t, read_w):
-        row_v, row_u = [], set()
+        row_v, row_u = [], {}
         for k, (t, w) in enumerate(zip(rt, rw)):
             v, disagreed = reconcile(t, w, max_clue)
             row_v.append(v)
             if disagreed:
-                row_u.add(k)
+                row_u[k] = sorted({x for x in (t, w) if x != v and x > 0 and (max_clue is None or x <= max_clue)})
         values.append(row_v)
         unsure.append(row_u)
 
@@ -204,6 +207,7 @@ def read_strip(
         uncertain = [ks.index(k) for k in sorted(unsure[i]) if k in ks]
         if uncertain:
             flags.append("uncertain:" + ",".join(str(u) for u in uncertain))
+        alternates = {ks.index(k): alt for k, alt in unsure[i].items() if k in ks and alt}
         reach = max(extents[i], extents[i + 1])
         complete = reach <= common + 0.5 * geom.cell_pitch
         # A clue grid running off the image may hide more numbers further out.
@@ -214,7 +218,10 @@ def read_strip(
         if min(y_mid) < 0 or max(y_mid) > h:
             complete = False
         canon_lines.append(
-            ClueLine(clues=clues, complete=complete, flags=flags, boxes=[cell_boxes[i][k] for k in ks])
+            ClueLine(
+                clues=clues, complete=complete, flags=flags,
+                boxes=[cell_boxes[i][k] for k in ks], alternates=alternates,
+            )
         )
 
     thick = list(geom.thick)

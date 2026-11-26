@@ -258,6 +258,8 @@ def _nonogram_strip(body: dict) -> dict:
             "complete": ln.complete,
             "flags": ln.flags,
             "boxes": [box_to_original(b, orientation, img.shape) for b in ln.boxes],
+            # [clue position, other value]: what the other crop read there
+            "alternates": [[i, v] for i, vs in sorted(ln.alternates.items()) for v in vs],
         }
         for j, ln in enumerate(r.lines)
         if "not_read" not in ln.flags

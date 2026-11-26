@@ -19,12 +19,14 @@ import { extractBase64 } from "../utils/image";
 import {
   Axis,
   Check,
+  Fix,
   LineId,
   LineResult,
+  RepairLine,
+  RepairResult,
   StripInput,
   checkClues,
   combineLines,
-  findSuspects,
   lineLabel,
   parseClueText,
   placeStrips,
@@ -34,9 +36,12 @@ import { runLimited, withRetry } from "../utils/runLimited";
 
 /**
  * Big-nonogram strip editor: a board too big for one photo is entered from
- * scans of its clue strips. Upload the strips, mark each as row or column
- * clues, read them, check where they landed, fix what the checks point at,
- * and create the question.
+ * scans of its clue strips. Built to run on a phone: add the strip images
+ * (camera or gallery) and the board size; the page reads every strip, works
+ * out which way it lies and where it goes, repairs misreadings the clues
+ * themselves prove wrong, and shows the solved picture. A person proofchecks
+ * the changes against the scan, settles anything the repair couldn't, and
+ * creates the question.
  */
 
 // The deployed parser has 2 minutes per request and ~1.7 vCPU: a strip is
@@ -46,15 +51,22 @@ const SHARES = PARSER_IS_LOCAL ? 1 : 4;
 const IN_FLIGHT = PARSER_IS_LOCAL ? 2 : 4;
 // Lambda Function URLs take at most 6 MB per request.
 const MAX_BASE64 = 4_500_000;
+// Phone browsers refuse canvases much over 16 megapixels.
+const MAX_CANVAS_AREA = 16_000_000;
 
 interface StripItem {
   id: string;
   name: string;
   url: string; // object URL for display and crops
   base64: string;
+  /** Uploaded-image pixels per pixel sent to the parser (boxes come back in the latter). */
+  scale: number;
   width: number;
   height: number;
   orientation: Axis;
+  /** Orientation guessed from the shape (not set by a person): may be flipped once if the parser can't read it. */
+  guessed: boolean;
+  flipped: boolean;
   status: "idle" | "reading" | "done" | "error";
   sharesDone: number;
   error?: string;
@@ -68,6 +80,7 @@ interface StripItem {
 
 const STATUS_COLORS: Record<string, string> = {
   ok: "#66bb6a",
+  auto: "#ab47bc",
   edited: "#42a5f5",
   flagged: "#ffca28",
   conflict: "#ef5350",
@@ -83,8 +96,12 @@ function loadImage(url: string): Promise<HTMLImageElement> {
   });
 }
 
-/** The image as base64 JPEG, re-encoded (same size) when too big to send. */
-async function encodeForParser(file: File, img: HTMLImageElement): Promise<string> {
+/**
+ * The image as base64 JPEG for the parser. Sent as is when small enough;
+ * otherwise re-encoded, scaled down only as far as a phone's canvas limit
+ * (and then the request size) needs.
+ */
+async function encodeForParser(file: File, img: HTMLImageElement): Promise<{ base64: string; scale: number }> {
   const original = extractBase64(
     await new Promise<string>((resolve, reject) => {
       const r = new FileReader();
@@ -93,61 +110,121 @@ async function encodeForParser(file: File, img: HTMLImageElement): Promise<strin
       r.readAsDataURL(file);
     }),
   );
-  if (original.length <= MAX_BASE64) return original;
-  const canvas = document.createElement("canvas");
-  canvas.width = img.naturalWidth;
-  canvas.height = img.naturalHeight;
-  canvas.getContext("2d")!.drawImage(img, 0, 0);
-  for (const q of [0.9, 0.85, 0.8, 0.7]) {
-    const b64 = extractBase64(canvas.toDataURL("image/jpeg", q));
-    if (b64.length <= MAX_BASE64) return b64;
+  const w = img.naturalWidth, h = img.naturalHeight;
+  // A phone photo's EXIF rotation is applied by the browser but not by the
+  // parser: re-encode those too, so both see the same upright pixels.
+  const isJpeg = file.type === "image/jpeg" || /\.jpe?g$/i.test(file.name);
+  if (original.length <= MAX_BASE64 && w * h <= MAX_CANVAS_AREA && !(isJpeg && (await hasExifRotation(file)))) {
+    return { base64: original, scale: 1 };
+  }
+  let shrink = Math.min(1, Math.sqrt(MAX_CANVAS_AREA / (w * h)));
+  for (let attempt = 0; attempt < 4; attempt++, shrink *= 0.85) {
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(w * shrink);
+    canvas.height = Math.round(h * shrink);
+    canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+    for (const q of [0.92, 0.85, 0.78]) {
+      const b64 = extractBase64(canvas.toDataURL("image/jpeg", q));
+      if (b64.length <= MAX_BASE64) return { base64: b64, scale: w / canvas.width };
+    }
   }
   throw new Error("Image too large to send, even re-compressed: crop it closer to the clues");
 }
 
+/** A JPEG whose EXIF orientation tag asks for a turn or flip (tag value 2–8). */
+async function hasExifRotation(file: File): Promise<boolean> {
+  const buf = new DataView(await file.slice(0, 128 * 1024).arrayBuffer());
+  if (buf.byteLength < 4 || buf.getUint16(0) !== 0xffd8) return false;
+  let off = 2;
+  while (off + 4 <= buf.byteLength) {
+    const marker = buf.getUint16(off);
+    const size = buf.getUint16(off + 2);
+    if (marker === 0xffe1 && off + 10 <= buf.byteLength && buf.getUint32(off + 4) === 0x45786966) {
+      const t = off + 10; // TIFF header
+      if (t + 8 > buf.byteLength) return false;
+      const le = buf.getUint16(t) === 0x4949;
+      const ifd = t + buf.getUint32(t + 4, le);
+      if (ifd + 2 > buf.byteLength) return false;
+      const n = buf.getUint16(ifd, le);
+      for (let i = 0; i < n; i++) {
+        const e = ifd + 2 + i * 12;
+        if (e + 10 > buf.byteLength) return false;
+        if (buf.getUint16(e, le) === 0x0112) return buf.getUint16(e + 8, le) > 1;
+      }
+      return false;
+    }
+    if ((marker & 0xff00) !== 0xff00) return false;
+    off += 2 + size;
+  }
+  return false;
+}
+
 let nextId = 1;
+
+interface RepairState {
+  key: string;
+  progress: string | null;
+  result: RepairResult | null;
+  error?: string;
+}
+
+const lineId = (axis: Axis, index: number) => `${axis === "rows" ? "r" : "c"}${index}` as LineId;
 
 export default function NonogramStrips() {
   const isMobile = useIsMobile();
   const [width, setWidth] = useState("");
   const [height, setHeight] = useState("");
+  const [stableSize, setStableSize] = useState("");
   const [strips, setStrips] = useState<StripItem[]>([]);
   const images = useRef(new Map<string, HTMLImageElement>());
   const [edits, setEdits] = useState<Record<Axis, Map<number, number[]>>>({ rows: new Map(), cols: new Map() });
   const [axisView, setAxisView] = useState<Axis>("rows");
   const [problemsOnly, setProblemsOnly] = useState(true);
-  const [logic, setLogic] = useState<{ key: string; settled: number; total: number; contradiction: LineId | null } | null>(null);
-  const [suspects, setSuspects] = useState<{ key: string; ids: LineId[] } | null>(null);
-  const [searching, setSearching] = useState<string | null>(null);
+  const [repair, setRepair] = useState<RepairState | null>(null);
+  const [adding, setAdding] = useState(0);
 
   const W = Number(width) || 0;
   const H = Number(height) || 0;
   const sizeOk = W > 0 && H > 0;
+  const sizeKey = `${W}x${H}`;
+
+  // Strips are read with the line length as the largest possible clue: wait
+  // until the size stops changing (typing "175" passes through "1" and "17").
+  useEffect(() => {
+    const t = setTimeout(() => setStableSize(sizeKey), 900);
+    return () => clearTimeout(t);
+  }, [sizeKey]);
 
   const update = (id: string, patch: Partial<StripItem>) =>
     setStrips((ss) => ss.map((s) => (s.id === id ? { ...s, ...patch } : s)));
 
   async function addFiles(files: FileList | null) {
     if (!files) return;
-    for (const file of Array.from(files)) {
+    const list = Array.from(files);
+    setAdding((n) => n + list.length);
+    for (const file of list) {
       const url = URL.createObjectURL(file);
       try {
         const img = await loadImage(url);
-        const base64 = await encodeForParser(file, img);
+        const { base64, scale } = await encodeForParser(file, img);
         const id = `s${nextId++}`;
         images.current.set(id, img);
         setStrips((ss) => [
           ...ss,
           {
-            id, name: file.name, url, base64,
+            id, name: file.name, url, base64, scale,
             width: img.naturalWidth, height: img.naturalHeight,
             // Row clue strips are usually taller than wide, column strips wider.
             orientation: img.naturalWidth > img.naturalHeight ? "cols" : "rows",
+            guessed: true, flipped: false,
             status: "idle", sharesDone: 0, manualOffset: null,
           },
         ]);
       } catch (e) {
+        URL.revokeObjectURL(url);
         alert(`${file.name}: ${e instanceof Error ? e.message : e}`);
+      } finally {
+        setAdding((n) => n - 1);
       }
     }
   }
@@ -167,7 +244,7 @@ export default function NonogramStrips() {
         );
         setStrips((ss) =>
           ss.map((x) => {
-            if (x.id !== s.id || x.status !== "reading") return x;
+            if (x.id !== s.id || x.status !== "reading" || x.orientation !== s.orientation) return x;
             const lines = x.lines && x.lines.length === res.lineCount ? [...x.lines] : new Array(res.lineCount).fill(null);
             for (const ln of res.lines) lines[ln.index] = ln;
             const sharesDone = x.sharesDone + 1;
@@ -179,59 +256,125 @@ export default function NonogramStrips() {
           }),
         );
       } catch (e) {
+        if (failed.has(s.id)) return;
         failed.add(s.id);
         const status = (e as { status?: number }).status;
         const msg = e instanceof Error ? e.message : String(e);
-        update(s.id, {
-          status: "error",
-          error: status === 422 ? `${msg} — is it a ${s.orientation === "rows" ? "column" : "row"} strip?` : msg,
-        });
+        setStrips((ss) =>
+          ss.map((x) => {
+            if (x.id !== s.id || x.orientation !== s.orientation) return x;
+            // No grid found the way we guessed: try the strip the other way once.
+            if (status === 422 && x.guessed && !x.flipped) {
+              return { ...x, orientation: x.orientation === "rows" ? "cols" : "rows", flipped: true, status: "idle", sharesDone: 0, error: undefined };
+            }
+            return {
+              ...x,
+              status: "error",
+              error: status === 422 ? `${msg} — is it a clue strip, with a few board cells showing?` : msg,
+            };
+          }),
+        );
       }
     });
   }
 
-  // --- merge -------------------------------------------------------------------
-  const merged = useMemo(() => {
-    const out = {} as Record<Axis, { lines: LineResult[]; placements: ReturnType<typeof placeStrips>; inputs: StripInput[] }>;
+  // Read new strips as soon as the board size is known and settled.
+  useEffect(() => {
+    if (!sizeOk || stableSize !== sizeKey) return;
+    const idle = strips.filter((s) => s.status === "idle");
+    if (idle.length) readStrips(idle);
+  }, [strips, sizeOk, stableSize, sizeKey]);
+
+  // --- merge ------------------------------------------------------------------
+  const inputs = useMemo(() => {
+    const out = {} as Record<Axis, StripInput[]>;
     for (const axis of ["rows", "cols"] as Axis[]) {
-      const length = axis === "rows" ? H : W;
-      const inputs: StripInput[] = strips
+      out[axis] = strips
         .filter((s) => s.orientation === axis && s.status === "done" && s.lines)
         .map((s) => ({
           id: s.id, lines: s.lines!, thick: s.thick ?? [],
           startBorder: !!s.startBorder, endBorder: !!s.endBorder, manualOffset: s.manualOffset,
         }));
-      const placements = placeStrips(inputs, length);
-      out[axis] = { lines: length ? combineLines(inputs, placements, length, edits[axis]) : [], placements, inputs };
     }
     return out;
-  }, [strips, edits, W, H]);
+  }, [strips]);
 
-  const rowClues = merged.rows.lines.map((l) => l.clues);
-  const colClues = merged.cols.lines.map((l) => l.clues);
+  const placements = useMemo(
+    () => ({ rows: placeStrips(inputs.rows, H), cols: placeStrips(inputs.cols, W) }),
+    [inputs, W, H],
+  );
+
+  // What the strips and a person say, before the automatic repair.
+  const baseLines = useMemo(
+    () => ({
+      rows: H ? combineLines(inputs.rows, placements.rows, H, edits.rows) : [],
+      cols: W ? combineLines(inputs.cols, placements.cols, W, edits.cols) : [],
+    }),
+    [inputs, placements, edits, W, H],
+  );
+
+  const busy = adding > 0 || strips.some((s) => s.status === "reading" || s.status === "idle");
+  const repairReady = sizeOk && !busy && inputs.rows.length > 0 && inputs.cols.length > 0;
+  const repairInput = useMemo(() => {
+    if (!repairReady) return null;
+    const toRepair = (l: LineResult): RepairLine => {
+      const readings = [...new Map(l.readings.map((r) => [r.clues.join(","), r.clues])).values()];
+      return {
+        clues: l.clues,
+        readings,
+        alternates: readings.length === 1 ? l.readings.flatMap((r) => r.alternates) : [],
+        doubtful: l.status === "flagged" || l.status === "conflict" || l.readings.some((r) => r.alternates.length > 0),
+        locked: l.status === "edited",
+      };
+    };
+    return { rows: baseLines.rows.map(toRepair), cols: baseLines.cols.map(toRepair) };
+  }, [repairReady, baseLines]);
+  const repairKey = repairInput ? JSON.stringify(repairInput) : "";
+
+  // Run the repair in a worker whenever the readings or edits change.
+  useEffect(() => {
+    if (!repairInput) return;
+    const key = repairKey;
+    const w = new Worker(new URL("../workers/nonogramRepair.worker.ts", import.meta.url), { type: "module" });
+    setRepair({ key, progress: "checking the clues…", result: null });
+    w.onmessage = (e: MessageEvent<{ progress?: string; result?: RepairResult; error?: string }>) => {
+      if (e.data.progress) setRepair((r) => (r && r.key === key ? { ...r, progress: e.data.progress! } : r));
+      else {
+        setRepair({ key, progress: null, result: e.data.result ?? null, error: e.data.error });
+        w.terminate();
+      }
+    };
+    w.onerror = (e) => {
+      setRepair({ key, progress: null, result: null, error: e.message || "the check failed" });
+      w.terminate();
+    };
+    w.postMessage(repairInput);
+    return () => w.terminate();
+  }, [repairKey]);
+
+  const current = repair && repair.key === repairKey ? repair : null;
+  const result = current?.result ?? null;
+  const applied = result && result.kind !== "stuck" ? result.fixes : [];
+  const autos = useMemo(() => {
+    const m: Record<Axis, Map<number, number[]>> = { rows: new Map(), cols: new Map() };
+    for (const f of applied) m[f.id[0] === "r" ? "rows" : "cols"].set(Number(f.id.slice(1)), f.to);
+    return m;
+  }, [result]);
+
+  const lines = useMemo(
+    () => ({
+      rows: H ? combineLines(inputs.rows, placements.rows, H, edits.rows, autos.rows) : [],
+      cols: W ? combineLines(inputs.cols, placements.cols, W, edits.cols, autos.cols) : [],
+    }),
+    [inputs, placements, edits, autos, W, H],
+  );
+
+  const rowClues = lines.rows.map((l) => l.clues);
+  const colClues = lines.cols.map((l) => l.clues);
   const allRead = sizeOk && [...rowClues, ...colClues].every((c) => c !== null);
-  const clueKey = allRead ? JSON.stringify([rowClues, colClues]) : "";
-  const checks: Check[] = sizeOk ? checkClues(merged.rows.lines, merged.cols.lines) : [];
+  const checks: Check[] = sizeOk ? checkClues(lines.rows, lines.cols) : [];
   const formatOk = sizeOk && checks.every((c) => c.ok || !c.blocking);
-  const currentLogic = logic && logic.key === clueKey ? logic : null;
-  const currentSuspects = suspects && suspects.key === clueKey ? suspects.ids : [];
-
-  async function runLineLogic() {
-    if (!allRead) return;
-    const key = clueKey;
-    const rc = rowClues as number[][], cc = colClues as number[][];
-    setSearching("line logic…");
-    await new Promise((r) => setTimeout(r, 0));
-    const p = propagate(rc, cc);
-    setLogic({ key, ...p });
-    if (p.contradiction) {
-      const ids = await findSuspects(rc, cc, (done, total) => setSearching(`looking for the misread line… ${done}/${total}`));
-      setSuspects({ key, ids });
-    } else {
-      setSuspects({ key, ids: [] });
-    }
-    setSearching(null);
-  }
+  const solved = result?.kind === "solved";
 
   function setEdit(axis: Axis, index: number, clues: number[] | null) {
     setEdits((e) => {
@@ -242,29 +385,52 @@ export default function NonogramStrips() {
     });
   }
 
-  const axisLines = merged[axisView].lines;
-  const suspectSet = new Set(currentSuspects);
-  const shown = axisLines.filter(
-    (l) => !problemsOnly || l.status !== "ok" || suspectSet.has(`${axisView === "rows" ? "r" : "c"}${l.index}` as LineId),
-  );
+  const suspectSet = new Set(result?.kind === "stuck" ? result.suspects : []);
+  const optionsFor = (id: LineId) => (result?.kind === "stuck" ? result.options.filter((o) => o.id === id) : []);
+  const fixFor = (id: LineId) => applied.find((f) => f.id === id);
+  const isProblem = (axis: Axis, l: LineResult) => {
+    if (suspectSet.has(lineId(axis, l.index))) return true;
+    if (l.status === "ok" || l.status === "auto") return false; // auto fixes are listed with the result
+    // A solved board proves its doubtful readings right.
+    return !(solved && l.status === "flagged");
+  };
+  const shown = lines[axisView].filter((l) => !problemsOnly || isProblem(axisView, l));
+  const lineRow = (axis: Axis, l: LineResult) => {
+    const id = lineId(axis, l.index);
+    return (
+      <LineRow
+        key={id}
+        axis={axis}
+        line={l}
+        suspect={suspectSet.has(id)}
+        fix={fixFor(id)}
+        options={optionsFor(id)}
+        strips={strips}
+        images={images.current}
+        onEdit={(clues) => setEdit(axis, l.index, clues)}
+      />
+    );
+  };
+  const anyDone = strips.some((s) => s.status === "done");
 
   return (
     <div>
       <p><Link to="/admin">← Admin</Link></p>
-      <h1>Big nonogram from clue strips</h1>
+      <h1 style={isMobile ? { fontSize: "1.4rem" } : undefined}>Big nonogram from clue strips</h1>
       <p style={{ color: "#555", marginTop: 0 }}>
-        For a board too big for one photo: scan its row clues and column clues in overlapping strips,
-        each showing a few board cells next to the clues.
+        For a board too big for one photo: scan its row clues and column clues in strips, each showing a
+        few board cells next to the clues. The page reads them, fixes what the clues prove misread, and
+        leaves you the proofcheck.
       </p>
 
       <section style={cardStyle}>
         <h2 style={{ marginTop: 0 }}>1. Board size</h2>
         <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
-          <label style={fieldStyle}>Columns (width)
-            <input style={inputStyle} type="number" min={1} value={width} onChange={(e) => setWidth(e.target.value)} />
+          <label style={{ ...fieldStyle, flex: 1, minWidth: 120 }}>Columns (width)
+            <input style={inputStyle} type="number" inputMode="numeric" min={1} value={width} onChange={(e) => setWidth(e.target.value)} />
           </label>
-          <label style={fieldStyle}>Rows (height)
-            <input style={inputStyle} type="number" min={1} value={height} onChange={(e) => setHeight(e.target.value)} />
+          <label style={{ ...fieldStyle, flex: 1, minWidth: 120 }}>Rows (height)
+            <input style={inputStyle} type="number" inputMode="numeric" min={1} value={height} onChange={(e) => setHeight(e.target.value)} />
           </label>
         </div>
         {sizeOk && <p style={{ marginBottom: 0, color: "#555" }}>{W} × {H} = {(W * H).toLocaleString()} cells</p>}
@@ -272,34 +438,32 @@ export default function NonogramStrips() {
 
       <section style={cardStyle}>
         <h2 style={{ marginTop: 0 }}>2. Clue strips</h2>
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "1rem" }}>
-          <label style={{ ...buttonLike }}>
-            Add images
+        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.75rem" }}>
+          <label style={{ ...buttonLike, ...(isMobile ? bigButton : {}) }}>
+            {isMobile ? "Choose scans" : "Add images"}
             <input type="file" accept="image/*" multiple hidden onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }} />
           </label>
           {isMobile && (
-            <label style={{ ...buttonLike }}>
+            <label style={{ ...buttonLike, ...bigButton }}>
               Take photo
               <input type="file" accept="image/*" capture="environment" hidden onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }} />
             </label>
           )}
-          <button
-            disabled={!sizeOk || !strips.some((s) => s.status === "idle" || s.status === "error")}
-            onClick={() => readStrips(strips.filter((s) => s.status === "idle" || s.status === "error"))}
-          >
-            Read new strips
-          </button>
-          {!sizeOk && strips.length > 0 && <span style={errorStyle}>Set the board size first</span>}
+          {strips.some((s) => s.status === "error") && (
+            <button onClick={() => readStrips(strips.filter((s) => s.status === "error"))} disabled={!sizeOk}>Retry failed</button>
+          )}
         </div>
+        {adding > 0 && <p style={{ color: "#555", margin: "0 0 0.5rem" }}>Preparing {adding} image{adding > 1 ? "s" : ""}…</p>}
+        {!sizeOk && strips.length > 0 && <p style={errorStyle}>Set the board size: reading starts then.</p>}
         {strips.map((s) => {
           const axisLength = s.orientation === "rows" ? H : W;
-          const p = merged[s.orientation].placements.get(s.id);
+          const p = placements[s.orientation].get(s.id);
           return (
-            <div key={s.id} style={{ display: "flex", gap: "0.75rem", padding: "0.5rem 0", borderTop: "1px solid #eee", alignItems: "flex-start", flexWrap: "wrap" }}>
-              <img src={s.url} alt="" style={{ width: 96, height: 96, objectFit: "contain", background: "#f5f5f5", borderRadius: 4 }} />
-              <div style={{ flex: 1, minWidth: 220, display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+            <div key={s.id} style={{ display: "flex", gap: "0.75rem", padding: "0.5rem 0", borderTop: "1px solid #eee", alignItems: "flex-start" }}>
+              <img src={s.url} alt="" style={{ width: isMobile ? 64 : 96, height: isMobile ? 64 : 96, objectFit: "contain", background: "#f5f5f5", borderRadius: 4, flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "0.3rem" }}>
                 <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
-                  <strong style={{ wordBreak: "break-all" }}>{s.name}</strong>
+                  <strong style={{ wordBreak: "break-all", fontSize: isMobile ? "0.85rem" : undefined }}>{s.name}</strong>
                   <span style={{ color: "#888", fontSize: "0.8rem" }}>{s.width}×{s.height}</span>
                 </div>
                 <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}>
@@ -307,15 +471,12 @@ export default function NonogramStrips() {
                     <button
                       key={o}
                       disabled={s.status === "reading"}
-                      onClick={() => update(s.id, { orientation: o, status: "idle", lines: undefined, manualOffset: null, error: undefined })}
+                      onClick={() => s.orientation !== o && update(s.id, { orientation: o, guessed: false, status: "idle", lines: undefined, manualOffset: null, error: undefined })}
                       style={{ fontWeight: s.orientation === o ? 700 : 400, background: s.orientation === o ? "#e3f2fd" : undefined }}
                     >
                       {o === "rows" ? "Row clues" : "Column clues"}
                     </button>
                   ))}
-                  {s.status !== "reading" && sizeOk && (
-                    <button onClick={() => readStrips([s])}>{s.status === "idle" ? "Read" : "Read again"}</button>
-                  )}
                   <button
                     disabled={s.status === "reading"}
                     onClick={() => { setStrips((ss) => ss.filter((x) => x.id !== s.id)); images.current.delete(s.id); URL.revokeObjectURL(s.url); }}
@@ -324,8 +485,8 @@ export default function NonogramStrips() {
                   </button>
                 </div>
                 <div style={{ fontSize: "0.85rem", color: "#555" }}>
-                  {s.status === "idle" && "Not read yet."}
-                  {s.status === "reading" && `Reading… ${s.sharesDone}/${SHARES}`}
+                  {s.status === "idle" && (sizeOk ? "Waiting to read…" : "Not read yet.")}
+                  {s.status === "reading" && `Reading… ${s.sharesDone}/${SHARES}${s.flipped ? " (turned the other way)" : ""}`}
                   {s.status === "error" && <span style={{ color: "#c62828" }}>{s.error}</span>}
                   {s.status === "done" && (
                     <>
@@ -340,7 +501,7 @@ export default function NonogramStrips() {
                   <div style={{ fontSize: "0.85rem", display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}>
                     {p.offset !== null ? (
                       <span>
-                        Placed at {s.orientation === "rows" ? "rows" : "columns"} {p.offset + 1}–{p.offset + (s.lineCount ?? 0)} of {axisLength}
+                        {s.orientation === "rows" ? "Rows" : "Columns"} {p.offset + 1}–{p.offset + (s.lineCount ?? 0)} of {axisLength}
                         <span style={{ color: "#888" }}> ({p.how}{p.how === "overlap" ? `, ${p.agree} lines agree` : ""})</span>
                       </span>
                     ) : (
@@ -350,6 +511,7 @@ export default function NonogramStrips() {
                       first line
                       <input
                         type="number"
+                        inputMode="numeric"
                         style={{ ...inputStyle, width: 70, padding: "0.15rem 0.3rem" }}
                         value={p.offset !== null ? p.offset + 1 : ""}
                         onChange={(e) => {
@@ -365,44 +527,55 @@ export default function NonogramStrips() {
             </div>
           );
         })}
-        {sizeOk && strips.some((s) => s.status === "done") && (
+        {sizeOk && anyDone && (
           <div style={{ marginTop: "1rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-            <Coverage label="Rows" lines={merged.rows.lines} />
-            <Coverage label="Columns" lines={merged.cols.lines} />
+            <Coverage label="Rows" lines={lines.rows} />
+            <Coverage label="Columns" lines={lines.cols} />
             <Legend />
           </div>
         )}
       </section>
 
-      {sizeOk && strips.some((s) => s.status === "done") && (
+      {sizeOk && anyDone && (
         <section style={cardStyle}>
-          <h2 style={{ marginTop: 0 }}>3. Check and fix</h2>
-          <ul style={{ paddingLeft: "1.2rem", marginTop: 0 }}>
+          <h2 style={{ marginTop: 0 }}>3. Result</h2>
+          <ResultSummary
+            busy={busy}
+            ready={repairReady}
+            progress={current?.progress ?? null}
+            result={result}
+            error={current?.error}
+            cells={W * H}
+          />
+          {result?.grid && <Picture grid={result.grid} width={W} height={H} />}
+
+          {applied.length > 0 && (
+            <>
+              <h3 style={{ marginBottom: "0.25rem" }}>Changes to proofcheck ({applied.length})</h3>
+              <p style={{ color: "#555", marginTop: 0, fontSize: "0.85rem" }}>
+                Compare each with the scan cut out above its numbers. If the scan says otherwise, type what it says.
+              </p>
+              {applied.map((f) => {
+                const axis: Axis = f.id[0] === "r" ? "rows" : "cols";
+                const l = lines[axis][Number(f.id.slice(1))];
+                return l ? lineRow(axis, l) : null;
+              })}
+            </>
+          )}
+
+          <ul style={{ paddingLeft: "1.2rem" }}>
             {checks.map((c) => (
-              <li key={c.name} style={{ color: c.ok ? "#2e7d32" : c.blocking ? "#c62828" : "#b26a00" }}>
-                <strong>{c.name}:</strong> {c.detail}
+              <li key={c.name} style={{ color: c.ok ? "#2e7d32" : c.blocking ? "#c62828" : solved ? "#2e7d32" : "#b26a00" }}>
+                <strong>{c.name}:</strong>{" "}
+                {!c.ok && !c.blocking && solved ? `${c.detail.replace(/ with a doubtful reading.*/, "")} doubtful, all confirmed by the solve` : c.detail}
               </li>
             ))}
-            <li style={{ color: !currentLogic ? "#555" : currentLogic.contradiction ? "#c62828" : "#2e7d32" }}>
-              <strong>Line logic:</strong>{" "}
-              {!allRead && "needs every line read"}
-              {allRead && !currentLogic && !searching && "not run on these clues yet"}
-              {searching}
-              {currentLogic && !searching && (currentLogic.contradiction
-                ? `the clues contradict each other; ${currentSuspects.length
-                    ? `suspect: ${currentSuspects.map(lineLabel).join(", ")}`
-                    : "no single line explains it (more than one misread)"}`
-                : currentLogic.settled === currentLogic.total
-                  ? "solves every cell: the clues have a unique picture"
-                  : `consistent; settles ${currentLogic.settled.toLocaleString()} of ${currentLogic.total.toLocaleString()} cells (the server's solver decides the rest)`)}
-            </li>
           </ul>
-          <button disabled={!allRead || !!searching} onClick={runLineLogic}>Run line logic</button>
 
           <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", margin: "1rem 0 0.5rem", flexWrap: "wrap" }}>
             {(["rows", "cols"] as Axis[]).map((a) => (
               <button key={a} onClick={() => setAxisView(a)} style={{ fontWeight: axisView === a ? 700 : 400, background: axisView === a ? "#e3f2fd" : undefined }}>
-                {a === "rows" ? "Rows" : "Columns"} ({merged[a].lines.filter((l) => l.status !== "ok").length} to look at)
+                {a === "rows" ? "Rows" : "Columns"} ({lines[a].filter((l) => isProblem(a, l)).length})
               </button>
             ))}
             <label style={{ marginLeft: "auto", display: "flex", gap: "0.3rem", alignItems: "center" }}>
@@ -410,29 +583,25 @@ export default function NonogramStrips() {
             </label>
           </div>
           {shown.length === 0 && <p style={{ color: "#555" }}>Nothing to look at here.</p>}
-          {shown.map((l) => (
-            <LineRow
-              key={`${axisView}-${l.index}`}
-              axis={axisView}
-              line={l}
-              suspect={suspectSet.has(`${axisView === "rows" ? "r" : "c"}${l.index}` as LineId)}
-              strips={strips}
-              images={images.current}
-              onEdit={(clues) => setEdit(axisView, l.index, clues)}
-            />
-          ))}
+          {shown.map((l) => lineRow(axisView, l))}
         </section>
       )}
 
-      {sizeOk && strips.some((s) => s.status === "done") && (
+      {sizeOk && anyDone && (
         <CreatePanel
-          ready={formatOk && allRead && !searching}
-          blockedBy={!allRead ? "every line must be read" : !formatOk ? "fix the red checks first" : null}
+          ready={formatOk && allRead && !!result && result.kind !== "stuck" && !current?.progress}
+          blockedBy={
+            busy ? "strips are still being read"
+              : !allRead ? "every line must be read"
+                : !formatOk ? "fix the red checks first"
+                  : !result ? "the check is still running"
+                    : result.kind === "stuck" ? "settle the lines the check points at"
+                      : null
+          }
           width={W}
           height={H}
           rowClues={rowClues as number[][]}
           colClues={colClues as number[][]}
-          onContradiction={async () => { await runLineLogic(); }}
         />
       )}
     </div>
@@ -448,6 +617,66 @@ const buttonLike: React.CSSProperties = {
   cursor: "pointer",
 };
 
+const bigButton: React.CSSProperties = { padding: "0.7rem 1rem", fontSize: "1rem", flex: 1, textAlign: "center" };
+
+function ResultSummary({
+  busy, ready, progress, result, error, cells,
+}: {
+  busy: boolean;
+  ready: boolean;
+  progress: string | null;
+  result: RepairResult | null;
+  error?: string;
+  cells: number;
+}) {
+  const box = (color: string, children: React.ReactNode) => (
+    <div style={{ borderLeft: `4px solid ${color}`, background: `${color}14`, padding: "0.6rem 0.8rem", borderRadius: 4, marginBottom: "0.75rem" }}>
+      {children}
+    </div>
+  );
+  if (busy) return box("#757575", "Reading the strips…");
+  if (!ready) return box("#757575", "Needs at least one row strip and one column strip.");
+  if (error) return box("#c62828", <>The check failed: {error}</>);
+  if (progress || !result) return box("#1565c0", <>Checking: {progress ?? "starting…"}</>);
+  const changes = result.fixes.length ? ` after ${result.fixes.length} automatic change${result.fixes.length > 1 ? "s" : ""} (below)` : "";
+  if (result.kind === "solved")
+    return box("#2e7d32", <><strong>Solved{changes}.</strong> Line logic fills all {cells.toLocaleString()} cells with no contradiction, so these clues have exactly one picture.</>);
+  if (result.kind === "consistent")
+    return box("#b26a00", <><strong>No contradiction{changes},</strong> but line logic settles only {result.settled.toLocaleString()} of {result.total.toLocaleString()} cells; the server's solver checks the rest when you create it. Look the picture over.</>);
+  return box("#c62828", <><strong>Needs you:</strong> {result.reason}.{result.suspects.length > 0 && <> Lines: {result.suspects.slice(0, 8).map(lineLabel).join(", ")}{result.suspects.length > 8 ? ", …" : ""}.</>}</>);
+}
+
+/** The picture the clues draw: what a misread that slipped through would scar. */
+function Picture({ grid, width, height }: { grid: Int8Array; width: number; height: number }) {
+  const url = useMemo(() => {
+    if (grid.length !== width * height) return null;
+    const px = Math.max(2, Math.min(8, Math.floor(1800 / Math.max(width, height))));
+    const c = document.createElement("canvas");
+    c.width = width * px;
+    c.height = height * px;
+    const ctx = c.getContext("2d")!;
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, c.width, c.height);
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const v = grid[y * width + x];
+        if (v === 0) continue;
+        ctx.fillStyle = v === 1 ? "#212121" : "#ffb74d";
+        ctx.fillRect(x * px, y * px, px, px);
+      }
+    }
+    return c.toDataURL("image/png");
+  }, [grid, width, height]);
+  if (!url) return null;
+  return (
+    <figure style={{ margin: "0 0 0.75rem" }}>
+      <img src={url} alt="The solved picture" style={{ width: "100%", maxWidth: width * 6, imageRendering: "pixelated", border: "1px solid #ccc", display: "block" }} />
+      <figcaption style={{ fontSize: "0.8rem", color: "#666" }}>
+        The picture the clues draw (orange: cells line logic leaves open). Pinch to zoom.
+      </figcaption>
+    </figure>
+  );
+}
 function Coverage({ label, lines }: { label: string; lines: LineResult[] }) {
   if (!lines.length) return null;
   const counts = lines.reduce<Record<string, number>>((a, l) => ({ ...a, [l.status]: (a[l.status] ?? 0) + 1 }), {});
@@ -474,7 +703,7 @@ function Coverage({ label, lines }: { label: string; lines: LineResult[] }) {
 
 function Legend() {
   const text: Record<string, string> = {
-    ok: "read", edited: "edited", flagged: "doubtful reading", conflict: "strips disagree", missing: "no strip covers it",
+    ok: "read", auto: "fixed automatically", edited: "edited", flagged: "doubtful reading", conflict: "strips disagree", missing: "no strip covers it",
   };
   return (
     <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", fontSize: "0.8rem", color: "#555" }}>
@@ -501,11 +730,13 @@ function describeFlag(flag: string): string {
 }
 
 function LineRow({
-  axis, line, suspect, strips, images, onEdit,
+  axis, line, suspect, fix, options, strips, images, onEdit,
 }: {
   axis: Axis;
   line: LineResult;
   suspect: boolean;
+  fix?: Fix;
+  options: Fix[];
   strips: StripItem[];
   images: Map<string, HTMLImageElement>;
   onEdit: (clues: number[] | null) => void;
@@ -536,11 +767,12 @@ function LineRow({
         </span>
         {suspect && (
           <span style={{ fontSize: "0.75rem", padding: "0.05rem 0.4rem", borderRadius: 3, background: "#c62828", color: "#fff" }}>
-            line logic: likely misread
+            likely misread
           </span>
         )}
         <input
-          style={{ ...inputStyle, flex: 1, minWidth: 200, fontFamily: "monospace", borderColor: draft !== null && !parsed ? "#c62828" : "#ccc" }}
+          inputMode="decimal"
+          style={{ ...inputStyle, flex: 1, minWidth: 160, fontFamily: "monospace", borderColor: draft !== null && !parsed ? "#c62828" : "#ccc" }}
           value={value}
           placeholder="clues, e.g. 3 1 12"
           onChange={(e) => setDraft(e.target.value)}
@@ -549,6 +781,22 @@ function LineRow({
         />
         {line.status === "edited" && <button onClick={() => { setDraft(null); onEdit(null); }}>Undo edit</button>}
       </div>
+      {fix && line.status === "auto" && (
+        <div style={{ fontSize: "0.85rem", color: "#6a1b9a" }}>
+          Read <code>{fix.from ? fix.from.join(" ") : "differently by the strips"}</code>, changed to{" "}
+          <code>{fix.to.join(" ")}</code>: {fix.why}.
+        </div>
+      )}
+      {options.length > 0 && (
+        <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", alignItems: "center", fontSize: "0.85rem" }}>
+          Could be:
+          {options.map((o) => (
+            <button key={o.to.join(",")} onClick={() => onEdit(o.to)} style={{ fontFamily: "monospace" }}>
+              {o.to.join(" ")}
+            </button>
+          ))}
+        </div>
+      )}
       {line.readings.map((r) => {
         const strip = strips.find((s) => s.id === r.stripId);
         const img = images.get(r.stripId);
@@ -557,7 +805,7 @@ function LineRow({
         );
         return (
           <div key={r.stripId} style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-            {img && r.boxes.length > 0 && <CellMosaic img={img} boxes={r.boxes} clues={r.clues} unsure={unsure} />}
+            {img && r.boxes.length > 0 && <CellMosaic img={img} scale={strip?.scale ?? 1} boxes={r.boxes} clues={r.clues} unsure={unsure} />}
             <div style={{ fontSize: "0.78rem", color: "#666" }}>
               {strip?.name ?? r.stripId}: {r.clues.join(" ") || "—"}
               {r.flags.map((f) => ` · ${describeFlag(f)}`).join("")}
@@ -571,12 +819,15 @@ function LineRow({
 }
 
 /** The clue cells of one reading, side by side, upright, each over its number. */
-function CellMosaic({ img, boxes, clues, unsure }: { img: HTMLImageElement; boxes: number[][]; clues: number[]; unsure: Set<number> }) {
+function CellMosaic({
+  img, scale, boxes, clues, unsure,
+}: { img: HTMLImageElement; scale: number; boxes: number[][]; clues: number[]; unsure: Set<number> }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const H = 34;
   // A little of the neighbouring cells shows around each one: a digit the
   // reader's box cut off is then still visible to compare.
-  const tiles = boxes.map(([x1, y1, x2, y2]) => {
+  // Boxes are in the pixels sent to the parser; the image shown may be bigger.
+  const tiles = boxes.map((b) => b.map((v) => v * scale)).map(([x1, y1, x2, y2]) => {
     const w = Math.max(1, x2 - x1), h = Math.max(1, y2 - y1);
     const px = Math.round(0.15 * w), py = Math.round(0.1 * h);
     return { x1: x1 - px, y1: y1 - py, w: w + 2 * px, h: h + 2 * py };
@@ -601,7 +852,7 @@ function CellMosaic({ img, boxes, clues, unsure }: { img: HTMLImageElement; boxe
       ctx.fillText(String(clues[i] ?? ""), x + widths[i] / 2, H + 14);
       x += widths[i];
     });
-  }, [img, JSON.stringify(boxes), clues.join(","), [...unsure].join(",")]);
+  }, [img, scale, JSON.stringify(boxes), clues.join(","), [...unsure].join(",")]);
   return (
     <div style={{ overflowX: "auto", maxWidth: "100%" }}>
       <canvas ref={ref} width={total} height={H + 18} style={{ display: "block" }} />
@@ -610,7 +861,7 @@ function CellMosaic({ img, boxes, clues, unsure }: { img: HTMLImageElement; boxe
 }
 
 function CreatePanel({
-  ready, blockedBy, width, height, rowClues, colClues, onContradiction,
+  ready, blockedBy, width, height, rowClues, colClues,
 }: {
   ready: boolean;
   blockedBy: string | null;
@@ -618,7 +869,6 @@ function CreatePanel({
   height: number;
   rowClues: number[][];
   colClues: number[][];
-  onContradiction: () => Promise<void>;
 }) {
   const [collections, setCollections] = useState<Collection[]>([]);
   const [title, setTitle] = useState("");
@@ -646,8 +896,7 @@ function CreatePanel({
     // Never send clues line logic proves contradictory.
     const p = propagate(rowClues, colClues);
     if (p.contradiction) {
-      setError("The clues contradict each other; see the suspect line under Check and fix.");
-      await onContradiction();
+      setError("The clues contradict each other; see the lines marked under Result.");
       return;
     }
     setSubmitting(true);

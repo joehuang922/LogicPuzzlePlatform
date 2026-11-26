@@ -3,7 +3,10 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 import type { StripLineReading } from "../api/client";
 import {
+  RepairLine,
   StripInput,
+  autoRepair,
+  candidates,
   checkClues,
   combineLines,
   findSuspects,
@@ -13,7 +16,7 @@ import {
 } from "./nonogramStrips";
 
 const line = (clues: number[] | null): StripLineReading | null =>
-  clues === null ? null : { index: 0, clues, complete: true, flags: [], boxes: [] };
+  clues === null ? null : { index: 0, clues, complete: true, flags: [], boxes: [], alternates: [] };
 
 function strip(id: string, clues: (number[] | null)[], opts: Partial<StripInput> & { firstThick?: number } = {}): StripInput {
   const first = opts.firstThick ?? 0;
@@ -99,4 +102,76 @@ describe("propagation on the 175x110 sample", () => {
     expect(propagate(canon.rowClues, cols).contradiction).not.toBeNull();
     expect(await findSuspects(canon.rowClues, cols)).toEqual(["c145"]);
   }, 60_000);
+});
+
+describe("candidates", () => {
+  const ln = (over: Partial<RepairLine> = {}): RepairLine => ({ clues: null, readings: [], alternates: [], doubtful: false, locked: false, ...over });
+
+  it("with the totals' change: one number off by it, or one missed", () => {
+    const c = candidates(ln(), [3, 16, 5], 2, 110).map((x) => x.join(" "));
+    expect(c).toEqual(expect.arrayContaining(["5 16 5", "3 18 5", "3 16 7", "2 3 16 5", "3 16 5 2"]));
+    expect(c.every((x) => x.split(" ").map(Number).reduce((a, b) => a + b, 0) === 26)).toBe(true);
+  });
+
+  it("without it: digit mix-ups, splits, merges, and the other crop's reading", () => {
+    const c = candidates(ln({ alternates: [[0, 4]] }), [12, 6], null, 200).map((x) => x.join(" "));
+    expect(c).toEqual(expect.arrayContaining(["4 6", "12 8", "1 2 6", "126", "6 12", "17 6"]));
+  });
+
+  it("drops lists that don't fit the line", () => {
+    expect(candidates(ln(), [3, 3], 4, 8).map((x) => x.join(" "))).not.toContain("3 7");
+  });
+});
+
+describe("autoRepair on the 175x110 sample", () => {
+  const canon = JSON.parse(
+    readFileSync(resolve(__dirname, "../../../../docs/nonogram/strips/q83.canon.json"), "utf8"),
+  ) as { rowClues: number[][]; colClues: number[][] };
+  const asLines = (cl: number[][], doubtful: number[] = []): RepairLine[] =>
+    cl.map((c, i) => ({ clues: c, readings: [c], alternates: [], doubtful: doubtful.includes(i), locked: false }));
+
+  it("finds and fixes the real misread (column 146: 18 read as 16)", async () => {
+    const cols = canon.colClues.map((c) => [...c]);
+    cols[145][cols[145].indexOf(18)] = 16;
+    const res = await autoRepair(asLines(canon.rowClues), asLines(cols));
+    expect(res.kind).toBe("solved");
+    expect(res.fixes).toEqual([expect.objectContaining({ id: "c145", from: cols[145], to: canon.colClues[145] })]);
+  }, 120_000);
+
+  it("settles lines two strips read differently", async () => {
+    const rows = asLines(canon.rowClues);
+    const truth = canon.rowClues[60];
+    const wrong = [...truth];
+    wrong[0] += 1;
+    rows[60] = { clues: null, readings: [wrong, truth], alternates: [], doubtful: true, locked: false };
+    const res = await autoRepair(rows, asLines(canon.colClues));
+    expect(res.kind).toBe("solved");
+    expect(res.fixes).toEqual([expect.objectContaining({ id: "r60", to: truth })]);
+  }, 120_000);
+
+  it("fixes two misreads at once among the doubtful lines", async () => {
+    const rows = canon.rowClues.map((c) => [...c]);
+    const cols = canon.colClues.map((c) => [...c]);
+    // a 6 read as 8 in a row, a 3 read as 8 in a column: totals off by 3
+    const r = rows.findIndex((c) => c.includes(6));
+    const c = cols.findIndex((x) => x.includes(3) && !x.includes(8));
+    rows[r][rows[r].indexOf(6)] = 8;
+    cols[c][cols[c].indexOf(3)] = 8;
+    const res = await autoRepair(asLines(rows, [r, 3, 9]), asLines(cols, [c, 20, 40]));
+    expect(res.kind).toBe("solved");
+    expect(res.fixes.map((f) => [f.id, f.to])).toEqual([
+      [`r${r}`, canon.rowClues[r]],
+      [`c${c}`, canon.colClues[c]],
+    ]);
+  }, 300_000);
+
+  it("never changes a line a person set, and hands back what it can't settle", async () => {
+    const cols = canon.colClues.map((c) => [...c]);
+    cols[145][cols[145].indexOf(18)] = 16;
+    const lines = asLines(cols);
+    lines[145].locked = true;
+    const res = await autoRepair(asLines(canon.rowClues), lines, undefined, 2_000);
+    expect(res.kind).toBe("stuck");
+    expect(res.fixes).toEqual([]);
+  }, 300_000);
 });

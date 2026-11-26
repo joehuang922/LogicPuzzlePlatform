@@ -519,6 +519,8 @@ export interface StripLineReading {
   flags: string[];
   /** Cell boxes [x1, y1, x2, y2] in the uploaded image, in clue order. */
   boxes: number[][];
+  /** [clue position, value]: what the other crop read where the two disagreed. */
+  alternates?: [number, number][];
 }
 
 export interface StripReadingResponse {
