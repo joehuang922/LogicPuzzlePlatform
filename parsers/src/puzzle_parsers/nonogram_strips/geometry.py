@@ -189,13 +189,28 @@ def _board_pitch_and_edge(vsolid: NDArray) -> tuple[float, float]:
     # period, or any few cells), so try its divisors. The board is the longest
     # evenly spaced run of solid lines; a title banner's edges or big
     # lettering never make one.
+    best, best_p = _longest_run(prof, guess, strong=0.35, weak=0.15)
+    # A strip may show only a few board columns; three lines running off
+    # the image are enough.
+    reaches_out = bool(best) and best[-1] > w - 1.5 * best_p
+    if len(best) >= 4 or (len(best) >= 3 and reaches_out):
+        return float(np.median(np.diff(best))), float(best[0])
+    raise ValueError("board not found: no regular run of grid lines")
+
+
+def _longest_run(prof: NDArray, guess: float, *, strong: float, weak: float) -> tuple[list[float], float]:
+    """The longest evenly spaced run of lines in ``prof``, and its pitch.
+
+    ``guess`` (an autocorrelation period) may be a multiple of the true pitch
+    (the thick-line period, or any few cells), so its divisors are tried too.
+    """
     best: list[float] = []
     best_p = 0.0
     for div in range(1, 7):
         p = guess / div
         if p < 15:
             break
-        xs, seen = regular_lines(prof, p, strong=0.35, weak=0.15)
+        xs, seen = regular_lines(prof, p, strong=strong, weak=weak)
         run: list[float] = []
         for x, sn in zip(xs, seen):
             if sn and run and 0.75 * p < x - run[-1] < 1.3 * p:
@@ -204,12 +219,35 @@ def _board_pitch_and_edge(vsolid: NDArray) -> tuple[float, float]:
                 run = [x] if sn else []
             if len(run) > len(best):
                 best, best_p = list(run), p
-    # A strip may show only a few board columns; three lines running off
-    # the image are enough.
-    reaches_out = bool(best) and best[-1] > w - 1.5 * best_p
-    if len(best) >= 4 or (len(best) >= 3 and reaches_out):
-        return float(np.median(np.diff(best))), float(best[0])
-    raise ValueError("board not found: no regular run of grid lines")
+    return best, best_p
+
+
+def _edge_from_border(vsolid: NDArray, ink: NDArray) -> tuple[float, float]:
+    """Fallback when too little of the board shows for a run of its lines.
+
+    A photo may keep only a row or two of board cells past the clues, and
+    their thin lines may be too faint to read as solid. The board's thick
+    border still runs the whole strip: take the rightmost solid vertical
+    that spans the middle third and sits in the image's right half. The
+    pitch then comes from the line separators left of it, which are the
+    board's own grid lines carried into the clue area.
+    """
+    h, w = vsolid.shape
+    band = vsolid[h // 3: 2 * h // 3].sum(0) / 255.0
+    spans = [x for x in find_peaks(band, 8, 0.9 * (2 * h // 3 - h // 3)) if x > w // 2]
+    if not spans:
+        raise ValueError("board not found: no regular run of grid lines")
+    edge_x = float(spans[-1])
+    left = ink[:, max(0, int(edge_x - 0.4 * w)): max(1, int(edge_x - 10))]
+    hsolid = solid_lines(left, horizontal=True, length=max(30, left.shape[1] // 8))
+    prof = hsolid.sum(1) / 255.0
+    if prof.max() <= 0:
+        raise ValueError("board not found: no regular run of grid lines")
+    guess = autocorr_pitch(prof, 15, min(400, h // 3))
+    run, _ = _longest_run(prof, guess, strong=0.35, weak=0.15)
+    if len(run) < 6:
+        raise ValueError("board not found: no regular run of grid lines")
+    return float(np.median(np.diff(run))), edge_x
 
 
 def _trace_vertical(vsolid: NDArray, x0: float, pitch: float, bands: int = 12) -> Polyline:
@@ -552,7 +590,10 @@ def detect_strip(image: NDArray, orientation: Orientation) -> StripGeometry:
     ink = ink_mask(canon)
     h, w = ink.shape
     vsolid = solid_lines(ink, horizontal=False, length=max(40, h // 25))
-    board_pitch, edge_x = _board_pitch_and_edge(vsolid)
+    try:
+        board_pitch, edge_x = _board_pitch_and_edge(vsolid)
+    except ValueError:
+        board_pitch, edge_x = _edge_from_border(vsolid, ink)
     edge = _trace_vertical(vsolid, edge_x, board_pitch)
     hsolid = solid_lines(ink, horizontal=True, length=max(30, int(1.2 * board_pitch)))
     seps, extents, row_pitch = _trace_separators(hsolid, edge, board_pitch)

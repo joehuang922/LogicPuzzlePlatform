@@ -183,6 +183,44 @@ export default function NonogramStrips() {
   const [problemsOnly, setProblemsOnly] = useState(true);
   const [repair, setRepair] = useState<RepairState | null>(null);
   const [adding, setAdding] = useState(0);
+  const [meta, setMeta] = useState<Meta>({ title: "", author: "", difficulty: "" });
+  const [header, setHeader] = useState<HeaderScan | null>(null);
+
+  // Read title / author / difficulty from a scan of the puzzle's header and
+  // fill what it finds; the person still checks the fields before creating.
+  async function readHeader(name: string, url: string, base64: string) {
+    setHeader((h) => {
+      if (h && h.url !== url) URL.revokeObjectURL(h.url);
+      return { name, url, status: "reading", note: "Reading the header…" };
+    });
+    try {
+      const found = await withRetry(() => parsePuzzleHeader(base64));
+      setMeta((m) => ({
+        title: found.title || m.title,
+        author: found.author || m.author,
+        difficulty: found.difficulty ? String(found.difficulty) : m.difficulty,
+      }));
+      const got = [found.title && "title", found.author && "author", found.difficulty && "difficulty"].filter(Boolean);
+      setHeader((h) => h && h.url === url
+        ? { name, url, status: "done", note: got.length ? `Filled in the ${got.join(", ")} under step 4: check them against the scan.` : "Found no title, author or difficulty on it." }
+        : h);
+    } catch (e) {
+      setHeader((h) => h && h.url === url ? { name, url, status: "error", note: e instanceof Error ? e.message : String(e) } : h);
+    }
+  }
+
+  async function headerFiles(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    try {
+      const { base64 } = await encodeForParser(file, await loadImage(url));
+      await readHeader(file.name, url, base64);
+    } catch (e) {
+      URL.revokeObjectURL(url);
+      alert(`${file.name}: ${e instanceof Error ? e.message : e}`);
+    }
+  }
 
   const W = Number(width) || 0;
   const H = Number(height) || 0;
@@ -261,6 +299,14 @@ export default function NonogramStrips() {
         failed.add(s.id);
         const status = (e as { status?: number }).status;
         const msg = e instanceof Error ? e.message : String(e);
+        // No grid either way round: not a clue strip. Most likely the scan
+        // of the puzzle's header, so read it as that.
+        if (status === 422 && s.guessed && s.flipped) {
+          setStrips((ss) => ss.filter((x) => x.id !== s.id));
+          images.current.delete(s.id);
+          readHeader(s.name, s.url, s.base64);
+          return;
+        }
         setStrips((ss) =>
           ss.map((x) => {
             if (x.id !== s.id || x.orientation !== s.orientation) return x;
@@ -457,6 +503,11 @@ export default function NonogramStrips() {
             <button onClick={() => readStrips(strips.filter((s) => s.status === "error"))} disabled={!sizeOk}>Retry failed</button>
           )}
         </div>
+        {header && (
+          <div style={{ padding: "0.5rem 0", borderTop: "1px solid #eee" }}>
+            <HeaderNote header={header} title={`${header.name}: no grid, read as the puzzle's header`} />
+          </div>
+        )}
         {adding > 0 && <p style={{ color: "#555", margin: "0 0 0.5rem" }}>Preparing {adding} image{adding > 1 ? "s" : ""}…</p>}
         {!sizeOk && strips.length > 0 && <p style={errorStyle}>Set the board size: reading starts then.</p>}
         {strips.map((s) => {
@@ -608,6 +659,10 @@ export default function NonogramStrips() {
           height={H}
           rowClues={rowClues as number[][]}
           colClues={colClues as number[][]}
+          meta={meta}
+          setMeta={setMeta}
+          header={header}
+          onHeaderFiles={headerFiles}
         />
       )}
     </div>
@@ -876,9 +931,17 @@ function CellMosaic({
   );
 }
 
+interface Meta { title: string; author: string; difficulty: string }
+
+interface HeaderScan { name: string; url: string; status: "reading" | "done" | "error"; note: string }
+
 function CreatePanel({
-  ready, blockedBy, width, height, rowClues, colClues,
+  ready, blockedBy, width, height, rowClues, colClues, meta, setMeta, header, onHeaderFiles,
 }: {
+  meta: Meta;
+  setMeta: (f: (m: Meta) => Meta) => void;
+  header: HeaderScan | null;
+  onHeaderFiles: (files: FileList | null) => void;
   ready: boolean;
   blockedBy: string | null;
   width: number;
@@ -887,9 +950,10 @@ function CreatePanel({
   colClues: number[][];
 }) {
   const [collections, setCollections] = useState<Collection[]>([]);
-  const [title, setTitle] = useState("");
-  const [author, setAuthor] = useState("");
-  const [difficulty, setDifficulty] = useState("");
+  const { title, author, difficulty } = meta;
+  const setTitle = (title: string) => setMeta((m) => ({ ...m, title }));
+  const setAuthor = (author: string) => setMeta((m) => ({ ...m, author }));
+  const setDifficulty = (difficulty: string) => setMeta((m) => ({ ...m, difficulty }));
   const [srcCollection, setSrcCollection] = useState("");
   const [special, setSpecial] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -897,34 +961,6 @@ function CreatePanel({
   const [success, setSuccess] = useState<string | null>(null);
   const [gateTimedOut, setGateTimedOut] = useState(false);
   const isMobile = useIsMobile();
-  const [header, setHeader] = useState<{ url: string; status: "reading" | "done" | "error"; note: string } | null>(null);
-
-  // Read title / author / difficulty from a scan of the puzzle's header and
-  // fill what it finds; the person still checks the fields before creating.
-  async function readHeader(files: FileList | null) {
-    const file = files?.[0];
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    setHeader((h) => {
-      if (h) URL.revokeObjectURL(h.url);
-      return { url, status: "reading", note: "Reading the header…" };
-    });
-    try {
-      const img = await loadImage(url);
-      const { base64 } = await encodeForParser(file, img);
-      const found = await withRetry(() => parsePuzzleHeader(base64));
-      if (found.title) setTitle(found.title);
-      if (found.author) setAuthor(found.author);
-      if (found.difficulty) setDifficulty(String(found.difficulty));
-      const got = [found.title && "title", found.author && "author", found.difficulty && "difficulty"].filter(Boolean);
-      setHeader((h) => h && h.url === url
-        ? { url, status: "done", note: got.length ? `Filled in the ${got.join(", ")}: check them against the scan.` : "Found no title, author or difficulty on this scan." }
-        : h);
-    } catch (e) {
-      setHeader((h) => h && h.url === url ? { url, status: "error", note: e instanceof Error ? e.message : String(e) } : h);
-    }
-  }
-
   useEffect(() => {
     listCollections().then((r) => setCollections(creationTargets(sortCollections(r.collections)))).catch(() => {});
   }, []);
@@ -972,24 +1008,20 @@ function CreatePanel({
       <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", flexWrap: "wrap", marginBottom: "0.75rem" }}>
         <label style={{ ...buttonLike, ...(isMobile ? bigButton : {}) }}>
           {isMobile ? "Choose header scan" : "Read header scan"}
-          <input type="file" accept="image/*" hidden onChange={(e) => { readHeader(e.target.files); e.target.value = ""; }} />
+          <input type="file" accept="image/*" hidden onChange={(e) => { onHeaderFiles(e.target.files); e.target.value = ""; }} />
         </label>
         {isMobile && (
           <label style={{ ...buttonLike, ...bigButton }}>
             Photo of header
-            <input type="file" accept="image/*" capture="environment" hidden onChange={(e) => { readHeader(e.target.files); e.target.value = ""; }} />
+            <input type="file" accept="image/*" capture="environment" hidden onChange={(e) => { onHeaderFiles(e.target.files); e.target.value = ""; }} />
           </label>
         )}
-        {header && (
-          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flex: "1 1 220px", minWidth: 0 }}>
-            <img src={header.url} alt="" style={{ width: 64, height: 64, objectFit: "contain", background: "#f5f5f5", borderRadius: 4, flexShrink: 0 }} />
-            <span style={{ fontSize: "0.85rem", color: header.status === "error" ? "#c62828" : "#555" }}>{header.note}</span>
-          </div>
-        )}
+        {header && <HeaderNote header={header} />}
       </div>
       {!header && (
         <p style={{ color: "#555", marginTop: 0, fontSize: "0.85rem" }}>
           Optional: scan the puzzle's header (number, title, author, difficulty) to fill the fields below.
+          A header scan added with the strips is recognised and read the same way.
         </p>
       )}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "0.75rem" }}>
@@ -1021,5 +1053,17 @@ function CreatePanel({
       {error && <p style={errorStyle}>{error}</p>}
       {success && <p style={{ color: "#2e7d32" }}>{success}</p>}
     </section>
+  );
+}
+
+function HeaderNote({ header, title }: { header: HeaderScan; title?: string }) {
+  return (
+    <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flex: "1 1 220px", minWidth: 0 }}>
+      <img src={header.url} alt="" style={{ width: 64, height: 64, objectFit: "contain", background: "#f5f5f5", borderRadius: 4, flexShrink: 0 }} />
+      <div style={{ fontSize: "0.85rem", minWidth: 0 }}>
+        {title && <strong style={{ display: "block", overflowWrap: "anywhere" }}>{title}</strong>}
+        <span style={{ color: header.status === "error" ? "#c62828" : "#555" }}>{header.note}</span>
+      </div>
+    </div>
   );
 }

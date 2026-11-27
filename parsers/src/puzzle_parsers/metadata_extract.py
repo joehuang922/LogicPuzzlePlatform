@@ -74,7 +74,8 @@ Return JSON only, with exactly these keys:
 (e.g. "ふわふわゆらり"). Not the number, not the puzzle genre name.
 - "author": the puzzle setter's name. It usually follows a 作 marker \
 ("作●セダム" -> "セダム", "作●四代目久方七" -> "四代目久方七", "作・…", \
-"作者 …") or "by …". Leave out the marker itself.
+"作者 …"), 出題 ("●出題／和合智樹" -> "和合智樹") or "by …". Leave out the \
+marker itself.
 
 The target puzzle's difficulty, if printed in its header, takes one of three \
 forms. Fill only the fields of the form you see; the rest are null.

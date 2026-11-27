@@ -229,6 +229,24 @@ def test_photographed_strip_lines_stay_evenly_spaced_past_a_smudge():
     assert np.abs(gaps - g.row_pitch).max() < 0.2 * g.row_pitch
 
 
+@pytest.mark.parametrize("name, n", [("j12600-cols-thin-board.jpg", 40), ("j12600-cols-corner.jpg", 35)])
+def test_photographed_cols_with_barely_any_board_find_the_board_by_its_border(name, n):
+    """Only a row or two of faint board cells show past the clues: no run of
+    board lines, so the board's thick border and the clue lines' pitch place it."""
+    g = detect_strip(cv2.imread(str(STRIPS / name)), "cols")
+    assert len(g.separators) - 1 == n
+    thick = [i for i, t in enumerate(g.thick) if t]
+    assert thick and all(b - a == 5 for a, b in zip(thick, thick[1:]))
+
+
+def test_a_header_scan_is_no_strip_either_way():
+    """The web editor reads an image with no grid either way as the puzzle's header."""
+    image = cv2.imread(str(STRIPS / "j12600-header.jpg"))
+    for axis in ("rows", "cols"):
+        with pytest.raises(ValueError):
+            detect_strip(image, axis)
+
+
 @pytest.fixture(scope="module")
 def sample_reading():
     from puzzle_parsers.recognition import EasyOcrBackend
