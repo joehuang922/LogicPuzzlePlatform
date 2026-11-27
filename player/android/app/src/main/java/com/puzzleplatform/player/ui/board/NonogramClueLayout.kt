@@ -1,13 +1,13 @@
 package com.puzzleplatform.player.ui.board
 
-/** Labels start switched on for boards whose longer side is above this. */
-const val NONOGRAM_LABELS_DEFAULT_ABOVE = 40
+/** Coordinates start switched on for boards whose longer side is above this. */
+const val NONOGRAM_COORDINATES_DEFAULT_ABOVE = 40
 
-/** Whether a board starts with line labels on: its longer side is past 40. */
-fun nonogramLabelsDefault(rows: Int, cols: Int): Boolean = maxOf(rows, cols) > NONOGRAM_LABELS_DEFAULT_ABOVE
+/** Whether a board starts with coordinates on: its longer side is past 40. */
+fun nonogramCoordinatesDefault(rows: Int, cols: Int): Boolean = maxOf(rows, cols) > NONOGRAM_COORDINATES_DEFAULT_ABOVE
 
 /**
- * Pure layout math for the Nonogram board's clue bands and line labels, kept free of
+ * Pure layout math for the Nonogram board's clue bands and coordinates, kept free of
  * Android types so it runs in JVM unit tests. Text widths come in "em": a number's
  * advance width at text size 1 (measure at any size and divide by it), so a layout
  * scales with the text size it picks.
@@ -65,9 +65,9 @@ object NonogramClueLayout {
     }
 
     /**
-     * Spacing of the line labels: every 5th line (the thick separators), or every 10th,
-     * 20th, ... when the cells are too small for labels [labelExtent] long (plus a little
-     * air) to sit 5 lines apart.
+     * Spacing of the coordinate labels: every 5th line (the thick separators), or every
+     * 10th, 20th, ... when the cells are too small for labels [labelExtent] long (plus a
+     * little air) to sit 5 lines apart.
      */
     fun labelStep(cell: Float, labelExtent: Float): Int {
         var step = 5
@@ -75,13 +75,26 @@ object NonogramClueLayout {
         return step
     }
 
-    /** The lines that get a label, 1-based like the cells they close off: 5, 10, ... */
-    fun labelLines(count: Int, step: Int): List<Int> = (step..count step step).toList()
+    /**
+     * A coordinate label at line [line] (between cells [line] and [line] + 1, 0-based):
+     * [fromStart] lines before it, [fromEnd] after it. Each is null at the board edge
+     * it would count from (no "0" sticking off the board).
+     */
+    data class Label(val line: Int, val fromStart: Int?, val fromEnd: Int?)
 
     /**
-     * Center of a label for line [line] (at [line] * [cell]) on a board [count] cells
-     * long, slid inward so a label of [extent] at the board's far edge isn't cut in half.
+     * Labels along a board [count] cells long: both edges, plus every [labelStep]th line
+     * in between, counting both ways (5 | 65 on a 70-long board). A line too close to
+     * the far edge for its label to clear the edge's is left out.
      */
-    fun labelCenter(line: Int, cell: Float, count: Int, extent: Float): Float =
-        minOf(line * cell, count * cell - extent / 2)
+    fun labels(count: Int, cell: Float, labelExtent: Float): List<Label> {
+        if (count <= 0) return emptyList()
+        val step = labelStep(cell, labelExtent)
+        val inner = (step until count step step).filter { (count - it) * cell >= labelExtent * 1.3f }
+        return buildList {
+            add(Label(0, null, count))
+            for (line in inner) add(Label(line, line, count - line))
+            add(Label(count, count, null))
+        }
+    }
 }

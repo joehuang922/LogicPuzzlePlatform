@@ -27,6 +27,9 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import com.puzzleplatform.player.R
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -79,7 +82,7 @@ import com.puzzleplatform.player.ui.board.LitsBoard
 import com.puzzleplatform.player.ui.board.MasyuBoard
 import com.puzzleplatform.player.ui.board.NonogramBoard
 import com.puzzleplatform.player.ui.board.NonogramMode
-import com.puzzleplatform.player.ui.board.nonogramLabelsDefault
+import com.puzzleplatform.player.ui.board.nonogramCoordinatesDefault
 import com.puzzleplatform.player.ui.board.NumberLinkBoard
 import com.puzzleplatform.player.ui.board.NurikabeBoard
 import com.puzzleplatform.player.ui.board.SinkaminoBoard
@@ -589,10 +592,10 @@ fun PlayScreen(
                                 )
                                 6 -> {
                                     var nonogramMode by remember(puzzle.id) { mutableStateOf(NonogramMode.FILL) }
-                                    // Row/column numbers at the thick lines: on by default for big boards.
-                                    var nonogramLabels by remember(puzzle.id) {
+                                    // Row/column coordinates at the thick lines: on by default for big boards.
+                                    var nonogramCoordinates by remember(puzzle.id) {
                                         val clues = NonogramEngine.parseClues(puzzle)
-                                        mutableStateOf(nonogramLabelsDefault(clues.rows, clues.cols))
+                                        mutableStateOf(nonogramCoordinatesDefault(clues.rows, clues.cols))
                                     }
                                     val lines = state.hint as? HintView.Lines
                                     NonogramBoard(
@@ -608,7 +611,7 @@ fun PlayScreen(
                                             emptyMap()
                                         },
                                         onSetCell = vm::setCellState,
-                                        showLabels = nonogramLabels,
+                                        showCoordinates = nonogramCoordinates,
                                     )
                                     // Fill / cross paint-mode toggle (touch has no right-click), kept
                                     // next to the board where paint-mode switching happens.
@@ -624,9 +627,16 @@ fun PlayScreen(
                                             label = { Text("✕ Cross") },
                                         )
                                         FilterChip(
-                                            selected = nonogramLabels,
-                                            onClick = { nonogramLabels = !nonogramLabels },
-                                            label = { Text("# Labels") },
+                                            selected = nonogramCoordinates,
+                                            onClick = { nonogramCoordinates = !nonogramCoordinates },
+                                            label = { Text("Coordinate") },
+                                            leadingIcon = {
+                                                Icon(
+                                                    painterResource(R.drawable.ic_coordinates),
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(FilterChipDefaults.IconSize),
+                                                )
+                                            },
                                         )
                                     }
                                     HintControls(

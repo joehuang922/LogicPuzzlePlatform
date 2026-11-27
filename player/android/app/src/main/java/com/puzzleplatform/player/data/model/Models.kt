@@ -410,6 +410,8 @@ data class Mission(
     val size: String? = null,
     val progress: Int,
     val target: Int,
+    /** Assigned-puzzle missions only: progress on the puzzle (0..1) from its latest snapshot. */
+    val puzzleProgress: Double? = null,
     @Serializable(with = FlexibleBooleanSerializer::class)
     val completed: Boolean = false,
     val completedAt: String? = null,

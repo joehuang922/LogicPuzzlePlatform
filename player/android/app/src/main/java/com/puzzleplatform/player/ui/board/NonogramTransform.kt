@@ -92,6 +92,8 @@ class NonogramTransform(
     fun cellAt(x: Float, y: Float): Pair<Int, Int>? {
         if (!entryEnabled) return null
         if (x < bandW || y < bandH) return null // over a band, not the grid
+        // Past the grid area: the coordinate strips on the far sides.
+        if (x >= bandW + gridW || y >= bandH + gridH) return null
         val col = ((x - bandW - panX) / cellPx).toInt()
         val row = ((y - bandH - panY) / cellPx).toInt()
         return if (col in 0 until cols && row in 0 until rows) col to row else null

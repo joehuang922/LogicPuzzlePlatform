@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluateMission, generateMissions, OpenPuzzle, periodWindow, toSqlDateTime, WindowSolve } from "./missions";
+import { assignedPuzzleProgress, evaluateMission, generateMissions, OpenPuzzle, periodWindow, toSqlDateTime, WindowSolve } from "./missions";
 import { sizeTag } from "./sizeTag";
 
 const win = (w: ReturnType<typeof periodWindow>) => [w.periodStart, toSqlDateTime(w.startUtc), toSqlDateTime(w.endUtc)];
@@ -111,5 +111,20 @@ describe("evaluateMission", () => {
     expect(evaluateMission({ kind: "solve_type", params: { typeId: 1 }, target: 3 }, solves)).toEqual({ progress: 2, completedAt: null });
     expect(evaluateMission({ kind: "solve_assigned", params: { questionId: "z" }, target: 1 }, solves)).toEqual({ progress: 0, completedAt: null });
     expect(evaluateMission({ kind: "solve_count", params: {}, target: 20 }, solves)).toEqual({ progress: 3, completedAt: null });
+  });
+});
+
+describe("assignedPuzzleProgress", () => {
+  const latest = new Map([["q1", 0.42], ["q2", 1.3]]);
+
+  it("reports the latest snapshot's progress on an open assigned puzzle", () => {
+    expect(assignedPuzzleProgress("solve_assigned", "q1", false, latest)).toBe(0.42);
+    expect(assignedPuzzleProgress("solve_assigned", "q2", false, latest)).toBe(1);
+    expect(assignedPuzzleProgress("solve_assigned", "q3", false, latest)).toBe(0);
+  });
+
+  it("is full once completed, and null for counted missions", () => {
+    expect(assignedPuzzleProgress("solve_assigned", "q1", true, latest)).toBe(1);
+    expect(assignedPuzzleProgress("solve_count", undefined, false, latest)).toBeNull();
   });
 });

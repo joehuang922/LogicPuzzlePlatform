@@ -261,7 +261,11 @@ function MissionsSection({ missions, error }: { missions: Mission[] | null; erro
               </span>
             </h3>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "0.75rem" }}>
-              {group.map((m) => (
+              {group.map((m) => {
+                // Assigned puzzles show how far the player has got on the board,
+                // not 0 / 1; counted missions show their count.
+                const fraction = m.puzzleProgress != null ? m.puzzleProgress : m.target > 0 ? m.progress / m.target : 0;
+                return (
                 <div key={m.id} style={{
                   padding: "0.75rem",
                   border: "1px solid",
@@ -292,13 +296,13 @@ function MissionsSection({ missions, error }: { missions: Mission[] | null; erro
                   <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                     <div style={{ flex: 1, height: 8, borderRadius: 4, backgroundColor: "#eee", overflow: "hidden" }}>
                       <div style={{
-                        width: `${Math.round((100 * m.progress) / m.target)}%`,
+                        width: `${Math.round(100 * fraction)}%`,
                         height: "100%",
                         backgroundColor: m.completed ? "#4caf50" : "#2196f3",
                       }} />
                     </div>
                     <span style={{ fontSize: "0.85rem", color: "#555", fontVariantNumeric: "tabular-nums" }}>
-                      {m.progress} / {m.target}
+                      {m.puzzleProgress != null ? `${Math.floor(100 * m.puzzleProgress)}%` : `${m.progress} / ${m.target}`}
                     </span>
                     {m.questionId && !m.completed && (
                       <button
@@ -312,7 +316,8 @@ function MissionsSection({ missions, error }: { missions: Mission[] | null; erro
                     )}
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         );

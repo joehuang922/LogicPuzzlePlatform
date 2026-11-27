@@ -52,22 +52,35 @@ class NonogramClueLayoutTest {
     }
 
     @Test
-    fun labels_everyFifthLine_widenWhenZoomedOut() {
+    fun labelStep_everyFifthLine_widenWhenZoomedOut() {
         assertEquals(5, NonogramClueLayout.labelStep(cell = 40f, labelExtent = 20f))
         assertEquals(10, NonogramClueLayout.labelStep(cell = 4f, labelExtent = 20f))
-        assertEquals(listOf(5, 10, 15), NonogramClueLayout.labelLines(17, 5))
-        assertEquals(listOf(10, 20), NonogramClueLayout.labelLines(20, 10))
     }
 
     @Test
-    fun label_atFarEdge_slidesInside() {
-        assertEquals(100f, NonogramClueLayout.labelCenter(5, 20f, 50, 16f), 0.01f)
-        assertEquals(1000f - 8f, NonogramClueLayout.labelCenter(50, 20f, 50, 16f), 0.01f)
+    fun labels_countBothWays_withEdgesOneSided() {
+        val labels = NonogramClueLayout.labels(count = 15, cell = 40f, labelExtent = 20f)
+        assertEquals(
+            listOf(
+                NonogramClueLayout.Label(0, null, 15),
+                NonogramClueLayout.Label(5, 5, 10),
+                NonogramClueLayout.Label(10, 10, 5),
+                NonogramClueLayout.Label(15, 15, null),
+            ),
+            labels,
+        )
     }
 
     @Test
-    fun labelsDefault_onlyAboveForty() {
-        assertFalse(nonogramLabelsDefault(40, 30))
-        assertTrue(nonogramLabelsDefault(20, 45))
+    fun labels_lineTooCloseToFarEdge_isLeftOut() {
+        // 72 cells at 10px: line 70 is 20px from the edge, too close for a 30px label.
+        val lines = NonogramClueLayout.labels(count = 72, cell = 10f, labelExtent = 30f).map { it.line }
+        assertEquals(listOf(0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 72), lines)
+    }
+
+    @Test
+    fun coordinatesDefault_onlyAboveForty() {
+        assertFalse(nonogramCoordinatesDefault(40, 30))
+        assertTrue(nonogramCoordinatesDefault(20, 45))
     }
 }

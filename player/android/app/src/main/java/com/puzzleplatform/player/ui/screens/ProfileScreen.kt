@@ -270,11 +270,22 @@ private fun MissionCard(m: Mission, onPlay: (questionId: String) -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                // Assigned puzzles show how far the player has got on the board, not 0 / 1.
+                val puzzleProgress = m.puzzleProgress
                 LinearProgressIndicator(
-                    progress = { if (m.target > 0) m.progress.toFloat() / m.target else 0f },
+                    progress = {
+                        when {
+                            puzzleProgress != null -> puzzleProgress.toFloat()
+                            m.target > 0 -> m.progress.toFloat() / m.target
+                            else -> 0f
+                        }
+                    },
                     modifier = Modifier.weight(1f),
                 )
-                Text("${m.progress} / ${m.target}", style = MaterialTheme.typography.bodySmall)
+                Text(
+                    if (puzzleProgress != null) "${(puzzleProgress * 100).toInt()}%" else "${m.progress} / ${m.target}",
+                    style = MaterialTheme.typography.bodySmall,
+                )
                 if (m.questionId != null && !m.completed) {
                     TextButton(onClick = { onPlay(m.questionId) }) { Text("Play") }
                 }

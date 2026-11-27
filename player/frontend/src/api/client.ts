@@ -452,6 +452,8 @@ export interface Mission {
   size: "BIG" | "GIANT" | null;
   progress: number;
   target: number;
+  /** Assigned-puzzle missions only: progress on the puzzle (0..1) from its latest snapshot. */
+  puzzleProgress?: number | null;
   completed: boolean;
   completedAt: string | null;
 }

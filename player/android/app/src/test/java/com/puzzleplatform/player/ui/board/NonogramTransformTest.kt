@@ -97,6 +97,15 @@ class NonogramTransformTest {
         assertEquals(byBefore, byAfter, 0.05f)
     }
 
+    @Test
+    fun cellAt_returnsNullPastGridArea() {
+        // Grid area 800x800 leaves 80px strips on the right and bottom (coordinates).
+        val t = NonogramTransform(60, 60, GRID - 80f, GRID - 80f, BAND, BAND, MAX, AUTO, FLOOR)
+        assertNull(t.cellAt(CANVAS - 10f, BAND + 5f))   // right strip
+        assertNull(t.cellAt(BAND + 5f, CANVAS - 10f))   // bottom strip
+        assertEquals(0 to 0, t.cellAt(BAND + 2f, BAND + 2f))
+    }
+
     // -- entry floor --------------------------------------------------------
 
     @Test

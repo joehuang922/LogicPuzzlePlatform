@@ -251,6 +251,21 @@ export function describeMission(
   }
 }
 
+/**
+ * An assigned mission's puzzle progress (0..1): 1 once completed, else the latest
+ * snapshot's (clamped; 0 when never started). Null for the other kinds.
+ */
+export function assignedPuzzleProgress(
+  kind: MissionKind,
+  questionId: string | undefined,
+  completed: boolean,
+  latest: Map<string, number>
+): number | null {
+  if (kind !== "solve_assigned" || !questionId) return null;
+  if (completed) return 1;
+  return Math.min(1, Math.max(0, latest.get(questionId) ?? 0));
+}
+
 // --- DB --------------------------------------------------------------------
 
 export interface MissionView {
@@ -269,6 +284,12 @@ export interface MissionView {
   size: SizeTag | null;
   progress: number;
   target: number;
+  /**
+   * solve_assigned only: how far the player has got on the puzzle, 0..1, from the
+   * latest snapshot of any of their attempts on it (1 once completed; 0 if never
+   * started), so a GIANT puzzle shows its real progress rather than 0 / 1.
+   */
+  puzzleProgress: number | null;
   completed: boolean;
   completedAt: string | null; // ISO UTC
 }
@@ -386,7 +407,7 @@ export async function getCurrentMissions(
   const ends = rows.map((r) => r.windowEnd).sort();
   const to = ends[ends.length - 1];
   const assignedIds = [...new Set(rows.map((r) => r.params.questionId).filter((id): id is string => !!id))];
-  const [solvesResult, typesResult, assignedResult] = await Promise.all([
+  const [solvesResult, typesResult, assignedResult, snapshotResult] = await Promise.all([
     executeStatement(
       `SELECT pa.question, pq.puzzle_type AS type_id, pq.difficulty,
               DATE_FORMAT(MIN(pa.finished_at), ${DATETIME_FMT}) AS finished_at
@@ -403,6 +424,20 @@ export async function getCurrentMissions(
           `SELECT id, puzzle_type, title FROM puzzle_questions WHERE id IN (${assignedIds.map((_, i) => `:q${i}`).join(", ")})`,
           assignedIds.map((id, i) => strParam(`q${i}`, id))
         ),
+    // The latest snapshot's progress on each assigned puzzle, across all attempts.
+    assignedIds.length === 0
+      ? Promise.resolve({ records: [] as Record<string, unknown>[] })
+      : executeStatement(
+          `SELECT question, progress FROM (
+             SELECT pa.question, s.progress,
+                    ROW_NUMBER() OVER (PARTITION BY pa.question ORDER BY s.created_at DESC) AS rn
+             FROM player_attempt pa
+             JOIN player_attempt_snapshot s ON s.attempt = pa.id
+             WHERE pa.player = :player AND pa.question IN (${assignedIds.map((_, i) => `:q${i}`).join(", ")})
+           ) latest
+           WHERE rn = 1`,
+          [longParam("player", playerId), ...assignedIds.map((id, i) => strParam(`q${i}`, id))]
+        ),
   ]);
   const allSolves: WindowSolve[] = solvesResult.records.map((r) => ({
     question: r.question as string,
@@ -416,6 +451,10 @@ export async function getCurrentMissions(
       r.id as string,
       { typeId: r.puzzle_type as number, title: (r.title as string | null) ?? null },
     ])
+  );
+
+  const latestProgress = new Map(
+    snapshotResult.records.map((r) => [r.question as string, Number(r.progress) || 0])
   );
 
   const views: MissionView[] = [];
@@ -446,6 +485,7 @@ export async function getCurrentMissions(
       size: r.params.size ?? null,
       progress: completedAt ? r.target : progress,
       target: r.target,
+      puzzleProgress: assignedPuzzleProgress(r.kind, r.params.questionId, completedAt !== null, latestProgress),
       completed: completedAt !== null,
       completedAt: completedAt ? sqlDateTimeToIso(completedAt) : null,
     });
