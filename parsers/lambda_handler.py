@@ -226,15 +226,16 @@ def _nonogram_strip(body: dict) -> dict:
     import cv2
     import numpy as np
 
+    from puzzle_parsers.nonogram_strips.geometry import detect_any
     from puzzle_parsers.nonogram_strips.reader import box_to_original, read_strip
 
     orientation = body.get("orientation")
     image_b64 = body.get("image")
-    if orientation not in ("rows", "cols") or not image_b64:
+    if orientation not in ("rows", "cols", "auto") or not image_b64:
         return {
             "statusCode": 400,
             "headers": HEADERS,
-            "body": json.dumps({"error": "image (base64) and orientation (rows|cols) are required"}),
+            "body": json.dumps({"error": "image (base64) and orientation (rows|cols|auto) are required"}),
         }
     chunks = max(1, int(body.get("chunks", 1)))
     chunk = min(max(0, int(body.get("chunk", 0))), chunks - 1)
@@ -244,9 +245,16 @@ def _nonogram_strip(body: dict) -> dict:
         return {"statusCode": 400, "headers": HEADERS, "body": json.dumps({"error": "Could not decode image"})}
     print(f"  - nonogram strip {orientation} {img.shape} chunk {chunk + 1}/{chunks}")
     try:
+        geometry = None
+        if orientation == "auto":
+            # Every share decides alike: the choice is deterministic.
+            geometry = detect_any(img)
+            orientation = geometry.orientation
+            max_clue = body.get("maxClueRows" if orientation == "rows" else "maxClueCols") or max_clue
+            print(f"  - auto orientation: {orientation}")
         r = read_strip(
             img, orientation, _get_ocr(),
-            max_clue=int(max_clue) if max_clue else None, share=(chunk, chunks),
+            max_clue=int(max_clue) if max_clue else None, share=(chunk, chunks), geometry=geometry,
         )
     except ValueError as e:
         # Geometry not found: usually the wrong orientation or not a clue strip.

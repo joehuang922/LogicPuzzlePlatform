@@ -356,7 +356,8 @@ def _trace_separators(
 
 
 def _fill_faint(
-    seps: list[Polyline], extents: list[float], reach: float, max_gap: int = 10
+    seps: list[Polyline], extents: list[float], reach: float, max_gap: int = 10, max_end_gap: int = 4,
+    height: float | None = None, pitch: float = 0.0,
 ) -> tuple[list[Polyline], list[float]]:
     """Carry faint separators across the clue grid from their neighbours.
 
@@ -365,6 +366,8 @@ def _fill_faint(
     The lines of a printed grid are evenly spaced, so a separator that died
     out short of the clue grid's far side follows the nearest lines above and
     below that reach it, in proportion, shifted to meet its own traced part.
+    Near the strip's first or last line, with lines reaching on one side
+    only, it runs parallel to the nearest of them.
     """
     reaching = [i for i, e in enumerate(extents) if e <= reach]
     seps, extents = list(seps), list(extents)
@@ -373,14 +376,26 @@ def _fill_faint(
             continue
         j = max((r for r in reaching if r < i), default=None)
         k = min((r for r in reaching if r > i), default=None)
-        if j is None or k is None or k - j > max_gap:
+        if j is None or k is None:
+            # Past the last line that reaches (a strip's edge, where a photo
+            # darkens or blurs): run parallel to the nearest one that does.
+            near = j if k is None else k
+            if near is None or abs(i - near) > max_end_gap:
+                continue
+            j = k = near
+        elif k - j > max_gap:
             continue
-        t = (i - j) / (k - j)
+        t = (i - j) / (k - j) if k != j else 0.0
         far = max(extents[j], extents[k])
         own = seps[i]
         between = lambda x: (1 - t) * seps[j](x) + t * seps[k](x)  # noqa: E731
         shift = float(own(e)) - float(between(e))
         xs = np.linspace(far, e, max(2, int((e - far) / 20)), endpoint=False)
+        if j == k and height is not None:
+            # Running off the image: the line beyond is cut, not faint.
+            ys = between(xs) + shift
+            if ys.size and (ys.min() < 0.25 * pitch or ys.max() > height - 0.25 * pitch):
+                continue
         kept = own.at >= e
         seps[i] = Polyline(
             np.concatenate([xs, own.at[kept]]),
@@ -466,6 +481,11 @@ def _classify_thick(widths: list[float]) -> list[bool]:
 # --- number separators ------------------------------------------------------
 
 
+# A dash weaker than the strong-snap threshold still counts near where it's
+# due when it is at least this share of the line's typical dash strength.
+WEAK_DASH = 0.7
+
+
 def _number_separators(
     ink: NDArray, seps: list[Polyline], extents: list[float], edge: Polyline, row_pitch: float
 ) -> tuple[list[list[float]], float]:
@@ -499,6 +519,12 @@ def _number_separators(
         y_bot = int(max(float(seps[hi_i](ex)), float(seps[hi_i](left))))
         prof = dashed[max(0, y_top):min(h, y_bot), :].sum(0).astype(float)
         stop = max(0.0, max(extents[i], extents[i + 1]))
+        # This line's typical dash strength. Dashes cover only part of each
+        # cell, and less where a curled page tilts them, so a weak one close
+        # to where it's due still counts: on a curved page the cells' pitch
+        # changes along the line and predictions alone drift off the dashes.
+        span = prof[int(stop):int(x_edge)]
+        weak = WEAK_DASH * float(np.percentile(span, 97)) if span.size else np.inf
         xs = [x_edge]
         x = x_edge
         while x - cell_pitch > stop - 0.3 * cell_pitch:
@@ -506,8 +532,12 @@ def _number_separators(
             a, b = int(pred - 0.25 * cell_pitch), int(pred + 0.25 * cell_pitch) + 1
             a, b = max(a, 0), min(b, w)
             seg = prof[a:b]
+            ca, cb = max(int(pred - 0.12 * cell_pitch), 0), min(int(pred + 0.12 * cell_pitch) + 1, w)
+            close = prof[ca:cb]
             if seg.size and seg.max() > 0.25 * (y_bot - y_top) * 255:
                 x = float(a + int(np.argmax(seg)))
+            elif close.size and close.max() > weak:
+                x = float(ca + int(np.argmax(close)))
             else:
                 x = pred
             xs.append(x)
@@ -579,6 +609,8 @@ def _is_border(
     row of image beyond the line to tell.
     """
     h = ink.shape[0]
+    # A scan's paper texture thresholds to specks of "ink"; strokes survive.
+    ink = cv2.morphologyEx(ink, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)))
     line = seps[0] if first else seps[-1]
     ex = float(np.median(edge.pos))
     x0 = int(max(0.0, float(np.median(extents))))
@@ -623,7 +655,7 @@ def detect_strip(image: NDArray, orientation: Orientation) -> StripGeometry:
     # boundary followed a crease or a banner, not the grid.
     common = float(np.median(extents))
     extents = [max(e, common - 0.5 * board_pitch) for e in extents]
-    seps, extents = _fill_faint(seps, extents, common + 0.5 * board_pitch)
+    seps, extents = _fill_faint(seps, extents, common + 0.5 * board_pitch, height=h, pitch=row_pitch)
     seps = _recentre_strays(seps, np.linspace(common, float(np.median(edge.pos)), 12), row_pitch)
     board_xs = float(np.median(edge.pos)) + board_pitch * (np.arange(4) + 0.5)
     widths = [_thickness(gray, s, board_xs, row_pitch) for s in seps]
@@ -663,3 +695,23 @@ def draw(geom: StripGeometry) -> NDArray:
         for x in xs:
             cv2.line(out, (int(x), int(y1(x))), (int(x), int(y2(x))), (0, 170, 0), 2)
     return out
+
+
+def detect_any(image: NDArray) -> StripGeometry:
+    """The strip's geometry the way round that finds more clue lines.
+
+    A strip's shape doesn't tell its orientation (a column strip cut short
+    and wide of the board is taller than wide), and read the wrong way round
+    a strip may still show a grid: the clue grid's own lines then pass for a
+    handful of clue lines. The right way finds many more.
+    """
+    found: list[StripGeometry] = []
+    errors: list[str] = []
+    for orientation in ("rows", "cols"):
+        try:
+            found.append(detect_strip(image, orientation))
+        except ValueError as e:
+            errors.append(f"{orientation}: {e}")
+    if not found:
+        raise ValueError("no clue strip either way round (" + "; ".join(errors) + ")")
+    return max(found, key=lambda g: len(g.separators))

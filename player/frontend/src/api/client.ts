@@ -541,21 +541,28 @@ export const PARSER_IS_LOCAL = Boolean(import.meta.env.VITE_PARSER_URL);
 
 /**
  * Read share `chunk` of `chunks` of one big-nonogram clue strip. Every share
- * returns the strip's geometry; `lines` holds only that share's lines.
+ * returns the strip's geometry; `lines` holds only that share's lines. With
+ * orientation "auto" the parser picks the way round that finds more clue
+ * lines (every share alike) and reports it; 422 then means no strip either way.
  */
 export async function parseNonogramStrip(
   image: string,
-  orientation: "rows" | "cols",
+  orientation: "rows" | "cols" | "auto",
   maxClue: number,
   chunk = 0,
   chunks = 1,
+  /** With "auto": the largest clue either way (board width for rows, height for columns). */
+  maxClues?: { rows: number; cols: number },
 ): Promise<StripReadingResponse> {
   let res: Response;
   try {
     res = await fetch(PARSER_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: "nonogramStrip", image, orientation, maxClue, chunk, chunks }),
+      body: JSON.stringify({
+        mode: "nonogramStrip", image, orientation, maxClue, chunk, chunks,
+        ...(maxClues ? { maxClueRows: maxClues.rows, maxClueCols: maxClues.cols } : {}),
+      }),
       signal: PARSE_TIMEOUT_MS === null ? undefined : AbortSignal.timeout(PARSE_TIMEOUT_MS),
     });
   } catch (err) {

@@ -62,6 +62,16 @@ function phaseOk(s: StripInput, offset: number): boolean {
 
 const same = (a: number[], b: number[]) => a.length === b.length && a.every((v, i) => v === b[i]);
 
+/**
+ * Two readings of one clue line a misread number or two apart (blurred rows
+ * at a strip's edge). Lines at a wrong offset almost never have as many clues.
+ * Mirrors merge.close.
+ */
+export function close(a: number[], b: number[]): boolean {
+  if (a.length !== b.length || same(a, b)) return false;
+  return a.filter((v, i) => v !== b[i]).length <= Math.max(1, Math.floor(a.length / 3));
+}
+
 /** Where each strip of one axis goes on a board with `length` lines. */
 export function placeStrips(strips: StripInput[], length: number): Map<string, Placement> {
   const out = new Map<string, Placement>();
@@ -93,15 +103,16 @@ export function placeStrips(strips: StripInput[], length: number): Map<string, P
       const scored: { score: number; agree: number; disagree: number; offset: number }[] = [];
       for (let o = -n + 1; o < length; o++) {
         if (!phaseOk(s, o)) continue;
-        let agree = 0, disagree = 0;
+        let agree = 0, near = 0, disagree = 0;
         s.lines.forEach((ln, j) => {
           if (!usable(ln)) return;
           for (const other of placed.get(o + j) ?? []) {
             if (same(other, ln.clues)) agree++;
+            else if (close(other, ln.clues)) near++;
             else disagree++;
           }
         });
-        scored.push({ score: agree - 3 * disagree, agree, disagree, offset: o });
+        scored.push({ score: agree + near - 3 * disagree, agree, disagree, offset: o });
       }
       scored.sort((a, b) => b.score - a.score);
       if (!scored.length || scored[0].agree < 3) continue;

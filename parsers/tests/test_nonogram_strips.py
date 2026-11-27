@@ -26,7 +26,9 @@ from puzzle_parsers.nonogram_strips.geometry import (
     _classify_thick,
     _fill_faint,
     _recentre_strays,
+    detect_any,
     detect_strip,
+    ink_mask,
     regular_lines,
 )
 from puzzle_parsers.nonogram_strips.merge import check_clues, merge_axis
@@ -247,6 +249,41 @@ def test_the_page_edge_past_the_bottom_border_is_no_clue_line():
     assert len(g.separators) - 1 == 60
     assert g.end_border and not g.start_border
     assert g.thick[-1] and g.thick[0]
+
+
+def test_a_tall_column_strip_is_found_to_be_columns():
+    """Taller than wide, and read as rows it still shows a few "rows" (the
+    clue grid's own lines): the way round with more lines wins."""
+    g = detect_any(cv2.imread(str(STRIPS / "j12600b-cols-middle.jpg")))
+    assert g.orientation == "cols" and len(g.separators) - 1 == 37
+
+
+def test_a_speckled_scan_below_the_bottom_border_is_blank_paper():
+    g = detect_strip(cv2.imread(str(STRIPS / "j12600b-rows-bottom-speckled.jpg")), "rows")
+    assert len(g.separators) - 1 == 13 and g.end_border
+
+
+def test_separators_fading_into_a_dark_photo_edge_still_cross_the_clues():
+    g = detect_strip(cv2.imread(str(STRIPS / "j12600b-rows-dark-bottom.jpg")), "rows")
+    common = float(np.median(g.extents))
+    assert len(g.separators) - 1 == 46
+    assert all(e <= common + 0.5 * g.cell_pitch for e in g.extents)
+
+
+def test_number_separators_follow_the_dashes_on_a_curved_page():
+    """Columns 5 to 14 of this photo curve: separators placed at an even
+    pitch from the board drift off the dashes after about eight numbers."""
+    g = detect_strip(cv2.imread(str(STRIPS / "j12600b-cols-left-curved.jpg")), "cols")
+    ink = ink_mask(g.image)
+    for i in range(4, 14):
+        y1, y2 = g.separators[i], g.separators[i + 1]
+        on_dash = 0
+        xs = g.number_seps[i][1:]
+        for x in xs:
+            a, b = sorted((int(y1(x)), int(y2(x))))
+            col = ink[a:b, max(0, int(x) - 3):int(x) + 4].max(axis=1)
+            on_dash += col.mean() / 255 > 0.25
+        assert on_dash >= 0.8 * len(xs), (i, on_dash, len(xs))
 
 
 def test_a_header_scan_is_no_strip_either_way():

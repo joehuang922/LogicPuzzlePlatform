@@ -55,19 +55,34 @@ def _phase_ok(reading: StripReading, offset: int) -> bool:
     return True
 
 
+def close(a: list[int], b: list[int]) -> bool:
+    """Two readings of one clue line that differ only by a misread number or two.
+
+    The rows at a strip's edge are often blurred (a curled page, a photo's
+    falloff), so overlapping strips may read the same line a digit apart.
+    Lines at a wrong offset almost never have the same number of clues.
+    """
+    if len(a) != len(b) or a == b:
+        return False
+    return sum(x != y for x, y in zip(a, b)) <= max(1, len(a) // 3)
+
+
 def _overlap_score(
     reading: StripReading, offset: int, placed: dict[int, list[tuple[int, list[int]]]]
-) -> tuple[int, int]:
-    agree = disagree = 0
+) -> tuple[int, int, int]:
+    """(agree, near, disagree): lines read alike, a misread apart, and unlike."""
+    agree = near = disagree = 0
     for j, line in enumerate(reading.lines):
         if not line.complete or not line.clues:
             continue
         for _, other in placed.get(offset + j, []):
             if other == line.clues:
                 agree += 1
+            elif close(other, line.clues):
+                near += 1
             else:
                 disagree += 1
-    return agree, disagree
+    return agree, near, disagree
 
 
 def merge_axis(axis: Axis, strips: list[StripReading], length: int) -> AxisResult:
@@ -100,8 +115,8 @@ def merge_axis(axis: Axis, strips: list[StripReading], length: int) -> AxisResul
             for o in range(-n + 1, length):
                 if not _phase_ok(s, o):
                     continue
-                a, d = _overlap_score(s, o, placed)
-                scored.append((a - 3 * d, a, d, o))
+                a, near, d = _overlap_score(s, o, placed)
+                scored.append((a + near - 3 * d, a, d, o))
             scored.sort(reverse=True)
             if not scored or scored[0][1] < 3:
                 continue

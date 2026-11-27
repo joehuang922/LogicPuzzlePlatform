@@ -65,9 +65,10 @@ interface StripItem {
   width: number;
   height: number;
   orientation: Axis;
-  /** Orientation guessed from the shape (not set by a person): may be flipped once if the parser can't read it. */
+  /** Not set by a person: the parser works out which way the strip lies. */
   guessed: boolean;
-  flipped: boolean;
+  /** Which read a parser reply belongs to (a stale reply is dropped). */
+  readSeq: number;
   status: "idle" | "reading" | "done" | "error";
   sharesDone: number;
   error?: string;
@@ -161,6 +162,7 @@ async function hasExifRotation(file: File): Promise<boolean> {
 }
 
 let nextId = 1;
+let nextSeq = 1;
 
 interface RepairState {
   key: string;
@@ -255,7 +257,7 @@ export default function NonogramStrips() {
             width: img.naturalWidth, height: img.naturalHeight,
             // Row clue strips are usually taller than wide, column strips wider.
             orientation: img.naturalWidth > img.naturalHeight ? "cols" : "rows",
-            guessed: true, flipped: false,
+            guessed: true, readSeq: 0,
             status: "idle", sharesDone: 0, manualOffset: null,
           },
         ]);
@@ -270,25 +272,30 @@ export default function NonogramStrips() {
 
   async function readStrips(targets: StripItem[]) {
     if (!sizeOk) return;
+    const seqs = new Map(targets.map((s) => [s.id, nextSeq++]));
     for (const s of targets) {
-      update(s.id, { status: "reading", sharesDone: 0, error: undefined, lines: undefined, lineCount: undefined, manualOffset: null });
+      update(s.id, { status: "reading", readSeq: seqs.get(s.id)!, sharesDone: 0, error: undefined, lines: undefined, lineCount: undefined, manualOffset: null });
     }
-    const jobs = targets.flatMap((s) => Array.from({ length: SHARES }, (_, k) => ({ s, k })));
+    const jobs = targets.flatMap((s) => Array.from({ length: SHARES }, (_, k) => ({ s, k, seq: seqs.get(s.id)! })));
     const failed = new Set<string>();
-    await runLimited(jobs, IN_FLIGHT, async ({ s, k }) => {
+    await runLimited(jobs, IN_FLIGHT, async ({ s, k, seq }) => {
       if (failed.has(s.id)) return;
       try {
         const res = await withRetry(() =>
-          parseNonogramStrip(s.base64, s.orientation, s.orientation === "rows" ? W : H, k, SHARES),
+          // A strip's shape doesn't tell which way it lies: unless a person
+          // said, the parser tries both and keeps the one with more lines.
+          s.guessed
+            ? parseNonogramStrip(s.base64, "auto", 0, k, SHARES, { rows: W, cols: H })
+            : parseNonogramStrip(s.base64, s.orientation, s.orientation === "rows" ? W : H, k, SHARES),
         );
         setStrips((ss) =>
           ss.map((x) => {
-            if (x.id !== s.id || x.status !== "reading" || x.orientation !== s.orientation) return x;
+            if (x.id !== s.id || x.status !== "reading" || x.readSeq !== seq) return x;
             const lines = x.lines && x.lines.length === res.lineCount ? [...x.lines] : new Array(res.lineCount).fill(null);
             for (const ln of res.lines) lines[ln.index] = ln;
             const sharesDone = x.sharesDone + 1;
             return {
-              ...x, lines, sharesDone,
+              ...x, lines, sharesDone, orientation: res.orientation,
               lineCount: res.lineCount, startBorder: res.startBorder, endBorder: res.endBorder, thick: res.thick,
               status: sharesDone === SHARES ? "done" : "reading",
             };
@@ -301,7 +308,7 @@ export default function NonogramStrips() {
         const msg = e instanceof Error ? e.message : String(e);
         // No grid either way round: not a clue strip. Most likely the scan
         // of the puzzle's header, so read it as that.
-        if (status === 422 && s.guessed && s.flipped) {
+        if (status === 422 && s.guessed) {
           setStrips((ss) => ss.filter((x) => x.id !== s.id));
           images.current.delete(s.id);
           readHeader(s.name, s.url, s.base64);
@@ -309,11 +316,7 @@ export default function NonogramStrips() {
         }
         setStrips((ss) =>
           ss.map((x) => {
-            if (x.id !== s.id || x.orientation !== s.orientation) return x;
-            // No grid found the way we guessed: try the strip the other way once.
-            if (status === 422 && x.guessed && !x.flipped) {
-              return { ...x, orientation: x.orientation === "rows" ? "cols" : "rows", flipped: true, status: "idle", sharesDone: 0, error: undefined };
-            }
+            if (x.id !== s.id || x.readSeq !== seq) return x;
             return {
               ...x,
               status: "error",
@@ -513,6 +516,8 @@ export default function NonogramStrips() {
         {strips.map((s) => {
           const axisLength = s.orientation === "rows" ? H : W;
           const p = placements[s.orientation].get(s.id);
+          // Until read, a strip left to the parser has no orientation to show.
+          const settled = !s.guessed || s.status === "done";
           return (
             <div key={s.id} style={{ display: "flex", gap: "0.75rem", padding: "0.5rem 0", borderTop: "1px solid #eee", alignItems: "flex-start" }}>
               <img src={s.url} alt="" style={{ width: isMobile ? 64 : 96, height: isMobile ? 64 : 96, objectFit: "contain", background: "#f5f5f5", borderRadius: 4, flexShrink: 0 }} />
@@ -526,8 +531,8 @@ export default function NonogramStrips() {
                     <button
                       key={o}
                       disabled={s.status === "reading"}
-                      onClick={() => s.orientation !== o && update(s.id, { orientation: o, guessed: false, status: "idle", lines: undefined, manualOffset: null, error: undefined })}
-                      style={{ fontWeight: s.orientation === o ? 700 : 400, background: s.orientation === o ? "#e3f2fd" : undefined }}
+                      onClick={() => (s.guessed || s.orientation !== o) && update(s.id, { orientation: o, guessed: false, status: "idle", lines: undefined, manualOffset: null, error: undefined })}
+                      style={{ fontWeight: s.orientation === o && settled ? 700 : 400, background: s.orientation === o && settled ? "#e3f2fd" : undefined }}
                     >
                       {o === "rows" ? "Row clues" : "Column clues"}
                     </button>
@@ -541,7 +546,7 @@ export default function NonogramStrips() {
                 </div>
                 <div style={{ fontSize: "0.85rem", color: "#555" }}>
                   {s.status === "idle" && (sizeOk ? "Waiting to read…" : "Not read yet.")}
-                  {s.status === "reading" && `Reading… ${s.sharesDone}/${SHARES}${s.flipped ? " (turned the other way)" : ""}`}
+                  {s.status === "reading" && `Reading… ${s.sharesDone}/${SHARES}`}
                   {s.status === "error" && <span style={{ color: "#c62828" }}>{s.error}</span>}
                   {s.status === "done" && (
                     <>

@@ -11,6 +11,7 @@ import {
   combineLines,
   findSuspects,
   parseClueText,
+  close,
   placeStrips,
   propagate,
 } from "./nonogramStrips";
@@ -50,10 +51,30 @@ describe("placeStrips", () => {
     expect(lines.every((l) => l.status === "ok")).toBe(true);
   });
 
+  it("an overlap whose edge rows are misread a digit apart still places", () => {
+    // Long, distinct lines (as on a real board) so a wrong offset can't pass for close.
+    const rows = Array.from({ length: 20 }, (_, i) => [i + 1, 2, (i % 4) + 3, 1, 9]);
+    const blurred = rows.slice(0, 8).map((c, i) => (i >= 6 ? [c[0], c[1], c[2] + 5, c[3], c[4]] : c));
+    const strips = [strip("top", blurred, { startBorder: true }), strip("next", rows.slice(3, 12), { firstThick: 2 })];
+    const p = placeStrips(strips, 20);
+    // 3 lines alike, 2 a misread apart: placed (they used to count as 2 contradictions).
+    expect(p.get("next")).toMatchObject({ offset: 3, how: "overlap" });
+  });
+
   it("a manual offset wins, and a strip with nothing to go on stays unplaced", () => {
     const p = placeStrips([strip("a", truth.slice(3, 6), { manualOffset: 3 }), strip("b", truth.slice(10, 12))], 20);
     expect(p.get("a")).toMatchObject({ offset: 3, how: "manual" });
     expect(p.get("b")).toMatchObject({ offset: null, how: "unplaced" });
+  });
+});
+
+describe("close", () => {
+  it("is a misread or two apart in a line with as many clues", () => {
+    expect(close([1, 19, 3, 1, 7, 1, 20], [1, 19, 3, 1, 7, 1, 24])).toBe(true);
+    expect(close([25, 1, 29, 2, 5], [25, 1, 99, 2, 5])).toBe(true);
+    expect(close([2, 5], [2, 5])).toBe(false); // alike, not close
+    expect(close([1, 2, 3], [1, 2])).toBe(false);
+    expect(close([1, 2, 3, 4, 5, 6], [9, 9, 9, 4, 5, 6])).toBe(false);
   });
 });
 
