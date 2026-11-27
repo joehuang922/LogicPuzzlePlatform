@@ -239,6 +239,16 @@ def test_photographed_cols_with_barely_any_board_find_the_board_by_its_border(na
     assert thick and all(b - a == 5 for a, b in zip(thick, thick[1:]))
 
 
+def test_the_page_edge_past_the_bottom_border_is_no_clue_line():
+    """The scanned page's straight edge, two and a half rows below the board's
+    bottom border, used to be taken for a clue line (with a predicted one
+    between), hiding the border the strip is placed by."""
+    g = detect_strip(cv2.imread(str(STRIPS / "j12600-rows-bottom.jpg")), "rows")
+    assert len(g.separators) - 1 == 60
+    assert g.end_border and not g.start_border
+    assert g.thick[-1] and g.thick[0]
+
+
 def test_a_header_scan_is_no_strip_either_way():
     """The web editor reads an image with no grid either way as the puzzle's header."""
     image = cv2.imread(str(STRIPS / "j12600-header.jpg"))

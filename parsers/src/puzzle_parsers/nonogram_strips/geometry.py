@@ -269,6 +269,28 @@ def _trace_vertical(vsolid: NDArray, x0: float, pitch: float, bands: int = 12) -
 # --- line separators --------------------------------------------------------
 
 
+def _regular_run(ys: list[float], seen: list[bool], pitch: float) -> tuple[list[float], list[bool]]:
+    """The longest run of ``ys`` spaced a pitch apart, unseen ends trimmed.
+
+    A straight edge beyond the board's border (the scanned page's edge, a
+    ruler) is a strong line off the grid's rhythm; the walk fills the gap to
+    it with predictions. Breaking at the first gap that isn't a pitch keeps
+    that line, and the predictions, out of the clue lines.
+    """
+    runs: list[list[int]] = []
+    for i in range(len(ys)):
+        if runs and 0.7 * pitch < ys[i] - ys[runs[-1][-1]] < 1.3 * pitch:
+            runs[-1].append(i)
+        else:
+            runs.append([i])
+    best = max(runs, key=lambda r: sum(seen[i] for i in r), default=[])
+    while best and not seen[best[0]]:
+        best = best[1:]
+    while best and not seen[best[-1]]:
+        best = best[:-1]
+    return [ys[i] for i in best], [seen[i] for i in best]
+
+
 def _trace_separators(
     hsolid: NDArray, edge: Polyline, board_pitch: float
 ) -> tuple[list[Polyline], list[float], float]:
@@ -288,7 +310,7 @@ def _trace_separators(
         p = row_guess / div
         if p < 15:
             break
-        cand, seen = regular_lines(ref, p, weak=0.1)
+        cand, seen = _regular_run(*regular_lines(ref, p, weak=0.1), p)
         real = [y for y, sn in zip(cand, seen) if sn]
         if len(real) >= 3 and np.median(np.diff(real)) < 1.3 * p and len(cand) > len(ys):
             ys = cand
