@@ -576,3 +576,35 @@ export async function parseNonogramStrip(
   }
   return res.json() as Promise<StripReadingResponse>;
 }
+
+export type PuzzleHeader = NonNullable<ParseImageResponse["metadata"]>;
+
+/**
+ * Title / author / difficulty (1..5) from a scan of a puzzle's header alone,
+ * for boards too big for one scan (the big-nonogram strip editor). Any may be null.
+ */
+export async function parsePuzzleHeader(image: string): Promise<PuzzleHeader> {
+  let res: Response;
+  try {
+    res = await fetch(PARSER_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "puzzleHeader", image }),
+      signal: PARSE_TIMEOUT_MS === null ? undefined : AbortSignal.timeout(PARSE_TIMEOUT_MS),
+    });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "TimeoutError") {
+      throw new Error("Reading timed out (2min).");
+    }
+    throw err;
+  }
+  if (!res.ok) {
+    let detail = res.statusText;
+    try {
+      const body = await res.json();
+      if (body.error) detail = body.error;
+    } catch {}
+    throw new Error(`Header error ${res.status}: ${detail}`);
+  }
+  return ((await res.json()) as { metadata: PuzzleHeader }).metadata;
+}

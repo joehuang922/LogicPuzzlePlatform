@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import inspect
+from pathlib import Path
 import sys
 import threading
 from unittest.mock import patch
@@ -199,6 +200,33 @@ def test_extractor_sends_crop_and_prompt():
     assert MetadataExtractor(rec).extract(crop) == {"title": "1", "author": "みのり", "difficulty": None}
     assert rec.images[0].size == (80, 50)
     assert "RED" in rec.prompts[0]
+
+
+def test_header_scan_uses_header_prompt_and_is_downscaled():
+    rec = _FakeRecognizer({"number": "30", "author": "セダム", "difficulty_face": 3})
+    scan = np.full((3000, 6000), 255, np.uint8)  # grayscale, oversized
+    found = MetadataExtractor(rec).extract_header(scan)
+    assert found == {"title": "30", "author": "セダム", "difficulty": 4}
+    assert max(rec.images[0].size) == MAX_CROP_SIDE
+    assert "RED" not in rec.prompts[0]
+    assert "header" in rec.prompts[0]
+
+
+def test_lambda_puzzle_header_mode(monkeypatch):
+    import base64
+    import json
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    import lambda_handler
+
+    rec = _FakeRecognizer({"number": "7", "title_text": "大きな絵", "difficulty_word": "hard"})
+    monkeypatch.setattr(metadata_extract, "_default_extractor", MetadataExtractor(rec))
+    monkeypatch.setattr(metadata_extract, "_default_failed", False)
+    ok, png = cv2.imencode(".png", np.full((100, 300, 3), 255, np.uint8))
+    body = {"mode": "puzzleHeader", "image": base64.b64encode(png.tobytes()).decode()}
+    res = lambda_handler.handler({"body": json.dumps(body)}, None)
+    assert res["statusCode"] == 200
+    assert json.loads(res["body"]) == {"metadata": {"title": "7 大きな絵", "author": None, "difficulty": 4}}
 
 
 # --- PuzzleParser wiring ----------------------------------------------------

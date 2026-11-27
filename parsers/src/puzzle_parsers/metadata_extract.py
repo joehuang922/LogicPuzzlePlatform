@@ -46,12 +46,23 @@ MAX_CROP_SIDE = 2048
 MAX_TITLE_LEN = 60
 MAX_AUTHOR_LEN = 40
 
-METADATA_PROMPT = """\
+_BOXED_INTRO = """\
 This image is part of a puzzle magazine or book page. The puzzle outlined with \
 a thick RED box is the target. Find the header printed next to the target \
 puzzle (above it, to its left, or to its right; the box may be slightly off and \
 include the header) and transcribe it.
 
+"""
+
+_HEADER_INTRO = """\
+This image is a scan of the header of one puzzle from a puzzle magazine or \
+book page: the puzzle itself is too big to fit and was scanned separately, so \
+the image may show only the header, perhaps with an edge of the puzzle's grid \
+or clues. Transcribe the header.
+
+"""
+
+_FIELDS = """\
 Return JSON only, with exactly these keys:
 {"number": string or null, "title_text": string or null, "author": string or null,
  "difficulty_face": integer or null, "difficulty_level": integer or null,
@@ -84,17 +95,37 @@ letters and digits (a pen name may be partly or wholly romaji). The header may b
 printed vertically (top to bottom) in the margin beside the board, e.g. a black \
 box with the number, a difficulty face, then "作●<name>" running down the side.
 
+"""
+
+_COMMON_RULES = """\
 Rules:
 - Transcribe exactly as printed. Do not translate or romanize.
 - Use null when a field is not printed. Never guess. Missing author is normal.
+"""
+
+_BOXED_RULES = """\
 - Only use the header belonging to the RED-boxed puzzle. Neighbouring puzzles' \
 headers (another number, another 作 line) are not it; a header just below the \
 red box usually belongs to the next puzzle.
+"""
+
+_HEADER_RULES = """\
+- If headers of more than one puzzle show, use the most complete one, the one \
+the scan is centred on.
+"""
+
+_EXCLUSIONS = """\
 - These are NOT the title or author: quiz questions and answer options \
 (e.g. "ロジックに現れた…"), prize / PRESENT boxes, corner or section names, \
 page numbers, difficulty stars or faces, and reader comment signatures such as \
 "(ジサシキシンゴウ 金沢市)" at the bottom of a page.
 """
+
+# A board found on the page, outlined in red by :func:`context_crop`.
+METADATA_PROMPT = _BOXED_INTRO + _FIELDS + _COMMON_RULES + _BOXED_RULES + _EXCLUSIONS
+
+# A scan of the header alone, for a board too big for one scan (big nonogram strips).
+HEADER_PROMPT = _HEADER_INTRO + _FIELDS + _COMMON_RULES + _HEADER_RULES + _EXCLUSIONS
 
 
 def locate_board(image: NDArray) -> NDArray:
@@ -261,8 +292,20 @@ class MetadataExtractor:
 
     def extract(self, crop: NDArray) -> dict[str, str | int | None]:
         """Read the header from a crop made by :func:`context_crop`."""
+        return self._read(crop, METADATA_PROMPT)
+
+    def extract_header(self, image: NDArray) -> dict[str, str | int | None]:
+        """Read a scan of the header alone (no board outlined), BGR or grayscale."""
+        if image.ndim == 2:
+            image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+        scale = MAX_CROP_SIDE / max(image.shape[:2])
+        if scale < 1:
+            image = cv2.resize(image, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+        return self._read(image, HEADER_PROMPT)
+
+    def _read(self, crop: NDArray, prompt: str) -> dict[str, str | int | None]:
         rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
-        raw = self._recognizer.recognize_image(Image.fromarray(rgb), METADATA_PROMPT)
+        raw = self._recognizer.recognize_image(Image.fromarray(rgb), prompt)
         return metadata_from_response(raw)
 
 

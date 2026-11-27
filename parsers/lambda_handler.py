@@ -280,6 +280,43 @@ def _nonogram_strip(body: dict) -> dict:
     }
 
 
+def _puzzle_header(body: dict) -> dict:
+    """Title / author / difficulty from a scan of a puzzle's header alone.
+
+    For boards too big for one scan (the web big-nonogram strip editor), whose
+    header is scanned on its own. Body: ``image`` (base64). Returns
+    ``{"metadata": {"title", "author", "difficulty"}}``, any of them null.
+    """
+    import base64
+
+    import cv2
+    import numpy as np
+
+    from puzzle_parsers.metadata_extract import default_metadata_extractor
+
+    image_b64 = body.get("image")
+    if not image_b64:
+        return {"statusCode": 400, "headers": HEADERS, "body": json.dumps({"error": "image (base64) is required"})}
+    img = cv2.imdecode(np.frombuffer(base64.b64decode(image_b64), np.uint8), cv2.IMREAD_COLOR)
+    if img is None:
+        return {"statusCode": 400, "headers": HEADERS, "body": json.dumps({"error": "Could not decode image"})}
+    extractor = default_metadata_extractor()
+    if extractor is None:
+        return {"statusCode": 503, "headers": HEADERS, "body": json.dumps({"error": "Header reading is unavailable"})}
+    print(f"  - puzzle header {img.shape}")
+    found = extractor.extract_header(img)
+    print(f"  [metadata] {found}")
+    return {
+        "statusCode": 200,
+        "headers": HEADERS,
+        "body": json.dumps({"metadata": {
+            "title": found.get("title"),
+            "author": found.get("author"),
+            "difficulty": found.get("difficulty"),
+        }}),
+    }
+
+
 def handler(event, context):
     print(f"=== Handler invoked: method={event.get('requestContext', {}).get('http', {}).get('method', event.get('httpMethod', '?'))} ===")
 
@@ -305,6 +342,8 @@ def handler(event, context):
         body = json.loads(event["body"])
         if body.get("mode") == "nonogramStrip":
             return _nonogram_strip(body)
+        if body.get("mode") == "puzzleHeader":
+            return _puzzle_header(body)
         image_b64 = body.get("image")
         puzzle_type = body.get("puzzleType")
 

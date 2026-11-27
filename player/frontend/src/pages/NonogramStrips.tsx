@@ -9,6 +9,7 @@ import {
   isGateTimeout,
   listCollections,
   parseNonogramStrip,
+  parsePuzzleHeader,
   sortCollections,
 } from "../api/client";
 import OverrideGateButton from "../components/OverrideGateButton";
@@ -895,6 +896,34 @@ function CreatePanel({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [gateTimedOut, setGateTimedOut] = useState(false);
+  const isMobile = useIsMobile();
+  const [header, setHeader] = useState<{ url: string; status: "reading" | "done" | "error"; note: string } | null>(null);
+
+  // Read title / author / difficulty from a scan of the puzzle's header and
+  // fill what it finds; the person still checks the fields before creating.
+  async function readHeader(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setHeader((h) => {
+      if (h) URL.revokeObjectURL(h.url);
+      return { url, status: "reading", note: "Reading the header…" };
+    });
+    try {
+      const img = await loadImage(url);
+      const { base64 } = await encodeForParser(file, img);
+      const found = await withRetry(() => parsePuzzleHeader(base64));
+      if (found.title) setTitle(found.title);
+      if (found.author) setAuthor(found.author);
+      if (found.difficulty) setDifficulty(String(found.difficulty));
+      const got = [found.title && "title", found.author && "author", found.difficulty && "difficulty"].filter(Boolean);
+      setHeader((h) => h && h.url === url
+        ? { url, status: "done", note: got.length ? `Filled in the ${got.join(", ")}: check them against the scan.` : "Found no title, author or difficulty on this scan." }
+        : h);
+    } catch (e) {
+      setHeader((h) => h && h.url === url ? { url, status: "error", note: e instanceof Error ? e.message : String(e) } : h);
+    }
+  }
 
   useEffect(() => {
     listCollections().then((r) => setCollections(creationTargets(sortCollections(r.collections)))).catch(() => {});
@@ -940,6 +969,29 @@ function CreatePanel({
   return (
     <section style={cardStyle}>
       <h2 style={{ marginTop: 0 }}>4. Create the question</h2>
+      <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", flexWrap: "wrap", marginBottom: "0.75rem" }}>
+        <label style={{ ...buttonLike, ...(isMobile ? bigButton : {}) }}>
+          {isMobile ? "Choose header scan" : "Read header scan"}
+          <input type="file" accept="image/*" hidden onChange={(e) => { readHeader(e.target.files); e.target.value = ""; }} />
+        </label>
+        {isMobile && (
+          <label style={{ ...buttonLike, ...bigButton }}>
+            Photo of header
+            <input type="file" accept="image/*" capture="environment" hidden onChange={(e) => { readHeader(e.target.files); e.target.value = ""; }} />
+          </label>
+        )}
+        {header && (
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flex: "1 1 220px", minWidth: 0 }}>
+            <img src={header.url} alt="" style={{ width: 64, height: 64, objectFit: "contain", background: "#f5f5f5", borderRadius: 4, flexShrink: 0 }} />
+            <span style={{ fontSize: "0.85rem", color: header.status === "error" ? "#c62828" : "#555" }}>{header.note}</span>
+          </div>
+        )}
+      </div>
+      {!header && (
+        <p style={{ color: "#555", marginTop: 0, fontSize: "0.85rem" }}>
+          Optional: scan the puzzle's header (number, title, author, difficulty) to fill the fields below.
+        </p>
+      )}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "0.75rem" }}>
         <label style={fieldStyle}>Title<input style={inputStyle} value={title} onChange={(e) => setTitle(e.target.value)} /></label>
         <label style={fieldStyle}>Author<input style={inputStyle} value={author} onChange={(e) => setAuthor(e.target.value)} /></label>
