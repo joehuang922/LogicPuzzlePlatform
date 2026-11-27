@@ -100,9 +100,12 @@ class NonogramParser(PuzzleParser):
         rx, ry, rw, rh = geom.row_clue_rect
         row_clue_img = img_array[ry : ry + rh, rx : rx + rw]
 
-        # Extract col clue region
+        # Extract col clue region, between its own printed side borders: on a
+        # keystoned or curved page the clue area is not as wide as the grid.
         cx, cy, cw, ch = geom.col_clue_rect
-        col_clue_img = img_array[cy : cy + ch, cx : cx + cw]
+        x1, x2 = _clue_area_sides(img_array, geom.col_clue_rect, geom.cell_w)
+        col_clue_img = img_array[cy : cy + ch, x1:x2]
+        col_cell_w = (x2 - x1) / geom.cols
 
         if debug_path:
             cv2.imwrite(str(debug_path / "02_row_clues.png"), row_clue_img)
@@ -113,11 +116,11 @@ class NonogramParser(PuzzleParser):
                 row_clue_img, geom.rows, geom.cell_h, grid_cell_w=geom.cell_w
             )
             col_clues = self._ocr_col_clues(
-                col_clue_img, geom.cols, geom.cell_w, grid_cell_h=geom.cell_h
+                col_clue_img, geom.cols, col_cell_w, grid_cell_h=geom.cell_h
             )
         else:
             row_clues, col_clues = self._llm_recognize_all_clues(
-                row_clue_img, geom.rows, col_clue_img, geom.cols, geom.cell_w
+                row_clue_img, geom.rows, col_clue_img, geom.cols, col_cell_w
             )
 
         if debug_path:
@@ -155,16 +158,16 @@ class NonogramParser(PuzzleParser):
         alone costs the 50s primary timeout. The calls are independent, so run
         them all at once: the parse takes about as long as the slowest call.
         """
-        h, w = col_clue_img.shape[:2]
         spans = [
             (start, min(start + chunk_size, num_cols))
             for start in range(0, num_cols, chunk_size)
         ]
+        w = col_clue_img.shape[1]
 
         def read_chunk(start: int, end: int) -> list[list[int]]:
             n = end - start
-            x1 = max(0, min(int(start * cell_w), w))
-            x2 = max(0, min(int(end * cell_w), w))
+            x1 = max(0, min(int(round(start * cell_w)), w))
+            x2 = max(0, min(int(round(end * cell_w)), w))
             clues = self._llm_recognize_clues(
                 col_clue_img[:, x1:x2], COL_CLUE_PROMPT.format(n=n)
             )
@@ -362,3 +365,43 @@ class NonogramParser(PuzzleParser):
             return True
         except Exception:
             return False
+
+
+# How far, in cells, a clue area's printed side border is searched for around
+# the grid's.
+_SIDE_SEARCH_CELLS = 0.6
+
+
+def _darkness(img: np.ndarray) -> np.ndarray:
+    gray = img if img.ndim == 2 else img.min(axis=2)
+    return 255.0 - gray.astype(np.float32).mean(axis=0)
+
+
+def _darkest_near(dark: np.ndarray, at: float, tol: int) -> int:
+    lo = max(0, int(round(at)) - tol)
+    hi = min(len(dark), int(round(at)) + tol + 1)
+    return lo + int(np.argmax(dark[lo:hi])) if hi > lo else int(round(at))
+
+
+def _clue_area_sides(
+    image: np.ndarray, rect: tuple[int, int, int, int], cell_w: float
+) -> tuple[int, int]:
+    """Left and right x of the column-clue area's own printed side borders.
+
+    ``rect`` spans the playable grid's width, but the clue area above it is
+    not always as wide: a keystoned photo printed it 1.6% narrower (cuts at
+    the grid's cell width drifted half a cell by the last strip), and a curved
+    spread's grid edge sat half a cell inside the clue area's. Each side moves
+    onto the darkest column, over the clue area's height, within
+    ``_SIDE_SEARCH_CELLS`` of the grid's side: the border line (the corner
+    beside the clue area is blank paper). Strips are then cut evenly between
+    the two sides; snapping each cut to its bold line did worse on a wavy
+    page, whose bold lines curve.
+    """
+    x, y, w, h = rect
+    dark = _darkness(image[y : y + h])
+    tol = max(1, int(round(cell_w * _SIDE_SEARCH_CELLS)))
+    left, right = _darkest_near(dark, x, tol), _darkest_near(dark, x + w, tol)
+    if right - left < w - 2 * tol:  # can't both be borders: keep the grid's
+        return x, x + w
+    return left, right

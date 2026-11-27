@@ -48,9 +48,39 @@ def _android(img):
         # Small board: at Android size only the bold lines pass the lattice
         # test (5x5); the count is checked against span / cell pitch.
         ("board-nonogram-small.jpg", 15, 15),
+        ("board-nonogram-narrow-clues.jpg", 40, 35),
     ],
 )
 def test_grid_size(name, rows, cols, android):
     img = cv2.imread(str(DOCS_DIR / name))
     geom = detect_nonogram_grid(_android(img) if android else img)
     assert (geom.rows, geom.cols) == (rows, cols)
+
+
+@pytest.mark.parametrize("android", [False, True])
+@pytest.mark.parametrize(
+    "name",
+    ["board-nonogram-narrow-clues.jpg", "board-nonogram-spread.jpg", "board-nonogram-big.jpg"],
+)
+def test_column_strips_cut_on_bold_lines(name, android):
+    """Column clues go to the model in 5-column strips; each cut must sit on
+    the bold line printed in the clue area, not at the grid's cell width.
+    The narrow-clues photo's clue area is 1.6% narrower than its grid (the
+    last cut drifted half a cell), the spread's starts half a cell outside it.
+    """
+    import numpy as np
+
+    from puzzle_parsers.nonogram.parser import _clue_area_sides
+
+    img = cv2.imread(str(DOCS_DIR / name))
+    geom = detect_nonogram_grid(_android(img) if android else img)
+    x1, x2 = _clue_area_sides(geom.image, geom.col_clue_rect, geom.cell_w)
+    _, cy, _, ch = geom.col_clue_rect
+    dark = 255.0 - geom.image[cy : cy + ch].min(axis=2).astype(np.float32).mean(axis=0)
+    col_w = (x2 - x1) / geom.cols
+    win = int(0.4 * col_w)
+    for c in range(0, geom.cols + 1, 5):
+        cut = x1 + round(c * col_w)
+        bold = cut - win + int(np.argmax(dark[cut - win : cut + win + 1]))
+        assert abs(cut - bold) <= 0.2 * col_w, (c, cut, bold)
+
