@@ -95,6 +95,20 @@ def find_quadrilateral_border(gray: NDArray) -> NDArray:
             best = quad
 
     if best is not None and best_support >= _BORDER_SUPPORT_MIN:
+        if _holds_grid(gray, best):
+            return best
+        # A well-inked box with no grid in it: on a whole-page photo the
+        # how-to-solve panel (larger than the board, under the photographer's
+        # hand) won, and the board itself, at 13% of the frame, sat below this
+        # step's floor. Take a smaller well-supported box that holds a grid.
+        for close_k in (1, 3, 5, 7):
+            quad = _find_border_via_contours(gray, close_k, min_span=0.3, min_area=0.08)
+            if (
+                quad is not None
+                and _edge_support(gray, quad) >= _BORDER_SUPPORT_MIN
+                and _holds_grid(gray, quad)
+            ):
+                return quad
         return best
 
     # No well-supported contour: try the projection box and keep whichever of
@@ -121,6 +135,26 @@ def find_quadrilateral_border(gray: NDArray) -> NDArray:
         return quad
 
     return best if best is not None else fallback
+
+
+# A box holds a grid when the cell-pitch estimate finds at least this many
+# cells across its shorter side.
+_GRID_MIN_CELLS = 4
+_GRID_CHECK_SIDE = 600
+
+
+def _holds_grid(gray: NDArray, quad: NDArray) -> bool:
+    """Whether the box ``quad`` encloses a lattice of cells (not a text panel)."""
+    q = np.float32(quad)
+    w = max(np.linalg.norm(q[1] - q[0]), np.linalg.norm(q[2] - q[3]))
+    h = max(np.linalg.norm(q[3] - q[0]), np.linalg.norm(q[2] - q[1]))
+    if min(w, h) < 2:
+        return False
+    s = _GRID_CHECK_SIDE / max(w, h)
+    W, H = max(2, int(w * s)), max(2, int(h * s))
+    M = cv2.getPerspectiveTransform(q, np.float32([[0, 0], [W, 0], [W, H], [0, H]]))
+    pitch = estimate_cell_pitch(cv2.warpPerspective(gray, M, (W, H)))
+    return bool(pitch) and min(W, H) / pitch >= _GRID_MIN_CELLS
 
 
 def _find_border_via_contours(

@@ -45,6 +45,7 @@ link to). All other cells are empty.
 
 - [big.jpg](big.jpg) — large board (clues 1–12)
 - [medium.jpg](medium.jpg) — medium board (clues 1–10)
+- [hand-over-example.jpg](hand-over-example.jpg) — 15×15 board on a whole-page photo; the how-to-solve panel under the photographer's hand is larger than the board (the border finder must skip a box with no grid in it)
 
 ## Answer structure description
 
