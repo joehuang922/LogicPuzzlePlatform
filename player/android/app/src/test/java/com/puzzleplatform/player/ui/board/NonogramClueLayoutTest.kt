@@ -37,6 +37,37 @@ class NonogramClueLayoutTest {
     }
 
     @Test
+    fun row_tooLongAtMinSize_keepsMinSizeAndOverflows() {
+        // 40 two-digit numbers: ~67em, far past a 300px band at a 25px floor.
+        val widths = FloatArray(40) { TWO }
+        val line = NonogramClueLayout.row(widths, maxSize = 34f, band = 300f, minSize = 25f)
+        assertEquals(25f, line.textSize, 0.01f)
+        // The overflow is exactly how far the first number's left edge sits past x = 0.
+        val firstLeft = line.centers[0] - TWO * line.textSize / 2 - NonogramClueLayout.ROW_EDGE_EM * line.textSize
+        assertEquals(-firstLeft, line.overflow, 0.01f)
+    }
+
+    @Test
+    fun row_fitsAboveMinSize_noOverflow() {
+        val line = NonogramClueLayout.row(floatArrayOf(TWO, TWO, ONE), maxSize = 34f, band = 300f, minSize = 25f)
+        assertEquals(0f, line.overflow, 0.01f)
+    }
+
+    @Test
+    fun row_zoomedOutRowHeightCapWinsOverMinSize() {
+        val line = NonogramClueLayout.row(FloatArray(40) { TWO }, maxSize = 9f, band = 300f, minSize = 25f)
+        assertEquals(9f, line.textSize, 0.01f)
+    }
+
+    @Test
+    fun col_tooTallAtMinSize_overflowsTop() {
+        val n = 40
+        val line = NonogramClueLayout.col(FloatArray(n) { ONE }, maxSize = 34f, cell = 60f, band = 200f, minSize = 20f)
+        assertEquals(20f, line.textSize, 0.01f)
+        assertEquals(n * 20f * NonogramClueLayout.COL_SLOT_EM - 200f * NonogramClueLayout.COL_USABLE, line.overflow, 0.01f)
+    }
+
+    @Test
     fun col_twoDigitNumberFitsColumnWidth() {
         val line = NonogramClueLayout.col(floatArrayOf(TWO, ONE), maxSize = 34f, cell = 20f, band = 300f)
         assertTrue(TWO * line.textSize <= 20f * NonogramClueLayout.CROSS_FILL + 0.01f)

@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -63,12 +64,15 @@ private val COORD_TICK = Color(0xFFBDBDBD)
  * the grid pans/zooms, per the design note: [PER_CLUE_DEPTH] is the room reserved for one
  * number, so the band holds that times the longest line, clamped to [MIN_BAND_DEPTH] ..
  * [MAX_BAND_DEPTH]. Past the point where [MAX_BAND_DEPTH] can hold them all at full size,
- * the numbers shrink to fit instead (see [drawRowClues]/[drawColClues]) — so there is no
- * hard cap on clue length, just progressively smaller text for very long lines.
+ * the numbers shrink to fit, down to [MIN_CLUE_TEXT]; a line still too long keeps that
+ * size and runs off the band's outer edge, and a one-finger drag in the band scrolls it
+ * into view (see [ClueScroll]) — so there is no hard cap on clue length.
  */
 private val PER_CLUE_DEPTH = 13.dp
 private val MIN_BAND_DEPTH = 84.dp
 private val MAX_BAND_DEPTH = 176.dp
+/** Smallest a clue shrinks to fit its band; a longer line scrolls instead. */
+private val MIN_CLUE_TEXT = 10.dp
 /** Largest grid cell (zoom-in stop) and the auto-zoom target, matching other boards. */
 private val MAX_CELL = 40.dp
 private val AUTO_CELL = 26.dp
@@ -189,6 +193,10 @@ fun NonogramBoard(
 
         // Per-gesture paint state, driven by detectBoardGestures' cell callbacks.
         val drag = remember(puzzle.id) { NonogramDragState() }
+        // How far the clue bands are scrolled to show lines too long for them, and the
+        // band a one-finger drag started in (that drag scrolls instead of painting).
+        val clueScroll = remember(puzzle.id) { ClueScroll() }
+        val minCluePx = with(density) { MIN_CLUE_TEXT.toPx() }
 
         val canvasMod = Modifier
             .size(side)
@@ -202,10 +210,39 @@ fun NonogramBoard(
                         }
                     },
                     onDragStart = { off ->
-                        drag.start(transform.cellAt(off.x, off.y), modeState.value, valuesState.value) { c, r, st -> onSet.value(c, r, st) }
+                        clueScroll.band = when {
+                            off.x < bandPx && off.y >= bandPx && off.y < gridBottom -> ClueScroll.Band.ROWS
+                            off.y < bandPx && off.x >= bandPx && off.x < gridRight -> ClueScroll.Band.COLS
+                            else -> ClueScroll.Band.NONE
+                        }
+                        clueScroll.last = off
+                        if (clueScroll.band == ClueScroll.Band.NONE) {
+                            drag.start(transform.cellAt(off.x, off.y), modeState.value, valuesState.value) { c, r, st -> onSet.value(c, r, st) }
+                        }
                     },
-                    onDrag = { off -> drag.moveTo(transform.cellAt(off.x, off.y), valuesState.value) { c, r, st -> onSet.value(c, r, st) } },
-                    onDragEnd = { drag.end() },
+                    onDrag = { off ->
+                        if (clueScroll.band == ClueScroll.Band.NONE) {
+                            drag.moveTo(transform.cellAt(off.x, off.y), valuesState.value) { c, r, st -> onSet.value(c, r, st) }
+                        } else {
+                            // The band follows the finger: across it scrolls the clues,
+                            // along it pans the grid with them.
+                            val dx = off.x - clueScroll.last.x
+                            val dy = off.y - clueScroll.last.y
+                            clueScroll.last = off
+                            if (clueScroll.band == ClueScroll.Band.ROWS) {
+                                clueScroll.row = (clueScroll.row + dx).coerceIn(0f, clueScroll.maxRow)
+                                transform.transform(off.x, off.y, 0f, dy, 1f)
+                            } else {
+                                clueScroll.col = (clueScroll.col + dy).coerceIn(0f, clueScroll.maxCol)
+                                transform.transform(off.x, off.y, dx, 0f, 1f)
+                            }
+                            version++
+                        }
+                    },
+                    onDragEnd = {
+                        if (clueScroll.band == ClueScroll.Band.NONE) drag.end()
+                        clueScroll.band = ClueScroll.Band.NONE
+                    },
                     onTransform = { centroid, pan, zoom ->
                         transform.transform(centroid.x, centroid.y, pan.x, pan.y, zoom)
                         version++
@@ -242,7 +279,8 @@ fun NonogramBoard(
             clipRect(left = bandPx, top = 0f, right = gridRight, bottom = bandPx) {
                 translate(bandPx + panX, 0f) {
                     for (line in hintLines) if (!line.isRow) drawRect(HINT_LINE_FILL, Offset(line.index * cell, 0f), Size(cell, bandPx))
-                    drawColClues(clues, colWidths, cell, bandPx, colStatus, colClueErrors, liveValidate)
+                    clueScroll.maxCol = drawColClues(clues, colWidths, cell, bandPx, minCluePx, clueScroll.col, colStatus, colClueErrors, liveValidate)
+                    clueScroll.col = clueScroll.col.coerceIn(0f, clueScroll.maxCol)
                 }
             }
 
@@ -250,7 +288,8 @@ fun NonogramBoard(
             clipRect(left = 0f, top = bandPx, right = bandPx, bottom = gridBottom) {
                 translate(0f, bandPx + panY) {
                     for (line in hintLines) if (line.isRow) drawRect(HINT_LINE_FILL, Offset(0f, line.index * cell), Size(bandPx, cell))
-                    drawRowClues(clues, rowWidths, cell, bandPx, rowStatus, rowClueErrors, liveValidate)
+                    clueScroll.maxRow = drawRowClues(clues, rowWidths, cell, bandPx, minCluePx, clueScroll.row, rowStatus, rowClueErrors, liveValidate)
+                    clueScroll.row = clueScroll.row.coerceIn(0f, clueScroll.maxRow)
                 }
             }
 
@@ -394,53 +433,100 @@ private fun DrawScope.drawNonogramThumbnail(
 /**
  * Row clues, right-aligned in the left band; row r's numbers sit at grid row r. Numbers
  * are spaced by their measured widths plus a fixed gap ([NonogramClueLayout.row]), so
- * runs of two-digit clues stay apart when a long line shrinks to fit the band.
+ * runs of two-digit clues stay apart. A line too long for the band at [minSize] runs
+ * off its left edge; [scroll] shifts every such line right by up to its own overflow
+ * (lines that fit don't move), and a fade marks the side a line is cut on. Returns the
+ * longest overflow: the furthest the band can scroll.
  */
 private fun DrawScope.drawRowClues(
     clues: NonogramEngine.Clues,
     widths: List<FloatArray>,
     cell: Float,
     bandPx: Float,
+    minSize: Float,
+    scroll: Float,
     rowStatus: List<List<ClueStatus>>,
     rowClueErrors: Set<String>,
     liveValidate: Boolean,
-) {
+): Float {
     // Capped by the row height too, so zoomed-out rows don't overlap.
     val maxSize = (cell * 0.5f).coerceIn(18f, 34f).coerceAtMost(cell * NonogramClueLayout.CROSS_FILL)
+    var maxOverflow = 0f
     for (r in 0 until clues.rows) {
         val clue = clues.rowClues[r]
         val yc = r * cell + cell / 2
-        val layout = NonogramClueLayout.row(widths[r], maxSize, bandPx)
+        val layout = NonogramClueLayout.row(widths[r], maxSize, bandPx, minSize)
+        maxOverflow = maxOf(maxOverflow, layout.overflow)
+        val shift = minOf(scroll, layout.overflow)
         for (i in clue.indices) {
             val color = clueColor(rowStatus.getOrNull(r)?.getOrNull(i), rowClueErrors.contains("$r:$i"), liveValidate)
-            drawClueText(clue[i].toString(), layout.centers[i], yc, layout.textSize, color)
+            drawClueText(clue[i].toString(), layout.centers[i] + shift, yc, layout.textSize, color)
+        }
+        val fade = layout.textSize
+        if (layout.overflow - shift > 0.5f) {
+            drawRect(Brush.horizontalGradient(listOf(BAND_BG, BAND_BG.copy(alpha = 0f)), 0f, fade), Offset(0f, r * cell), Size(fade, cell))
+        }
+        if (shift > 0.5f) {
+            drawRect(Brush.horizontalGradient(listOf(BAND_BG.copy(alpha = 0f), BAND_BG), bandPx - fade, bandPx), Offset(bandPx - fade, r * cell), Size(fade, cell))
         }
     }
+    return maxOverflow
 }
 
 /**
  * Column clues, bottom-aligned in the top band; column c's numbers sit at grid col c,
- * sized so a two-digit number fits its column's width ([NonogramClueLayout.col]).
+ * sized so a two-digit number fits its column's width ([NonogramClueLayout.col]). Too
+ * tall a stack scrolls like [drawRowClues], downward. Returns the longest overflow.
  */
 private fun DrawScope.drawColClues(
     clues: NonogramEngine.Clues,
     widths: List<FloatArray>,
     cell: Float,
     bandPx: Float,
+    minSize: Float,
+    scroll: Float,
     colStatus: List<List<ClueStatus>>,
     colClueErrors: Set<String>,
     liveValidate: Boolean,
-) {
+): Float {
     val maxSize = (cell * 0.5f).coerceIn(18f, 34f)
+    var maxOverflow = 0f
     for (c in 0 until clues.cols) {
         val clue = clues.colClues[c]
         val xc = c * cell + cell / 2
-        val layout = NonogramClueLayout.col(widths[c], maxSize, cell, bandPx)
+        val layout = NonogramClueLayout.col(widths[c], maxSize, cell, bandPx, minSize)
+        maxOverflow = maxOf(maxOverflow, layout.overflow)
+        val shift = minOf(scroll, layout.overflow)
         for (i in clue.indices) {
             val color = clueColor(colStatus.getOrNull(c)?.getOrNull(i), colClueErrors.contains("$c:$i"), liveValidate)
-            drawClueText(clue[i].toString(), xc, layout.centers[i], layout.textSize, color)
+            drawClueText(clue[i].toString(), xc, layout.centers[i] + shift, layout.textSize, color)
+        }
+        val fade = layout.textSize
+        if (layout.overflow - shift > 0.5f) {
+            drawRect(Brush.verticalGradient(listOf(BAND_BG, BAND_BG.copy(alpha = 0f)), 0f, fade), Offset(c * cell, 0f), Size(cell, fade))
+        }
+        if (shift > 0.5f) {
+            drawRect(Brush.verticalGradient(listOf(BAND_BG.copy(alpha = 0f), BAND_BG), bandPx - fade, bandPx), Offset(c * cell, bandPx - fade), Size(cell, fade))
         }
     }
+    return maxOverflow
+}
+
+/**
+ * Scroll state of the clue bands. [row] / [col] shift the overflowing lines of the
+ * row / column band toward the grid (0 = aligned to the grid, the default), up to
+ * [maxRow] / [maxCol], the longest overflow at the current zoom (set on each draw).
+ * [band] is the band the current one-finger drag started in, if any.
+ */
+private class ClueScroll {
+    enum class Band { NONE, ROWS, COLS }
+
+    var row = 0f
+    var col = 0f
+    var maxRow = 0f
+    var maxCol = 0f
+    var band = Band.NONE
+    var last = Offset.Zero
 }
 
 /**

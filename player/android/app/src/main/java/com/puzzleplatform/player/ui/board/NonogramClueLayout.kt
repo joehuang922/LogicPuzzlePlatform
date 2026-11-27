@@ -24,21 +24,27 @@ object NonogramClueLayout {
     /** Share of a cell's width a column-clue number (or row-clue height) may take. */
     const val CROSS_FILL = 0.9f
 
-    /** A laid-out clue line: its text size and each number's center along the line. */
-    class Line(val textSize: Float, val centers: FloatArray)
+    /**
+     * A laid-out clue line: its text size, each number's center along the line (with
+     * the line aligned against the band's inner edge), and [overflow], how far the line
+     * runs past the band's outer edge — the most it can be scrolled into view.
+     */
+    class Line(val textSize: Float, val centers: FloatArray, val overflow: Float = 0f)
 
     /**
      * Row clue laid out right-aligned against [band]'s inner edge (x = [band]). Each
      * number takes its own measured width plus a fixed em gap, so a run of two-digit
-     * numbers never runs together ("12 13 4 5 21", not "12134521"); a line too long for
-     * the band shrinks the text — gaps shrink with it but never close. [maxSize] caps the
-     * size (the zoom-derived size, and the row height so rows don't overlap).
+     * numbers never runs together ("12 13 4 5 21", not "12134521"). A line too long for
+     * the band shrinks the text, but not below [minSize]: past that it keeps its size and
+     * runs off the band's outer edge ([Line.overflow]) for the player to scroll to,
+     * instead of shrinking to unreadable. [maxSize] caps the size (the zoom-derived size,
+     * and the row height so rows don't overlap) and wins over [minSize].
      */
-    fun row(widthsEm: FloatArray, maxSize: Float, band: Float): Line {
+    fun row(widthsEm: FloatArray, maxSize: Float, band: Float, minSize: Float = 0f): Line {
         val n = widthsEm.size
         if (n == 0) return Line(maxSize, FloatArray(0))
         val totalEm = widthsEm.sum() + ROW_GAP_EM * (n - 1) + ROW_EDGE_EM * 2
-        val size = minOf(maxSize, band / totalEm)
+        val size = minOf(maxSize, maxOf(minSize, band / totalEm))
         val centers = FloatArray(n)
         var right = band - ROW_EDGE_EM * size
         for (i in n - 1 downTo 0) {
@@ -46,22 +52,25 @@ object NonogramClueLayout {
             centers[i] = right - w / 2
             right -= w + ROW_GAP_EM * size
         }
-        return Line(size, centers)
+        return Line(size, centers, maxOf(0f, totalEm * size - band))
     }
 
     /**
      * Column clue stacked bottom-aligned against the band's inner edge (y = [band]).
      * The text also fits the column's width: the widest number takes at most
      * [CROSS_FILL] of [cell], so neighbouring columns' two-digit numbers don't touch.
+     * Like [row], a stack too tall for the band shrinks down to [minSize], then runs off
+     * the band's top ([Line.overflow]).
      */
-    fun col(widthsEm: FloatArray, maxSize: Float, cell: Float, band: Float): Line {
+    fun col(widthsEm: FloatArray, maxSize: Float, cell: Float, band: Float, minSize: Float = 0f): Line {
         val n = widthsEm.size
         val widest = widthsEm.maxOrNull() ?: 0f
         var size = maxSize
         if (widest > 0f) size = minOf(size, cell * CROSS_FILL / widest)
-        if (n > 0) size = minOf(size, band * COL_USABLE / (n * COL_SLOT_EM))
+        val usable = band * COL_USABLE
+        if (n > 0) size = minOf(size, maxOf(minSize, usable / (n * COL_SLOT_EM)))
         val slot = size * COL_SLOT_EM
-        return Line(size, FloatArray(n) { i -> band - (n - i - 0.5f) * slot })
+        return Line(size, FloatArray(n) { i -> band - (n - i - 0.5f) * slot }, maxOf(0f, n * slot - usable))
     }
 
     /**

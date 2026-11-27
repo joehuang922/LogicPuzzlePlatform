@@ -27,9 +27,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import com.puzzleplatform.player.R
-import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -234,6 +231,14 @@ fun PlayScreen(
             }
             state.puzzle != null -> {
                 val puzzle = state.puzzle!!
+                // Nonogram row/column coordinates at the thick lines: on by default for
+                // big boards; toggled from the Options menu.
+                var nonogramCoordinates by remember(puzzle.id) {
+                    mutableStateOf(
+                        puzzle.puzzleType == 6 &&
+                            NonogramEngine.parseClues(puzzle).let { nonogramCoordinatesDefault(it.rows, it.cols) },
+                    )
+                }
                 // The play screen is the header (info, timer, actions, progress,
                 // undo/redo) and the board. Portrait stacks them in one scroll; landscape
                 // (wider than tall) puts the header in a left pane and the board in a
@@ -294,11 +299,15 @@ fun PlayScreen(
                             Text(if (state.saving) "Saving…" else "Save")
                         }
                         OutlinedButton(onClick = vm::openLoadDialog) { Text("Load") }
-                        Spacer(Modifier.width(4.dp))
-                        FilterChip(
-                            selected = state.liveValidate,
-                            onClick = vm::toggleLiveValidate,
-                            label = { Text("Errors: ${if (state.liveValidate) "On" else "Off"}") },
+                        // Opt-in display aids live together in one menu rather than as
+                        // chips scattered around the board's input controls.
+                        PlayOptionsMenu(
+                            options = buildList {
+                                add(PlayOption("Show errors", state.liveValidate, vm::toggleLiveValidate))
+                                if (puzzle.puzzleType == 6) {
+                                    add(PlayOption("Coordinates", nonogramCoordinates) { nonogramCoordinates = !nonogramCoordinates })
+                                }
+                            },
                             modifier = Modifier.align(Alignment.CenterVertically),
                         )
                     }
@@ -592,11 +601,6 @@ fun PlayScreen(
                                 )
                                 6 -> {
                                     var nonogramMode by remember(puzzle.id) { mutableStateOf(NonogramMode.FILL) }
-                                    // Row/column coordinates at the thick lines: on by default for big boards.
-                                    var nonogramCoordinates by remember(puzzle.id) {
-                                        val clues = NonogramEngine.parseClues(puzzle)
-                                        mutableStateOf(nonogramCoordinatesDefault(clues.rows, clues.cols))
-                                    }
                                     val lines = state.hint as? HintView.Lines
                                     NonogramBoard(
                                         puzzle = puzzle,
@@ -625,18 +629,6 @@ fun PlayScreen(
                                             selected = nonogramMode == NonogramMode.CROSS,
                                             onClick = { nonogramMode = NonogramMode.CROSS },
                                             label = { Text("✕ Cross") },
-                                        )
-                                        FilterChip(
-                                            selected = nonogramCoordinates,
-                                            onClick = { nonogramCoordinates = !nonogramCoordinates },
-                                            label = { Text("Coordinate") },
-                                            leadingIcon = {
-                                                Icon(
-                                                    painterResource(R.drawable.ic_coordinates),
-                                                    contentDescription = null,
-                                                    modifier = Modifier.size(FilterChipDefaults.IconSize),
-                                                )
-                                            },
                                         )
                                     }
                                     HintControls(
