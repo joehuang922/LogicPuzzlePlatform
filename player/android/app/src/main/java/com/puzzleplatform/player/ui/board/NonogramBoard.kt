@@ -51,6 +51,9 @@ private val ERROR_FILL = Color(0xFFDD3333)
 // Hint highlights (docs/auto-solve): amber focus lines, blue settled cells (matches web).
 private val HINT_LINE_FILL = Color(0x4DFFC107)
 private val HINT_CELL = Color(0xFF1976D2)
+// Line labels: a light strip between each clue band and the grid.
+private val LABEL_BG = Color(0xFFFAFAFA)
+private val LABEL_TEXT = Color(0xFF555555)
 
 /**
  * Clue-band depth adapts to the longest clue line so every number stays visible, however
@@ -68,6 +71,14 @@ private val MAX_BAND_DEPTH = 176.dp
 private val MAX_CELL = 40.dp
 private val AUTO_CELL = 26.dp
 private val ENTRY_FLOOR = 18.dp
+/**
+ * Line labels (row/column numbers at every 5th, thick, separator): the strip the grid
+ * gives up for them. The row strip is wider than the column strip is tall, since row
+ * numbers are written across it ("100" needs more room than a digit's height).
+ */
+private val ROW_LABEL_W = 22.dp
+private val COL_LABEL_H = 16.dp
+private val LABEL_TEXT_SIZE = 11.dp
 
 enum class NonogramMode { FILL, CROSS }
 
@@ -96,6 +107,8 @@ fun NonogramBoard(
     // the cells it settles once the player asks to see them ("col,row" -> 1 fill / 2 cross).
     hintLines: List<NonogramHinter.Line> = emptyList(),
     hintCells: Map<String, Int> = emptyMap(),
+    // Row/column numbers beside every 5th (thick) line, in a strip the grid gives up.
+    showLabels: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val clues = remember(puzzle.id) { NonogramEngine.parseClues(puzzle) }
@@ -133,6 +146,15 @@ fun NonogramBoard(
         )
     }
 
+    // Each number's width in em, so clues are spaced by their real widths (see
+    // [NonogramClueLayout]) rather than packed into equal slots.
+    val rowWidths = remember(clues) { clues.rowClues.map { line -> FloatArray(line.size) { textWidthEm(line[it].toString()) } } }
+    val colWidths = remember(clues) { clues.colClues.map { line -> FloatArray(line.size) { textWidthEm(line[it].toString()) } } }
+
+    // The transform in use before the latest re-creation, so toggling labels keeps the
+    // player's zoom and scroll position.
+    val lastTransform = remember(puzzle.id) { arrayOfNulls<NonogramTransform>(1) }
+
     BoxWithConstraints(modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
         val side = boardSide(maxWidth)
         val vpx = with(density) { side.toPx() }
@@ -143,11 +165,20 @@ fun NonogramBoard(
         val maxCellPx = with(density) { MAX_CELL.toPx() }
         val autoCellPx = with(density) { AUTO_CELL.toPx() }
         val entryFloorPx = with(density) { ENTRY_FLOOR.toPx() }
-        val gridW = vpx - bandPx
-        val gridH = vpx - bandPx // square canvas; grid area is the square minus bands
+        val rowLabelPx = if (showLabels) with(density) { ROW_LABEL_W.toPx() } else 0f
+        val colLabelPx = if (showLabels) with(density) { COL_LABEL_H.toPx() } else 0f
+        val labelTextPx = with(density) { LABEL_TEXT_SIZE.toPx() }
+        // The grid starts past the clue band plus the label strip on each axis.
+        val leftPx = bandPx + rowLabelPx
+        val topPx = bandPx + colLabelPx
+        val gridW = vpx - leftPx
+        val gridH = vpx - topPx // square canvas; grid area is the square minus bands
 
-        val transform = remember(cols, rows, puzzle.id, vpx) {
-            NonogramTransform(cols, rows, gridW, gridH, bandPx, bandPx, maxCellPx, autoCellPx, entryFloorPx)
+        val transform = remember(cols, rows, puzzle.id, vpx, showLabels) {
+            NonogramTransform(cols, rows, gridW, gridH, leftPx, topPx, maxCellPx, autoCellPx, entryFloorPx).also { t ->
+                lastTransform[0]?.let { prev -> if (prev.cols == cols && prev.rows == rows) t.adoptView(prev) }
+                lastTransform[0] = t
+            }
         }
         var version by remember(transform) { mutableStateOf(0) }
 
@@ -183,10 +214,14 @@ fun NonogramBoard(
             val panX = transform.panX
             val panY = transform.panY
 
-            // Backgrounds: bands, corner, grid.
-            drawRect(CORNER_BG, Offset(0f, 0f), Size(bandPx, bandPx))
-            drawRect(BAND_BG, Offset(bandPx, 0f), Size(gridW, bandPx))   // column-clue band
-            drawRect(BAND_BG, Offset(0f, bandPx), Size(bandPx, gridH))   // row-clue band
+            // Backgrounds: bands, corner, label strips, grid.
+            drawRect(CORNER_BG, Offset(0f, 0f), Size(leftPx, topPx))
+            drawRect(BAND_BG, Offset(leftPx, 0f), Size(gridW, bandPx))   // column-clue band
+            drawRect(BAND_BG, Offset(0f, topPx), Size(bandPx, gridH))    // row-clue band
+            if (showLabels) {
+                drawRect(LABEL_BG, Offset(leftPx, bandPx), Size(gridW, colLabelPx))
+                drawRect(LABEL_BG, Offset(bandPx, topPx), Size(rowLabelPx, gridH))
+            }
 
             // Live thumbnail of the filled cells in the static corner, mirroring the
             // web board's upper-left preview so the emerging picture is always visible
@@ -194,26 +229,40 @@ fun NonogramBoard(
             drawNonogramThumbnail(cols, rows, bandPx, valuesState.value)
 
             // --- Grid region (pans in both axes) ---
-            clipRect(left = bandPx, top = bandPx, right = vpx, bottom = vpx) {
-                translate(bandPx + panX, bandPx + panY) {
+            clipRect(left = leftPx, top = topPx, right = vpx, bottom = vpx) {
+                translate(leftPx + panX, topPx + panY) {
                     drawNonogramGrid(cols, rows, cell, valuesState.value, cellErrors, liveValidate)
                     drawHintGrid(cols, rows, cell, hintLines, hintCells)
                 }
             }
 
             // --- Column-clue band (pinned to top, pans horizontally) ---
-            clipRect(left = bandPx, top = 0f, right = vpx, bottom = bandPx) {
-                translate(bandPx + panX, 0f) {
+            clipRect(left = leftPx, top = 0f, right = vpx, bottom = bandPx) {
+                translate(leftPx + panX, 0f) {
                     for (line in hintLines) if (!line.isRow) drawRect(HINT_LINE_FILL, Offset(line.index * cell, 0f), Size(cell, bandPx))
-                    drawColClues(clues, cell, bandPx, colStatus, colClueErrors, liveValidate)
+                    drawColClues(clues, colWidths, cell, bandPx, colStatus, colClueErrors, liveValidate)
                 }
             }
 
             // --- Row-clue band (pinned to left, pans vertically) ---
-            clipRect(left = 0f, top = bandPx, right = bandPx, bottom = vpx) {
-                translate(0f, bandPx + panY) {
+            clipRect(left = 0f, top = topPx, right = bandPx, bottom = vpx) {
+                translate(0f, topPx + panY) {
                     for (line in hintLines) if (line.isRow) drawRect(HINT_LINE_FILL, Offset(0f, line.index * cell), Size(bandPx, cell))
-                    drawRowClues(clues, cell, bandPx, rowStatus, rowClueErrors, liveValidate)
+                    drawRowClues(clues, rowWidths, cell, bandPx, rowStatus, rowClueErrors, liveValidate)
+                }
+            }
+
+            // --- Line labels (pan with the grid along their own axis) ---
+            if (showLabels) {
+                clipRect(left = leftPx, top = bandPx, right = vpx, bottom = topPx) {
+                    translate(leftPx + panX, bandPx) {
+                        drawColLabels(cols, cell, colLabelPx, labelTextPx)
+                    }
+                }
+                clipRect(left = bandPx, top = topPx, right = leftPx, bottom = vpx) {
+                    translate(bandPx, topPx + panY) {
+                        drawRowLabels(rows, cell, rowLabelPx, labelTextPx)
+                    }
                 }
             }
         }
@@ -340,68 +389,95 @@ private fun DrawScope.drawNonogramThumbnail(
     drawRect(THUMB_BORDER, Offset(ox, oy), Size(thumbW, thumbH), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1f))
 }
 
-/** Row clues, right-aligned in the left band; row r's numbers sit at grid row r. */
+/**
+ * Row clues, right-aligned in the left band; row r's numbers sit at grid row r. Numbers
+ * are spaced by their measured widths plus a fixed gap ([NonogramClueLayout.row]), so
+ * runs of two-digit clues stay apart when a long line shrinks to fit the band.
+ */
 private fun DrawScope.drawRowClues(
     clues: NonogramEngine.Clues,
+    widths: List<FloatArray>,
     cell: Float,
     bandPx: Float,
     rowStatus: List<List<ClueStatus>>,
     rowClueErrors: Set<String>,
     liveValidate: Boolean,
 ) {
-    val baseTextSize = (cell * 0.5f).coerceIn(18f, 34f)
+    // Capped by the row height too, so zoomed-out rows don't overlap.
+    val maxSize = (cell * 0.5f).coerceIn(18f, 34f).coerceAtMost(cell * NonogramClueLayout.CROSS_FILL)
     for (r in 0 until clues.rows) {
         val clue = clues.rowClues[r]
         val yc = r * cell + cell / 2
-        // Right-align the run of numbers against the band's inner edge, shrinking the
-        // slot (and text) when the line is too long to fit the band at full size.
-        val n = clue.size
-        val slot = clueSlot(baseTextSize, n, bandPx)
-        val textSize = (slot / 1.15f).coerceAtMost(baseTextSize)
+        val layout = NonogramClueLayout.row(widths[r], maxSize, bandPx)
         for (i in clue.indices) {
-            val x = bandPx - (n - i - 0.5f) * slot
             val color = clueColor(rowStatus.getOrNull(r)?.getOrNull(i), rowClueErrors.contains("$r:$i"), liveValidate)
-            drawClueText(clue[i].toString(), x, yc, textSize, color)
+            drawClueText(clue[i].toString(), layout.centers[i], yc, layout.textSize, color)
         }
     }
 }
 
-/** Column clues, bottom-aligned in the top band; column c's numbers sit at grid col c. */
+/**
+ * Column clues, bottom-aligned in the top band; column c's numbers sit at grid col c,
+ * sized so a two-digit number fits its column's width ([NonogramClueLayout.col]).
+ */
 private fun DrawScope.drawColClues(
     clues: NonogramEngine.Clues,
+    widths: List<FloatArray>,
     cell: Float,
     bandPx: Float,
     colStatus: List<List<ClueStatus>>,
     colClueErrors: Set<String>,
     liveValidate: Boolean,
 ) {
-    val baseTextSize = (cell * 0.5f).coerceIn(18f, 34f)
+    val maxSize = (cell * 0.5f).coerceIn(18f, 34f)
     for (c in 0 until clues.cols) {
         val clue = clues.colClues[c]
         val xc = c * cell + cell / 2
-        val n = clue.size
-        val slot = clueSlot(baseTextSize, n, bandPx)
-        val textSize = (slot / 1.15f).coerceAtMost(baseTextSize)
+        val layout = NonogramClueLayout.col(widths[c], maxSize, cell, bandPx)
         for (i in clue.indices) {
-            val y = bandPx - (n - i - 0.5f) * slot
             val color = clueColor(colStatus.getOrNull(c)?.getOrNull(i), colClueErrors.contains("$c:$i"), liveValidate)
-            drawClueText(clue[i].toString(), xc, y, textSize, color)
+            drawClueText(clue[i].toString(), xc, layout.centers[i], layout.textSize, color)
         }
     }
 }
 
 /**
- * Per-number slot (center-to-center spacing) for a clue line of [n] numbers. Uses the
- * full-size slot when the line fits in [bandPx], otherwise divides the band evenly so
- * every number is shown — the text shrinks to match. A small margin keeps the first
- * number off the band's outer edge. This is what lets lines of any length stay visible.
+ * Column numbers in the strip above the grid (grid-local x), one centered on every
+ * 5th line — or 10th, 20th, ... when zoomed out too far for them to fit 5 apart.
  */
-private fun clueSlot(baseTextSize: Float, n: Int, bandPx: Float): Float {
-    val fullSlot = baseTextSize * 1.15f
-    if (n <= 0) return fullSlot
-    val usable = bandPx * 0.94f
-    return minOf(fullSlot, usable / n)
+private fun DrawScope.drawColLabels(cols: Int, cell: Float, stripPx: Float, textPx: Float) {
+    val size = textPx.coerceAtMost(stripPx * 0.8f)
+    val extent = textWidthEm(cols.toString()) * size
+    val step = NonogramClueLayout.labelStep(cell, extent)
+    for (line in NonogramClueLayout.labelLines(cols, step)) {
+        val x = NonogramClueLayout.labelCenter(line, cell, cols, extent)
+        drawClueText(line.toString(), x, stripPx / 2, size, LABEL_TEXT)
+    }
 }
+
+/** Row numbers in the strip left of the grid (grid-local y), as [drawColLabels]. */
+private fun DrawScope.drawRowLabels(rows: Int, cell: Float, stripPx: Float, textPx: Float) {
+    // Shrink to fit the strip's width when the numbers run to three digits.
+    val size = minOf(textPx, stripPx * 0.88f / textWidthEm(rows.toString()))
+    val extent = size // a number's height is about its text size
+    val step = NonogramClueLayout.labelStep(cell, extent)
+    for (line in NonogramClueLayout.labelLines(rows, step)) {
+        val y = NonogramClueLayout.labelCenter(line, cell, rows, extent)
+        drawClueText(line.toString(), stripPx / 2, y, size, LABEL_TEXT)
+    }
+}
+
+/** Paint used only to measure clue widths (bold, like the drawn clues). */
+private val measurePaint by lazy {
+    android.graphics.Paint().apply {
+        textSize = 100f
+        isAntiAlias = true
+        typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+    }
+}
+
+/** [text]'s advance width at text size 1, in the clue font. */
+private fun textWidthEm(text: String): Float = measurePaint.measureText(text) / 100f
 
 private fun clueColor(status: ClueStatus?, isError: Boolean, liveValidate: Boolean): Color = when {
     status == ClueStatus.SATISFIED -> CLUE_SATISFIED

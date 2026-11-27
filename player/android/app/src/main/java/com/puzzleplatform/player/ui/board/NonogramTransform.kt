@@ -50,6 +50,17 @@ class NonogramTransform(
         panY = BoardTransform.clampAxis(0f, rows * cellPx, gridH)
     }
 
+    /**
+     * Take over [other]'s zoom and scroll position (e.g. when the line labels are
+     * toggled and the grid area changes size), clamped to this transform's limits, so
+     * the player stays where they were instead of snapping back to the start.
+     */
+    fun adoptView(other: NonogramTransform) {
+        cellPx = other.cellPx.coerceIn(minCell, maxCell)
+        panX = BoardTransform.clampAxis(other.panX, cols * cellPx, gridW)
+        panY = BoardTransform.clampAxis(other.panY, rows * cellPx, gridH)
+    }
+
     /** True when there's a real zoom range (a board that fits at max cell has none). */
     val zoomable: Boolean get() = maxCell - minCell > 0.5f
 

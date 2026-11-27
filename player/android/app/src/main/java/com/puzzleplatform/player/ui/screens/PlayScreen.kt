@@ -79,6 +79,7 @@ import com.puzzleplatform.player.ui.board.LitsBoard
 import com.puzzleplatform.player.ui.board.MasyuBoard
 import com.puzzleplatform.player.ui.board.NonogramBoard
 import com.puzzleplatform.player.ui.board.NonogramMode
+import com.puzzleplatform.player.ui.board.nonogramLabelsDefault
 import com.puzzleplatform.player.ui.board.NumberLinkBoard
 import com.puzzleplatform.player.ui.board.NurikabeBoard
 import com.puzzleplatform.player.ui.board.SinkaminoBoard
@@ -588,6 +589,11 @@ fun PlayScreen(
                                 )
                                 6 -> {
                                     var nonogramMode by remember(puzzle.id) { mutableStateOf(NonogramMode.FILL) }
+                                    // Row/column numbers at the thick lines: on by default for big boards.
+                                    var nonogramLabels by remember(puzzle.id) {
+                                        val clues = NonogramEngine.parseClues(puzzle)
+                                        mutableStateOf(nonogramLabelsDefault(clues.rows, clues.cols))
+                                    }
                                     val lines = state.hint as? HintView.Lines
                                     NonogramBoard(
                                         puzzle = puzzle,
@@ -602,6 +608,7 @@ fun PlayScreen(
                                             emptyMap()
                                         },
                                         onSetCell = vm::setCellState,
+                                        showLabels = nonogramLabels,
                                     )
                                     // Fill / cross paint-mode toggle (touch has no right-click), kept
                                     // next to the board where paint-mode switching happens.
@@ -615,6 +622,11 @@ fun PlayScreen(
                                             selected = nonogramMode == NonogramMode.CROSS,
                                             onClick = { nonogramMode = NonogramMode.CROSS },
                                             label = { Text("✕ Cross") },
+                                        )
+                                        FilterChip(
+                                            selected = nonogramLabels,
+                                            onClick = { nonogramLabels = !nonogramLabels },
+                                            label = { Text("# Labels") },
                                         )
                                     }
                                     HintControls(
