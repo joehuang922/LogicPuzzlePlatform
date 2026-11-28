@@ -7,6 +7,11 @@ import { cardStyle, fieldStyle, inputStyle, errorStyle } from "../styles/admin";
 import { DIFFICULTY_OPTIONS } from "../constants";
 import CanonPreview from "./CanonPreview";
 import PuzzleEditorModal, { hasVisualEditor } from "./PuzzleEditorModal";
+import NonogramParseCheck, { checkMarks } from "./NonogramParseCheck";
+import { NonogramCheck, asNonogramCanon, checkParsedNonogram } from "../utils/parsedNonogramRepair";
+
+/** Puzzle type id of Nonogram, whose parse gets the clue self-check. */
+const NONOGRAM_TYPE = 6;
 
 const MAX_IMAGES = 50;
 const PARSE_CONCURRENCY = 3;
@@ -35,6 +40,8 @@ interface BatchItem {
   // The admin overrode that timeout: the next "Create All" sends allowUnverified.
   // Cleared by a canon edit, so changed clues get checked again.
   allowUnverified?: boolean;
+  // Nonogram: the parse self-check (misread clues found and fixed by line logic).
+  nonogramCheck?: NonogramCheck | null;
 }
 
 function computeDimensions(typeId: number, canon: Record<string, unknown>): { w?: number; h?: number } {
@@ -90,6 +97,8 @@ function BatchItemRow({
   onToggleEditor,
   onOverrideGate,
   overrideDisabled,
+  onCheckChange,
+  onRecheck,
 }: {
   item: BatchItem;
   puzzleType: number;
@@ -104,6 +113,8 @@ function BatchItemRow({
   onToggleEditor: () => void;
   onOverrideGate: () => void;
   overrideDisabled: boolean;
+  onCheckChange: (check: NonogramCheck | null) => void;
+  onRecheck: (json: string) => void;
 }) {
   const typeName = puzzleTypes.find((pt) => pt.id === puzzleType)?.name;
   const hasEditor = hasVisualEditor(typeName);
@@ -220,9 +231,26 @@ function BatchItemRow({
         </div>
       )}
 
+      {item.status === "success" && item.canonRepr && puzzleType === NONOGRAM_TYPE && item.nonogramCheck && (
+        <div style={{ marginTop: "0.5rem", marginLeft: 80 }}>
+          <NonogramParseCheck
+            check={item.nonogramCheck}
+            canonRepr={item.canonRepr}
+            onCanonChange={onCanonChange}
+            onCheckChange={onCheckChange}
+            onRecheck={onRecheck}
+            compact
+          />
+        </div>
+      )}
+
       {item.status === "success" && !item.editorOpen && item.canonRepr && (
         <div style={{ marginTop: "0.5rem", marginLeft: 80 }}>
-          <CanonPreview puzzleType={puzzleType} canonRepr={item.canonRepr} />
+          <CanonPreview
+            puzzleType={puzzleType}
+            canonRepr={item.canonRepr}
+            nonogramMarks={puzzleType === NONOGRAM_TYPE ? checkMarks(item.nonogramCheck ?? null) : undefined}
+          />
         </div>
       )}
 
@@ -283,6 +311,38 @@ export default function BatchUploadForm({
 
   function updateItem(id: string, patch: Partial<BatchItem>) {
     setItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+  }
+
+  // Each item's latest check, so a superseded one (a recheck, a retry) is dropped.
+  const checkSeq = useRef(new Map<string, number>());
+
+  /** Nonogram parse self-check for one item; its fixes apply only if the clues are unchanged since. */
+  async function checkItem(itemId: string, json: string) {
+    let canon = null;
+    try {
+      canon = asNonogramCanon(JSON.parse(json));
+    } catch {
+      canon = null;
+    }
+    if (!canon) return;
+    const seq = (checkSeq.current.get(itemId) ?? 0) + 1;
+    checkSeq.current.set(itemId, seq);
+    const current = () => checkSeq.current.get(itemId) === seq;
+    updateItem(itemId, { nonogramCheck: { kind: "running", progress: "" } });
+    const out = await checkParsedNonogram(canon, (progress) => {
+      if (current()) updateItem(itemId, { nonogramCheck: { kind: "running", progress } });
+    });
+    if (!current()) return;
+    setItems((prev) => prev.map((item) => {
+      if (item.id !== itemId) return item;
+      if (item.canonRepr !== json) return { ...item, nonogramCheck: null };
+      return {
+        ...item,
+        canonRepr: out.check.kind === "fixed" ? JSON.stringify(out.canon, null, 2) : item.canonRepr,
+        nonogramCheck: out.check,
+        allowUnverified: out.check.kind === "fixed" ? false : item.allowUnverified,
+      };
+    }));
   }
 
   async function handleZipUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -396,16 +456,19 @@ export default function BatchUploadForm({
 
       // Pre-fill title/author/difficulty from the scan, but never overwrite what the
       // admin entered. An unreadable difficulty keeps the batch default.
+      const parsedJson = JSON.stringify(res.canon, null, 2);
       setItems((prev) => prev.map((item) => item.id === itemId ? {
         ...item,
         status: "success",
-        canonRepr: JSON.stringify(res.canon, null, 2),
+        canonRepr: parsedJson,
+        nonogramCheck: null,
         dataUrl,
         error: undefined,
         title: item.title || res.metadata?.title || "",
         author: item.author || res.metadata?.author || "",
         difficulty: !item.difficultyEdited && res.metadata?.difficulty ? res.metadata.difficulty : item.difficulty,
       } : item));
+      if (Number(puzzleType) === NONOGRAM_TYPE) void checkItem(itemId, parsedJson);
     } catch (err: unknown) {
       updateItem(itemId, {
         status: "error",
@@ -613,6 +676,8 @@ export default function BatchUploadForm({
                 onDifficultyChange={(d) => updateItem(item.id, { difficulty: d, difficultyEdited: true })}
                 onCanonChange={(json) => updateItem(item.id, { canonRepr: json, allowUnverified: false })}
                 onToggleEditor={() => updateItem(item.id, { editorOpen: !item.editorOpen })}
+                onCheckChange={(check) => updateItem(item.id, { nonogramCheck: check })}
+                onRecheck={(json) => void checkItem(item.id, json)}
               />
             ))}
           </div>

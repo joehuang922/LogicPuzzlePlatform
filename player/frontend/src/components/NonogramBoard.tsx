@@ -14,6 +14,9 @@ interface NonogramBoardProps {
   // The gate-computed solution grid (0/1), when stored. Backs the "reveal" hint
   // fallback and the check that a hint doesn't build on a mistaken mark.
   solution?: number[][] | null;
+  // Lines to tint across clue and grid, e.g. the parse check's fixed (green) and
+  // suspect (amber) lines on an authoring preview.
+  markedLines?: { axis: "row" | "col"; index: number; color: string }[];
 }
 
 // The hint affordance's view model: a step (with its settled cells shown or not), or a
@@ -89,6 +92,7 @@ export default function NonogramBoard({
   readonly,
   liveValidate,
   solution,
+  markedLines,
 }: NonogramBoardProps) {
   const { rowClues, colClues } = canon;
   const rows = rowClues.length;
@@ -524,6 +528,17 @@ export default function NonogramBoard({
   // Hint highlights: the focus lines (clue + grid, like the hover band), and the settled
   // cells once the player asks to see them.
   const hintMarks: JSX.Element[] = [];
+  for (const { axis, index, color } of markedLines ?? []) {
+    hintMarks.push(
+      axis === "row" ? (
+        <rect key={`mark-row-${index}`} x={PAD} y={gridY + index * CELL_SIZE} width={clueAreaWidth + gridWidth}
+          height={CELL_SIZE} fill={color} opacity={0.3} stroke={color} strokeWidth={1.5} pointerEvents="none" />
+      ) : (
+        <rect key={`mark-col-${index}`} x={gridX + index * CELL_SIZE} y={PAD} width={CELL_SIZE}
+          height={clueAreaHeight + gridHeight} fill={color} opacity={0.3} stroke={color} strokeWidth={1.5} pointerEvents="none" />
+      )
+    );
+  }
   if (hint?.kind === "step") {
     for (const { axis, index } of hint.step.focusLines ?? []) {
       hintMarks.push(

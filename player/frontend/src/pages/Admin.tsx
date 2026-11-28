@@ -21,6 +21,9 @@ import {
 } from "../api/client";
 import PuzzleEditorModal, { hasVisualEditor } from "../components/PuzzleEditorModal";
 import CanonPreview from "../components/CanonPreview";
+import NonogramParseCheck, { checkMarks } from "../components/NonogramParseCheck";
+import { NonogramCheck, asNonogramCanon, checkParsedNonogram } from "../utils/parsedNonogramRepair";
+import { NonogramCanon } from "../types/canon";
 import BatchUploadForm from "../components/BatchUploadForm";
 import OverrideGateButton from "../components/OverrideGateButton";
 import { extractBase64 } from "../utils/image";
@@ -28,6 +31,9 @@ import { normalizeTitles, patternError, suggestPattern, TitleChange } from "../u
 import { runLimited, withRetry } from "../utils/runLimited";
 import { cardStyle, fieldStyle, inputStyle, errorStyle } from "../styles/admin";
 import { DIFFICULTY_OPTIONS, DIFFICULTY_LABELS } from "../constants";
+
+/** Puzzle type id of Nonogram, whose parse gets the clue self-check. */
+const NONOGRAM_TYPE = 6;
 
 /** Cover image: a URL to paste, or a file upload that fills the URL in, plus a preview. */
 function CoverField({ value, onChange }: { value: string; onChange: (url: string) => void }) {
@@ -411,6 +417,34 @@ function QuestionForm({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [editorOpen, setEditorOpen] = useState(false);
 
+  // Nonogram: the parse self-check (misread clues found and fixed by line logic).
+  const [nonogramCheck, setNonogramCheck] = useState<NonogramCheck | null>(null);
+  const canonRef = useRef(canonRepr);
+  canonRef.current = canonRepr;
+  const checkSeq = useRef(0);
+  async function runNonogramCheck(json: string) {
+    let canon: NonogramCanon | null = null;
+    try {
+      canon = asNonogramCanon(JSON.parse(json));
+    } catch {
+      canon = null;
+    }
+    if (!canon) return;
+    const seq = ++checkSeq.current;
+    setNonogramCheck({ kind: "running", progress: "" });
+    const out = await checkParsedNonogram(canon, (progress) => {
+      if (seq === checkSeq.current) setNonogramCheck({ kind: "running", progress });
+    });
+    if (seq !== checkSeq.current) return;
+    // Edited while the check ran: its fixes are for clues no longer there.
+    if (canonRef.current !== json) {
+      setNonogramCheck(null);
+      return;
+    }
+    if (out.check.kind === "fixed") setCanonRepr(JSON.stringify(out.canon, null, 2));
+    setNonogramCheck(out.check);
+  }
+
   const selectedTypeName = puzzleTypes.find((pt) => String(pt.id) === puzzleType)?.name;
   const hasEditor = hasVisualEditor(selectedTypeName);
 
@@ -555,6 +589,7 @@ function QuestionForm({
       setTitle("");
       setAuthor("");
       setCanonRepr("");
+      setNonogramCheck(null);
       setImagePreview(null);
       setSpecial(false);
       setErrors({});
@@ -585,7 +620,11 @@ function QuestionForm({
       try {
         const base64 = extractBase64(dataUrl);
         const res = await parseImage(base64, Number(puzzleType));
-        setCanonRepr(JSON.stringify(res.canon, null, 2));
+        const parsedJson = JSON.stringify(res.canon, null, 2);
+        setCanonRepr(parsedJson);
+        checkSeq.current++;
+        setNonogramCheck(null);
+        if (Number(puzzleType) === NONOGRAM_TYPE) void runNonogramCheck(parsedJson);
         // Pre-fill from the scan, but never overwrite what the admin typed.
         setTitle((t) => t || res.metadata?.title || "");
         setAuthor((a) => a || res.metadata?.author || "");
@@ -732,7 +771,22 @@ function QuestionForm({
         {showPreview && (
           <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: "1rem" }}>
             <label style={{ fontWeight: "bold", marginBottom: "0.5rem", display: "block" }}>Preview</label>
-            <CanonPreview puzzleType={Number(puzzleType)} canonRepr={canonRepr} />
+            {Number(puzzleType) === NONOGRAM_TYPE && nonogramCheck && (
+              <div style={{ marginBottom: "0.75rem" }}>
+                <NonogramParseCheck
+                  check={nonogramCheck}
+                  canonRepr={canonRepr}
+                  onCanonChange={setCanonRepr}
+                  onCheckChange={setNonogramCheck}
+                  onRecheck={(json) => void runNonogramCheck(json)}
+                />
+              </div>
+            )}
+            <CanonPreview
+              puzzleType={Number(puzzleType)}
+              canonRepr={canonRepr}
+              nonogramMarks={Number(puzzleType) === NONOGRAM_TYPE ? checkMarks(nonogramCheck) : undefined}
+            />
           </div>
         )}
 

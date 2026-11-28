@@ -440,8 +440,24 @@ function lineRuns(grid: Int8Array, id: LineId, R: number, C: number): number[] |
   return runs;
 }
 
+/** Most lines a board may have for the two-line search to try every pair. */
+const PAIR_SEARCH_ALL_LINES = 100;
+
 const lineIds = (n: number, p: "r" | "c") => Array.from({ length: n }, (_, i) => `${p}${i}` as LineId);
 const pause = () => new Promise((r) => setTimeout(r, 0));
+
+export interface RepairOptions {
+  /**
+   * The board was read once (a parsed regular nonogram), with no second
+   * readings or doubts. Skips reading set-aside lines off the picture the
+   * others draw (step 2): with nothing to say which line is doubtful, it
+   * "clears" a contradiction as readily by redrawing an innocent line around
+   * the misread one, and stops at the first redraw that solves. The suspect
+   * search (steps 3-5) weighs every likely misreading instead, and stops for
+   * a person when more than one solves.
+   */
+  singleReading?: boolean;
+}
 
 /**
  * Repair the clue set: settle lines the strips disagree on, then find and fix
@@ -453,6 +469,7 @@ export async function autoRepair(
   cols: RepairLine[],
   onProgress?: (what: string) => void,
   budgetMs = 60_000,
+  options: RepairOptions = {},
 ): Promise<RepairResult> {
   const R = rows.length, C = cols.length;
   const get = (id: LineId) => (id[0] === "r" ? rows : cols)[Number(id.slice(1))];
@@ -555,7 +572,7 @@ export async function autoRepair(
   // agrees with, and read the others off the picture the clean lines draw.
   // Kept only if the result solves the whole board.
   let stuckHere: { open: LineId[]; grid: Int8Array; fixes: Fix[] } | null = null;
-  if (base.contradiction || totalsGap !== 0) {
+  if ((base.contradiction || totalsGap !== 0) && !options.singleReading) {
     const aside = new Set(editable.filter((id) => get(id).doubtful || conflicts.includes(id)));
     if (aside.size <= 0.3 * ids.length) {
       onProgress?.(`solving without the ${aside.size} doubtful lines…`);
@@ -667,7 +684,10 @@ export async function autoRepair(
   if (base.contradiction) {
     suspects = await findSuspects(rc0, cc0, (d, t) => onProgress?.(`looking for the misread line… ${d}/${t}`), editable);
   } else {
-    suspects = editable.filter((id) => get(id).doubtful); // totals off, but nothing contradicts yet
+    // Totals off, but nothing contradicts yet: the doubtful lines, or with no
+    // doubts to go on (a board read once), every line.
+    suspects = editable.filter((id) => get(id).doubtful);
+    if (!suspects.length && options.singleReading) suspects = editable;
   }
 
   // 4. One line wrong: try its likely readings, with the totals' change.
@@ -692,8 +712,11 @@ export async function autoRepair(
   if (clean.length > 1)
     return { kind: "stuck", fixes: [], reason: "several fixes clear the contradiction: pick the one the scan shows", suspects, options: clean.map((c) => c.fix), grid: base.grid };
 
-  // 5. Two lines wrong: pairs of doubtful lines whose removal clears it.
-  const doubtful = editable.filter((id) => get(id).doubtful).slice(0, 40);
+  // 5. Two lines wrong: pairs of doubtful lines whose removal clears it. A
+  // board read in one pass (a parsed regular nonogram) has no doubts to go
+  // on: on a board of up to PAIR_SEARCH_ALL_LINES lines, try every pair.
+  const flagged = editable.filter((id) => get(id).doubtful);
+  const doubtful = flagged.length ? flagged.slice(0, 40) : ids.length <= PAIR_SEARCH_ALL_LINES ? editable : [];
   const started = Date.now();
   const pairFixes: Fix[][] = [];
   outer: for (let a = 0; a < doubtful.length; a++) {
@@ -735,7 +758,9 @@ export async function autoRepair(
       ? "more than one pair of fixes lets the board solve: pick what the scan shows"
       : suspects.length
         ? `no likely misreading of ${suspects.slice(0, 4).map(lineLabel).join(", ")} lets the board solve: read the scan and type the clues`
-        : "the clues contradict each other and no one or two doubtful lines explain it: check the lines marked doubtful",
+        : flagged.length || ids.length > PAIR_SEARCH_ALL_LINES
+          ? "the clues contradict each other and no one or two doubtful lines explain it: check the lines marked doubtful"
+          : "the clues contradict each other and no likely misreading of one or two lines explains it: check the scan",
     suspects,
     options: pairFixes.flat(),
     grid: base.grid,

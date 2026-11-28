@@ -50,7 +50,16 @@ import MelonPieBoard from "./MelonPieBoard";
 import TetroChainKBoard from "./TetroChainKBoard";
 import { NurimazeCanon, DoubleChocoCanon, SlitherlinkCanon, NonogramCanon, MasyuCanon, PencilsCanon, NuritwinCanon, SlalomCanon, ShakashakaCanon, KakuroCanon, YajilinCanon, FillominoCanon, LitsCanon, ChocoBananaCanon, NumberLinkCanon, AkariCanon, HellGolfCanon, TentaishowCanon, HeyawakeCanon, ShikakuCanon, NorinoriCanon, NurikabeCanon, RippleEffectCanon, HitoriCanon, PictoLinkCanon, KuralinCanon, UnequalSudokuCanon, CornerChainCanon, SinkaminoCanon, BalanceLinkCanon, LRingCanon, PerfectLRingCanon, MannequinGate2Canon, HashiCanon, SkeletonPuzzleCanon, ZebraRopeCanon, WhimsicalKnightCanon, OminoTreeCanon, MinusRoomCanon, TilePaintCanon, CountryRoadCanon, PicturesqueMazeCanon, IrregularNonogramCanon, YajilixCanon, MajorityYajilixCanon, HalfFullPaintCanon, MelonPieCanon, TetroChainKCanon } from "../types/canon";
 
-export default function CanonPreview({ puzzleType, canonRepr }: { puzzleType: number; canonRepr: string }) {
+export default function CanonPreview({
+  puzzleType,
+  canonRepr,
+  nonogramMarks,
+}: {
+  puzzleType: number;
+  canonRepr: string;
+  /** Nonogram only: lines to tint (the parse check's fixed and suspect lines). */
+  nonogramMarks?: { axis: "row" | "col"; index: number; color: string }[];
+}) {
   let parsed: Record<string, unknown>;
   try {
     parsed = JSON.parse(canonRepr);
@@ -80,7 +89,7 @@ export default function CanonPreview({ puzzleType, canonRepr }: { puzzleType: nu
     return <SlitherlinkBoard canon={parsed as unknown as SlitherlinkCanon} readonly />;
   }
   if (puzzleType === 6 && parsed.rowClues && parsed.colClues) {
-    return <NonogramBoard canon={parsed as unknown as NonogramCanon} readonly />;
+    return <NonogramBoard canon={parsed as unknown as NonogramCanon} readonly markedLines={nonogramMarks} />;
   }
   if (puzzleType === 7 && parsed.cells) {
     return <MasyuBoard canon={parsed as unknown as MasyuCanon} readonly />;
