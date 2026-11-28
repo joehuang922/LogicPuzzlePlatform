@@ -117,6 +117,10 @@ fun NonogramBoard(
     // Row/column coordinates at every 5th (thick) line, counted from both ends, in
     // strips along the grid's right and bottom edges.
     showCoordinates: Boolean = false,
+    // The clue line shown in full in the readout below the board, tinted like a hint
+    // line; a tap on a clue band reports its line through [onTapClue].
+    selectedClue: NonogramHinter.Line? = null,
+    onTapClue: (NonogramHinter.Line) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val clues = remember(puzzle.id) { NonogramEngine.parseClues(puzzle) }
@@ -140,6 +144,9 @@ fun NonogramBoard(
 
     val valuesState = rememberUpdatedState(userValues)
     val onSet = rememberUpdatedState(onSetCell)
+    val onClue = rememberUpdatedState(onTapClue)
+    // Lines tinted across band and grid: the hint's focus lines and the selected clue.
+    val litLines = hintLines + listOfNotNull(selectedClue)
     val modeState = rememberUpdatedState(mode)
 
     val density = LocalDensity.current
@@ -205,8 +212,20 @@ fun NonogramBoard(
                     transformEnabled = transform.zoomable,
                     drawEnabled = true,
                     onTap = { off ->
-                        transform.cellAt(off.x, off.y)?.let { (c, r) ->
-                            drag.paintSingle(c, r, modeState.value, valuesState.value) { col, row, st -> onSet.value(col, row, st) }
+                        val cell = transform.cellPx
+                        when {
+                            // A tap on a clue band picks that line for the readout.
+                            off.x < bandPx && off.y >= bandPx && off.y < gridBottom -> {
+                                val r = ((off.y - bandPx - transform.panY) / cell).toInt()
+                                if (r in 0 until rows && off.y - bandPx - transform.panY >= 0f) onClue.value(NonogramHinter.Line(true, r))
+                            }
+                            off.y < bandPx && off.x >= bandPx && off.x < gridRight -> {
+                                val c = ((off.x - bandPx - transform.panX) / cell).toInt()
+                                if (c in 0 until cols && off.x - bandPx - transform.panX >= 0f) onClue.value(NonogramHinter.Line(false, c))
+                            }
+                            else -> transform.cellAt(off.x, off.y)?.let { (c, r) ->
+                                drag.paintSingle(c, r, modeState.value, valuesState.value) { col, row, st -> onSet.value(col, row, st) }
+                            }
                         }
                     },
                     onDragStart = { off ->
@@ -271,14 +290,14 @@ fun NonogramBoard(
             clipRect(left = bandPx, top = bandPx, right = gridRight, bottom = gridBottom) {
                 translate(bandPx + panX, bandPx + panY) {
                     drawNonogramGrid(cols, rows, cell, valuesState.value, cellErrors, liveValidate)
-                    drawHintGrid(cols, rows, cell, hintLines, hintCells)
+                    drawHintGrid(cols, rows, cell, litLines, hintCells)
                 }
             }
 
             // --- Column-clue band (pinned to top, pans horizontally) ---
             clipRect(left = bandPx, top = 0f, right = gridRight, bottom = bandPx) {
                 translate(bandPx + panX, 0f) {
-                    for (line in hintLines) if (!line.isRow) drawRect(HINT_LINE_FILL, Offset(line.index * cell, 0f), Size(cell, bandPx))
+                    for (line in litLines) if (!line.isRow) drawRect(HINT_LINE_FILL, Offset(line.index * cell, 0f), Size(cell, bandPx))
                     clueScroll.maxCol = drawColClues(clues, colWidths, cell, bandPx, minCluePx, clueScroll.col, colStatus, colClueErrors, liveValidate)
                     clueScroll.col = clueScroll.col.coerceIn(0f, clueScroll.maxCol)
                 }
@@ -287,7 +306,7 @@ fun NonogramBoard(
             // --- Row-clue band (pinned to left, pans vertically) ---
             clipRect(left = 0f, top = bandPx, right = bandPx, bottom = gridBottom) {
                 translate(0f, bandPx + panY) {
-                    for (line in hintLines) if (line.isRow) drawRect(HINT_LINE_FILL, Offset(0f, line.index * cell), Size(bandPx, cell))
+                    for (line in litLines) if (line.isRow) drawRect(HINT_LINE_FILL, Offset(0f, line.index * cell), Size(bandPx, cell))
                     clueScroll.maxRow = drawRowClues(clues, rowWidths, cell, bandPx, minCluePx, clueScroll.row, rowStatus, rowClueErrors, liveValidate)
                     clueScroll.row = clueScroll.row.coerceIn(0f, clueScroll.maxRow)
                 }
@@ -583,6 +602,27 @@ private val measurePaint by lazy {
 
 /** [text]'s advance width at text size 1, in the clue font. */
 private fun textWidthEm(text: String): Float = measurePaint.measureText(text) / 100f
+
+/** How a clue number reads: still to place, satisfied (greyed), or in error (red). */
+enum class ClueTone { NORMAL, SATISFIED, ERROR }
+
+/**
+ * The tone of each number of one clue line, as its band draws it: satisfied always,
+ * errors only with [liveValidate] on. Feeds the readout below the board.
+ */
+fun nonogramClueTones(puzzle: Puzzle, values: Map<String, Int>, liveValidate: Boolean, line: NonogramHinter.Line): List<ClueTone> {
+    val status = if (line.isRow) NonogramEngine.rowClueStatus(puzzle, values, line.index)
+    else NonogramEngine.colClueStatus(puzzle, values, line.index)
+    val analysis = if (liveValidate) NonogramEngine.analyze(puzzle, values) else null
+    val errors = (if (line.isRow) analysis?.rowClueErrors else analysis?.colClueErrors) ?: emptySet()
+    return status.mapIndexed { i, st ->
+        when {
+            st == ClueStatus.SATISFIED -> ClueTone.SATISFIED
+            (st == ClueStatus.ERROR || errors.contains("${line.index}:$i")) && liveValidate -> ClueTone.ERROR
+            else -> ClueTone.NORMAL
+        }
+    }
+}
 
 private fun clueColor(status: ClueStatus?, isError: Boolean, liveValidate: Boolean): Color = when {
     status == ClueStatus.SATISFIED -> CLUE_SATISFIED

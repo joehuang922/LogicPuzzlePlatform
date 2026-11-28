@@ -40,6 +40,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -79,6 +80,7 @@ import com.puzzleplatform.player.ui.board.LitsBoard
 import com.puzzleplatform.player.ui.board.MasyuBoard
 import com.puzzleplatform.player.ui.board.NonogramBoard
 import com.puzzleplatform.player.ui.board.NonogramMode
+import com.puzzleplatform.player.ui.board.NonogramClueReadout
 import com.puzzleplatform.player.ui.board.nonogramCoordinatesDefault
 import com.puzzleplatform.player.ui.board.NumberLinkBoard
 import com.puzzleplatform.player.ui.board.NurikabeBoard
@@ -124,6 +126,9 @@ import com.puzzleplatform.player.puzzle.PuzzleEngines
 import com.puzzleplatform.player.puzzle.SudokuEngine
 import com.puzzleplatform.player.puzzle.SudokuHinter
 import com.puzzleplatform.player.ui.formatElapsed
+
+/** True inside the landscape (two-pane) layout, where pieces like the clue readout move to the header pane. */
+private val LocalLandscapePlay = compositionLocalOf { false }
 
 /** Narrowest the header pane gets in landscape (two-pane) layout. */
 private val LANDSCAPE_HEADER_MIN = 260.dp
@@ -239,6 +244,20 @@ fun PlayScreen(
                             NonogramEngine.parseClues(puzzle).let { nonogramCoordinatesDefault(it.rows, it.cols) },
                     )
                 }
+                // Nonogram: the clue line tapped on a band, shown whole in a readout under
+                // the board (in landscape, at the foot of the header pane, where there's room).
+                var nonogramClue by remember(puzzle.id) { mutableStateOf<NonogramHinter.Line?>(null) }
+                val clueReadout: @Composable () -> Unit = {
+                    nonogramClue?.let { line ->
+                        NonogramClueReadout(
+                            puzzle = puzzle,
+                            userValues = state.userValues,
+                            liveValidate = state.liveValidate,
+                            line = line,
+                            onClose = { nonogramClue = null },
+                        )
+                    }
+                }
                 // The play screen is the header (info, timer, actions, progress,
                 // undo/redo) and the board. Portrait stacks them in one scroll; landscape
                 // (wider than tall) puts the header in a left pane and the board in a
@@ -339,6 +358,8 @@ fun PlayScreen(
                             modifier = Modifier.align(Alignment.CenterVertically),
                         )
                     }
+
+                    if (LocalLandscapePlay.current && puzzle.puzzleType == 6) clueReadout()
                 }
 
                 val board: @Composable () -> Unit = {
@@ -616,7 +637,11 @@ fun PlayScreen(
                                         },
                                         onSetCell = vm::setCellState,
                                         showCoordinates = nonogramCoordinates,
+                                        selectedClue = nonogramClue,
+                                        // Tapping the shown clue again closes it.
+                                        onTapClue = { nonogramClue = if (nonogramClue == it) null else it },
                                     )
+                                    if (!LocalLandscapePlay.current) clueReadout()
                                     // Fill / cross paint-mode toggle (touch has no right-click), kept
                                     // next to the board where paint-mode switching happens.
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -808,6 +833,7 @@ fun PlayScreen(
                         val boardPaneWidth = maxOf(maxWidth - LANDSCAPE_HEADER_MIN, maxWidth * 0.5f)
                         val side = minOf(fullHeight - 16.dp, boardPaneWidth - LANDSCAPE_GUTTER * 2)
                         Row(Modifier.fillMaxSize()) {
+                          CompositionLocalProvider(LocalLandscapePlay provides true) {
                             Column(
                                 Modifier
                                     .weight(1f)
@@ -826,6 +852,7 @@ fun PlayScreen(
                             ) {
                                 CompositionLocalProvider(LocalBoardMaxSide provides side) { board() }
                             }
+                          }
                         }
                     } else {
                         Column(
