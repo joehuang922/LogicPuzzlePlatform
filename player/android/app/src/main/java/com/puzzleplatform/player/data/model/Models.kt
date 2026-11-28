@@ -415,10 +415,20 @@ data class Mission(
     @Serializable(with = FlexibleBooleanSerializer::class)
     val completed: Boolean = false,
     val completedAt: String? = null,
+    /** This mission was refreshed (the period's one refresh). */
+    @Serializable(with = FlexibleBooleanSerializer::class)
+    val refreshed: Boolean = false,
+    /** Changeable (a type or an assigned puzzle), open, and the period's refresh unused. */
+    @Serializable(with = FlexibleBooleanSerializer::class)
+    val refreshable: Boolean = false,
 )
 
 @Serializable
 data class MissionsResponse(val missions: List<Mission> = emptyList())
+
+/** POST /profile/missions/refresh: swap one mission for another, once per period. */
+@Serializable
+data class RefreshMissionRequest(val player: Int, val missionId: Int, val tz: String)
 
 @Serializable
 data class ProfilePlayer(val id: Int, val name: String)

@@ -39,8 +39,10 @@ data class ProfileUiState(
     /** null while loading; missions load on their own so a failure doesn't hide the profile. */
     val missions: List<Mission>? = null,
     val missionsError: String? = null,
-    /** Set when an assigned mission puzzle couldn't be opened. */
+    /** Set when an assigned mission puzzle couldn't be opened, or a refresh failed. */
     val openError: String? = null,
+    /** The mission whose refresh is in flight. */
+    val refreshingMissionId: Int? = null,
     val syncState: SyncState = SyncState(),
     /** Activity heat map: date -> puzzle type id -> solves; null until loaded. */
     val historyDays: Map<LocalDate, Map<Int, Int>>? = null,
@@ -98,6 +100,35 @@ class ProfileViewModel(
         }
     }
 
+    /**
+     * Recount the shown missions from local attempts (on returning to the screen),
+     * so a puzzle just solved on this device counts without waiting for its sync.
+     */
+    fun recountMissionsLocally() {
+        val shown = _state.value.missions ?: return
+        viewModelScope.launch {
+            val recounted = runCatching { repo.withLocalProgress(shown) }.getOrNull() ?: return@launch
+            // Skip if a reload or refresh replaced the list meanwhile.
+            _state.update { if (it.missions === shown) it.copy(missions = recounted) else it }
+        }
+    }
+
+    /** Swap [missionId] for another mission (the period's one refresh). */
+    fun refreshMission(missionId: Int) {
+        if (_state.value.refreshingMissionId != null) return
+        _state.update { it.copy(refreshingMissionId = missionId, openError = null) }
+        viewModelScope.launch {
+            try {
+                val missions = repo.refreshMission(missionId)
+                _state.update { it.copy(missions = missions, refreshingMissionId = null) }
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(refreshingMissionId = null, openError = "Couldn't swap the mission: ${e.message ?: "unknown error"}")
+                }
+            }
+        }
+    }
+
     /** The heat map's year of solves, fetched alongside the profile, in the device's time zone. */
     private fun loadHistory() {
         val tz = ZoneId.systemDefault()
@@ -135,7 +166,7 @@ class ProfileViewModel(
                 val result = repo.createAttempt(puzzle.id, engine.extractAnswer(puzzle, emptyMap()))
                 onReady(puzzle.id, result.attemptId)
             } catch (e: Exception) {
-                _state.update { it.copy(openError = e.message ?: "Failed to open the puzzle") }
+                _state.update { it.copy(openError = "Couldn't open the puzzle: ${e.message ?: "unknown error"}") }
             }
         }
     }

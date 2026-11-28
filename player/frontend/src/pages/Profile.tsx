@@ -4,6 +4,7 @@ import {
   createAttempt,
   getAttemptSnapshot,
   getMissions,
+  refreshMission,
   getProfile,
   getPuzzle,
   listAttempts,
@@ -84,7 +85,7 @@ export default function Profile() {
     <div>
       <h1>{playerName}</h1>
 
-      <MissionsSection missions={missions} error={missionsError} />
+      <MissionsSection missions={missions} error={missionsError} onMissions={setMissions} />
 
       <h2>Activity</h2>
       <ActivityHeatmap
@@ -236,9 +237,24 @@ async function openMissionPuzzle(questionId: string, navigate: ReturnType<typeof
   navigate(`/play/${questionId}?attempt=${result.attemptId}`);
 }
 
-function MissionsSection({ missions, error }: { missions: Mission[] | null; error: string | null }) {
+function MissionsSection({ missions, error, onMissions }: {
+  missions: Mission[] | null;
+  error: string | null;
+  onMissions: (missions: Mission[]) => void;
+}) {
   const navigate = useNavigate();
   const [openError, setOpenError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState<number | null>(null);
+
+  const refresh = (m: Mission) => {
+    if (!window.confirm(`Swap "${m.description}" for another? You get one swap per period.`)) return;
+    setOpenError(null);
+    setRefreshing(m.id);
+    refreshMission(HARDCODED_PLAYER_ID, m.id)
+      .then((res) => onMissions(res.missions))
+      .catch((e) => setOpenError(e.message))
+      .finally(() => setRefreshing(null));
+  };
 
   if (error) return (<><h2>Missions</h2><p style={{ color: "red" }}>Couldn't load missions: {error}</p></>);
   if (missions === null) return (<><h2>Missions</h2><p style={{ color: "#666" }}>Loading missions...</p></>);
@@ -248,7 +264,7 @@ function MissionsSection({ missions, error }: { missions: Mission[] | null; erro
   return (
     <>
       <h2>Missions</h2>
-      {openError && <p style={{ color: "red" }}>Couldn't open the puzzle: {openError}</p>}
+      {openError && <p style={{ color: "red" }}>{openError}</p>}
       {periods.map((period) => {
         const group = missions.filter((m) => m.period === period);
         const done = group.filter((m) => m.completed).length;
@@ -289,6 +305,16 @@ function MissionsSection({ missions, error }: { missions: Mission[] | null; erro
                     )}
                     <span>{m.description}</span>
                     {m.completed && <span style={{ marginLeft: "auto", color: "#4caf50" }}>✓</span>}
+                    {m.refreshable && (
+                      <button
+                        title="Swap for another (once per period)"
+                        disabled={refreshing !== null}
+                        onClick={() => refresh(m)}
+                        style={{ marginLeft: "auto", padding: "0 0.4rem" }}
+                      >
+                        {refreshing === m.id ? "…" : "↻"}
+                      </button>
+                    )}
                   </div>
                   {m.questionTitle && (
                     <div style={{ fontSize: "0.85rem", color: "#555" }}>{m.questionTitle}</div>
@@ -308,7 +334,7 @@ function MissionsSection({ missions, error }: { missions: Mission[] | null; erro
                       <button
                         onClick={() => {
                           setOpenError(null);
-                          openMissionPuzzle(m.questionId!, navigate).catch((e) => setOpenError(e.message));
+                          openMissionPuzzle(m.questionId!, navigate).catch((e) => setOpenError(`Couldn't open the puzzle: ${e.message}`));
                         }}
                       >
                         Play

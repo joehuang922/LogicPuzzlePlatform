@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { assignedPuzzleProgress, evaluateMission, generateMissions, OpenPuzzle, periodWindow, toSqlDateTime, WindowSolve } from "./missions";
+import { assignedPuzzleProgress, evaluateMission, generateMissions, OpenPuzzle, periodWindow, rerollMission, toSqlDateTime, WindowSolve } from "./missions";
+import { NONOGRAM } from "./sizeTag";
 import { sizeTag } from "./sizeTag";
 
 const win = (w: ReturnType<typeof periodWindow>) => [w.periodStart, toSqlDateTime(w.startUtc), toSqlDateTime(w.endUtc)];
@@ -126,5 +127,36 @@ describe("assignedPuzzleProgress", () => {
   it("is full once completed, and null for counted missions", () => {
     expect(assignedPuzzleProgress("solve_assigned", "q1", true, latest)).toBe(1);
     expect(assignedPuzzleProgress("solve_count", undefined, false, latest)).toBeNull();
+  });
+});
+
+describe("rerollMission", () => {
+  const P = (id: string, typeId: number, size: OpenPuzzle["size"] = null, incubating = false): OpenPuzzle =>
+    ({ id, typeId, difficulty: 3, size, incubating });
+  const repeat = (f: () => void) => { for (let i = 0; i < 50; i++) f(); };
+
+  it("swaps a type for one not already a mission, solved, or incubating", () => repeat(() => {
+    const open = [P("a", 1), P("b", 2), P("c", 3), P("d", 4), P("e", 5, null, true)];
+    const siblings = [{ kind: "solve_type" as const, params: { typeId: 2 } }];
+    const p = rerollMission({ kind: "solve_type", params: { typeId: 1 } }, siblings, open, { solvedTypeIds: new Set([3]) });
+    expect(p).toEqual({ typeId: 4, refreshed: true });
+  }));
+
+  it("swaps an assigned puzzle for another of its size, nonogram for nonogram", () => repeat(() => {
+    const open = [P("cur", NONOGRAM, "GIANT"), P("n2", NONOGRAM, "GIANT"), P("g", 7, "GIANT"), P("b", NONOGRAM, "BIG")];
+    const p = rerollMission({ kind: "solve_assigned", params: { questionId: "cur", size: "GIANT" } }, [], open, { currentTypeId: NONOGRAM });
+    expect(p).toEqual({ questionId: "n2", size: "GIANT", refreshed: true });
+  }));
+
+  it("falls back to any type of the size, never a puzzle already assigned", () => repeat(() => {
+    const open = [P("cur", NONOGRAM, "GIANT"), P("g1", 8, "GIANT"), P("g2", 7, "GIANT")];
+    const siblings = [{ kind: "solve_assigned" as const, params: { questionId: "g1", size: "GIANT" as const } }];
+    const p = rerollMission({ kind: "solve_assigned", params: { questionId: "cur", size: "GIANT" } }, siblings, open, { currentTypeId: NONOGRAM });
+    expect(p).toEqual({ questionId: "g2", size: "GIANT", refreshed: true });
+  }));
+
+  it("returns null when nothing is left, and for counted missions", () => {
+    expect(rerollMission({ kind: "solve_type", params: { typeId: 1 } }, [], [P("a", 1)])).toBeNull();
+    expect(rerollMission({ kind: "solve_count", params: {} }, [], [P("a", 1)])).toBeNull();
   });
 });

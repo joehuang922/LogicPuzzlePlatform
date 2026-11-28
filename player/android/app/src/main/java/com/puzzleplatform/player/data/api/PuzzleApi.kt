@@ -6,6 +6,7 @@ import com.puzzleplatform.player.data.model.CollectionManifestResponse
 import com.puzzleplatform.player.data.model.CollectionProgressResponse
 import com.puzzleplatform.player.data.model.CreateAttemptRequest
 import com.puzzleplatform.player.data.model.MissionsResponse
+import com.puzzleplatform.player.data.model.RefreshMissionRequest
 import com.puzzleplatform.player.data.model.CreateAttemptResponse
 import com.puzzleplatform.player.data.model.CreateCollectionRequest
 import com.puzzleplatform.player.data.model.CreateCollectionResponse
@@ -138,6 +139,9 @@ interface PuzzleApi {
 
     @GET("profile/missions")
     suspend fun getMissions(@Query("player") player: Int, @Query("tz") tz: String): MissionsResponse
+
+    @POST("profile/missions/refresh")
+    suspend fun refreshMission(@Body body: RefreshMissionRequest): MissionsResponse
 
     @POST("sync")
     suspend fun sync(@Body body: SyncRequest): SyncResponse

@@ -179,7 +179,10 @@ export class ApiStack extends cdk.Stack {
     const profileIntegration = new apigw.LambdaIntegration(profileHandler);
     profile.addMethod("GET", profileIntegration);
     // Periodic missions (current day/week/month), served by the profile Lambda.
-    profile.addResource("missions").addMethod("GET", profileIntegration);
+    const missions = profile.addResource("missions");
+    missions.addMethod("GET", profileIntegration);
+    // Swap one changeable mission for another, once per period.
+    missions.addResource("refresh").addMethod("POST", profileIntegration);
 
     // Per-day activity by puzzle type over a date range (heat map, missions).
     const historyHandler = new lambda.Function(this, "HistoryHandler", {
