@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   createAttempt,
   getAttemptSnapshot,
@@ -18,6 +18,14 @@ import { PuzzleDefinition } from "../types/puzzle";
 import ActivityHeatmap from "../components/ActivityHeatmap";
 
 const HARDCODED_PLAYER_ID = 1;
+
+/** Inner tabs of the Profile page; the choice is kept in ?tab= so Back returns to it. */
+const PROFILE_TABS = [
+  { id: "missions", label: "Missions" },
+  { id: "player", label: "Player" },
+  { id: "achievements", label: "Achievements" },
+] as const;
+type ProfileTab = (typeof PROFILE_TABS)[number]["id"];
 
 interface CollectionGroup {
   collectionId: number;
@@ -57,6 +65,9 @@ export default function Profile() {
   const [error, setError] = useState<string | null>(null);
   const [missions, setMissions] = useState<Mission[] | null>(null);
   const [missionsError, setMissionsError] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const tab: ProfileTab = PROFILE_TABS.some((t) => t.id === tabParam) ? (tabParam as ProfileTab) : "missions";
 
   useEffect(() => {
     getMissions(HARDCODED_PLAYER_ID)
@@ -80,20 +91,54 @@ export default function Profile() {
   if (error) return <p style={{ color: "red" }}>Error: {error}</p>;
 
   const unlockedCount = achievements.filter((a) => a.unlocked).length;
+  const solvedCount = questionStats.reduce((n, s) => n + Number(s.solved), 0);
+  const triedCount = questionStats.reduce((n, s) => n + Number(s.tried), 0);
 
   return (
     <div>
       <h1>{playerName}</h1>
 
-      <MissionsSection missions={missions} error={missionsError} onMissions={setMissions} />
+      <div role="tablist" style={{ display: "flex", gap: "0.25rem", borderBottom: "1px solid #ddd", marginBottom: "1rem" }}>
+        {PROFILE_TABS.map((t) => (
+          <button
+            key={t.id}
+            role="tab"
+            aria-selected={tab === t.id}
+            onClick={() => setSearchParams(t.id === "missions" ? {} : { tab: t.id }, { replace: true })}
+            style={{
+              padding: "0.5rem 1rem",
+              border: "none",
+              borderBottom: `3px solid ${tab === t.id ? "#2196f3" : "transparent"}`,
+              background: "none",
+              fontWeight: tab === t.id ? 700 : 400,
+              color: tab === t.id ? "#000" : "#666",
+              cursor: "pointer",
+              marginBottom: -1,
+            }}
+          >
+            {t.id === "achievements" ? `${t.label} (${unlockedCount} / ${achievements.length})` : t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "missions" && (
+        <MissionsSection missions={missions} error={missionsError} onMissions={setMissions} />
+      )}
+
+      {tab === "player" && (<>
+      <p style={{ fontSize: "1.1rem" }}>
+        <strong>{solvedCount}</strong> puzzles solved
+        <span style={{ color: "#666" }}> · {triedCount} tried, unsolved</span>
+      </p>
 
       <h2>Activity</h2>
       <ActivityHeatmap
         player={HARDCODED_PLAYER_ID}
         typeLabels={Object.fromEntries(questionStats.map((s) => [s.typeId, s.typeJpLabel]))}
       />
+      </>)}
 
-      <h2>Achievements ({unlockedCount} / {achievements.length})</h2>
+      {tab === "achievements" && (<>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "0.75rem", marginBottom: "2rem" }}>
         {achievements.map((a) => (
           <div key={a.id} style={{
@@ -133,7 +178,9 @@ export default function Profile() {
           </div>
         ))}
       </div>
+      </>)}
 
+      {tab === "player" && (<>
       <h2>Question Stats</h2>
       <table style={{ borderCollapse: "collapse", width: "100%" }}>
         <thead>
@@ -187,6 +234,7 @@ export default function Profile() {
           </div>
         ))
       )}
+      </>)}
     </div>
   );
 }
@@ -256,14 +304,13 @@ function MissionsSection({ missions, error, onMissions }: {
       .finally(() => setRefreshing(null));
   };
 
-  if (error) return (<><h2>Missions</h2><p style={{ color: "red" }}>Couldn't load missions: {error}</p></>);
-  if (missions === null) return (<><h2>Missions</h2><p style={{ color: "#666" }}>Loading missions...</p></>);
-  if (missions.length === 0) return (<><h2>Missions</h2><p style={{ color: "#666" }}>No missions right now.</p></>);
+  if (error) return <p style={{ color: "red" }}>Couldn't load missions: {error}</p>;
+  if (missions === null) return <p style={{ color: "#666" }}>Loading missions...</p>;
+  if (missions.length === 0) return <p style={{ color: "#666" }}>No missions right now.</p>;
 
   const periods = ["day", "week", "month"].filter((p) => missions.some((m) => m.period === p));
   return (
     <>
-      <h2>Missions</h2>
       {openError && <p style={{ color: "red" }}>{openError}</p>}
       {periods.map((period) => {
         const group = missions.filter((m) => m.period === period);

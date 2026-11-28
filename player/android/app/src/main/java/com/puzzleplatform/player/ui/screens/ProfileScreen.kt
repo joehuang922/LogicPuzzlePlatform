@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -25,6 +27,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.Tab
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -91,116 +95,145 @@ fun ProfileScreen(
                 Text("Error: ${state.error}", color = MaterialTheme.colorScheme.error)
             }
 
-            else -> {
+            else -> Column(Modifier.fillMaxSize().padding(padding)) {
                 val unlocked = state.achievements.count { it.unlocked }
+                val tabs = listOf("Missions", "Player", "Achievements ($unlocked / ${state.achievements.size})")
+                PrimaryTabRow(selectedTabIndex = state.tab.ordinal) {
+                    ProfileTab.entries.forEachIndexed { i, t ->
+                        Tab(
+                            selected = state.tab == t,
+                            onClick = { vm.selectTab(t) },
+                            text = { Text(tabs[i], maxLines = 1) },
+                        )
+                    }
+                }
                 LazyColumn(
-                    Modifier.fillMaxSize().padding(padding).padding(horizontal = 12.dp),
+                    Modifier.fillMaxSize().padding(horizontal = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    item { SyncStatusRow(state.syncState) }
-                    item { Header("Missions") }
-                    val missions = state.missions
-                    when {
-                        state.missionsError != null -> item {
-                            Text(
-                                "Couldn't load missions: ${state.missionsError}",
-                                color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                        missions == null -> item {
-                            Text("Loading missions…", style = MaterialTheme.typography.bodySmall)
-                        }
-                        missions.isEmpty() -> item {
-                            Text("No missions right now.", style = MaterialTheme.typography.bodySmall)
-                        }
-                        else -> {
-                            state.openError?.let { err ->
-                                item {
-                                    Text(
-                                        err,
-                                        color = MaterialTheme.colorScheme.error,
-                                        style = MaterialTheme.typography.bodySmall,
-                                    )
-                                }
-                            }
-                            for (period in listOf("day", "week", "month")) {
-                                val group = missions.filter { it.period == period }
-                                if (group.isEmpty()) continue
-                                item(key = "mh-$period") { MissionPeriodHeader(period, group) }
-                                items(group, key = { "m-${it.id}" }) { m ->
-                                    MissionCard(
-                                        m,
-                                        refreshing = state.refreshingMissionId == m.id,
-                                        onPlay = { qid -> vm.openMissionPuzzle(qid, onOpenAttempt) },
-                                        onRefresh = { confirmRefresh = m },
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    item { Header("Activity") }
-                    item {
-                        val days = state.historyDays
+                    item { Spacer(Modifier.height(6.dp)) }
+                    if (state.tab == ProfileTab.MISSIONS) {
+                        val missions = state.missions
                         when {
-                            days != null -> ActivityHeatmap(
-                                days = days,
-                                today = state.today,
-                                typeLabels = state.questionStats.associate { it.typeId to it.typeJpLabel },
-                            )
-                            state.historyError != null -> Text(
-                                "Activity: ${state.historyError}",
-                                color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                            else -> Text("Loading activity…", style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                    item { Header("Achievements ($unlocked / ${state.achievements.size})") }
-                    items(state.achievements, key = { it.id }) { a ->
-                        Card(Modifier.fillMaxWidth()) {
-                            Row(
-                                Modifier.padding(12.dp),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
+                            state.missionsError != null -> item {
                                 Text(
-                                    a.icon,
-                                    modifier = Modifier.graphicsLayer { alpha = if (a.unlocked) 1f else 0.4f },
+                                    "Couldn't load missions: ${state.missionsError}",
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall,
                                 )
-                                Column {
-                                    Text(a.name, fontWeight = FontWeight.Bold)
-                                    Text(a.description, style = MaterialTheme.typography.bodySmall)
-                                }
                             }
-                        }
-                    }
-
-                    item { Header("Question Stats") }
-                    items(state.questionStats, key = { "q-${it.typeId}" }) { s ->
-                        Row(
-                            Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            Text(s.typeJpLabel)
-                            Text("${s.solved} solved · ${s.tried} tried · ${s.total} total", style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-
-                    if (state.collectionGroups.isNotEmpty()) {
-                        item { Header("Collection Stats") }
-                        items(state.collectionGroups, key = { "cg-${it.collectionId}" }) { cg ->
-                            Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                                Text("${cg.collectionName} (${cg.totalSolved} / ${cg.totalCount})", fontWeight = FontWeight.Medium)
-                                for (t in cg.types) {
-                                    Row(Modifier.fillMaxWidth().padding(start = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Text(t.typeJpLabel, style = MaterialTheme.typography.bodySmall)
-                                        Text("${t.solved} / ${t.total}", style = MaterialTheme.typography.bodySmall)
+                            missions == null -> item {
+                                Text("Loading missions…", style = MaterialTheme.typography.bodySmall)
+                            }
+                            missions.isEmpty() -> item {
+                                Text("No missions right now.", style = MaterialTheme.typography.bodySmall)
+                            }
+                            else -> {
+                                state.openError?.let { err ->
+                                    item {
+                                        Text(
+                                            err,
+                                            color = MaterialTheme.colorScheme.error,
+                                            style = MaterialTheme.typography.bodySmall,
+                                        )
+                                    }
+                                }
+                                for (period in listOf("day", "week", "month")) {
+                                    val group = missions.filter { it.period == period }
+                                    if (group.isEmpty()) continue
+                                    item(key = "mh-$period") { MissionPeriodHeader(period, group) }
+                                    items(group, key = { "m-${it.id}" }) { m ->
+                                        MissionCard(
+                                            m,
+                                            refreshing = state.refreshingMissionId == m.id,
+                                            onPlay = { qid -> vm.openMissionPuzzle(qid, onOpenAttempt) },
+                                            onRefresh = { confirmRefresh = m },
+                                        )
                                     }
                                 }
                             }
                         }
                     }
+                    if (state.tab == ProfileTab.PLAYER) {
+                        item { SyncStatusRow(state.syncState) }
+                        item {
+                            val solved = state.questionStats.sumOf { it.solved }
+                            val tried = state.questionStats.sumOf { it.tried }
+                            Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 8.dp)) {
+                                Text("$solved", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                                Text(
+                                    " puzzles solved · $tried tried, unsolved",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(bottom = 4.dp),
+                                )
+                            }
+                        }
+                        item { Header("Activity") }
+                        item {
+                            val days = state.historyDays
+                            when {
+                                days != null -> ActivityHeatmap(
+                                    days = days,
+                                    today = state.today,
+                                    typeLabels = state.questionStats.associate { it.typeId to it.typeJpLabel },
+                                )
+                                state.historyError != null -> Text(
+                                    "Activity: ${state.historyError}",
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                                else -> Text("Loading activity…", style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                        item { Header("Question Stats") }
+                        items(state.questionStats, key = { "q-${it.typeId}" }) { s ->
+                            Row(
+                                Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Text(s.typeJpLabel)
+                                Text("${s.solved} solved · ${s.tried} tried · ${s.total} total", style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+
+                        if (state.collectionGroups.isNotEmpty()) {
+                            item { Header("Collection Stats") }
+                            items(state.collectionGroups, key = { "cg-${it.collectionId}" }) { cg ->
+                                Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                                    Text("${cg.collectionName} (${cg.totalSolved} / ${cg.totalCount})", fontWeight = FontWeight.Medium)
+                                    for (t in cg.types) {
+                                        Row(Modifier.fillMaxWidth().padding(start = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                                            Text(t.typeJpLabel, style = MaterialTheme.typography.bodySmall)
+                                            Text("${t.solved} / ${t.total}", style = MaterialTheme.typography.bodySmall)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (state.tab == ProfileTab.ACHIEVEMENTS) {
+                        items(state.achievements, key = { it.id }) { a ->
+                            Card(Modifier.fillMaxWidth()) {
+                                Row(
+                                    Modifier.padding(12.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        a.icon,
+                                        modifier = Modifier.graphicsLayer { alpha = if (a.unlocked) 1f else 0.4f },
+                                    )
+                                    Column {
+                                        Text(a.name, fontWeight = FontWeight.Bold)
+                                        Text(a.description, style = MaterialTheme.typography.bodySmall)
+                                    }
+                                }
+                            }
+                        }
+
+                    }
+                    item { Spacer(Modifier.height(12.dp)) }
                 }
             }
         }

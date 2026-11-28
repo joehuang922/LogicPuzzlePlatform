@@ -29,7 +29,11 @@ data class CollectionGroup(
     data class TypeStat(val typeJpLabel: String, val solved: Int, val total: Int)
 }
 
+/** The Profile screen's inner tabs. */
+enum class ProfileTab { MISSIONS, PLAYER, ACHIEVEMENTS }
+
 data class ProfileUiState(
+    val tab: ProfileTab = ProfileTab.MISSIONS,
     val loading: Boolean = true,
     val error: String? = null,
     val playerName: String = "",
@@ -70,6 +74,8 @@ class ProfileViewModel(
             }
         }
     }
+
+    fun selectTab(tab: ProfileTab) = _state.update { it.copy(tab = tab) }
 
     fun load() {
         _state.update { it.copy(loading = true, error = null, missions = null, missionsError = null) }
