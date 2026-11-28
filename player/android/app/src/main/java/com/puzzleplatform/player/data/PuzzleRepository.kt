@@ -16,6 +16,9 @@ import com.puzzleplatform.player.data.model.DEFAULT_COLLECTION_ID
 import com.puzzleplatform.player.data.model.defaultCollection
 import com.puzzleplatform.player.data.model.HistoryResponse
 import com.puzzleplatform.player.data.model.Mission
+import com.puzzleplatform.player.data.model.MissionsResponse
+import com.puzzleplatform.player.data.model.PlayerXp
+import com.puzzleplatform.player.data.model.RefreshMissionRequest
 import com.puzzleplatform.player.data.model.ProfileResponse
 import com.puzzleplatform.player.data.model.Puzzle
 import com.puzzleplatform.player.data.model.PuzzleType
@@ -314,9 +317,81 @@ class PuzzleRepository(
     suspend fun getHistory(from: String, to: String, tz: String): HistoryResponse =
         api.getHistory(PLAYER_ID, from, to, tz)
 
-    /** Current day/week/month missions in the device's time zone (online only). */
-    suspend fun getMissions(): List<Mission> =
-        api.getMissions(PLAYER_ID, java.time.ZoneId.systemDefault().id).missions
+    /** Total XP, overall level and per-type mastery (online only; counted by the server). */
+    suspend fun getXp(): PlayerXp = api.getXp(PLAYER_ID)
+
+    private val missionCache by lazy { context.getSharedPreferences("missions", Context.MODE_PRIVATE) }
+
+    /**
+     * Current day/week/month missions in the device's time zone, with local solves
+     * merged in ([withLocalProgress]). Offline, the last fetched set still running is
+     * shown from the cache.
+     */
+    suspend fun getMissions(): List<Mission> {
+        val missions = try {
+            api.getMissions(PLAYER_ID, java.time.ZoneId.systemDefault().id).missions
+                .also(::cacheMissions)
+        } catch (e: Exception) {
+            cachedMissions() ?: throw e
+        }
+        return withLocalProgress(missions)
+    }
+
+    /** Swap one mission for another (once per period, server-side); answers with the current missions. */
+    suspend fun refreshMission(missionId: Int): List<Mission> {
+        val missions = try {
+            api.refreshMission(
+                RefreshMissionRequest(PLAYER_ID, missionId, java.time.ZoneId.systemDefault().id)
+            ).missions
+        } catch (e: retrofit2.HttpException) {
+            // Surface the API's reason ("already used", "nothing left to swap to").
+            val raw = runCatching { e.response()?.errorBody()?.string() }.getOrNull()
+            val message = raw?.let {
+                runCatching {
+                    (json.parseToJsonElement(it) as JsonObject)["error"]
+                        ?.let { el -> (el as kotlinx.serialization.json.JsonPrimitive).content }
+                }.getOrNull()
+            }
+            throw IllegalStateException(message ?: e.message(), e)
+        }
+        cacheMissions(missions)
+        return withLocalProgress(missions)
+    }
+
+    /**
+     * [missions] with progress counted from local attempts too, so a solve on this
+     * device shows at once, before its sync lands (see [LocalMissionProgress]).
+     */
+    suspend fun withLocalProgress(missions: List<Mission>): List<Mission> {
+        if (missions.isEmpty()) return missions
+        val starts = missions.mapNotNull { LocalMissionProgress.toSqlDateTime(it.startsAt) }
+        val ends = missions.mapNotNull { LocalMissionProgress.toSqlDateTime(it.endsAt) }
+        if (starts.isEmpty() || ends.isEmpty()) return missions
+        val finishes = db.attemptDao().finishesBetween(starts.min(), ends.max()).map {
+            LocalMissionProgress.Finish(it.question, it.typeId, it.difficulty, it.finishedAt)
+        }
+        val assigned = missions.mapNotNull { it.questionId }.distinct()
+        val latest = if (assigned.isEmpty()) emptyMap() else
+            db.snapshotDao().latestProgressByQuestion(assigned).associate { it.question to it.progress }
+        return missions.map { LocalMissionProgress.apply(it, finishes, latest) }
+    }
+
+    private fun cacheMissions(missions: List<Mission>) {
+        missionCache.edit()
+            .putString("missions", json.encodeToString(MissionsResponse.serializer(), MissionsResponse(missions)))
+            .apply()
+    }
+
+    /** The cached missions whose period hasn't ended; null when there's no cache. */
+    private fun cachedMissions(): List<Mission>? {
+        val raw = missionCache.getString("missions", null) ?: return null
+        val cached = runCatching { json.decodeFromString(MissionsResponse.serializer(), raw).missions }
+            .getOrNull() ?: return null
+        val now = java.time.Instant.now()
+        return cached.filter { m ->
+            runCatching { java.time.Instant.parse(m.endsAt).isAfter(now) }.getOrDefault(false)
+        }
+    }
 
     /** Parse a snapshot's stringified currentAnswer into a JsonObject. */
     fun parseAnswer(currentAnswer: String): JsonObject =

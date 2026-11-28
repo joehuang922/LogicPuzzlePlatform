@@ -456,14 +456,63 @@ export interface Mission {
   puzzleProgress?: number | null;
   completed: boolean;
   completedAt: string | null;
+  /** This mission was refreshed (the period's one refresh). */
+  refreshed?: boolean;
+  /** Changeable (a type or an assigned puzzle), open, and the period's refresh unused. */
+  refreshable?: boolean;
+  /** XP the mission earns. */
+  xp: number;
+}
+
+/** Missions of the current periods, and the XP for completing all of a period's. */
+export interface MissionsResponse {
+  missions: Mission[];
+  setBonusXp: Record<MissionPeriod, number>;
 }
 
 /** Current day/week/month missions; the API generates any missing one. */
 export function getMissions(player: number) {
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC";
-  return request<{ missions: Mission[] }>(
+  return request<MissionsResponse>(
     `/profile/missions?player=${player}&tz=${encodeURIComponent(tz)}`
   );
+}
+
+/** Swap one mission for another (once per period); answers with the current missions. */
+export function refreshMission(player: number, missionId: number) {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC";
+  return request<MissionsResponse>("/profile/missions/refresh", {
+    method: "POST",
+    body: JSON.stringify({ player, missionId, tz }),
+  });
+}
+
+/** A level on the XP curve: total XP where it started and where the next begins. */
+export interface LevelProgress {
+  level: number;
+  levelStartXp: number;
+  nextLevelXp: number;
+}
+
+export interface TypeMastery extends LevelProgress {
+  typeId: number;
+  label: string;
+  xp: number;
+  solved: number;
+}
+
+export interface PlayerXp extends LevelProgress {
+  total: number;
+  fromSolves: number;
+  fromMissions: number;
+  fromSetBonuses: number;
+  /** Types with at least one solve, most XP first. */
+  mastery: TypeMastery[];
+}
+
+/** Total XP, overall level and per-type mastery, counted from solves and missions. */
+export function getXp(player: number) {
+  return request<PlayerXp>(`/profile/xp?player=${player}`);
 }
 
 const PARSER_URL = import.meta.env.VITE_PARSER_URL ?? `${API_BASE}/parse`;

@@ -104,7 +104,29 @@ interface AttemptDao {
 
     @Query("UPDATE attempts SET finishedAt = :finishedAt WHERE id = :id")
     suspend fun setFinishedAt(id: String, finishedAt: String)
+
+    /**
+     * Finished attempts in [from, to) (UTC "YYYY-MM-DD HH:MM:SS"), with their puzzle's
+     * type and difficulty when it's cached: local mission progress.
+     */
+    @Query(
+        """
+        SELECT a.question AS question, p.puzzleType AS typeId, p.difficulty AS difficulty,
+               a.finishedAt AS finishedAt
+        FROM attempts a LEFT JOIN puzzles p ON p.id = a.question
+        WHERE a.finishedAt IS NOT NULL AND a.finishedAt >= :from AND a.finishedAt < :to
+        """
+    )
+    suspend fun finishesBetween(from: String, to: String): List<AttemptFinish>
 }
+
+/** Projection: one finished attempt for local mission progress. */
+data class AttemptFinish(
+    val question: String,
+    val typeId: Int?,
+    val difficulty: Int?,
+    val finishedAt: String,
+)
 
 @Dao
 interface SnapshotDao {
@@ -143,7 +165,26 @@ interface SnapshotDao {
         """
     )
     suspend fun finishedAnswersByQuestion(questionIds: List<String>): List<FinishedAnswer>
+
+    /** The latest snapshot's progress on each of the given questions, across attempts. */
+    @Query(
+        """
+        SELECT a.question AS question, s.progress AS progress, MAX(s.createdAt) AS latestCreatedAt
+        FROM snapshots s
+        JOIN attempts a ON a.id = s.attempt
+        WHERE a.question IN (:questionIds)
+        GROUP BY a.question
+        """
+    )
+    suspend fun latestProgressByQuestion(questionIds: List<String>): List<QuestionProgress>
 }
+
+/** Projection: one question's latest snapshot progress (0..1). */
+data class QuestionProgress(
+    val question: String,
+    val progress: Double,
+    val latestCreatedAt: String,
+)
 
 /** Projection: one question's saved finished answer (stringified JSON). */
 data class FinishedAnswer(

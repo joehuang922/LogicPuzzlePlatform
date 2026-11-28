@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.puzzleplatform.player.data.PuzzleRepository
 import com.puzzleplatform.player.data.ServiceLocator
 import com.puzzleplatform.player.data.model.Mission
+import com.puzzleplatform.player.data.model.PlayerXp
 import com.puzzleplatform.player.data.model.ProfileAchievement
 import com.puzzleplatform.player.data.model.ProfileCollectionRow
 import com.puzzleplatform.player.data.model.ProfileQuestionStat
@@ -29,7 +30,11 @@ data class CollectionGroup(
     data class TypeStat(val typeJpLabel: String, val solved: Int, val total: Int)
 }
 
+/** The Profile screen's inner tabs. */
+enum class ProfileTab { MISSIONS, PLAYER, ACHIEVEMENTS }
+
 data class ProfileUiState(
+    val tab: ProfileTab = ProfileTab.MISSIONS,
     val loading: Boolean = true,
     val error: String? = null,
     val playerName: String = "",
@@ -39,8 +44,13 @@ data class ProfileUiState(
     /** null while loading; missions load on their own so a failure doesn't hide the profile. */
     val missions: List<Mission>? = null,
     val missionsError: String? = null,
-    /** Set when an assigned mission puzzle couldn't be opened. */
+    /** null until loaded; fetched after missions, whose load settles the completions XP counts. */
+    val xp: PlayerXp? = null,
+    val xpError: String? = null,
+    /** Set when an assigned mission puzzle couldn't be opened, or a refresh failed. */
     val openError: String? = null,
+    /** The mission whose refresh is in flight. */
+    val refreshingMissionId: Int? = null,
     val syncState: SyncState = SyncState(),
     /** Activity heat map: date -> puzzle type id -> solves; null until loaded. */
     val historyDays: Map<LocalDate, Map<Int, Int>>? = null,
@@ -69,8 +79,10 @@ class ProfileViewModel(
         }
     }
 
+    fun selectTab(tab: ProfileTab) = _state.update { it.copy(tab = tab) }
+
     fun load() {
-        _state.update { it.copy(loading = true, error = null, missions = null, missionsError = null) }
+        _state.update { it.copy(loading = true, error = null, missions = null, missionsError = null, xpError = null) }
         loadHistory()
         viewModelScope.launch {
             try {
@@ -79,6 +91,7 @@ class ProfileViewModel(
             } catch (e: Exception) {
                 _state.update { it.copy(missionsError = e.message ?: "Failed to load missions") }
             }
+            loadXp()
         }
         viewModelScope.launch {
             try {
@@ -94,6 +107,48 @@ class ProfileViewModel(
                 }
             } catch (e: Exception) {
                 _state.update { it.copy(loading = false, error = e.message ?: "Failed to load profile") }
+            }
+        }
+    }
+
+    /**
+     * Recount the shown missions from local attempts (on returning to the screen),
+     * so a puzzle just solved on this device counts without waiting for its sync.
+     */
+    fun recountMissionsLocally() {
+        val shown = _state.value.missions ?: return
+        // A solve that already synced shows in the level too; offline the last level stays.
+        viewModelScope.launch { loadXp(keepOnError = true) }
+        viewModelScope.launch {
+            val recounted = runCatching { repo.withLocalProgress(shown) }.getOrNull() ?: return@launch
+            // Skip if a reload or refresh replaced the list meanwhile.
+            _state.update { if (it.missions === shown) it.copy(missions = recounted) else it }
+        }
+    }
+
+    private suspend fun loadXp(keepOnError: Boolean = false) {
+        try {
+            val xp = repo.getXp()
+            _state.update { it.copy(xp = xp, xpError = null) }
+        } catch (e: Exception) {
+            _state.update {
+                if (keepOnError && it.xp != null) it else it.copy(xpError = e.message ?: "Failed to load XP")
+            }
+        }
+    }
+
+    /** Swap [missionId] for another mission (the period's one refresh). */
+    fun refreshMission(missionId: Int) {
+        if (_state.value.refreshingMissionId != null) return
+        _state.update { it.copy(refreshingMissionId = missionId, openError = null) }
+        viewModelScope.launch {
+            try {
+                val missions = repo.refreshMission(missionId)
+                _state.update { it.copy(missions = missions, refreshingMissionId = null) }
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(refreshingMissionId = null, openError = "Couldn't swap the mission: ${e.message ?: "unknown error"}")
+                }
             }
         }
     }
@@ -135,7 +190,7 @@ class ProfileViewModel(
                 val result = repo.createAttempt(puzzle.id, engine.extractAnswer(puzzle, emptyMap()))
                 onReady(puzzle.id, result.attemptId)
             } catch (e: Exception) {
-                _state.update { it.copy(openError = e.message ?: "Failed to open the puzzle") }
+                _state.update { it.copy(openError = "Couldn't open the puzzle: ${e.message ?: "unknown error"}") }
             }
         }
     }

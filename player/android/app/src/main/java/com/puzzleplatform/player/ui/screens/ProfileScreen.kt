@@ -2,15 +2,20 @@ package com.puzzleplatform.player.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -22,8 +27,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.Tab
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -34,6 +46,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.puzzleplatform.player.data.model.Mission
+import com.puzzleplatform.player.data.model.PlayerXp
+import com.puzzleplatform.player.data.model.TypeMastery
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,6 +57,23 @@ fun ProfileScreen(
     vm: ProfileViewModel = viewModel(),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    // Back from a puzzle: count its solve from the local DB right away.
+    LifecycleResumeEffect(Unit) {
+        vm.recountMissionsLocally()
+        onPauseOrDispose { }
+    }
+    var confirmRefresh by remember { mutableStateOf<Mission?>(null) }
+    confirmRefresh?.let { m ->
+        AlertDialog(
+            onDismissRequest = { confirmRefresh = null },
+            title = { Text("Swap this mission?") },
+            text = { Text("\"${m.description}\" will be replaced by another. You get one swap per period.") },
+            confirmButton = {
+                TextButton(onClick = { vm.refreshMission(m.id); confirmRefresh = null }) { Text("Swap") }
+            },
+            dismissButton = { TextButton(onClick = { confirmRefresh = null }) { Text("Cancel") } },
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -67,111 +98,164 @@ fun ProfileScreen(
                 Text("Error: ${state.error}", color = MaterialTheme.colorScheme.error)
             }
 
-            else -> {
+            else -> Column(Modifier.fillMaxSize().padding(padding)) {
                 val unlocked = state.achievements.count { it.unlocked }
+                val tabs = listOf("Missions", "Player", "Achievements ($unlocked / ${state.achievements.size})")
+                Box(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                    val xp = state.xp
+                    when {
+                        xp != null -> LevelCard(xp)
+                        state.xpError != null -> Text(
+                            "Couldn't load XP: ${state.xpError}",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        else -> Text("Loading level…", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                PrimaryTabRow(selectedTabIndex = state.tab.ordinal) {
+                    ProfileTab.entries.forEachIndexed { i, t ->
+                        Tab(
+                            selected = state.tab == t,
+                            onClick = { vm.selectTab(t) },
+                            text = { Text(tabs[i], maxLines = 1) },
+                        )
+                    }
+                }
                 LazyColumn(
-                    Modifier.fillMaxSize().padding(padding).padding(horizontal = 12.dp),
+                    Modifier.fillMaxSize().padding(horizontal = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    item { SyncStatusRow(state.syncState) }
-                    item { Header("Missions") }
-                    val missions = state.missions
-                    when {
-                        state.missionsError != null -> item {
-                            Text(
-                                "Couldn't load missions: ${state.missionsError}",
-                                color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                        missions == null -> item {
-                            Text("Loading missions…", style = MaterialTheme.typography.bodySmall)
-                        }
-                        missions.isEmpty() -> item {
-                            Text("No missions right now.", style = MaterialTheme.typography.bodySmall)
-                        }
-                        else -> {
-                            state.openError?.let { err ->
-                                item {
-                                    Text(
-                                        "Couldn't open the puzzle: $err",
-                                        color = MaterialTheme.colorScheme.error,
-                                        style = MaterialTheme.typography.bodySmall,
-                                    )
-                                }
-                            }
-                            for (period in listOf("day", "week", "month")) {
-                                val group = missions.filter { it.period == period }
-                                if (group.isEmpty()) continue
-                                item(key = "mh-$period") { MissionPeriodHeader(period, group) }
-                                items(group, key = { "m-${it.id}" }) { m ->
-                                    MissionCard(m, onPlay = { qid -> vm.openMissionPuzzle(qid, onOpenAttempt) })
-                                }
-                            }
-                        }
-                    }
-                    item { Header("Activity") }
-                    item {
-                        val days = state.historyDays
+                    item { Spacer(Modifier.height(6.dp)) }
+                    if (state.tab == ProfileTab.MISSIONS) {
+                        val missions = state.missions
                         when {
-                            days != null -> ActivityHeatmap(
-                                days = days,
-                                today = state.today,
-                                typeLabels = state.questionStats.associate { it.typeId to it.typeJpLabel },
-                            )
-                            state.historyError != null -> Text(
-                                "Activity: ${state.historyError}",
-                                color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                            else -> Text("Loading activity…", style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                    item { Header("Achievements ($unlocked / ${state.achievements.size})") }
-                    items(state.achievements, key = { it.id }) { a ->
-                        Card(Modifier.fillMaxWidth()) {
-                            Row(
-                                Modifier.padding(12.dp),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
+                            state.missionsError != null -> item {
                                 Text(
-                                    a.icon,
-                                    modifier = Modifier.graphicsLayer { alpha = if (a.unlocked) 1f else 0.4f },
+                                    "Couldn't load missions: ${state.missionsError}",
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall,
                                 )
-                                Column {
-                                    Text(a.name, fontWeight = FontWeight.Bold)
-                                    Text(a.description, style = MaterialTheme.typography.bodySmall)
-                                }
                             }
-                        }
-                    }
-
-                    item { Header("Question Stats") }
-                    items(state.questionStats, key = { "q-${it.typeId}" }) { s ->
-                        Row(
-                            Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            Text(s.typeJpLabel)
-                            Text("${s.solved} solved · ${s.tried} tried · ${s.total} total", style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-
-                    if (state.collectionGroups.isNotEmpty()) {
-                        item { Header("Collection Stats") }
-                        items(state.collectionGroups, key = { "cg-${it.collectionId}" }) { cg ->
-                            Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                                Text("${cg.collectionName} (${cg.totalSolved} / ${cg.totalCount})", fontWeight = FontWeight.Medium)
-                                for (t in cg.types) {
-                                    Row(Modifier.fillMaxWidth().padding(start = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Text(t.typeJpLabel, style = MaterialTheme.typography.bodySmall)
-                                        Text("${t.solved} / ${t.total}", style = MaterialTheme.typography.bodySmall)
+                            missions == null -> item {
+                                Text("Loading missions…", style = MaterialTheme.typography.bodySmall)
+                            }
+                            missions.isEmpty() -> item {
+                                Text("No missions right now.", style = MaterialTheme.typography.bodySmall)
+                            }
+                            else -> {
+                                state.openError?.let { err ->
+                                    item {
+                                        Text(
+                                            err,
+                                            color = MaterialTheme.colorScheme.error,
+                                            style = MaterialTheme.typography.bodySmall,
+                                        )
+                                    }
+                                }
+                                for (period in listOf("day", "week", "month")) {
+                                    val group = missions.filter { it.period == period }
+                                    if (group.isEmpty()) continue
+                                    item(key = "mh-$period") {
+                                        MissionPeriodHeader(period, group, state.xp?.rewards?.setBonus?.get(period))
+                                    }
+                                    items(group, key = { "m-${it.id}" }) { m ->
+                                        MissionCard(
+                                            m,
+                                            refreshing = state.refreshingMissionId == m.id,
+                                            onPlay = { qid -> vm.openMissionPuzzle(qid, onOpenAttempt) },
+                                            onRefresh = { confirmRefresh = m },
+                                        )
                                     }
                                 }
                             }
                         }
                     }
+                    if (state.tab == ProfileTab.PLAYER) {
+                        item { SyncStatusRow(state.syncState) }
+                        val mastery = state.xp?.mastery.orEmpty()
+                        if (mastery.isNotEmpty()) {
+                            item { Header("Mastery") }
+                            items(mastery, key = { "mastery-${it.typeId}" }) { MasteryRow(it) }
+                        }
+                        item {
+                            val solved = state.questionStats.sumOf { it.solved }
+                            val tried = state.questionStats.sumOf { it.tried }
+                            Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 8.dp)) {
+                                Text("$solved", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                                Text(
+                                    " puzzles solved · $tried tried, unsolved",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(bottom = 4.dp),
+                                )
+                            }
+                        }
+                        item { Header("Activity") }
+                        item {
+                            val days = state.historyDays
+                            when {
+                                days != null -> ActivityHeatmap(
+                                    days = days,
+                                    today = state.today,
+                                    typeLabels = state.questionStats.associate { it.typeId to it.typeJpLabel },
+                                )
+                                state.historyError != null -> Text(
+                                    "Activity: ${state.historyError}",
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                                else -> Text("Loading activity…", style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                        item { Header("Question Stats") }
+                        items(state.questionStats, key = { "q-${it.typeId}" }) { s ->
+                            Row(
+                                Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Text(s.typeJpLabel)
+                                Text("${s.solved} solved · ${s.tried} tried · ${s.total} total", style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+
+                        if (state.collectionGroups.isNotEmpty()) {
+                            item { Header("Collection Stats") }
+                            items(state.collectionGroups, key = { "cg-${it.collectionId}" }) { cg ->
+                                Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                                    Text("${cg.collectionName} (${cg.totalSolved} / ${cg.totalCount})", fontWeight = FontWeight.Medium)
+                                    for (t in cg.types) {
+                                        Row(Modifier.fillMaxWidth().padding(start = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                                            Text(t.typeJpLabel, style = MaterialTheme.typography.bodySmall)
+                                            Text("${t.solved} / ${t.total}", style = MaterialTheme.typography.bodySmall)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (state.tab == ProfileTab.ACHIEVEMENTS) {
+                        items(state.achievements, key = { it.id }) { a ->
+                            Card(Modifier.fillMaxWidth()) {
+                                Row(
+                                    Modifier.padding(12.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        a.icon,
+                                        modifier = Modifier.graphicsLayer { alpha = if (a.unlocked) 1f else 0.4f },
+                                    )
+                                    Column {
+                                        Text(a.name, fontWeight = FontWeight.Bold)
+                                        Text(a.description, style = MaterialTheme.typography.bodySmall)
+                                    }
+                                }
+                            }
+                        }
+
+                    }
+                    item { Spacer(Modifier.height(12.dp)) }
                 }
             }
         }
@@ -223,18 +307,93 @@ private fun formatRelativeTime(epochMillis: Long): String {
 private val PERIOD_LABELS = mapOf("day" to "Today", "week" to "This week", "month" to "This month")
 
 @Composable
-private fun MissionPeriodHeader(period: String, group: List<Mission>) {
+private fun MissionPeriodHeader(period: String, group: List<Mission>, setBonusXp: Int?) {
     val done = group.count { it.completed }
-    Row(
-        Modifier.fillMaxWidth().padding(top = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(PERIOD_LABELS[period] ?: period, fontWeight = FontWeight.SemiBold)
-        Text(
-            "$done / ${group.size} done · ${missionTimeLeft(group.first().endsAt)}",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+    Column(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(PERIOD_LABELS[period] ?: period, fontWeight = FontWeight.SemiBold)
+            Text(
+                "$done / ${group.size} done · ${missionTimeLeft(group.first().endsAt)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (setBonusXp != null) {
+            val allDone = done == group.size
+            Text(
+                (if (allDone) "✓ " else "") + "All done: +$setBonusXp XP",
+                style = MaterialTheme.typography.labelSmall,
+                color = if (allDone) MaterialTheme.colorScheme.primary else XP_COLOR,
+            )
+        }
+    }
+}
+
+private val XP_COLOR = Color(0xFF7E57C2)
+
+/** Fraction of the way from a level's start to the next level. */
+private fun levelFraction(xp: Int, start: Int, next: Int): Float =
+    if (next > start) ((xp - start).toFloat() / (next - start)).coerceIn(0f, 1f) else 0f
+
+@Composable
+private fun LevelCard(xp: PlayerXp) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "Lv ${xp.level}",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = XP_COLOR,
+                )
+                LinearProgressIndicator(
+                    progress = { levelFraction(xp.total, xp.levelStartXp, xp.nextLevelXp) },
+                    modifier = Modifier.weight(1f),
+                    color = XP_COLOR,
+                )
+            }
+            Text(
+                "${xp.total - xp.levelStartXp} / ${xp.nextLevelXp - xp.levelStartXp} XP to level ${xp.level + 1}" +
+                    " · ${xp.total} XP total",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                "Solves ${xp.fromSolves} · missions ${xp.fromMissions} · set bonuses ${xp.fromSetBonuses}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun MasteryRow(m: TypeMastery) {
+    Column(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(m.label, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Text(
+                "${m.xp} XP · ${m.solved} solved",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text("Lv ${m.level}", fontWeight = FontWeight.Bold, color = XP_COLOR)
+        }
+        LinearProgressIndicator(
+            progress = { levelFraction(m.xp, m.levelStartXp, m.nextLevelXp) },
+            modifier = Modifier.fillMaxWidth(),
+            color = XP_COLOR,
         )
     }
 }
@@ -242,7 +401,12 @@ private fun MissionPeriodHeader(period: String, group: List<Mission>) {
 private val SIZE_PILL_COLORS = mapOf("BIG" to Color(0xFFEF6C00), "GIANT" to Color(0xFFC62828))
 
 @Composable
-private fun MissionCard(m: Mission, onPlay: (questionId: String) -> Unit) {
+private fun MissionCard(
+    m: Mission,
+    refreshing: Boolean,
+    onPlay: (questionId: String) -> Unit,
+    onRefresh: () -> Unit,
+) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(
@@ -262,7 +426,21 @@ private fun MissionCard(m: Mission, onPlay: (questionId: String) -> Unit) {
                     )
                 }
                 Text(m.description, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                if (m.completed) Text("✓", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                Text(
+                    (if (m.completed) "✓ " else "") + "+${m.xp} XP",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = if (m.completed) MaterialTheme.colorScheme.primary else XP_COLOR,
+                )
+                if (m.refreshable) {
+                    if (refreshing) {
+                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                    } else {
+                        IconButton(onClick = onRefresh, modifier = Modifier.size(28.dp)) {
+                            Icon(Icons.Filled.Refresh, contentDescription = "Swap this mission (once per period)")
+                        }
+                    }
+                }
             }
             m.questionTitle?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
             Row(

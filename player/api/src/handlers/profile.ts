@@ -2,7 +2,8 @@ import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { executeStatement } from "../lib/db";
 import { evaluateAndUnlock, getAllDefinitions } from "../lib/achievements";
 import { isValidTimeZone } from "../lib/history";
-import { getCurrentMissions } from "../lib/missions";
+import { getPlayerXp, SET_BONUS_XP } from "../lib/xp";
+import { getCurrentMissions, MissionRefreshError, refreshMission } from "../lib/missions";
 
 function toCamelCase(str: string): string {
   return str.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
@@ -139,7 +140,50 @@ async function getMissions(
   const tzParam = event.queryStringParameters?.tz ?? "UTC";
   const tz = isValidTimeZone(tzParam) ? tzParam : "UTC";
   const missions = await getCurrentMissions(playerId, tz);
-  return response(200, { missions });
+  return response(200, { missions, setBonusXp: SET_BONUS_XP });
+}
+
+/**
+ * GET /profile/xp?player={id}: total XP, overall level and per-type mastery.
+ * Counted from solves and missions on every call (lib/xp.ts).
+ */
+async function getXp(
+  event: APIGatewayProxyEvent
+): Promise<APIGatewayProxyResult> {
+  const playerId = Number(event.queryStringParameters?.player);
+  if (!Number.isInteger(playerId) || playerId <= 0) {
+    return response(400, { error: "player query param required" });
+  }
+  return response(200, await getPlayerXp(playerId));
+}
+
+/**
+ * POST /profile/missions/refresh {player, missionId, tz}: swap one changeable
+ * mission (a type or an assigned puzzle) for another, once per period. Answers
+ * with the current missions.
+ */
+async function postRefreshMission(
+  event: APIGatewayProxyEvent
+): Promise<APIGatewayProxyResult> {
+  let body: { player?: unknown; missionId?: unknown; tz?: unknown };
+  try {
+    body = JSON.parse(event.body ?? "{}");
+  } catch {
+    return response(400, { error: "Invalid JSON body" });
+  }
+  const playerId = Number(body.player);
+  const missionId = Number(body.missionId);
+  if (!Number.isInteger(playerId) || playerId <= 0 || !Number.isInteger(missionId) || missionId <= 0) {
+    return response(400, { error: "player and missionId required" });
+  }
+  const tz = typeof body.tz === "string" && isValidTimeZone(body.tz) ? body.tz : "UTC";
+  try {
+    const missions = await refreshMission(playerId, missionId, tz);
+    return response(200, { missions, setBonusXp: SET_BONUS_XP });
+  } catch (err) {
+    if (err instanceof MissionRefreshError) return response(err.status, { error: err.message });
+    throw err;
+  }
 }
 
 export async function handler(
@@ -147,6 +191,12 @@ export async function handler(
 ): Promise<APIGatewayProxyResult> {
   if (event.httpMethod === "GET" && event.resource === "/profile/missions") {
     return getMissions(event);
+  }
+  if (event.httpMethod === "POST" && event.resource === "/profile/missions/refresh") {
+    return postRefreshMission(event);
+  }
+  if (event.httpMethod === "GET" && event.resource === "/profile/xp") {
+    return getXp(event);
   }
   if (event.httpMethod === "GET") {
     return getProfile(event);

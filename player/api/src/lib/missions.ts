@@ -1,5 +1,6 @@
 import { executeStatement } from "./db";
 import { NONOGRAM, SizeTag, sizeTag } from "./sizeTag";
+import { MISSION_XP } from "./xp";
 
 /**
  * Periodic missions. Each player gets a fixed set per day, week (Monday start)
@@ -12,7 +13,14 @@ import { NONOGRAM, SizeTag, sizeTag } from "./sizeTag";
  * - month: two assigned unsolved GIANT puzzles, one of them a nonogram (a BIG
  *   one when no GIANT nonogram is left).
  * A mission is left out when the player hasn't enough unsolved live puzzles
- * for it, and a count is capped at what's left.
+ * for it, and a count is capped at what's left. Puzzles under editorial
+ * concern (validation_status none / multiple / unknown: no solution, several,
+ * or unverified) are never drawn, nor counted as left.
+ *
+ * Once per period the player may refresh one changeable mission (a type to
+ * solve, or an assigned puzzle) that isn't completed yet: it is redrawn in
+ * place and marked `refreshed` in its params, which uses up the period's
+ * refresh (POST /profile/missions/refresh).
  *
  * Progress is never stored: it is counted from player_attempt.finished_at
  * inside the mission's window, frozen in UTC at generation. completed_at is
@@ -30,6 +38,8 @@ export interface MissionParams {
   /** solve_assigned: the puzzle to solve and its size pill. */
   questionId?: string;
   size?: SizeTag;
+  /** Set on the mission the player refreshed; one per period. */
+  refreshed?: boolean;
 }
 
 export interface MissionDraft {
@@ -191,6 +201,44 @@ export function generateMissions(
   return out.map((m, slot) => ({ slot, ...m }));
 }
 
+/** Kinds the player may refresh: those aimed at a specific type or puzzle. */
+export const REFRESHABLE_KINDS: MissionKind[] = ["solve_type", "solve_assigned"];
+
+/**
+ * Fresh params for a refreshed mission, or null when there's nothing to swap
+ * to. A type mission takes another non-incubating type with an open puzzle,
+ * not one of the period's other type missions nor one already solved in the
+ * window. An assigned puzzle takes another open puzzle of the same size, a
+ * nonogram for a nonogram when one is left, never one already assigned this
+ * period.
+ */
+export function rerollMission(
+  mission: { kind: MissionKind; params: MissionParams },
+  siblings: { kind: MissionKind; params: MissionParams }[],
+  open: OpenPuzzle[],
+  opts: { currentTypeId?: number; solvedTypeIds?: Set<number> } = {},
+  rng: () => number = Math.random
+): MissionParams | null {
+  if (mission.kind === "solve_type") {
+    const taken = new Set(siblings.filter((m) => m.kind === "solve_type").map((m) => m.params.typeId));
+    taken.add(mission.params.typeId);
+    const types = [...new Set(open.filter((p) => !p.incubating).map((p) => p.typeId))]
+      .filter((t) => !taken.has(t) && !opts.solvedTypeIds?.has(t));
+    const [typeId] = sample(rng, types, 1);
+    return typeId === undefined ? null : { typeId, refreshed: true };
+  }
+  if (mission.kind === "solve_assigned") {
+    const taken = new Set(siblings.map((m) => m.params.questionId));
+    taken.add(mission.params.questionId);
+    const pool = open.filter((p) => p.size === mission.params.size && !taken.has(p.id));
+    const wantNonogram = opts.currentTypeId === NONOGRAM;
+    const preferred = pool.filter((p) => (p.typeId === NONOGRAM) === wantNonogram);
+    const [pick] = sample(rng, preferred.length > 0 ? preferred : pool, 1);
+    return pick ? { questionId: pick.id, size: pick.size!, refreshed: true } : null;
+  }
+  return null;
+}
+
 // --- Progress --------------------------------------------------------------
 
 export interface MissionProgress {
@@ -292,12 +340,25 @@ export interface MissionView {
   puzzleProgress: number | null;
   completed: boolean;
   completedAt: string | null; // ISO UTC
+  /** This mission was refreshed (the period's one refresh). */
+  refreshed: boolean;
+  /** The player may refresh this mission now (changeable, open, refresh unused). */
+  refreshable: boolean;
+  /** XP the mission earns (lib/xp.ts). */
+  xp: number;
 }
 
-const longParam = (name: string, v: number) => ({ name, value: { longValue: v } });
-const strParam = (name: string, v: string) => ({ name, value: { stringValue: v } });
+export const longParam = (name: string, v: number) => ({ name, value: { longValue: v } });
+export const strParam = (name: string, v: string) => ({ name, value: { stringValue: v } });
 
-const DATETIME_FMT = "'%Y-%m-%d %H:%i:%s'";
+export const DATETIME_FMT = "'%Y-%m-%d %H:%i:%s'";
+
+/**
+ * Editorial review set (no solution, several, or unverified): never assigned.
+ * Matches the admin "flagged" listing in handlers/puzzles.ts.
+ */
+export const FLAGGED_STATUSES = ["multiple", "none", "unknown"];
+const FLAGGED_SQL = FLAGGED_STATUSES.map((s) => `'${s}'`).join(", ");
 
 async function loadOpenPuzzles(playerId: number): Promise<OpenPuzzle[]> {
   const result = await executeStatement(
@@ -308,6 +369,7 @@ async function loadOpenPuzzles(playerId: number): Promise<OpenPuzzle[]> {
      FROM puzzle_questions pq
      JOIN puzzle_types pt ON pt.id = pq.puzzle_type
      WHERE pq.deleted_at IS NULL
+       AND (pq.validation_status IS NULL OR pq.validation_status NOT IN (${FLAGGED_SQL}))
        AND NOT EXISTS (
          SELECT 1 FROM player_attempt pa
          WHERE pa.question = pq.id AND pa.player = :player AND pa.finished_at IS NOT NULL
@@ -330,6 +392,25 @@ async function loadOpenPuzzles(playerId: number): Promise<OpenPuzzle[]> {
       }),
     };
   });
+}
+
+/** First finish of each question the player solved in [from, to) (SQL UTC datetimes). */
+async function loadWindowSolves(playerId: number, from: string, to: string): Promise<WindowSolve[]> {
+  const result = await executeStatement(
+    `SELECT pa.question, pq.puzzle_type AS type_id, pq.difficulty,
+            DATE_FORMAT(MIN(pa.finished_at), ${DATETIME_FMT}) AS finished_at
+     FROM player_attempt pa
+     JOIN puzzle_questions pq ON pq.id = pa.question
+     WHERE pa.player = :player AND pa.finished_at >= :from AND pa.finished_at < :to
+     GROUP BY pa.question, pq.puzzle_type, pq.difficulty`,
+    [longParam("player", playerId), strParam("from", from), strParam("to", to)]
+  );
+  return result.records.map((r) => ({
+    question: r.question as string,
+    typeId: r.type_id as number,
+    difficulty: r.difficulty as number,
+    finishedAt: r.finished_at as string,
+  }));
 }
 
 async function selectMissions(playerId: number, windows: PeriodWindow[]) {
@@ -407,16 +488,8 @@ export async function getCurrentMissions(
   const ends = rows.map((r) => r.windowEnd).sort();
   const to = ends[ends.length - 1];
   const assignedIds = [...new Set(rows.map((r) => r.params.questionId).filter((id): id is string => !!id))];
-  const [solvesResult, typesResult, assignedResult, snapshotResult] = await Promise.all([
-    executeStatement(
-      `SELECT pa.question, pq.puzzle_type AS type_id, pq.difficulty,
-              DATE_FORMAT(MIN(pa.finished_at), ${DATETIME_FMT}) AS finished_at
-       FROM player_attempt pa
-       JOIN puzzle_questions pq ON pq.id = pa.question
-       WHERE pa.player = :player AND pa.finished_at >= :from AND pa.finished_at < :to
-       GROUP BY pa.question, pq.puzzle_type, pq.difficulty`,
-      [longParam("player", playerId), strParam("from", from), strParam("to", to)]
-    ),
+  const [allSolves, typesResult, assignedResult, snapshotResult] = await Promise.all([
+    loadWindowSolves(playerId, from, to),
     executeStatement(`SELECT id, jp_label FROM puzzle_types`),
     assignedIds.length === 0
       ? Promise.resolve({ records: [] as Record<string, unknown>[] })
@@ -439,12 +512,6 @@ export async function getCurrentMissions(
           [longParam("player", playerId), ...assignedIds.map((id, i) => strParam(`q${i}`, id))]
         ),
   ]);
-  const allSolves: WindowSolve[] = solvesResult.records.map((r) => ({
-    question: r.question as string,
-    typeId: r.type_id as number,
-    difficulty: r.difficulty as number,
-    finishedAt: r.finished_at as string,
-  }));
   const typeLabels = new Map(typesResult.records.map((r) => [r.id as number, r.jp_label as string]));
   const assigned = new Map(
     assignedResult.records.map((r) => [
@@ -457,6 +524,7 @@ export async function getCurrentMissions(
     snapshotResult.records.map((r) => [r.question as string, Number(r.progress) || 0])
   );
 
+  const refreshUsed = new Set(rows.filter((r) => r.params.refreshed).map((r) => r.period));
   const views: MissionView[] = [];
   for (const r of rows) {
     const solves = allSolves.filter((s) => s.finishedAt >= r.windowStart && s.finishedAt < r.windowEnd);
@@ -488,8 +556,66 @@ export async function getCurrentMissions(
       puzzleProgress: assignedPuzzleProgress(r.kind, r.params.questionId, completedAt !== null, latestProgress),
       completed: completedAt !== null,
       completedAt: completedAt ? sqlDateTimeToIso(completedAt) : null,
+      refreshed: r.params.refreshed === true,
+      refreshable: REFRESHABLE_KINDS.includes(r.kind) && completedAt === null && !refreshUsed.has(r.period),
+      xp: MISSION_XP[r.period],
     });
   }
   views.sort((a, b) => PERIODS.indexOf(a.period) - PERIODS.indexOf(b.period) || a.slot - b.slot);
   return views;
+}
+
+
+/** A refresh the player isn't allowed; `status` is the HTTP status to answer with. */
+export class MissionRefreshError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+  }
+}
+
+/**
+ * Refresh one of the player's current missions (see the header): redraw its
+ * type or puzzle in place. Returns the current missions afterwards.
+ */
+export async function refreshMission(
+  playerId: number,
+  missionId: number,
+  tz: string,
+  now: number = Date.now()
+): Promise<MissionView[]> {
+  const windows = PERIODS.map((p) => periodWindow(p, now, tz));
+  const rows = await selectMissions(playerId, windows);
+  const mission = rows.find((r) => r.id === missionId);
+  if (!mission) throw new MissionRefreshError(404, "Not one of your current missions");
+  if (!REFRESHABLE_KINDS.includes(mission.kind)) {
+    throw new MissionRefreshError(400, "This mission can't be refreshed");
+  }
+  const siblings = rows.filter((r) => r.period === mission.period && r.id !== mission.id);
+  if (mission.params.refreshed || siblings.some((r) => r.params.refreshed)) {
+    throw new MissionRefreshError(409, "This period's refresh is already used");
+  }
+  const solves = await loadWindowSolves(playerId, mission.windowStart, mission.windowEnd);
+  if (mission.completedAt || evaluateMission(mission, solves).completedAt) {
+    throw new MissionRefreshError(409, "This mission is already completed");
+  }
+
+  let currentTypeId: number | undefined;
+  if (mission.params.questionId) {
+    const q = await executeStatement(`SELECT puzzle_type FROM puzzle_questions WHERE id = :id`, [
+      strParam("id", mission.params.questionId),
+    ]);
+    currentTypeId = q.records[0]?.puzzle_type as number | undefined;
+  }
+  const params = rerollMission(mission, siblings, await loadOpenPuzzles(playerId), {
+    currentTypeId,
+    solvedTypeIds: new Set(solves.map((s) => s.typeId)),
+  });
+  if (!params) throw new MissionRefreshError(409, "Nothing left to swap this mission for");
+
+  await executeStatement(
+    `UPDATE player_mission SET params = :params
+     WHERE id = :id AND player = :player AND completed_at IS NULL`,
+    [strParam("params", JSON.stringify(params)), longParam("id", mission.id), longParam("player", playerId)]
+  );
+  return getCurrentMissions(playerId, tz, now);
 }

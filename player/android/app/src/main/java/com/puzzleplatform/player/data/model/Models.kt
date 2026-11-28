@@ -415,10 +415,56 @@ data class Mission(
     @Serializable(with = FlexibleBooleanSerializer::class)
     val completed: Boolean = false,
     val completedAt: String? = null,
+    /** This mission was refreshed (the period's one refresh). */
+    @Serializable(with = FlexibleBooleanSerializer::class)
+    val refreshed: Boolean = false,
+    /** Changeable (a type or an assigned puzzle), open, and the period's refresh unused. */
+    @Serializable(with = FlexibleBooleanSerializer::class)
+    val refreshable: Boolean = false,
+    /** XP the mission earns. */
+    val xp: Int = 0,
 )
 
 @Serializable
 data class MissionsResponse(val missions: List<Mission> = emptyList())
+
+/** A puzzle type's mastery (GET /profile/xp): XP from its solves and the level it reached. */
+@Serializable
+data class TypeMastery(
+    val typeId: Int,
+    val label: String,
+    val xp: Int,
+    val solved: Int,
+    val level: Int,
+    val levelStartXp: Int,
+    val nextLevelXp: Int,
+)
+
+/** XP for one mission and for a whole period's set, keyed "day" / "week" / "month". */
+@Serializable
+data class XpRewards(
+    val mission: Map<String, Int> = emptyMap(),
+    val setBonus: Map<String, Int> = emptyMap(),
+)
+
+/** GET /profile/xp: total XP and overall level; levelStartXp / nextLevelXp bound the current level. */
+@Serializable
+data class PlayerXp(
+    val total: Int,
+    val level: Int,
+    val levelStartXp: Int,
+    val nextLevelXp: Int,
+    val fromSolves: Int = 0,
+    val fromMissions: Int = 0,
+    val fromSetBonuses: Int = 0,
+    /** Types with at least one solve, most XP first. */
+    val mastery: List<TypeMastery> = emptyList(),
+    val rewards: XpRewards = XpRewards(),
+)
+
+/** POST /profile/missions/refresh: swap one mission for another, once per period. */
+@Serializable
+data class RefreshMissionRequest(val player: Int, val missionId: Int, val tz: String)
 
 @Serializable
 data class ProfilePlayer(val id: Int, val name: String)
