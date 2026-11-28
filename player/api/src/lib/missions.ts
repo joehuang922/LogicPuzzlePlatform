@@ -1,5 +1,6 @@
 import { executeStatement } from "./db";
 import { NONOGRAM, SizeTag, sizeTag } from "./sizeTag";
+import { MISSION_XP } from "./xp";
 
 /**
  * Periodic missions. Each player gets a fixed set per day, week (Monday start)
@@ -343,12 +344,14 @@ export interface MissionView {
   refreshed: boolean;
   /** The player may refresh this mission now (changeable, open, refresh unused). */
   refreshable: boolean;
+  /** XP the mission earns (lib/xp.ts). */
+  xp: number;
 }
 
-const longParam = (name: string, v: number) => ({ name, value: { longValue: v } });
-const strParam = (name: string, v: string) => ({ name, value: { stringValue: v } });
+export const longParam = (name: string, v: number) => ({ name, value: { longValue: v } });
+export const strParam = (name: string, v: string) => ({ name, value: { stringValue: v } });
 
-const DATETIME_FMT = "'%Y-%m-%d %H:%i:%s'";
+export const DATETIME_FMT = "'%Y-%m-%d %H:%i:%s'";
 
 /**
  * Editorial review set (no solution, several, or unverified): never assigned.
@@ -555,6 +558,7 @@ export async function getCurrentMissions(
       completedAt: completedAt ? sqlDateTimeToIso(completedAt) : null,
       refreshed: r.params.refreshed === true,
       refreshable: REFRESHABLE_KINDS.includes(r.kind) && completedAt === null && !refreshUsed.has(r.period),
+      xp: MISSION_XP[r.period],
     });
   }
   views.sort((a, b) => PERIODS.indexOf(a.period) - PERIODS.indexOf(b.period) || a.slot - b.slot);

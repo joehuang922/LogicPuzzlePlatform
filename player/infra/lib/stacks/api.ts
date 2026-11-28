@@ -183,6 +183,8 @@ export class ApiStack extends cdk.Stack {
     missions.addMethod("GET", profileIntegration);
     // Swap one changeable mission for another, once per period.
     missions.addResource("refresh").addMethod("POST", profileIntegration);
+    // XP, level and per-type mastery, counted from solves and missions.
+    profile.addResource("xp").addMethod("GET", profileIntegration);
 
     // Per-day activity by puzzle type over a date range (heat map, missions).
     const historyHandler = new lambda.Function(this, "HistoryHandler", {

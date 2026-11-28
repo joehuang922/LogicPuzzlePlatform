@@ -2,6 +2,7 @@ package com.puzzleplatform.player.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -45,6 +46,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.puzzleplatform.player.data.model.Mission
+import com.puzzleplatform.player.data.model.PlayerXp
+import com.puzzleplatform.player.data.model.TypeMastery
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -98,6 +101,18 @@ fun ProfileScreen(
             else -> Column(Modifier.fillMaxSize().padding(padding)) {
                 val unlocked = state.achievements.count { it.unlocked }
                 val tabs = listOf("Missions", "Player", "Achievements ($unlocked / ${state.achievements.size})")
+                Box(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                    val xp = state.xp
+                    when {
+                        xp != null -> LevelCard(xp)
+                        state.xpError != null -> Text(
+                            "Couldn't load XP: ${state.xpError}",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        else -> Text("Loading level…", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
                 PrimaryTabRow(selectedTabIndex = state.tab.ordinal) {
                     ProfileTab.entries.forEachIndexed { i, t ->
                         Tab(
@@ -141,7 +156,9 @@ fun ProfileScreen(
                                 for (period in listOf("day", "week", "month")) {
                                     val group = missions.filter { it.period == period }
                                     if (group.isEmpty()) continue
-                                    item(key = "mh-$period") { MissionPeriodHeader(period, group) }
+                                    item(key = "mh-$period") {
+                                        MissionPeriodHeader(period, group, state.xp?.rewards?.setBonus?.get(period))
+                                    }
                                     items(group, key = { "m-${it.id}" }) { m ->
                                         MissionCard(
                                             m,
@@ -156,6 +173,11 @@ fun ProfileScreen(
                     }
                     if (state.tab == ProfileTab.PLAYER) {
                         item { SyncStatusRow(state.syncState) }
+                        val mastery = state.xp?.mastery.orEmpty()
+                        if (mastery.isNotEmpty()) {
+                            item { Header("Mastery") }
+                            items(mastery, key = { "mastery-${it.typeId}" }) { MasteryRow(it) }
+                        }
                         item {
                             val solved = state.questionStats.sumOf { it.solved }
                             val tried = state.questionStats.sumOf { it.tried }
@@ -285,18 +307,93 @@ private fun formatRelativeTime(epochMillis: Long): String {
 private val PERIOD_LABELS = mapOf("day" to "Today", "week" to "This week", "month" to "This month")
 
 @Composable
-private fun MissionPeriodHeader(period: String, group: List<Mission>) {
+private fun MissionPeriodHeader(period: String, group: List<Mission>, setBonusXp: Int?) {
     val done = group.count { it.completed }
-    Row(
-        Modifier.fillMaxWidth().padding(top = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(PERIOD_LABELS[period] ?: period, fontWeight = FontWeight.SemiBold)
-        Text(
-            "$done / ${group.size} done · ${missionTimeLeft(group.first().endsAt)}",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+    Column(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(PERIOD_LABELS[period] ?: period, fontWeight = FontWeight.SemiBold)
+            Text(
+                "$done / ${group.size} done · ${missionTimeLeft(group.first().endsAt)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (setBonusXp != null) {
+            val allDone = done == group.size
+            Text(
+                (if (allDone) "✓ " else "") + "All done: +$setBonusXp XP",
+                style = MaterialTheme.typography.labelSmall,
+                color = if (allDone) MaterialTheme.colorScheme.primary else XP_COLOR,
+            )
+        }
+    }
+}
+
+private val XP_COLOR = Color(0xFF7E57C2)
+
+/** Fraction of the way from a level's start to the next level. */
+private fun levelFraction(xp: Int, start: Int, next: Int): Float =
+    if (next > start) ((xp - start).toFloat() / (next - start)).coerceIn(0f, 1f) else 0f
+
+@Composable
+private fun LevelCard(xp: PlayerXp) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "Lv ${xp.level}",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = XP_COLOR,
+                )
+                LinearProgressIndicator(
+                    progress = { levelFraction(xp.total, xp.levelStartXp, xp.nextLevelXp) },
+                    modifier = Modifier.weight(1f),
+                    color = XP_COLOR,
+                )
+            }
+            Text(
+                "${xp.total - xp.levelStartXp} / ${xp.nextLevelXp - xp.levelStartXp} XP to level ${xp.level + 1}" +
+                    " · ${xp.total} XP total",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                "Solves ${xp.fromSolves} · missions ${xp.fromMissions} · set bonuses ${xp.fromSetBonuses}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun MasteryRow(m: TypeMastery) {
+    Column(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(m.label, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Text(
+                "${m.xp} XP · ${m.solved} solved",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text("Lv ${m.level}", fontWeight = FontWeight.Bold, color = XP_COLOR)
+        }
+        LinearProgressIndicator(
+            progress = { levelFraction(m.xp, m.levelStartXp, m.nextLevelXp) },
+            modifier = Modifier.fillMaxWidth(),
+            color = XP_COLOR,
         )
     }
 }
@@ -329,7 +426,12 @@ private fun MissionCard(
                     )
                 }
                 Text(m.description, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                if (m.completed) Text("✓", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                Text(
+                    (if (m.completed) "✓ " else "") + "+${m.xp} XP",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = if (m.completed) MaterialTheme.colorScheme.primary else XP_COLOR,
+                )
                 if (m.refreshable) {
                     if (refreshing) {
                         CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)

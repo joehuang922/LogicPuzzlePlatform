@@ -2,6 +2,7 @@ import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { executeStatement } from "../lib/db";
 import { evaluateAndUnlock, getAllDefinitions } from "../lib/achievements";
 import { isValidTimeZone } from "../lib/history";
+import { getPlayerXp, SET_BONUS_XP } from "../lib/xp";
 import { getCurrentMissions, MissionRefreshError, refreshMission } from "../lib/missions";
 
 function toCamelCase(str: string): string {
@@ -139,7 +140,21 @@ async function getMissions(
   const tzParam = event.queryStringParameters?.tz ?? "UTC";
   const tz = isValidTimeZone(tzParam) ? tzParam : "UTC";
   const missions = await getCurrentMissions(playerId, tz);
-  return response(200, { missions });
+  return response(200, { missions, setBonusXp: SET_BONUS_XP });
+}
+
+/**
+ * GET /profile/xp?player={id}: total XP, overall level and per-type mastery.
+ * Counted from solves and missions on every call (lib/xp.ts).
+ */
+async function getXp(
+  event: APIGatewayProxyEvent
+): Promise<APIGatewayProxyResult> {
+  const playerId = Number(event.queryStringParameters?.player);
+  if (!Number.isInteger(playerId) || playerId <= 0) {
+    return response(400, { error: "player query param required" });
+  }
+  return response(200, await getPlayerXp(playerId));
 }
 
 /**
@@ -164,7 +179,7 @@ async function postRefreshMission(
   const tz = typeof body.tz === "string" && isValidTimeZone(body.tz) ? body.tz : "UTC";
   try {
     const missions = await refreshMission(playerId, missionId, tz);
-    return response(200, { missions });
+    return response(200, { missions, setBonusXp: SET_BONUS_XP });
   } catch (err) {
     if (err instanceof MissionRefreshError) return response(err.status, { error: err.message });
     throw err;
@@ -179,6 +194,9 @@ export async function handler(
   }
   if (event.httpMethod === "POST" && event.resource === "/profile/missions/refresh") {
     return postRefreshMission(event);
+  }
+  if (event.httpMethod === "GET" && event.resource === "/profile/xp") {
+    return getXp(event);
   }
   if (event.httpMethod === "GET") {
     return getProfile(event);

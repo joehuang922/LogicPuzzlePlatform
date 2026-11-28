@@ -17,6 +17,7 @@ import com.puzzleplatform.player.data.model.defaultCollection
 import com.puzzleplatform.player.data.model.HistoryResponse
 import com.puzzleplatform.player.data.model.Mission
 import com.puzzleplatform.player.data.model.MissionsResponse
+import com.puzzleplatform.player.data.model.PlayerXp
 import com.puzzleplatform.player.data.model.RefreshMissionRequest
 import com.puzzleplatform.player.data.model.ProfileResponse
 import com.puzzleplatform.player.data.model.Puzzle
@@ -315,6 +316,9 @@ class PuzzleRepository(
 
     suspend fun getHistory(from: String, to: String, tz: String): HistoryResponse =
         api.getHistory(PLAYER_ID, from, to, tz)
+
+    /** Total XP, overall level and per-type mastery (online only; counted by the server). */
+    suspend fun getXp(): PlayerXp = api.getXp(PLAYER_ID)
 
     private val missionCache by lazy { context.getSharedPreferences("missions", Context.MODE_PRIVATE) }
 
